@@ -53,7 +53,7 @@ config IOSCHED_BFQ
 	  It aims at distributing the bandwidth as desired, independently of
 	  the disk parameters and with any workload. It also tries to
 	  guarantee low latency to interactive and soft real-time
-	  applications. If compiled built-in (saying Y here), BFQ can
+	  applications.  If compiled built-in (saying Y here), BFQ can
 	  be configured to support hierarchical scheduling.
 
 config CGROUP_BFQIO
