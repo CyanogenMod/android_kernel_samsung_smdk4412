@@ -125,6 +125,7 @@ enum {
 	ADC_DOCK_VOL_DN		= 0x0a, /* 0x01010 14.46K ohm */
 	ADC_DOCK_VOL_UP		= 0x0b, /* 0x01011 17.26K ohm */
 	ADC_DOCK_PLAY_PAUSE_KEY = 0x0d,
+	ADC_ACA_OTG		= 0x0f, /* 36K ohm */
 	ADC_CEA936ATYPE1_CHG	= 0x17,	/* 0x10111 200K ohm */
 	ADC_JIG_USB_OFF		= 0x18, /* 0x11000 255K ohm */
 	ADC_JIG_USB_ON		= 0x19, /* 0x11001 301K ohm */
@@ -233,7 +234,10 @@ static ssize_t max8997_muic_show_device(struct device *dev,
 	case MUIC_ACC_TYPE_USB:
 		return sprintf(buf, "USB\n");
 	case MUIC_ACC_TYPE_OTG:
-		return sprintf(buf, "OTG\n");
+		if (info->chg_type == MUIC_CHG_TYPE_OTG_VB)
+			return sprintf(buf, "OTG charging\n");
+		else
+			return sprintf(buf, "OTG\n");
 	case MUIC_ACC_TYPE_TA:
 		return sprintf(buf, "TA\n");
 	case MUIC_ACC_TYPE_DESKDOCK:
@@ -924,6 +928,9 @@ static enum cable_type chg_type_convertor(enum muic_chg_type chg_type)
 	case MUIC_CHG_TYPE_MHL_VB:
 		charger_type = CABLE_TYPE_MHL_VB;
 		break;
+	case MUIC_CHG_TYPE_OTG_VB:
+		charger_type = CABLE_TYPE_OTG_VB;
+		break;
 	case MUIC_CHG_TYPE_NONE:
 	case MUIC_CHG_TYPE_UNKNOWN:
 	default:
@@ -1060,7 +1067,7 @@ static int attach_usb(struct max8997_muic_info *info)
 		return ret;
 
 	if (mdata->usb_cb && info->is_usb_ready)
-		mdata->usb_cb(USB_CABLE_ATTACHED);
+		mdata->usb_cb(USB_CABLE_ATTACHED, 0);
 
 	return ret;
 }
@@ -1088,7 +1095,7 @@ static int detach_usb(struct max8997_muic_info *info)
 		return ret;
 
 	if (mdata->usb_cb && info->is_usb_ready)
-		mdata->usb_cb(USB_CABLE_DETACHED);
+		mdata->usb_cb(USB_CABLE_DETACHED, 0);
 
 	return ret;
 }
@@ -1174,7 +1181,7 @@ static int attach_otg(struct max8997_muic_info *info, u8 chgtyp)
 		info->acc_type = MUIC_ACC_TYPE_OTG;
 		ret = switch_to_ap_usb(info);
 		if (mdata->usb_cb && info->is_usb_ready)
-			mdata->usb_cb(USB_OTGHOST_ATTACHED);
+			mdata->usb_cb(USB_OTGHOST_ATTACHED, 0);
 		break;
 	case CHGTYP_USB:
 	case CHGTYP_DOWNSTREAM_PORT:
@@ -1199,8 +1206,52 @@ static int detach_otg(struct max8997_muic_info *info)
 	dev_info(info->dev, "%s\n", __func__);
 	info->acc_type = MUIC_ACC_TYPE_NONE;
 
-	if (mdata->usb_cb && info->is_usb_ready)
-		mdata->usb_cb(USB_OTGHOST_DETACHED);
+	if (mdata->usb_cb && info->is_usb_ready) {
+		if (info->chg_type == MUIC_CHG_TYPE_OTG_VB)
+			mdata->usb_cb(USB_OTGHOST_DETACHED, 1);
+		else
+			mdata->usb_cb(USB_OTGHOST_DETACHED, 0);
+	}
+
+	if (info->chg_type == MUIC_CHG_TYPE_OTG_VB)
+		ret = attach_charger(info, MUIC_CHG_TYPE_NONE);
+
+	return ret;
+}
+
+static int attach_aca_otg(struct max8997_muic_info *info, u8 vbvolt)
+{
+	struct max8997_muic_data *mdata = info->muic_data;
+	int ret = 0;
+
+	if (vbvolt & STATUS2_VBVOLT_MASK) {
+		if (info->acc_type == MUIC_ACC_TYPE_OTG && info->chg_type == MUIC_CHG_TYPE_OTG_VB) {
+			dev_info(info->dev, "%s: duplicated(OTG/VB)\n", __func__);
+			return ret;
+		}
+
+		dev_info(info->dev, "%s: OTG ACA detected\n", __func__);
+
+		info->acc_type = MUIC_ACC_TYPE_OTG;
+
+		ret = switch_to_ap_usb(info);
+		if (mdata->usb_cb && info->is_usb_ready)
+			mdata->usb_cb(USB_OTGHOST_ATTACHED, 1);
+
+		ret = attach_charger(info, MUIC_CHG_TYPE_OTG_VB);
+	} else {
+		dev_info(info->dev, "%s: unpowered OTG ACA detected\n", __func__);
+
+		if (info->acc_type == MUIC_ACC_TYPE_OTG && info->chg_type == MUIC_CHG_TYPE_OTG_VB) {
+			dev_info(info->dev, "%s: OTG ACA power loss\n", __func__);
+
+			if (mdata->usb_cb && info->is_usb_ready)
+				mdata->usb_cb(USB_OTGHOST_DETACHED, 1);
+		}
+
+		info->acc_type = MUIC_ACC_TYPE_NONE;
+		ret = attach_charger(info, MUIC_CHG_TYPE_NONE);
+	}
 
 	return ret;
 }
@@ -1624,6 +1675,9 @@ static int handle_attach(struct max8997_muic_info *info,
 #endif /* CONFIG_MACH_U1 || CONFIG_MACH_TRATS */
 		ret = attach_otg(info, chgtyp);
 		break;
+	case ADC_ACA_OTG:
+		ret = attach_aca_otg(info, vbvolt);
+		break;
 	case ADC_MHL:
 #if defined(CONFIG_MACH_U1) || defined(CONFIG_MACH_TRATS)
 		/* This is for support old MUIC */
@@ -1824,7 +1878,7 @@ static int detect_dev(struct max8997_muic_info *info, int irq)
 #endif /* CONFIG_MACH_U1 || CONFIG_MACH_TRATS */
 	case (ADC_MHL + 1):
 	case (ADC_DOCK_VOL_DN - 1):
-	case (ADC_DOCK_PLAY_PAUSE_KEY + 2) ... (ADC_CEA936ATYPE1_CHG - 1):
+	case (ADC_ACA_OTG + 1) ... (ADC_CEA936ATYPE1_CHG - 1):
 	case (ADC_CARDOCK + 1):
 		dev_warn(info->dev, "%s: unsupported ADC(0x%02x)\n",
 				__func__, adc);
@@ -1987,12 +2041,16 @@ static void max8997_muic_usb_detect(struct work_struct *work)
 			case MUIC_ACC_TYPE_JIG_USB_ON:
 				dev_info(info->dev, "%s: usb attach\n",
 						__func__);
-				mdata->usb_cb(USB_CABLE_ATTACHED);
+				mdata->usb_cb(USB_CABLE_ATTACHED, 0);
 				break;
 			case MUIC_ACC_TYPE_OTG:
-				dev_info(info->dev, "%s: otg attach\n",
-						__func__);
-				mdata->usb_cb(USB_OTGHOST_ATTACHED);
+				if (info->chg_type == MUIC_CHG_TYPE_OTG_VB) {
+					dev_info(info->dev, "%s: charging otg attach\n", __func__);
+					mdata->usb_cb(USB_OTGHOST_ATTACHED, 1);
+				} else {
+					dev_info(info->dev, "%s: otg attach\n", __func__);
+					mdata->usb_cb(USB_OTGHOST_ATTACHED, 0);
+				}
 				break;
 			default:
 				break;
