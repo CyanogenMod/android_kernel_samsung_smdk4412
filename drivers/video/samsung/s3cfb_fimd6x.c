@@ -405,14 +405,15 @@ int s3cfb_set_vsync_interrupt(struct s3cfb_global *ctrl, int enable)
 	u32 cfg = 0;
 
 	cfg = readl(ctrl->regs + S3C_VIDINTCON0);
-	cfg &= ~S3C_VIDINTCON0_FRAMESEL0_MASK;
 
 	if (enable) {
 		dev_dbg(ctrl->dev, "vsync interrupt is on\n");
-		cfg |= S3C_VIDINTCON0_FRAMESEL0_VSYNC;
+		cfg &= ~S3C_VIDINTCON0_FRAMESEL0_MASK;
+		cfg |= S3C_VIDINTCON0_INTFRMEN_ENABLE |
+		       S3C_VIDINTCON0_FRAMESEL0_VSYNC;
 	} else {
 		dev_dbg(ctrl->dev, "vsync interrupt is off\n");
-		cfg &= ~S3C_VIDINTCON0_FRAMESEL0_VSYNC;
+		cfg &= ~S3C_VIDINTCON0_INTFRMEN_ENABLE;
 	}
 
 	writel(cfg, ctrl->regs + S3C_VIDINTCON0);
@@ -425,9 +426,9 @@ int s3cfb_get_vsync_interrupt(struct s3cfb_global *ctrl)
 	u32 cfg = 0;
 
 	cfg = readl(ctrl->regs + S3C_VIDINTCON0);
-	cfg &= S3C_VIDINTCON0_FRAMESEL0_VSYNC;
+	cfg &= S3C_VIDINTCON0_INTFRMEN_ENABLE;
 
-	if (cfg & S3C_VIDINTCON0_FRAMESEL0_VSYNC) {
+	if (cfg & S3C_VIDINTCON0_INTFRMEN_ENABLE) {
 		dev_dbg(ctrl->dev, "vsync interrupt is on\n");
 		return 1;
 	} else {
