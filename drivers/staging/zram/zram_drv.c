@@ -279,12 +279,9 @@ static int zram_bvec_write(struct zram *zram, struct bio_vec *bvec, u32 index)
 	    zram_test_flag(zram, index, ZRAM_ZERO))
 		zram_free_page(zram, index);
 
-	mutex_lock(&zram->lock);
-
 	user_mem = kmap_atomic(page, KM_USER0);
 	if (page_zero_filled(user_mem)) {
 		kunmap_atomic(user_mem, KM_USER0);
-		mutex_unlock(&zram->lock);
 		zram_stat_inc(&zram->stats.pages_zero);
 		zram_set_flag(zram, index, ZRAM_ZERO);
 		return 0;
@@ -296,7 +293,6 @@ static int zram_bvec_write(struct zram *zram, struct bio_vec *bvec, u32 index)
 	kunmap_atomic(user_mem, KM_USER0);
 
 	if (unlikely(ret != LZO_E_OK)) {
-		mutex_unlock(&zram->lock);
 		pr_err("Compression failed! err=%d\n", ret);
 		zram_stat64_inc(zram, &zram->stats.failed_writes);
 		return ret;
@@ -311,7 +307,6 @@ static int zram_bvec_write(struct zram *zram, struct bio_vec *bvec, u32 index)
 		clen = PAGE_SIZE;
 		page_store = alloc_page(GFP_NOIO | __GFP_HIGHMEM);
 		if (unlikely(!page_store)) {
-			mutex_unlock(&zram->lock);
 			pr_info("Error allocating memory for "
 				"incompressible page: %u\n", index);
 			zram_stat64_inc(zram, &zram->stats.failed_writes);
@@ -329,7 +324,6 @@ static int zram_bvec_write(struct zram *zram, struct bio_vec *bvec, u32 index)
 	if (xv_malloc(zram->mem_pool, clen + sizeof(*zheader),
 		      &zram->table[index].page, &offset,
 		      GFP_NOIO | __GFP_HIGHMEM)) {
-		mutex_unlock(&zram->lock);
 		pr_info("Error allocating memory for compressed "
 			"page: %u, size=%zu\n", index, clen);
 		zram_stat64_inc(zram, &zram->stats.failed_writes);
@@ -363,18 +357,25 @@ memstore:
 	if (clen <= PAGE_SIZE / 2)
 		zram_stat_inc(&zram->stats.good_compress);
 
-	mutex_unlock(&zram->lock);
-
 	return 0;
 }
 
 static int zram_bvec_rw(struct zram *zram, struct bio_vec *bvec, u32 index,
 			struct bio *bio, int rw)
 {
-	if (rw == READ)
-		return zram_bvec_read(zram, bvec, index, bio);
+	int ret;
 
-	return zram_bvec_write(zram, bvec, index);
+	if (rw == READ) {
+		down_read(&zram->lock);
+		ret = zram_bvec_read(zram, bvec, index, bio);
+		up_read(&zram->lock);
+	} else {
+		down_write(&zram->lock);
+		ret = zram_bvec_write(zram, bvec, index);
+		up_write(&zram->lock);
+	}
+
+	return ret;
 }
 
 static void __zram_make_request(struct zram *zram, struct bio *bio, int rw)
@@ -574,7 +575,7 @@ static int create_device(struct zram *zram, int device_id)
 {
 	int ret = 0;
 
-	mutex_init(&zram->lock);
+	init_rwsem(&zram->lock);
 	mutex_init(&zram->init_lock);
 	spin_lock_init(&zram->stat64_lock);
 
