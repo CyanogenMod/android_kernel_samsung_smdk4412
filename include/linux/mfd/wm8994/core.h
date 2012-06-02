@@ -20,6 +20,7 @@
 enum wm8994_type {
 	WM8994 = 0,
 	WM8958 = 1,
+	WM1811 = 2,
 };
 
 struct regulator_dev;
@@ -55,6 +56,9 @@ struct wm8994 {
 
 	enum wm8994_type type;
 
+	int revision;
+	int cust_id;
+
 	struct device *dev;
 	int (*read_dev)(struct wm8994 *wm8994, unsigned short reg,
 			int bytes, void *dest);
@@ -62,6 +66,8 @@ struct wm8994 {
 			 int bytes, const void *src);
 
 	void *control_data;
+
+	bool ldo_ena_always_driven;
 
 	int gpio_base;
 	int irq_base;
@@ -97,6 +103,8 @@ static inline int wm8994_request_irq(struct wm8994 *wm8994, int irq,
 				     irq_handler_t handler, const char *name,
 				     void *data)
 {
+	if (!wm8994)
+		return -EINVAL;
 	if (!wm8994->irq_base)
 		return -EINVAL;
 	return request_threaded_irq(wm8994->irq_base + irq, NULL, handler,

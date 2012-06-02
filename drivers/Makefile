@@ -64,7 +64,7 @@ obj-$(CONFIG_SBUS)		+= sbus/
 obj-$(CONFIG_ZORRO)		+= zorro/
 obj-$(CONFIG_MAC)		+= macintosh/
 obj-$(CONFIG_ATA_OVER_ETH)	+= block/aoe/
-obj-$(CONFIG_PARIDE) 		+= block/paride/
+obj-$(CONFIG_PARIDE)		+= block/paride/
 obj-$(CONFIG_TC)		+= tc/
 obj-$(CONFIG_UWB)		+= uwb/
 obj-$(CONFIG_USB_OTG_UTILS)	+= usb/
@@ -80,6 +80,7 @@ obj-y				+= i2c/ media/
 obj-$(CONFIG_PPS)		+= pps/
 obj-$(CONFIG_PTP_1588_CLOCK)	+= ptp/
 obj-$(CONFIG_W1)		+= w1/
+obj-$(CONFIG_POWER_SUPPLY)	+= battery/
 obj-$(CONFIG_POWER_SUPPLY)	+= power/
 obj-$(CONFIG_HWMON)		+= hwmon/
 obj-$(CONFIG_THERMAL)		+= thermal/
@@ -98,6 +99,7 @@ obj-$(CONFIG_CPU_IDLE)		+= cpuidle/
 obj-$(CONFIG_MMC)		+= mmc/
 obj-$(CONFIG_MEMSTICK)		+= memstick/
 obj-y				+= leds/
+obj-$(CONFIG_SWITCH)		+= switch/
 obj-$(CONFIG_INFINIBAND)	+= infiniband/
 obj-$(CONFIG_SGI_SN)		+= sn/
 obj-y				+= firmware/
@@ -120,5 +122,22 @@ obj-y				+= platform/
 obj-y				+= ieee802154/
 #common clk code
 obj-y				+= clk/
-
 obj-$(CONFIG_HWSPINLOCK)	+= hwspinlock/
+obj-$(CONFIG_VIBETONZ)		+= motor/
+
+obj-$(CONFIG_SENSORS_CORE)	+= sensor/
+obj-$(CONFIG_SAMSUNG_MODULES)   += samsung/
+obj-$(CONFIG_PM_DEVFREQ)	+= devfreq/
+obj-$(CONFIG_SAMSUNG_PHONE_SVNET) += svnet/
+obj-$(CONFIG_PHONE_IPC_SPI) += phone_svn/
+obj-$(CONFIG_ACCESSORY)		+= accessory/
+obj-$(CONFIG_IR_REMOCON)		+= irda/
+obj-$(CONFIG_EXTCON)		+= extcon/
+# Secure OS Mobicore
+obj-$(CONFIG_MOBICORE_SUPPORT)	+= gud/
+
+obj-$(CONFIG_IOMMU_SUPPORT)	+= iommu/
+
+ifeq (1, $(shell if [ -d ./drivers/exfat ]; then echo 1; fi))
+obj-y	+= exfat/
+endif

@@ -1272,6 +1272,79 @@ static unsigned long minimum_image_size(unsigned long saveable)
 	return saveable <= size ? 0 : saveable - size;
 }
 
+#ifdef CONFIG_FULL_PAGE_RECLAIM
+static int is_exist_entry(pgd_t *pgd, int i)
+{
+	pmd_t *pmd;
+
+	pgd = pgd+i;
+
+	if (pgd_none(*pgd))
+		return 0;
+
+	if (pgd_bad(*pgd))
+		return 0;
+
+	pmd = pmd_offset(pgd, 0);
+
+	if (pmd_none(*pmd))
+		return 0;
+
+	if (pmd_bad(*pmd))
+		return 0;
+
+	return 1;
+}
+
+static int show_process_pte_size(void)
+{
+	struct task_struct *p;
+	int i;
+	int count;
+	int tot_count = 0;
+	int kernel_did = 0;
+	int k_count = 0;
+	int task_struct_size = 0;
+
+	read_lock(&tasklist_lock);
+	for_each_process(p) {
+		count = 0;
+		task_struct_size += sizeof(struct task_struct);
+		if (p->comm[0] == '[') {
+			printk(KERN_DEBUG "%s skip\n", p->comm);
+			continue;
+		}
+		if (p->mm == NULL) {
+			printk(KERN_DEBUG "%s skip\n", p->comm);
+			continue;
+		}
+		if (p->mm->pgd == NULL)
+			continue;
+
+		for (i = 0; i < 1536; i++) {
+			if (is_exist_entry(p->mm->pgd, i))
+				count++;
+		}
+		if (!kernel_did) {
+			for (i = 1536; i < 2048; i++) {
+				if (is_exist_entry(p->mm->pgd, i))
+					k_count++;
+			}
+			kernel_did = 1;
+		}
+		printk(KERN_INFO "%s : pgd entry count = %d, size = %d K\n",
+					p->comm, count, (16 + count * 4));
+		tot_count = tot_count + (16 + count * 4);
+	}
+	printk(KERN_INFO "PAGE TABLE ==> total size = %d K , kernel = %d K\n",
+			tot_count, k_count * 4);
+	printk(KERN_INFO "task_struct_size = %d K\n", task_struct_size / 1024);
+	read_unlock(&tasklist_lock);
+
+	return 0;
+}
+#endif /* CONFIG_FULL_PAGE_RECLAIM */
+
 /**
  * hibernate_preallocate_memory - Preallocate memory for hibernation image
  *
@@ -1304,6 +1377,16 @@ int hibernate_preallocate_memory(void)
 
 	printk(KERN_INFO "PM: Preallocating image memory... ");
 	do_gettimeofday(&start);
+
+#ifdef CONFIG_FULL_PAGE_RECLAIM
+	/* First of all, throw out unnecessary page frames for saving */
+	do {
+		pages = shrink_all_memory(ULONG_MAX);
+		printk(KERN_INFO "\bdone (%lu pages freed)\n", pages);
+	/* shrink all pages */
+	} while (pages);
+	show_process_pte_size();
+#endif
 
 	error = memory_bm_create(&orig_bm, GFP_IMAGE, PG_ANY);
 	if (error)

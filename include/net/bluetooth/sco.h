@@ -22,6 +22,9 @@
    SOFTWARE IS DISCLAIMED.
 */
 
+#ifdef CONFIG_BT_MGMT
+#include "sco_mgmt.h"
+#else
 #ifndef __SCO_H
 #define __SCO_H
 
@@ -37,6 +40,7 @@
 struct sockaddr_sco {
 	sa_family_t	sco_family;
 	bdaddr_t	sco_bdaddr;
+	__u16		sco_pkt_type;
 };
 
 /* SCO socket options */
@@ -72,8 +76,10 @@ struct sco_conn {
 
 struct sco_pinfo {
 	struct bt_sock	bt;
-	__u32		flags;
+	__u16		pkt_type;
+
 	struct sco_conn	*conn;
 };
 
 #endif /* __SCO_H */
+#endif /* CONFIG_BT_MGMT */

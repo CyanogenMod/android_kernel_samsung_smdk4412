@@ -178,6 +178,15 @@ repeat:
 		if (!new_transaction)
 			goto alloc_transaction;
 		write_lock(&journal->j_state_lock);
+
+		/* add to bug fix code, j.gap.lee@samsung.com, 2012.04.23 */
+		/* barrier check */
+		if (journal->j_barrier_count) {
+			write_unlock(&journal->j_state_lock);
+			goto repeat;
+		}
+		/* end */
+
 		if (!journal->j_running_transaction) {
 			jbd2_get_transaction(journal, new_transaction);
 			new_transaction = NULL;

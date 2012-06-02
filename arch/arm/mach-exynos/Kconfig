@@ -1,0 +1,1706 @@
+# arch/arm/mach-exynos/Kconfig
+#
+# Copyright (c) 2010-2011 Samsung Electronics Co., Ltd.
+#		http://www.samsung.com/
+#
+# Licensed under GPLv2
+
+# Configuration options for the EXYNOS
+
+if ARCH_EXYNOS
+
+choice
+	prompt "EXYNOS system type"
+	default ARCH_EXYNOS4
+
+config ARCH_EXYNOS4
+	bool "Samsung Exynos4"
+	select ARM_ERRATA_743622
+	select ARM_ERRATA_751472
+	select ARM_ERRATA_754322
+	select ARM_ERRATA_764369
+	help
+	  Samsung EXYNOS4 series based systems
+
+config ARCH_EXYNOS5
+	bool "Samsung Exynos5"
+	select ARM_ERRATA_761171
+	select ARM_ERRATA_762974
+	select ARM_ERRATA_763722
+	select HAVE_EXYNOS5_HSI2C if I2C
+	help
+	  Samsung EXYNOS5 series based systems
+
+endchoice
+
+config CPU_EXYNOS4210
+	bool
+	select S3C_PL330_DMA
+	select PL310_ERRATA_727915
+	select ARM_ERRATA_753970
+	help
+	  Enable EXYNOS4210 CPU support
+
+config CPU_EXYNOS4212
+	bool
+	select S3C_PL330_DMA
+	help
+	  Enable EXYNOS4212 CPU support
+
+config CPU_EXYNOS4412
+	bool
+	select S3C_PL330_DMA
+	select ARM_ERRATA_761320
+	help
+	  Enable EXYNOS4412 CPU support
+
+config CPU_EXYNOS5210
+	bool
+	select S3C_PL330_DMA
+	help
+	  Enable EXYNOS5210 CPU support
+
+config S5PV310_HI_ARMCLK_THAN_1_2GHZ
+	bool "Enable the higher ARM clock than 1.2GHz"
+	default n
+	help
+	  S5PV310 has different max arm clock. (i.e. 1.0GHz, 1.2GHz and 1.4GHz etc.)
+	  If you are using the chip to work at the high clock than 1.2GHz,
+	  activate this option.
+
+choice
+	prompt "EXYNOS5210 core type"
+	depends on CPU_EXYNOS5210
+	default CPU_A15
+
+config CPU_EXYNOS5210_A15
+	bool "A15 core"
+	help
+	  A15 dual core CPU support
+
+config CPU_EXYNOS5210_A5_IOP
+	bool "A5 IOP core"
+	help
+	  A5 single core CPU support
+endchoice
+
+config CPU_EXYNOS5250
+	bool
+	select S3C_PL330_DMA
+	help
+	  Enable EXYNOS5250 CPU support
+
+config EXYNOS_CONTENT_PATH_PROTECTION
+	bool "Exynos Content Path Protection"
+	depends on (ARM_TRUSTZONE && (ARCH_EXYNOS4 || ARCH_EXYNOS5))
+	default n
+	help
+	  Enable content path protection of EXYNOS.
+
+config EXYNOS4_PM
+	bool "Exynos4 Power Management"
+	depends on (PM && ARCH_EXYNOS4)
+	default y
+	help
+	  Enable suspend and resume for Exynos4 series.
+
+config EXYNOS5_PM
+	bool "Exynos5 Power Management"
+	depends on (PM && ARCH_EXYNOS5)
+	default y
+	help
+	  Enable suspend and resume for Exynos5 series.
+
+config EXYNOS4_CPUIDLE
+	bool "Exynos4 CPUIDLE Feature"
+	depends on (CPU_IDLE && ARCH_EXYNOS4)
+	default y
+	help
+	  Enable CPUIDLE for Exynos4 series.
+
+config EXYNOS4_LOWPWR_IDLE
+	bool "Exynos4 Lowpower IDLE Feature"
+	depends on EXYNOS4_CPUIDLE
+	default y
+	help
+	  Enable Low power IDLE for Exynos4 series.
+
+config EXYNOS5_CPUIDLE
+	bool "Exynos5 CPUIDLE Feature"
+	depends on (CPU_IDLE && ARCH_EXYNOS5)
+	default y
+	help
+	  Enable CPUIDLE for Exynos5 series.
+
+config EXYNOS5_LOWPWR_IDLE
+	bool "Exynos5 Lowpower IDLE Feature"
+	depends on EXYNOS5_CPUIDLE
+	default y
+	help
+	  Enable Low power IDLE for Exynos5 series.
+
+config EXYNOS_MCT
+	bool
+	default y
+	help
+	  Use MCT (Multi Core Timer) as kernel timers
+
+config EXYNOS5_DEV_AHCI
+	bool
+	help
+	  Compile in platform device definitions for AHCI SATA3.0
+
+config EXYNOS4_DEV_AHCI
+	bool
+	help
+	  Compile in platform device definitions for AHCI
+
+config EXYNOS4_SETUP_FIMD0
+	bool
+	help
+	  Common setup code for FIMD0.
+
+config EXYNOS4_SETUP_FIMD
+	bool
+	help
+	  Common setup code for FIMD.
+
+config EXYNOS4_SETUP_DP
+	bool
+	help
+	  Common setup code for DP.
+
+config EXYNOS_DEV_SYSMMU
+	bool
+	help
+	  Common setup code for SYSTEM MMU in EXYNOS
+
+config EXYNOS_DEV_PD
+	bool
+	select SAMSUNG_PD
+	help
+	  Compile in platform device definitions for Power Domain
+
+config EXYNOS4_DEV_DWMCI
+	bool
+	help
+	  Compile in platform device definitions for DWMCI
+
+config EXYNOS4_DEV_FIMC_LITE
+	bool
+	help
+	  Compile in platform device definitions for FIMC_LITE
+
+config EXYNOS4_DEV_FIMC_IS
+	bool
+	depends on (VIDEO_EXYNOS_FIMC_IS || VIDEO_EXYNOS5_FIMC_IS)
+	default y
+	help
+	  Compile in platform device definition for FIMC-IS
+
+config EXYNOS4_SETUP_HDMI
+	bool
+	help
+	  Common setup code for hdmi
+
+config EXYNOS4_SETUP_I2C1
+	bool
+	help
+	  Common setup code for i2c bus 1.
+
+config EXYNOS4_SETUP_I2C2
+	bool
+	help
+	  Common setup code for i2c bus 2.
+
+config EXYNOS4_SETUP_I2C3
+	bool
+	help
+	  Common setup code for i2c bus 3.
+
+config EXYNOS4_SETUP_I2C4
+	bool
+	help
+	  Common setup code for i2c bus 4.
+
+config EXYNOS4_SETUP_I2C5
+	bool
+	help
+	  Common setup code for i2c bus 5.
+
+config EXYNOS4_SETUP_I2C6
+	bool
+	help
+	  Common setup code for i2c bus 6.
+
+config EXYNOS4_SETUP_I2C7
+	bool
+	help
+	  Common setup code for i2c bus 7.
+
+config EXYNOS5_SETUP_HSI2C0
+	bool
+	help
+	  Common setup code for hs-i2c bus 0.
+
+config EXYNOS5_SETUP_HSI2C1
+	bool
+	help
+	  Common setup code for hs-i2c bus 1.
+
+config EXYNOS5_SETUP_HSI2C2
+	bool
+	help
+	  Common setup code for hs-i2c bus 2.
+
+config EXYNOS5_DEV_HSI2C0
+	bool
+	help
+	  Compile in platform device definitions for HS-I2C channel 0
+
+config EXYNOS5_DEV_HSI2C1
+	bool
+	help
+	  Compile in platform device definitions for HS-I2C channel 1
+
+config EXYNOS5_DEV_HSI2C2
+	bool
+	help
+	  Compile in platform device definitions for HS-I2C channel 2
+
+config EXYNOS5_DEV_HSI2C3
+	bool
+	help
+	  Compile in platform device definitions for HS-I2C channel 3
+
+config EXYNOS5_SETUP_HSI2C3
+	bool
+	help
+	  Common setup code for hs-i2c bus 3.
+
+config EXYNOS4_SETUP_KEYPAD
+	bool
+	help
+	  Common setup code for keypad.
+
+config EXYNOS4_SETUP_MFC
+	bool
+	help
+	  Common setup code for MFC.
+
+config EXYNOS4_SETUP_SDHCI
+	bool
+	select EXYNOS4_SETUP_SDHCI_GPIO
+	help
+	  Internal helper functions for EXYNOS4 based SDHCI systems.
+
+config EXYNOS4_SETUP_SDHCI_GPIO
+	bool
+	help
+	  Common setup code for SDHCI gpio.
+
+config EXYNOS4_SETUP_MSHCI
+	bool
+	select EXYNOS4_SETUP_MSHCI_GPIO
+	help
+	  Internal helper functions for EXYNOS4 based MSHCI systems.
+
+config EXYNOS4_SETUP_MSHCI_GPIO
+	bool
+	help
+	  Common setup code for MSHCI gpio.
+
+config EXYNOS4_SETUP_FIMC
+	bool
+	depends on VIDEO_SAMSUNG_S5P_FIMC
+	default y
+	help
+	  Common setup code for the camera interfaces.
+
+config EXYNOS4_SETUP_FIMC0
+	bool
+	depends on VIDEO_FIMC
+	default y
+	help
+	  Common setup code for the camera interfaces.
+
+config EXYNOS4_SETUP_FIMC1
+	bool
+	depends on VIDEO_FIMC
+	default y
+	help
+	  Common setup code for the camera interfaces.
+
+config EXYNOS4_SETUP_FIMC2
+	bool
+	depends on VIDEO_FIMC
+	default y
+	help
+	  Common setup code for the camera interfaces.
+
+config EXYNOS4_SETUP_FIMC3
+	bool
+	depends on VIDEO_FIMC
+	default y
+	help
+	  Common setup code for the camera interfaces.
+
+config EXYNOS4_SETUP_FIMC_IS
+	bool
+	depends on (VIDEO_EXYNOS_FIMC_IS || VIDEO_EXYNOS5_FIMC_IS)
+	default y
+	help
+	  Common setup code for the FIMC-IS
+
+config EXYNOS4_SETUP_USB_PHY
+	bool
+	help
+	  Common setup code for USB PHY controller
+
+config EXYNOS4_SETUP_CSIS
+	bool
+	depends on VIDEO_FIMC_MIPI
+	default y
+	help
+	  Common setup code for MIPI-CSIS
+
+config EXYNOS4_SETUP_FB_S5P
+	bool
+	default n
+	help
+	  Setup code for EXYNOS4 FIMD
+
+config EXYNOS4_SETUP_TVOUT
+	bool
+	default y
+	help
+	  Common setup code for TVOUT
+
+config EXYNOS4_SETUP_THERMAL
+	bool "Use thermal management for exynos4"
+	depends on CPU_FREQ
+	help
+	  Common setup code for Exynos4 TMU
+
+config EXYNOS_SETUP_THERMAL
+	bool "Use thermal management"
+	depends on CPU_FREQ
+	help
+	  Common setup code for TMU
+
+config TMU_DEBUG
+	bool "Thermal management Debug"
+	depends on EXYNOS_SETUP_THERMAL
+	help
+	  TMU debugging message on
+
+config EXYNOS4_SETUP_MIPI_DSI
+	bool
+	depends on FB_S5P_MIPI_DSIM
+	default y
+	help
+	  Common setup code for MIPI_DSIM.
+
+config EXYNOS4_SETUP_MIPI_DSIM
+	bool
+	depends on FB_MIPI_DSIM
+	default y
+	help
+	  Common setup code for MIPI_DSIM to support mainline style fimd.
+
+config EXYNOS4_SETUP_JPEG
+	bool
+	depends on VIDEO_JPEG_V2X
+	default y
+	help
+	  Common setup code for JPEG
+
+config EXYNOS5_DEV_GSC
+	bool
+	depends on VIDEO_EXYNOS_GSCALER
+	default y
+	help
+	  Compile in platform device definitions for GSC
+
+config EXYNOS5_DEV_FIMC_IS
+	bool
+	depends on VIDEO_EXYNOS5_FIMC_IS
+	default y
+	help
+	  Compile in platform device definition for FIMC-IS
+
+config EXYNOS5_SETUP_GSC
+	bool
+	depends on VIDEO_EXYNOS_GSCALER
+	default y
+	help
+	  Common setup code for GSC
+
+config EXYNOS4_ENABLE_CLOCK_DOWN
+	bool "ARM core clock down feature enable"
+	depends on EXYNOS4_CPUIDLE
+	default n
+	help
+	  ARM core clock down in idle time.
+
+config EXYNOS5_ENABLE_CLOCK_DOWN
+	bool "ARM core clock down feature enable"
+	depends on EXYNOS5_CPUIDLE
+	default n
+	help
+	  ARM core clock down in idle time.
+
+config EXYNOS4_CPUFREQ
+	def_bool y
+	depends on CPU_FREQ && ARCH_EXYNOS4
+	help
+	  Exynos4 cpufreq support
+
+config EXYNOS5_CPUFREQ
+	def_bool y
+	depends on CPU_FREQ && ARCH_EXYNOS5
+	help
+	  Exynos5 cpufreq support
+
+choice
+	prompt "Max CPU frequency"
+	depends on EXYNOS4_CPUFREQ
+	default EXYNOS4X12_1400MHZ_SUPPORT if (CPU_EXYNOS4212 || CPU_EXYNOS4412)
+	default EXYNOS4210_1400MHZ_SUPPORT if CPU_EXYNOS4210
+
+config EXYNOS4210_1200MHZ_SUPPORT
+	bool "Max 1200MHz CPUFREQ LEVEL"
+	depends on EXYNOS4_CPUFREQ && CPU_EXYNOS4210
+	help
+	  Max 1.2Ghz support
+
+config EXYNOS4210_1400MHZ_SUPPORT
+	bool "Max 1400MHz CPUFREQ LEVEL"
+	depends on EXYNOS4_CPUFREQ && CPU_EXYNOS4210
+	help
+	  Max 1.4Ghz support
+
+config EXYNOS4X12_1500MHZ_SUPPORT
+	bool "Max 1500MHz CPUFREQ LEVEL"
+	depends on EXYNOS4_CPUFREQ && (CPU_EXYNOS4212 || CPU_EXYNOS4412)
+	help
+	  Max 1.5Ghz support
+
+config EXYNOS4X12_1400MHZ_SUPPORT
+	bool "Max 1400MHz CPUFREQ LEVEL"
+	depends on EXYNOS4_CPUFREQ && (CPU_EXYNOS4212 || CPU_EXYNOS4412)
+	help
+	  Max 1.4Ghz support
+
+config EXYNOS4X12_1200MHZ_SUPPORT
+	bool "Max 1200MHz CPUFREQ LEVEL"
+	depends on EXYNOS4_CPUFREQ && (CPU_EXYNOS4212 || CPU_EXYNOS4412)
+	help
+	  Max 1.2Ghz support
+
+config EXYNOS4X12_1000MHZ_SUPPORT
+	bool "Max 1000MHz CPUFREQ LEVEL"
+	depends on EXYNOS4_CPUFREQ && (CPU_EXYNOS4212 || CPU_EXYNOS4412)
+	help
+	  Max 1.0Ghz support
+
+endchoice
+
+config MIDAS_COMMON
+	bool
+	help
+	  Support common devices of MIDAS boards
+
+menu "Support dynamic CPU Hotplug"
+	depends on HOTPLUG_CPU && SMP
+
+config EXYNOS_PM_HOTPLUG
+	bool "EXYNOS Dynamic Hotplug"
+	help
+	  Dynamic CPU HOTLUG for EXYNOS series
+
+choice
+	prompt "Dynamic CPU HOTPLUG Policy"
+	depends on EXYNOS_PM_HOTPLUG
+	default DVFS_NR_RUNNING_POLICY if (CPU_EXYNOS4212 || CPU_EXYNOS4412 || CPU_EXYNOS5250)
+
+config STAND_ALONE_POLICY
+	bool "Stand alone policy CPU hotplug"
+	depends on EXYNOS_PM_HOTPLUG
+	help
+	  PM hotplug policy. This is for exynos4210
+	  Enable to use pm hotplug, then it uses stand-hotplug.c file.
+	  Avg-load is calculated with both cpu frequency aspect
+	  and run queue status.
+
+config LEGACY_HOTPLUG_POLICY
+	bool "Legacy policy CPU hotplug"
+	depends on EXYNOS_PM_HOTPLUG
+	help
+	  PM hotplug policy. This is for exynos4210
+	  Enable to use pm hotplug, then it uses pm-hotplug.c file.
+	  Avg-load is calculated with only cpu utilization of cpu
+	  frequency at that time.
+
+config WITH_DVFS_POLICY
+	depends on EXYNOS4_CPUFREQ
+	bool "Intergrated DVFS CPU hotplug"
+
+config DVFS_NR_RUNNING_POLICY
+	depends on (EXYNOS4_CPUFREQ || EXYNOS5_CPUFREQ)
+	bool "DVFS-nr_running CPU hotplug"
+
+config NR_RUNNING_POLICY
+	bool "nr_running CPU hotplug"
+
+endchoice
+endmenu
+
+menu "Busfreq Model"
+	depends on EXYNOS4_CPUFREQ || EXYNOS5_CPUFREQ
+
+config BUSFREQ
+	bool "Busfreq with PPC/PPMU"
+	depends on EXYNOS4_CPUFREQ
+
+config BUSFREQ_QOS
+	bool "QoS with Busfreq"
+	depends on BUSFREQ
+	default n
+
+config BUSFREQ_OPP
+	bool "Busfreq with OPP"
+	depends on EXYNOS4_CPUFREQ || EXYNOS5_CPUFREQ
+
+config DEVFREQ_BUS
+	bool "Busfreq support with Devfreq framework & Simple-Ondemand"
+	depends on EXYNOS4_CPUFREQ
+	select PM_DEVFREQ
+	select ARM_EXYNOS4_BUS_DEVFREQ
+
+choice
+	prompt "QoS LEVEL By Resolution"
+	depends on BUSFREQ_QOS || BUSFREQ_OPP
+	default BUSFREQ_QOS_LEVEL_NONE
+
+config BUSFREQ_QOS_NONE
+	bool "QoS Setting is not required"
+
+config BUSFREQ_QOS_1024X600
+	bool "QoS for 1024x600 (like P2)"
+
+config BUSFREQ_QOS_1280X720
+	bool "QoS for 1280x720 (like M0/T0)"
+
+config BUSFREQ_QOS_1280X800
+	bool "QoS for 1280x800 or 800x1280 (like Q1/P8)"
+
+endchoice
+
+endmenu
+
+config BUSFREQ_DEBUG
+	bool "BUSFREQ sysfs support"
+	default n
+
+config GPIO_MIDAS_01_BD
+	bool "GPIO configuration for Midas 01 BD"
+	depends on MACH_SLP_MIDAS
+
+config GPIO_MIDAS_02_BD
+	bool "GPIO configuration for Midas 02 BD"
+	depends on MACH_SLP_MIDAS
+
+config BUSFREQ_L2_160M
+	bool "Busfreq L2 level use 160MHz"
+	default n
+	help
+	Busfreq uses 160MHz for L2, not 133MHz. Optimize busfreq
+	dvfs level transition for LCD high resolution.
+	This enable 160MHz of L2 level. Q1 has high LCD resolution,
+	so uses busfreq dvfs L2 as 160MHz.
+
+config SEC_THERMISTOR
+	bool "Use external thermistor with ADC"
+	depends on SAMSUNG_DEV_ADC
+	default n
+	help
+	 Use thermistor driver for U1 & U1 Premium.
+	 U1 has two thermistors. this device driver use one of those
+	 to check system temperature.
+
+config EXYNOS_SYSREG_PM
+	bool "PM Support for System Registers"
+	depends on CPU_EXYNOS4210 || CPU_EXYNOS4412 || CPU_EXYNOS4212
+	default n
+	help
+	  Use System Register save/restore for suspend-to-RAM
+	  Some boards have this code hard coded in device drivers(FB);
+	  however, this is better supported at SoC support code.
+	  Currently, SLP kernel depends on this.
+
+config ANDROID_WIP
+	bool "work in progress hacks for android"
+	default n
+	help
+	  This enables 'work in progress' hacks for android issues.
+	  Please remove it later.
+
+# machine support
+
+menu "EXYNOS4 Machines"
+	depends on ARCH_EXYNOS4
+
+config MACH_SMDKC210
+	bool "SMDKC210"
+	select CPU_EXYNOS4210
+	select S3C_DEV_RTC
+	select S3C_DEV_WDT
+	select S3C_DEV_I2C1
+	select S3C_DEV_HSMMC2
+	select S3C_DEV_HSMMC3
+	select S3C_DEV_HWMON if S3C_ADC
+	select S5P_GPIO_INT
+	select S5P_DEV_FIMD0
+	select S5P_DEV_FIMD_S5P
+	select S5P_DEV_MFC
+	select S5P_DEV_FIMG2D
+	select S5P_DEV_ROTATOR
+	select S5P_DEV_USBGADGET
+	select S5P_DEV_JPEG
+	select S5P_DEV_THERMAL
+	select S5P_DEV_USB_EHCI
+	select S5P_SYSTEM_MMU
+	select EXYNOS_DEV_PD
+	select EXYNOS4_SETUP_FIMD0
+	select EXYNOS4_SETUP_I2C1
+	select EXYNOS4_SETUP_KEYPAD
+	select EXYNOS4_SETUP_SDHCI
+	select EXYNOS4_SETUP_FB_S5P
+	select EXYNOS4_SETUP_USB_PHY
+	select EXYNOS4_SETUP_MFC
+	select SAMSUNG_DEV_KEYPAD
+	select SAMSUNG_DEV_ADC
+	select SAMSUNG_DEV_TS
+	select SAMSUNG_DEV_TS1
+	select SAMSUNG_DEV_PWM
+	select SAMSUNG_DEV_BACKLIGHT
+	help
+	  Machine support for Samsung SMDKC210
+
+config MACH_SMDKV310
+	bool "SMDKV310"
+	select CPU_EXYNOS4210
+	select S3C_DEV_RTC
+	select S3C_DEV_WDT
+	select S3C_DEV_I2C1
+	select S3C_DEV_HSMMC2
+	select S3C_DEV_HSMMC3
+	select S3C_DEV_HWMON if S3C_ADC
+	select S5P_GPIO_INT
+	select S5P_DEV_FIMD0
+	select S5P_DEV_FIMD_S5P
+	select S5P_DEV_MFC
+	select S5P_DEV_FIMG2D
+	select S5P_DEV_ROTATOR
+	select S5P_DEV_USBGADGET
+	select S5P_DEV_JPEG
+	select S5P_DEV_THERMAL
+	select S5P_DEV_USB_EHCI
+	select S5P_SYSTEM_MMU
+	select EXYNOS_DEV_PD
+	select EXYNOS4_SETUP_FIMD0
+	select EXYNOS4_SETUP_I2C1
+	select EXYNOS4_SETUP_KEYPAD
+	select EXYNOS4_SETUP_SDHCI
+	select EXYNOS4_SETUP_FB_S5P
+	select EXYNOS4_SETUP_USB_PHY
+	select EXYNOS4_SETUP_MFC
+	select EXYNOS4_DEV_AHCI
+	select SAMSUNG_DEV_PWM
+	select SAMSUNG_DEV_BACKLIGHT
+	select SAMSUNG_DEV_KEYPAD
+	select SAMSUNG_DEV_ADC
+	select SAMSUNG_DEV_TS
+	select SAMSUNG_DEV_TS1
+	help
+	  Machine support for Samsung SMDKV310
+
+config MACH_ARMLEX4210
+	bool "ARMLEX4210"
+	select CPU_EXYNOS4210
+	select S3C_DEV_RTC
+	select S3C_DEV_WDT
+	select S3C_DEV_HSMMC
+	select S3C_DEV_HSMMC2
+	select S3C_DEV_HSMMC3
+	select S5P_SYSTEM_MMU
+	select EXYNOS4_DEV_AHCI
+	select EXYNOS4_SETUP_SDHCI
+	help
+	  Machine support for Samsung ARMLEX4210 based on EXYNOS4210
+
+config MACH_UNIVERSAL_C210
+	bool "Mobile UNIVERSAL_C210 Board"
+	select CPU_EXYNOS4210
+	select S3C_DEV_HSMMC
+	select S3C_DEV_HSMMC2
+	select S3C_DEV_HSMMC3
+	select S3C_DEV_I2C1
+	select S3C_DEV_I2C5
+	select S5P_DEV_ONENAND
+	select EXYNOS4_SETUP_I2C1
+	select EXYNOS4_SETUP_I2C5
+	select EXYNOS4_SETUP_SDHCI
+	help
+	  Machine support for Samsung Mobile Universal S5PC210 Reference
+	  Board.
+
+config MACH_NURI
+	bool "Mobile NURI Board"
+	select CPU_EXYNOS4210
+	select S3C_DEV_WDT
+	select S3C_DEV_HSMMC
+	select S3C_DEV_HSMMC2
+	select S3C_DEV_HSMMC3
+	select S3C_DEV_I2C1
+	select S3C_DEV_I2C3
+	select S3C_DEV_I2C4
+	select S3C_DEV_I2C5
+	select S5P_DEV_USB_EHCI
+	select EXYNOS4_SETUP_I2C1
+	select EXYNOS4_SETUP_I2C3
+	select EXYNOS4_SETUP_I2C4
+	select EXYNOS4_SETUP_I2C5
+	select EXYNOS4_SETUP_SDHCI
+	select EXYNOS4_SETUP_USB_PHY
+	select SAMSUNG_DEV_PWM
+	help
+	  Machine support for Samsung Mobile NURI Board.
+
+config MACH_U1
+	bool "U1 board"
+	select CPU_EXYNOS4210
+	select S5P_GPIO_INT
+	select S5P_DEV_FIMD0
+	select S5P_DEV_FIMD_S5P
+	select S5P_DEV_TVOUT
+	select S5P_DEV_MFC
+	select S5P_DEV_FIMG2D
+	select S5P_DEV_USB_EHCI
+	select S5P_SYSTEM_MMU
+	select S5P_DEV_USBGADGET
+	select S3C_DEV_RTC
+	select S3C_DEV_WDT
+	select S3C_DEV_I2C1
+	select S3C_DEV_I2C3
+	select S3C_DEV_I2C5
+	select S3C_DEV_I2C6
+	select S3C_DEV_I2C7
+	select S3C_DEV_I2C8_EMUL
+	select S3C_DEV_I2C9_EMUL
+	select EXYNOS4_DEV_MSHC
+	select EXYNOS4_MSHC_MPLL_40MHZ
+	select EXYNOS4_MSHC_DDR
+	select EXYNOS4_MSHC_8BIT
+	select S3C_DEV_HSMMC2
+	select S3C_DEV_HSMMC3
+	select SAMSUNG_DEV_ADC
+	select SAMSUNG_DEV_TS
+	select SAMSUNG_DEV_TS1
+	select EXYNOS_DEV_PD
+	select S5P_SYSTEM_MMU
+	select EXYNOS4_SETUP_FIMD0
+	select EXYNOS4_SETUP_I2C1
+	select EXYNOS4_SETUP_I2C3
+	select EXYNOS4_SETUP_I2C5
+	select EXYNOS4_SETUP_I2C6
+	select EXYNOS4_SETUP_I2C7
+	select EXYNOS4_SETUP_SDHCI
+	select EXYNOS4_SETUP_MSHCI
+	select EXYNOS4_SETUP_MFC
+	select EXYNOS4_SETUP_FB_S5P
+	select EXYNOS4_SETUP_USB_PHY
+	select EXYNOS4_SETUP_THERMAL
+	help
+	  Machine support for U1 Board
+
+choice
+	prompt "U1 board"
+	depends on MACH_U1
+	default MACH_U1_BD
+
+config MACH_U1_BD
+	bool "U1 Board"
+
+config MACH_U1CAMERA_BD
+	bool "U1CAMERA Board"
+
+config MACH_Q1_BD
+	bool "Q1 Board"
+
+endchoice
+
+config MACH_PX
+	bool "PX board"
+	select CPU_EXYNOS4210
+	select S5P_GPIO_INT
+	select S5P_DEV_FIMD0
+	select S5P_DEV_FIMD_S5P
+	select S5P_DEV_TVOUT
+	select S5P_DEV_MFC
+	select S5P_DEV_FIMG2D
+	select S5P_DEV_USB_EHCI
+	select S5P_SYSTEM_MMU
+	select S5P_DEV_USBGADGET
+	select S5P_DEV_THERMAL
+	select S3C_DEV_RTC
+	select S3C_DEV_WDT
+	select S3C_DEV_I2C1
+	select S3C_DEV_I2C3
+	select S3C_DEV_I2C4
+	select S3C_DEV_I2C5
+	select S3C_DEV_I2C6
+	select S3C_DEV_I2C7
+	select S3C_DEV_I2C9_EMUL
+	select EXYNOS4_DEV_MSHC
+	select EXYNOS4_MSHC_MPLL_40MHZ
+	select EXYNOS4_MSHC_DDR
+	select EXYNOS4_MSHC_8BIT
+	select S3C_DEV_HSMMC2
+	select S3C_DEV_HSMMC3
+	select SAMSUNG_DEV_ADC
+	select SAMSUNG_DEV_TS
+	select SAMSUNG_DEV_TS1
+	select EXYNOS_DEV_PD
+	select S5P_SYSTEM_MMU
+	select EXYNOS4_SETUP_FIMD0
+	select EXYNOS4_SETUP_I2C1
+	select EXYNOS4_SETUP_I2C3
+	select EXYNOS4_SETUP_I2C4
+	select EXYNOS4_SETUP_I2C5
+	select EXYNOS4_SETUP_I2C6
+	select EXYNOS4_SETUP_I2C7
+	select EXYNOS4_SETUP_SDHCI
+	select EXYNOS4_SETUP_MSHCI
+	select EXYNOS4_SETUP_MFC
+	select EXYNOS4_SETUP_FB_S5P
+	select EXYNOS4_SETUP_USB_PHY
+	help
+	  Machine support for PX Board
+choice
+	prompt "PX board"
+	depends on MACH_PX
+	default MACH_P4
+
+config MACH_P4
+	bool "P4 board"
+
+config MACH_P2
+	bool "P2 board"
+
+config MACH_P8
+	bool "P8 board"
+
+config MACH_P8LTE
+	bool "P8 LTE board"
+	select S3C64XX_DEV_SPI0
+
+endchoice
+
+choice
+	prompt "LCD panel select"
+	depends on MACH_U1
+	default PANEL_U1
+
+config PANEL_U1
+	bool "U1/Q1 default panel"
+
+endchoice
+
+config PANEL_S2PLUS
+	bool "s2plus panel"
+
+if MACH_U1 || MACH_C1 || MACH_C1VZW || MACH_M0 || MACH_P4 || MACH_P2 || MACH_P4NOTE || MACH_T0
+source "arch/arm/mach-exynos/Kconfig.local"
+endif
+
+config MACH_SMDK4X12
+	bool "SMDK4X12 board"
+	select CPU_EXYNOS4212
+	select CPU_EXYNOS4412
+	select S3C_DEV_WDT
+	select S3C_DEV_RTC
+	select S3C_DEV_HSMMC2
+	select S3C_DEV_I2C1
+	select S3C_DEV_I2C2
+	select S3C_DEV_I2C3
+	select S3C_DEV_I2C4
+	select S3C_DEV_I2C5
+	select S3C_DEV_I2C7
+	select S5P_DEV_I2C_HDMIPHY
+	select S5P_GPIO_INT
+	select S5P_DEV_MFC
+	select S5P_DEV_FIMG2D
+	select S5P_DEV_FIMD0
+	select S5P_DEV_FIMD_S5P
+	select S5P_DEV_USB_EHCI
+	select S5P_DEV_USBGADGET
+	select S5P_DEV_USB_SWITCH
+	select S5P_DEV_THERMAL
+	select S5P_SYSTEM_MMU
+	select EXYNOS_DEV_PD
+	select EXYNOS4_SETUP_SDHCI
+	select EXYNOS4_SETUP_FB_S5P
+	select EXYNOS4_SETUP_FIMD0
+	select EXYNOS4_SETUP_I2C1
+	select EXYNOS4_SETUP_I2C2
+	select EXYNOS4_SETUP_I2C3
+	select EXYNOS4_SETUP_I2C4
+	select EXYNOS4_SETUP_I2C5
+	select EXYNOS4_SETUP_I2C7
+	select EXYNOS4_SETUP_USB_PHY
+	select EXYNOS4_SETUP_KEYPAD
+	select EXYNOS4_SETUP_MFC
+	select EXYNOS4_DEV_FIMC_LITE
+	select SAMSUNG_DEV_ADC
+	select SAMSUNG_DEV_BACKLIGHT
+	select SAMSUNG_DEV_PWM
+	select SAMSUNG_DEV_KEYPAD
+	help
+	  Machine support for Samsung SMDK4X12
+
+config MACH_MIDAS
+	bool "MIDAS board"
+	select CPU_EXYNOS4212
+	select CPU_EXYNOS4412
+	select S3C_DEV_WDT
+	select S3C_DEV_RTC
+	select S3C_DEV_HSMMC2
+	select S3C_DEV_HSMMC3
+	select SAMSUNG_DEV_ADC
+	select S3C_DEV_I2C1
+	select S3C_DEV_I2C3
+	select S3C_DEV_I2C6
+	select S3C_DEV_I2C7
+	select S5P_GPIO_INT
+	select S5P_DEV_MFC
+	select S5P_DEV_TVOUT
+	select S5P_DEV_FIMG2D
+	select S5P_DEV_FIMD_S5P
+	select S5P_DEV_USB_EHCI
+	select S5P_DEV_USBGADGET
+	select EXYNOS4_DEV_MSHC
+	select EXYNOS4_SETUP_MSHCI
+	select EXYNOS4_MSHC_MPLL_40MHZ
+	select EXYNOS4_MSHC_DDR
+	select EXYNOS4_MSHC_8BIT
+	select EXYNOS4_SETUP_SDHCI
+	select EXYNOS4_DEV_FIMC_LITE
+	select EXYNOS4_SETUP_FB_S5P
+	select EXYNOS4_SETUP_I2C1
+	select EXYNOS4_SETUP_I2C3
+	select EXYNOS4_SETUP_I2C4
+	select EXYNOS4_SETUP_I2C5
+	select EXYNOS4_SETUP_I2C6
+	select EXYNOS4_SETUP_I2C7
+	select EXYNOS4_SETUP_USB_PHY
+	select EXYNOS4_SETUP_MFC
+	select SAMSUNG_DEV_BACKLIGHT
+	select SAMSUNG_DEV_PWM
+	select EXYNOS_DEV_PD
+	select EXYNOS4_SETUP_MFC
+	select MIDAS_COMMON
+	help
+	  Machine support for Samsung midas board
+
+choice
+	prompt "EXYNOS4212 board"
+	depends on MACH_MIDAS
+	default MACH_MIDAS_02_BD
+
+config MACH_MIDAS_01_BD
+	bool "Midas Rev 0.1 board"
+
+config MACH_MIDAS_02_BD
+	bool "Midas Rev 0.2 board"
+	select S3C_DEV_I2C4
+	select S3C_DEV_I2C5
+
+config MACH_M0
+	bool "M0 board"
+	select S3C_DEV_I2C4
+	select S3C_DEV_I2C5
+	select MIDAS_COMMON_BD
+
+config MACH_M3
+	bool "M3 board"
+	select S3C_DEV_I2C4
+	select S3C_DEV_I2C5
+	select MIDAS_COMMON_BD
+
+config MACH_C1
+	bool "C1 board"
+	select S3C_DEV_I2C4
+	select S3C_DEV_I2C5
+	select MIDAS_COMMON_BD
+
+config MACH_C1VZW
+	bool "C1 VZW board"
+	select S3C_DEV_I2C4
+	select S3C_DEV_I2C5
+	select MIDAS_COMMON_BD
+
+config MACH_C1CTC
+	bool "C1 CTC board"
+	select S3C_DEV_I2C4
+	select S3C_DEV_I2C5
+	select MIDAS_COMMON_BD
+
+config MACH_JENGA
+	bool "Jenga board"
+	select S3C_DEV_I2C4
+	select S3C_DEV_I2C5
+	select MIDAS_COMMON_BD
+
+config MACH_S2PLUS
+	bool "S2PLUS board"
+	select S3C_DEV_I2C4
+	select S3C_DEV_I2C5
+	select PANEL_S2PLUS
+	select MIDAS_COMMON_BD
+
+config MACH_S2PLUS
+	bool "S2 Plus board"
+	select S3C_DEV_I2C4
+	select MIDAS_COMMON_BD
+
+config MACH_P4NOTE
+	bool "P4 Note board"
+	select S3C_DEV_I2C4
+	select S3C_DEV_I2C5
+	select P4NOTE_00_BD
+
+config MACH_GC1
+	bool "Galuxy Camera board"
+	select S3C_DEV_I2C4
+	select S3C_DEV_I2C5
+	select GC1_00_BD
+
+config MACH_T0
+	bool "T0 board"
+	select S3C_DEV_I2C4
+	select S3C_DEV_I2C5
+	select T0_00_BD
+
+endchoice
+
+config MIDAS_COMMON_BD
+	bool "Midas default common Board"
+
+config P4NOTE_00_BD
+	bool "P4 Note PQ common Board"
+
+config GC1_00_BD
+	bool "Galaxy Camera common Board"
+
+config T0_00_BD
+	bool "T0 common Board"
+
+config WRITEBACK_ENABLED
+	bool "Samsung Writeback Enable"
+	help
+	  This option enables writeback operations. It can
+	  support fimd streams data to fimc destinations ram.
+	  writeback operations support final blended stream.
+	  when enable this options.
+
+endmenu
+
+menu "EXYNOS5 Machines"
+	depends on ARCH_EXYNOS5
+
+config MACH_SMDK5210
+	bool "SMDK5210 board"
+	select CPU_EXYNOS5210
+	select S3C_DEV_HSMMC2
+	select S3C_DEV_HSMMC3
+	select S3C_DEV_I2C1
+	select S3C_DEV_I2C2
+	select S5P_DEV_DP
+	select S5P_DEV_FIMD1
+	select S5P_DEV_MFC
+	select S5P_DEV_USB_EHCI
+	select EXYNOS_DEV_PD
+	select EXYNOS4_SETUP_DP
+	select EXYNOS4_SETUP_FIMD
+	select EXYNOS4_SETUP_I2C1
+	select EXYNOS4_SETUP_I2C2
+	select EXYNOS4_SETUP_MFC
+	select EXYNOS4_SETUP_SDHCI
+	select EXYNOS4_SETUP_USB_PHY
+	select SAMSUNG_DEV_BACKLIGHT
+	select SAMSUNG_DEV_PWM
+	select S5P_DEV_I2C_HDMIPHY
+	select EXYNOS_DEV_SS_UDC
+	help
+	  Machine support for Samsung SMDK5210
+
+config MACH_SMDK5250
+	bool "SMDK5250 board"
+	select CPU_EXYNOS5250
+	select S3C_DEV_HWMON if S3C_ADC
+	select S3C_DEV_RTC
+	select S3C_DEV_WDT
+	select S3C_DEV_HSMMC2
+	select S3C_DEV_HSMMC3
+	select S3C_DEV_I2C1
+	select S3C_DEV_I2C2
+	select S3C_DEV_I2C4
+	select S3C_DEV_I2C5
+	select S3C_DEV_I2C7
+	select S5P_GPIO_INT
+	select S5P_DEV_DP
+	select EXYNOS_DEV_SYSMMU
+	select S5P_DEV_FIMD1
+	select S5P_DEV_USB_EHCI
+	select S5P_DEV_MFC
+	select S5P_DEV_FIMG2D
+	select S5P_DEV_ROTATOR
+	select S5P_DEV_USBGADGET
+	select S5P_DEV_I2C_HDMIPHY
+	select S5P_DEV_THERMAL
+	select S5P_DEV_USB_SWITCH
+	select EXYNOS_DEV_PD
+	select EXYNOS4_DEV_FIMC_LITE
+	select EXYNOS4_SETUP_I2C1
+	select EXYNOS4_SETUP_I2C2
+	select EXYNOS4_SETUP_I2C4
+	select EXYNOS4_SETUP_I2C5
+	select EXYNOS4_SETUP_I2C7
+	select EXYNOS4_SETUP_SDHCI
+	select EXYNOS4_SETUP_DP
+	select EXYNOS4_SETUP_FIMD
+	select EXYNOS4_SETUP_USB_PHY
+	select EXYNOS4_SETUP_MFC
+	select EXYNOS5_DEV_AHCI
+	select EXYNOS5_DEV_DWMCI2
+	select EXYNOS_DEV_SS_UDC
+	select SAMSUNG_DEV_ADC
+	select SAMSUNG_DEV_BACKLIGHT
+	select SAMSUNG_DEV_PWM
+	help
+	  Machine support for Samsung SMDK5250
+
+config MACH_P10
+	bool "P10 board"
+	select CPU_EXYNOS5250
+	select S3C_DEV_HWMON if S3C_ADC
+	select S3C_DEV_RTC
+	select S3C_DEV_WDT
+	select S3C_DEV_HSMMC2
+	select S3C_DEV_HSMMC3
+	select S3C_DEV_I2C1
+	select S3C_DEV_I2C3
+	select S3C_DEV_I2C4
+	select S3C_DEV_I2C5
+	select S3C_DEV_I2C7
+	select S5P_GPIO_INT
+	select S5P_DEV_DP
+	select EXYNOS_DEV_SYSMMU
+	select S5P_DEV_FIMD1
+	select S5P_DEV_USB_EHCI
+	select S5P_DEV_TV
+	select S5P_DEV_USBGADGET
+	select S5P_DEV_MFC
+	select S5P_DEV_FIMG2D
+	select S5P_DEV_ROTATOR
+	select S5P_DEV_I2C_HDMIPHY
+	select EXYNOS_DEV_PD
+	select EXYNOS4_DEV_FIMC_LITE
+	select EXYNOS4_SETUP_I2C1
+	select EXYNOS4_SETUP_I2C3
+	select EXYNOS4_SETUP_I2C4
+	select EXYNOS4_SETUP_I2C5
+	select EXYNOS4_SETUP_I2C7
+	select EXYNOS4_SETUP_DP
+	select EXYNOS4_SETUP_SDHCI
+	select EXYNOS4_DEV_DWMCI
+	select EXYNOS4_SETUP_FIMD
+	select EXYNOS4_SETUP_USB_PHY
+	select SAMSUNG_DEV_BACKLIGHT
+	select SAMSUNG_DEV_PWM
+	select EXYNOS4_SETUP_MFC
+	select EXYNOS_DEV_SS_UDC
+	select SAMSUNG_DEV_ADC
+	select EXYNOS4_SETUP_THERMAL
+	help
+	  Machine support for Samsung P10 board
+
+choice
+	prompt "P10 board"
+	depends on MACH_P10
+	default MACH_P10_00_BD
+
+config MACH_P10_00_BD
+	bool "P10 Rev 0.0 board"
+
+config MACH_P10_LTE_00_BD
+	bool "P10 LTE Rev 0.0 board"
+
+config MACH_P10_WIFI_00_BD
+	bool "P10 WIFI Rev 0.0 board"
+
+config MACH_P10_LUNGO_01_BD
+	bool "P10 lungo Rev 0.1 board"
+
+config MACH_P10_LUNGO_WIFI_01_BD
+	bool "P10 lungo Wifi Rev 0.1 board"
+
+endchoice
+choice
+	prompt "P10 DP version"
+	depends on MACH_P10
+	default MACH_P10_DP_01
+
+config MACH_P10_DP_00
+	bool "P10 DP 0.0(evt0.0)"
+
+config MACH_P10_DP_01
+	bool "P10 DP 0.1(evt0.1)"
+
+endchoice
+choice
+	prompt "DP FrameRate of P10"
+	depends on MACH_P10
+	default DP_40HZ_P10
+
+config DP_40HZ_P10
+	bool "support 40HZ for DP of P10"
+
+config DP_60HZ_P10
+	bool "support 60HZ for DP of P10"
+
+endchoice
+endmenu
+
+config EXYNOS5_DEV_BTS
+	bool "Support BTS driver"
+	select S5P_BTS
+	help
+	  Compile in platform device definitions for BTS devices
+
+menu "MMC/SD slot setup"
+depends on PLAT_S5P
+
+comment "SELECT SYNOPSYS CONTROLLER INTERFACE DRIVER"
+config EXYNOS4_DEV_DWMCI
+	bool "DWMCI"
+	depends on PLAT_S5P && MMC_DW
+	default n
+	help
+	IF DWMCI is used, SDHC channel 0 is disabled.
+
+config EXYNOS5_DEV_DWMCI1
+	bool
+	help
+	  Compile in platform device definitions for DWMCI channel 1
+
+config EXYNOS5_DEV_DWMCI2
+	bool
+	help
+	  Compile in platform device definitions for DWMCI channel 2
+
+config EXYNOS5_DEV_DWMCI3
+	bool
+	help
+	  Compile in platform device definitions for DWMCI channel 3
+
+config EXYNOS4_DEV_MSHC
+	bool "MSHCI"
+	depends on PLAT_S5P
+	default n
+	help
+	IF MSHC is used, SDHC channel 0 is disabled.
+
+choice
+	prompt "Use Special PLL for MSHC"
+	depends on PLAT_S5P && EXYNOS4_DEV_MSHC
+	help
+		This feature change MMC4OUT's clock source between MPLL and EPLL
+	default EXYNOS4_MSHC_MPLL_40MHZ
+
+config EXYNOS4_MSHC_MPLL_40MHZ
+	bool "MPLL"
+
+config EXYNOS4_MSHC_VPLL_46MHZ
+	bool "VPLL"
+
+config EXYNOS4_MSHC_EPLL_45MHZ
+	bool "EPLL"
+endchoice
+
+comment "Use 8-bit bus width"
+
+config EXYNOS4_MSHC_8BIT
+	bool "MSHC with 8-bit bus"
+	depends on PLAT_S5P && EXYNOS4_DEV_MSHC
+	default n
+	help
+	  IF MSHC uses 8-bit bus, SDHC channel 1 is disabled.
+
+config EXYNOS4_SDHCI_CH0_8BIT
+	bool "SDHC Channel 0 with 8-bit bus"
+	depends on PLAT_S5P && !EXYNOS4_DEV_DWMCI && !EXYNOS4_DEV_MSHC
+	default n
+	help
+	  Support HSMMC Channel 0 8-bit bus.
+	  If selected, Channel 1 is disabled.
+
+config EXYNOS4_SDHCI_CH2_8BIT
+	bool "SDHC Channel 2 with 8-bit bus"
+	help
+	  Support HSMMC Channel 2 8-bit bus.
+	  If selected, Channel 3 is disabled.
+
+comment "Use DDR"
+	depends on PLAT_S5P && EXYNOS4_DEV_MSHC
+config EXYNOS4_MSHC_DDR
+	depends on PLAT_S5P && EXYNOS4_DEV_MSHC
+	bool "MSHC with DDR mode"
+	default n
+	help
+	  Enabling DDR(Dual Data Rate) mode.
+
+endmenu
+
+comment "Miscellaneous drivers"
+config WAKEUP_ASSIST
+	bool "Wakeup assist driver"
+	depends on PM
+	help
+	  If the wakeup time is too slow, toggling POWER butten shortly causes to
+	  ignore report of key event. It makes the android system not execute wake
+	  up codes.
+
+	  If selected, the wakeup assistant driver will report POWER key event
+	  directly
+endif
+
+config EXYNOS_C2C
+	bool "C2C device support"
+	depends on SAMSUNG_C2C
+	default y
+	help
+	  Add C2C device driver
+
+config S3C64XX_DEV_SPI0
+	bool
+	depends on S3C64XX_DEV_SPI
+	default n
+	help
+	  Samsung S3C64XX series type SPI
+
+config EXYNOS_DEV_C2C
+	bool
+	depends on EXYNOS_C2C
+	default y
+
+comment "Debugging Feature"
+menuconfig SEC_DEBUG
+	bool "Samsung TN Ramdump Feature"
+	default y
+	help
+	  Samsung TN Ramdump Feature. Use INFORM3 and magic number at 0xc0000000.
+
+if SEC_DEBUG
+config SEC_DEBUG_SCHED_LOG
+	bool "Samsung Scheduler Logging Feature"
+	default n
+	help
+	  Samsung Scheduler Logging Feature for Debug use.
+
+config SEC_DEBUG_SOFTIRQ_LOG
+	bool "Samsung Softirq Logging Feature"
+	default n
+	depends on SEC_DEBUG_SCHED_LOG
+	help
+	  Samsung Softirq Logging Feature for Debug use.
+	  This option enables us to log softirq enter/exit.
+	  It is not only hard-irq which results in scheduler lockup,
+	  To be more clear we need to see also softirq logs.
+
+config SEC_DEBUG_SCHED_LOG_NONCACHED
+	bool "Samsung Scheduler Logging on noncached buf"
+	depends on SEC_DEBUG_SCHED_LOG
+	default n
+	help
+	  This option enables sec_debug_sched_log_noncached support.
+	  It can support non-cached sched log in RAM dump and We don't
+	  need to concern cache flush status for analyzing sudden
+	  lockup issue.
+
+config SEC_DEBUG_SEMAPHORE_LOG
+	bool "Samsung Semaphore Logging Feature"
+	default n
+	help
+	  Samsung Semaphore Logging Feature for Debug use.
+
+config SEC_DEBUG_USER
+	bool "Panic on Userspace fault"
+	default y
+	help
+	  Panic on Userspace fault
+
+config SEC_DEBUG_PM_TEMP
+	bool "Temporary Logging for Sleep/Wakeup Issue"
+	default n
+	help
+	  Verbose Log on Sleep/Wakeup.
+
+config SEC_DEBUG_IRQ_EXIT_LOG
+	bool "Temporary Logging for IRQ delay"
+	default n
+	help
+	  Verbose Logging for IRQ delay.
+
+config SEC_DEBUG_AUXILIARY_LOG
+	bool "Samsung Auxiliary Logging on noncached buf"
+	default n
+	help
+	  This option enables sec_auxiliary_log support.
+	  we can log repeated information insuitable for kernel log like DVFS
+	  or power domain control information.
+	  It can support non-cached auxiliary log in RAM dump and We don't
+	  need to concern cache flush status for analyzing sudden
+	  system hang issue.
+
+config SEC_DEBUG_FUPLOAD_DUMP_MORE
+	bool "Dump more information at forced upload"
+	default n
+	help
+	  More information is printed out when a forced upload happens.
+	  It uses customized dump functions instead of panic call.
+
+config SEC_DEBUG_LIST_CORRUPTION
+	bool "Panic when list corruption detected"
+	default n
+	help
+	  Panic when list structure corruption detected.
+	  Sometimes list corruptions are reported.
+	  But it reports only with WARN level.
+	  This will immediately stop the system.
+
+config SEC_DEBUG_SYSRQ_B
+	bool "Panic when sysrq(b) detected"
+	default n
+	help
+	  Panic when sysrq('b') detected.
+	  In current debuggin feature sysrq('b') will anyway lead us to upload
+	  with unknown reset, we are not handling debug flags for this.
+	  With this feature we can find out what situation sysrq('b') is used.
+
+menuconfig SEC_WATCHDOG_RESET
+	bool "S5PV310 watchdog reset to exit from lockup"
+	depends on (CPU_EXYNOS4210 || CPU_EXYNOS4212 || CPU_EXYNOS4412)
+	default n
+	help
+	  Use watchdog reset to exit from lockup
+
+if SEC_WATCHDOG_RESET
+config SEC_WATCHDOG_PET_TIME
+	int "sec watchdog kicking time interval value"
+	default 5
+endif
+
+endif
+
+config SEC_LOG
+	default n
+	bool "Enable support for sec_log" if EMBEDDED
+	depends on PRINTK
+	help
+	  This option enables sec_log support. This provides combined
+	  log buffer for both bootloader and kernel. It also preserves
+	  previous content before reboot.
+
+config SEC_LOG_NONCACHED
+	default n
+	bool "Enable non cached kernel sec_log support" if EMBEDDED
+	depends on SEC_LOG
+	help
+	  This option enables sec_non_cached_klog support.  It can
+	  support non-cached kernel log in RAM dump and We don't need
+	  to concern cache flush status for analyzing sudden lockup
+	  issue.
+
+config SEC_LOG_LAST_KMSG
+	default n
+	bool "Enable /proc/last_kmsg support" if EMBEDDED
+	depends on SEC_LOG
+	help
+	  This option enables /proc/last_kmsg support.
+
+if SEC_MODEM
+comment "Samsung Modem Feature"
+
+config LTE_VIA_SWITCH
+	bool
+	default n
+
+choice
+	prompt "SEC MODEM CONFIG"
+	depends on SEC_MODEM
+	default SEC_MODEM_M0_C2C
+
+config SEC_MODEM_M0_C2C
+	bool "M0 with xmm6262 c2c"
+	select UMTS_MODEM_XMM6262
+	select LINK_DEVICE_HSIC
+	select LINK_DEVICE_C2C
+	select SAMSUNG_C2C
+	select C2C_DEUBG
+
+config SEC_MODEM_M0
+	bool "M0 with xmm6262"
+	select UMTS_MODEM_XMM6262
+	select LINK_DEVICE_HSIC
+
+config SEC_MODEM_M0_CTC
+	bool "M0 CTC with MDM6600"
+	select CDMA_MODEM_MDM6600
+	select LINK_DEVICE_DPRAM
+	select USBHUB_USB3503
+
+config SEC_MODEM_M1
+	bool "M1 with cmc221"
+	select LTE_MODEM_CMC221
+	select LINK_DEVICE_DPRAM
+	select LINK_DEVICE_USB
+	select USBHUB_USB3503
+
+config SEC_MODEM_C1
+	bool "C1 with cmc221"
+	select LTE_MODEM_CMC221
+	select LINK_DEVICE_DPRAM
+	select LINK_DEVICE_USB
+	select USBHUB_USB3503
+
+config SEC_MODEM_C1_VZW
+	bool "C1 with CMC221 and CBP7.2"
+	select CDMA_MODEM_CBP72
+	select LTE_MODEM_CMC221
+	select LTE_VIA_SWITCH
+	select LINK_DEVICE_DPRAM
+	select LINK_DEVICE_USB
+	select USBHUB_USB3503
+
+config SEC_MODEM_C1_LGT
+	bool "C1 with CMC221 and CBP7.2"
+	select CDMA_MODEM_CBP72
+	select LTE_MODEM_CMC221
+	select LTE_VIA_SWITCH
+	select LINK_DEVICE_DPRAM
+	select LINK_DEVICE_USB
+	select USBHUB_USB3503
+
+config SEC_MODEM_C1_CTC
+	bool "C1 with MDM6600"
+	select CDMA_MODEM_MDM6600
+	select LINK_DEVICE_DPRAM
+	select USBHUB_USB3503
+
+config SEC_MODEM_M2
+	bool "M2 with MDM9x15"
+
+config SEC_MODEM_U1
+	bool "U1 with xmm6260"
+	select UMTS_MODEM_XMM6260
+	select LINK_DEVICE_HSIC
+
+config SEC_MODEM_JENGA
+	bool "JENGA with xmm6262"
+	select UMTS_MODEM_XMM6262
+	select LINK_DEVICE_HSIC
+
+config SEC_MODEM_S2PLUS
+	bool "S2PLUS with xmm6262"
+	select UMTS_MODEM_XMM6262
+	select LINK_DEVICE_HSIC
+
+config SEC_MODEM_U1_LGT
+	bool "U1 with mdm6600"
+	select CDMA_MODEM_MDM6600
+	select LINK_DEVICE_DPRAM
+
+config SEC_MODEM_GAIA
+	bool "GAIA with cmc221"
+	select LTE_MODEM_CMC221
+	select LINK_DEVICE_DPRAM
+
+endchoice
+
+endif
+
+if BT
+config BT_CSR8811
+	bool "Enable CSR8811 driver"
+	default n
+
+config BT_BCM4330
+	bool "Enable BCM4330 driver"
+	default n
+
+config BT_BCM4334
+	bool "Enable BCM4334 driver"
+	default n
+	help
+	  Adds BCM4334 RFKILL driver for Broadcom BCM4334 chipset
+
+config BT_BCM43241
+	bool "Enable BCM43241 driver"
+	default n
+	help
+	  Adds BCM43241 RFKILL driver for Broadcom BCM4334 chipset
+
+config BT_MGMT
+	bool "Bluetooth Mgmt"
+	default n
+	help
+	  This is for bluetooth mgmt
+endif
+
+comment "Qualcomm Modem Feature"
+config QC_MODEM
+	bool "Qualcomm modem support"
+	default n
+
+config MSM_SUBSYSTEM_RESTART
+	bool "QC Modem restart handler"
+	default n
+
+config QC_MODEM_MDM9X15
+	bool "support QC mdm9x15 modem"
+	default n
+
+if QC_MODEM
+choice
+	prompt "QC MODEM CONFIG"
+	depends on QC_MODEM
+	default QC_MODEM_M3
+
+config QC_MODEM_M3
+	bool "M3 support QMI inteface over HSIC"
+	select MODEM_SUPPORT_QMI_INTERFACE
+	select MSM_SUBSYSTEM_RESTART
+	select USB_QCOM_DIAG_BRIDGE
+	select USB_QCOM_MDM_BRIDGE
+	select QC_MODEM_MDM9X15
+	select MSM_RMNET_USB
+
+endchoice
+endif
+
+config SAMSUNG_PRODUCT_SHIP
+	bool "set up for product shippling"
+	default n

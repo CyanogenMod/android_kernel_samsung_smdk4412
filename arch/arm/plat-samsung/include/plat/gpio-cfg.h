@@ -26,6 +26,8 @@
 
 typedef unsigned int __bitwise__ s3c_gpio_pull_t;
 typedef unsigned int __bitwise__ s5p_gpio_drvstr_t;
+typedef unsigned int __bitwise__ s5p_gpio_pd_cfg_t;
+typedef unsigned int __bitwise__ s5p_gpio_pd_pull_t;
 
 /* forward declaration if gpio-core.h hasn't been included */
 struct s3c_gpio_chip;
@@ -125,12 +127,30 @@ extern int s3c_gpio_cfgpin_range(unsigned int start, unsigned int nr,
  *
  * These values control the state of the weak pull-{up,down} resistors
  * available on most pins on the S3C series. Not all chips support both
- * up or down settings, and it may be dependent on the chip that is being
+ * up or down settings, and it may be dependant on the chip that is being
  * used to whether the particular mode is available.
  */
+#if defined(CONFIG_ARCH_S5PV310) || defined(CONFIG_ARCH_EXYNOS)
+#define S3C_GPIO_PULL_NONE	((__force s3c_gpio_pull_t)0x00)
+#define S3C_GPIO_PULL_DOWN	((__force s3c_gpio_pull_t)0x01)
+#define S3C_GPIO_PULL_UP	((__force s3c_gpio_pull_t)0x03)
+#else
 #define S3C_GPIO_PULL_NONE	((__force s3c_gpio_pull_t)0x00)
 #define S3C_GPIO_PULL_DOWN	((__force s3c_gpio_pull_t)0x01)
 #define S3C_GPIO_PULL_UP	((__force s3c_gpio_pull_t)0x02)
+#endif
+
+#if defined(CONFIG_ARCH_S5PV310) || defined(CONFIG_ARCH_EXYNOS)
+/* need to move to mach/gpio.h */
+#define S3C_GPIO_SLP_OUT0       ((__force s3c_gpio_pull_t)0x00)
+#define S3C_GPIO_SLP_OUT1       ((__force s3c_gpio_pull_t)0x01)
+#define S3C_GPIO_SLP_INPUT      ((__force s3c_gpio_pull_t)0x02)
+#define S3C_GPIO_SLP_PREV       ((__force s3c_gpio_pull_t)0x03)
+
+#define S3C_GPIO_SETPIN_ZERO         0
+#define S3C_GPIO_SETPIN_ONE          1
+#define S3C_GPIO_SETPIN_NONE	     2
+#endif
 
 /**
  * s3c_gpio_setpull() - set the state of a gpio pin pull resistor
@@ -206,6 +226,65 @@ extern s5p_gpio_drvstr_t s5p_gpio_get_drvstr(unsigned int pin);
  * cannot support the requested setting.
 */
 extern int s5p_gpio_set_drvstr(unsigned int pin, s5p_gpio_drvstr_t drvstr);
+
+/* Define values for the power down configuration available for each gpio pin.
+ *
+ * These values control the state of the power down configuration resistors
+ * available on most pins on the S5P series.
+ */
+#define S5P_GPIO_PD_OUTPUT0	((__force s5p_gpio_pd_cfg_t)0x00)
+#define S5P_GPIO_PD_OUTPUT1	((__force s5p_gpio_pd_cfg_t)0x01)
+#define S5P_GPIO_PD_INPUT	((__force s5p_gpio_pd_cfg_t)0x02)
+#define S5P_GPIO_PD_PREV_STATE	((__force s5p_gpio_pd_cfg_t)0x03)
+
+/**
+ * s5p_gpio_set_pd_cfg() - set the configuration of a gpio power down mode
+ * @pin: The pin number to configure the pull resistor.
+ * @pd_cfg: The configuration for the pwer down mode configuration register.
+ *
+ * This function sets the configuration of the power down mode resistor for the
+ * specified pin. It will return 0 if successful, or a negative error
+ * code if the pin cannot support the requested power down mode.
+ *
+*/
+extern int s5p_gpio_set_pd_cfg(unsigned int pin, s5p_gpio_pd_cfg_t pd_cfg);
+
+/**
+ * s5p_gpio_get_pd_cfg() - get the power down mode configuration of a gpio pin
+ * @pin: The pin number to get the settings for
+ *
+ * Read the power down mode resistor value for the specified pin.
+*/
+extern s5p_gpio_pd_cfg_t s5p_gpio_get_pd_cfg(unsigned int pin);
+
+/* Define values for the power down pull-{up,down} available for each gpio pin.
+ *
+ * These values control the state of the power down mode pull-{up,down}
+ * resistors available on most pins on the S5P series.
+ */
+#define S5P_GPIO_PD_UPDOWN_DISABLE	((__force s5p_gpio_pd_pull_t)0x00)
+#define S5P_GPIO_PD_DOWN_ENABLE		((__force s5p_gpio_pd_pull_t)0x01)
+#define S5P_GPIO_PD_UP_ENABLE		((__force s5p_gpio_pd_pull_t)0x03)
+
+/**
+ * s5p_gpio_set_pd_pull() - set the pull-{up,down} of a gpio pin power down mode
+ * @pin: The pin number to configure the pull resistor.
+ * @pd_pull: The configuration for the power down mode pull resistor.
+ *
+ * This function sets the configuration of the pull-{up,down} resistor for the
+ * specified pin. It will return 0 if successful, or a negative error
+ * code if the pin cannot support the requested pull setting.
+ *
+*/
+extern int s5p_gpio_set_pd_pull(unsigned int pin, s5p_gpio_pd_pull_t pd_pull);
+
+/**
+ * s5p_gpio_get_pd_pull() - get the power down pull resistor config of gpio pin
+ * @pin: The pin number to get the settings for
+ *
+ * Read the power mode pull resistor value for the specified pin.
+*/
+extern s5p_gpio_pd_pull_t s5p_gpio_get_pd_pull(unsigned int pin);
 
 /**
  * s5p_register_gpio_interrupt() - register interrupt support for a gpio group

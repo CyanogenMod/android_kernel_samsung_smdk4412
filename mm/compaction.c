@@ -635,6 +635,10 @@ unsigned long try_to_compact_pages(struct zonelist *zonelist,
 	if (!order || !may_enter_fs || !may_perform_io)
 		return rc;
 
+#ifdef CONFIG_MACH_Q1_BD
+	/* Temporary log to get information whether the compaction works well */
+	printk(KERN_NOTICE "%s, order=%d, sync=%d\n", __func__, order, sync);
+#endif
 	count_vm_event(COMPACTSTALL);
 
 	/* Compact each zone in the list */

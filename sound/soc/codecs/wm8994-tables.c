@@ -78,7 +78,7 @@ const struct wm8994_access_mask wm8994_access_masks[WM8994_CACHE_SIZE] = {
 	{ 0x0000, 0x0000 }, /* R74 */
 	{ 0x0000, 0x0000 }, /* R75 */
 	{ 0x8000, 0x8000 }, /* R76    - Charge Pump (1) */
-	{ 0x0000, 0x0000 }, /* R77 */
+	{ 0x8000, 0x8000 }, /* R77    - Charge Pump (2) */
 	{ 0x0000, 0x0000 }, /* R78 */
 	{ 0x0000, 0x0000 }, /* R79 */
 	{ 0x0000, 0x0000 }, /* R80 */
@@ -1073,8 +1073,8 @@ const struct wm8994_access_mask wm8994_access_masks[WM8994_CACHE_SIZE] = {
 	{ 0x0000, 0x0000 }, /* R1069 */
 	{ 0x0000, 0x0000 }, /* R1070 */
 	{ 0x0000, 0x0000 }, /* R1071 */
-	{ 0x0000, 0x0000 }, /* R1072 */
-	{ 0x0000, 0x0000 }, /* R1073 */
+	{ 0x006F, 0x006F }, /* R1072  - AIF1 DAC1 Noise Gate */
+	{ 0x006F, 0x006F }, /* R1073  - AIF1 DAC2 Noise Gate */
 	{ 0x0000, 0x0000 }, /* R1074 */
 	{ 0x0000, 0x0000 }, /* R1075 */
 	{ 0x0000, 0x0000 }, /* R1076 */
@@ -1329,7 +1329,7 @@ const struct wm8994_access_mask wm8994_access_masks[WM8994_CACHE_SIZE] = {
 	{ 0x0000, 0x0000 }, /* R1325 */
 	{ 0x0000, 0x0000 }, /* R1326 */
 	{ 0x0000, 0x0000 }, /* R1327 */
-	{ 0x0000, 0x0000 }, /* R1328 */
+	{ 0x006F, 0x006F }, /* R1328  - AIF2 DAC Noise Gate */
 	{ 0x0000, 0x0000 }, /* R1329 */
 	{ 0x0000, 0x0000 }, /* R1330 */
 	{ 0x0000, 0x0000 }, /* R1331 */
@@ -1651,7 +1651,7 @@ const u16 wm8994_reg_defaults[WM8994_CACHE_SIZE] = {
 	0x0000,     /* R74 */
 	0x0000,     /* R75 */
 	0x1F25,     /* R76    - Charge Pump (1) */
-	0x0000,     /* R77 */
+	0xAB19,     /* R77    - Charge Pump (2) */
 	0x0000,     /* R78 */
 	0x0000,     /* R79 */
 	0x0000,     /* R80 */
@@ -2124,8 +2124,8 @@ const u16 wm8994_reg_defaults[WM8994_CACHE_SIZE] = {
 	0x0000,     /* R547   - FLL1 Control (4) */
 	0x0C80,     /* R548   - FLL1 Control (5) */
 	0x0000,     /* R549 */
-	0x0000,     /* R550 */
-	0x0000,     /* R551 */
+	0x0000,     /* R550   - FLL1 EFS 1 */
+	0x0006,     /* R551   - FLL1 EFS 2 */
 	0x0000,     /* R552 */
 	0x0000,     /* R553 */
 	0x0000,     /* R554 */
@@ -2156,8 +2156,8 @@ const u16 wm8994_reg_defaults[WM8994_CACHE_SIZE] = {
 	0x0000,     /* R579   - FLL2 Control (4) */
 	0x0C80,     /* R580   - FLL2 Control (5) */
 	0x0000,     /* R581 */
-	0x0000,     /* R582 */
-	0x0000,     /* R583 */
+	0x0000,     /* R582   - FLL2 EFS 1 */
+	0x0006,     /* R583   - FLL2 EFS 2 */
 	0x0000,     /* R584 */
 	0x0000,     /* R585 */
 	0x0000,     /* R586 */
@@ -2646,8 +2646,8 @@ const u16 wm8994_reg_defaults[WM8994_CACHE_SIZE] = {
 	0x0000,     /* R1069 */
 	0x0000,     /* R1070 */
 	0x0000,     /* R1071 */
-	0x0000,     /* R1072 */
-	0x0000,     /* R1073 */
+	0x0068,     /* R1072  - AIF1 DAC1 Noise Gate */
+	0x0068,     /* R1073  - AIF1 DAC2 Noise Gate */
 	0x0000,     /* R1074 */
 	0x0000,     /* R1075 */
 	0x0000,     /* R1076 */
@@ -2902,7 +2902,7 @@ const u16 wm8994_reg_defaults[WM8994_CACHE_SIZE] = {
 	0x0000,     /* R1325 */
 	0x0000,     /* R1326 */
 	0x0000,     /* R1327 */
-	0x0000,     /* R1328 */
+	0x0068,     /* R1328  - AIF2 DAC Noise Gate */
 	0x0000,     /* R1329 */
 	0x0000,     /* R1330 */
 	0x0000,     /* R1331 */

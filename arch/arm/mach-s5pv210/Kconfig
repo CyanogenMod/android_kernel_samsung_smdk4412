@@ -18,6 +18,11 @@ config CPU_S5PV210
 	help
 	  Enable S5PV210 CPU support
 
+config CPU_S5PC110
+	bool
+	help
+	  S5PC110(MCP) is one of package option of S5PV210.
+
 config S5PV210_SETUP_I2C1
 	bool
 	help
@@ -105,14 +110,29 @@ config MACH_GONI
 config MACH_SMDKC110
 	bool "SMDKC110"
 	select CPU_S5PV210
+	select CPU_S5PC110
+	select S3C_DEV_FB
+	select S3C_DEV_HSMMC
+	select S3C_DEV_HSMMC1
+	select S3C_DEV_HSMMC2
+	select S3C_DEV_HSMMC3
 	select S3C_DEV_I2C1
 	select S3C_DEV_I2C2
 	select S3C_DEV_RTC
 	select S3C_DEV_WDT
+	select SAMSUNG_DEV_ADC
+	select SAMSUNG_DEV_BACKLIGHT
 	select SAMSUNG_DEV_IDE
+	select SAMSUNG_DEV_KEYPAD
+	select SAMSUNG_DEV_PWM
+	select SAMSUNG_DEV_TS
+	select S5PV210_SETUP_FB_24BPP
 	select S5PV210_SETUP_I2C1
 	select S5PV210_SETUP_I2C2
 	select S5PV210_SETUP_IDE
+	select S5PV210_SETUP_KEYPAD
+	select S5PV210_SETUP_SDHCI
+	select HAVE_PWM
 	help
 	  Machine support for Samsung SMDKC110
 	  S5PC110(MCP) is one of package option of S5PV210
@@ -134,6 +154,7 @@ config MACH_SMDKV210
 	select S3C_DEV_RTC
 	select S3C_DEV_WDT
 	select SAMSUNG_DEV_ADC
+	select SAMSUNG_DEV_BACKLIGHT
 	select SAMSUNG_DEV_IDE
 	select SAMSUNG_DEV_KEYPAD
 	select SAMSUNG_DEV_PWM
@@ -144,6 +165,7 @@ config MACH_SMDKV210
 	select S5PV210_SETUP_IDE
 	select S5PV210_SETUP_KEYPAD
 	select S5PV210_SETUP_SDHCI
+	select HAVE_PWM
 	help
 	  Machine support for Samsung SMDKV210
 

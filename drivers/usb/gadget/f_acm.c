@@ -366,6 +366,9 @@ static int acm_setup(struct usb_function *f, const struct usb_ctrlrequest *ctrl)
 		 * that bit, we should return to that no-flow state.
 		 */
 		acm->port_handshake_bits = w_value;
+#ifdef CONFIG_USB_DUN_SUPPORT
+		notify_control_line_state((unsigned long)w_value);
+#endif
 		break;
 
 	default:
@@ -405,10 +408,10 @@ static int acm_set_alt(struct usb_function *f, unsigned intf, unsigned alt)
 			usb_ep_disable(acm->notify);
 		} else {
 			VDBG(cdev, "init acm ctrl interface %d\n", intf);
-			acm->notify_desc = ep_choose(cdev->gadget,
-					acm->hs.notify,
-					acm->fs.notify);
 		}
+		acm->notify_desc = ep_choose(cdev->gadget,
+				acm->hs.notify,
+				acm->fs.notify);
 		usb_ep_enable(acm->notify, acm->notify_desc);
 		acm->notify->driver_data = acm;
 
@@ -418,11 +421,11 @@ static int acm_set_alt(struct usb_function *f, unsigned intf, unsigned alt)
 			gserial_disconnect(&acm->port);
 		} else {
 			DBG(cdev, "activate acm ttyGS%d\n", acm->port_num);
-			acm->port.in_desc = ep_choose(cdev->gadget,
-					acm->hs.in, acm->fs.in);
-			acm->port.out_desc = ep_choose(cdev->gadget,
-					acm->hs.out, acm->fs.out);
 		}
+		acm->port.in_desc = ep_choose(cdev->gadget,
+				acm->hs.in, acm->fs.in);
+		acm->port.out_desc = ep_choose(cdev->gadget,
+				acm->hs.out, acm->fs.out);
 		gserial_connect(&acm->port, acm->port_num);
 
 	} else
@@ -536,6 +539,21 @@ static void acm_cdc_notify_complete(struct usb_ep *ep, struct usb_request *req)
 		acm_notify_serial_state(acm);
 }
 
+#ifdef CONFIG_USB_DUN_SUPPORT
+int acm_notify(void *dev, u16 state)
+{
+	struct f_acm	*acm;
+	if (dev) {
+		acm = (struct f_acm *)dev;
+		acm->serial_state = state;
+		acm_notify_serial_state(acm);
+	} else {
+		printk(KERN_DEBUG "usb: %s not ready\n", __func__);
+		return -EAGAIN;
+	}
+	return 0;
+}
+#endif
 /* connect == the TTY link is open */
 
 static void acm_connect(struct gserial *port)
@@ -669,6 +687,9 @@ acm_bind(struct usb_configuration *c, struct usb_function *f)
 			gadget_is_dualspeed(c->cdev->gadget) ? "dual" : "full",
 			acm->port.in->name, acm->port.out->name,
 			acm->notify->name);
+#ifdef CONFIG_USB_DUN_SUPPORT
+	modem_register(acm);
+#endif
 	return 0;
 
 fail:
@@ -697,7 +718,11 @@ acm_unbind(struct usb_configuration *c, struct usb_function *f)
 		usb_free_descriptors(f->hs_descriptors);
 	usb_free_descriptors(f->descriptors);
 	gs_free_req(acm->notify, acm->notify_req);
+	kfree(acm->port.func.name);
 	kfree(acm);
+#ifdef CONFIG_USB_DUN_SUPPORT
+	modem_unregister();
+#endif
 }
 
 /* Some controllers can't support CDC ACM ... */
@@ -768,7 +793,11 @@ int acm_bind_config(struct usb_configuration *c, u8 port_num)
 	acm->port.disconnect = acm_disconnect;
 	acm->port.send_break = acm_send_break;
 
-	acm->port.func.name = "acm";
+	acm->port.func.name = kasprintf(GFP_KERNEL, "acm%u", port_num);
+	if (!acm->port.func.name) {
+		kfree(acm);
+		return -ENOMEM;
+	}
 	acm->port.func.strings = acm_strings;
 	/* descriptors are per-instance copies */
 	acm->port.func.bind = acm_bind;

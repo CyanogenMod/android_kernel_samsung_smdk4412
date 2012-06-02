@@ -48,18 +48,32 @@ static int __vb2_buf_mem_alloc(struct vb2_buffer *vb,
 {
 	struct vb2_queue *q = vb->vb2_queue;
 	void *mem_priv;
-	int plane;
+	int plane, ret, export_fd = 0;
 
 	/* Allocate memory for all planes in this buffer */
 	for (plane = 0; plane < vb->num_planes; ++plane) {
 		mem_priv = call_memop(q, plane, alloc, q->alloc_ctx[plane],
 					plane_sizes[plane]);
-		if (IS_ERR_OR_NULL(mem_priv))
+		if (IS_ERR_OR_NULL(mem_priv)) {
+			ret = -ENOMEM;
 			goto free;
+		}
 
 		/* Associate allocator private data with this plane */
 		vb->planes[plane].mem_priv = mem_priv;
 		vb->v4l2_planes[plane].length = plane_sizes[plane];
+
+		if (q->memory == V4L2_MEMORY_DMABUF) {
+			ret = call_memop(q, plane, export_dmabuf,
+						q->alloc_ctx[plane],
+						mem_priv, &export_fd);
+			if (ret < 0) {
+				dprintk(1, "failed to export buf to dmabuf.\n");
+				goto free;
+			}
+
+			vb->v4l2_planes[plane].m.fd = export_fd;
+		}
 	}
 
 	return 0;
@@ -68,7 +82,7 @@ free:
 	for (; plane > 0; --plane)
 		call_memop(q, plane, put, vb->planes[plane - 1].mem_priv);
 
-	return -ENOMEM;
+	return ret;
 }
 
 /**
@@ -101,6 +115,27 @@ static void __vb2_buf_userptr_put(struct vb2_buffer *vb)
 
 		if (mem_priv) {
 			call_memop(q, plane, put_userptr, mem_priv);
+			vb->planes[plane].mem_priv = NULL;
+		}
+	}
+}
+
+/**
+ * __vb2_buf_dmabuf_put() - release memory associated with
+ * a DMABUF shared buffer
+ */
+static void __vb2_buf_dmabuf_put(struct vb2_buffer *vb)
+{
+	struct vb2_queue *q = vb->vb2_queue;
+	unsigned int plane;
+
+	for (plane = 0; plane < vb->num_planes; ++plane) {
+		void *mem_priv = vb->planes[plane].mem_priv;
+
+		if (mem_priv) {
+			call_memop(q, plane, detach_dmabuf, mem_priv);
+			dma_buf_put(vb->planes[plane].dbuf);
+			vb->planes[plane].dbuf = NULL;
 			vb->planes[plane].mem_priv = NULL;
 		}
 	}
@@ -167,8 +202,9 @@ static int __vb2_queue_alloc(struct vb2_queue *q, enum v4l2_memory memory,
 		vb->v4l2_buf.type = q->type;
 		vb->v4l2_buf.memory = memory;
 
-		/* Allocate video buffer memory for the MMAP type */
-		if (memory == V4L2_MEMORY_MMAP) {
+		/* Allocate video buffer memory for the MMAP and DMABUF type */
+		if (memory == V4L2_MEMORY_MMAP ||
+					memory == V4L2_MEMORY_DMABUF) {
 			ret = __vb2_buf_mem_alloc(vb, plane_sizes);
 			if (ret) {
 				dprintk(1, "Failed allocating memory for "
@@ -220,6 +256,8 @@ static void __vb2_free_mem(struct vb2_queue *q)
 		/* Free MMAP buffers or release USERPTR buffers */
 		if (q->memory == V4L2_MEMORY_MMAP)
 			__vb2_buf_mem_free(vb);
+		if (q->memory == V4L2_MEMORY_DMABUF)
+			__vb2_buf_dmabuf_put(vb);
 		else
 			__vb2_buf_userptr_put(vb);
 	}
@@ -260,7 +298,8 @@ static void __vb2_queue_free(struct vb2_queue *q)
  * __verify_planes_array() - verify that the planes array passed in struct
  * v4l2_buffer from userspace can be safely used
  */
-static int __verify_planes_array(struct vb2_buffer *vb, struct v4l2_buffer *b)
+static int __verify_planes_array(struct vb2_buffer *vb,
+					const struct v4l2_buffer *b)
 {
 	/* Is memory for copying plane information present? */
 	if (NULL == b->m.planes) {
@@ -303,6 +342,14 @@ static int __fill_v4l2_buffer(struct vb2_buffer *vb, struct v4l2_buffer *b)
 		 */
 		memcpy(b->m.planes, vb->v4l2_planes,
 			b->length * sizeof(struct v4l2_plane));
+
+		if (q->memory == V4L2_MEMORY_DMABUF) {
+			unsigned int plane;
+
+			for (plane = 0; plane < vb->num_planes; ++plane)
+				b->m.planes[plane].m.fd =
+						vb->v4l2_planes[plane].m.fd;
+		}
 	} else {
 		/*
 		 * We use length and offset in v4l2_planes array even for
@@ -314,6 +361,8 @@ static int __fill_v4l2_buffer(struct vb2_buffer *vb, struct v4l2_buffer *b)
 			b->m.offset = vb->v4l2_planes[0].m.mem_offset;
 		else if (q->memory == V4L2_MEMORY_USERPTR)
 			b->m.userptr = vb->v4l2_planes[0].m.userptr;
+		else if (q->memory == V4L2_MEMORY_DMABUF)
+			b->m.fd = vb->v4l2_planes[0].m.fd;
 	}
 
 	/*
@@ -429,6 +478,21 @@ static bool __buffers_in_use(struct vb2_queue *q)
 }
 
 /**
+ * __verify_dmabuf_ops() - verify that all memory operations required for
+ * DMABUF queue type have been provided
+ */
+static int __verify_dmabuf_ops(struct vb2_queue *q)
+{
+	if (!(q->io_modes & VB2_DMABUF) || !q->mem_ops->attach_dmabuf
+			|| !q->mem_ops->detach_dmabuf
+			|| !q->mem_ops->map_dmabuf
+			|| !q->mem_ops->unmap_dmabuf)
+		return -EINVAL;
+
+	return 0;
+}
+
+/**
  * vb2_reqbufs() - Initiate streaming
  * @q:		videobuf2 queue
  * @req:	struct passed from userspace to vidioc_reqbufs handler in driver
@@ -463,6 +527,7 @@ int vb2_reqbufs(struct vb2_queue *q, struct v4l2_requestbuffers *req)
 	}
 
 	if (req->memory != V4L2_MEMORY_MMAP
+			&& req->memory != V4L2_MEMORY_DMABUF
 			&& req->memory != V4L2_MEMORY_USERPTR) {
 		dprintk(1, "reqbufs: unsupported memory type\n");
 		return -EINVAL;
@@ -489,6 +554,11 @@ int vb2_reqbufs(struct vb2_queue *q, struct v4l2_requestbuffers *req)
 
 	if (req->memory == V4L2_MEMORY_USERPTR && __verify_userptr_ops(q)) {
 		dprintk(1, "reqbufs: USERPTR for current setup unsupported\n");
+		return -EINVAL;
+	}
+
+	if (req->memory == V4L2_MEMORY_DMABUF && __verify_dmabuf_ops(q)) {
+		dprintk(1, "reqbufs: DMABUF for current setup unsupported\n");
 		return -EINVAL;
 	}
 
@@ -658,7 +728,7 @@ EXPORT_SYMBOL_GPL(vb2_buffer_done);
  * __fill_vb2_buffer() - fill a vb2_buffer with information provided in
  * a v4l2_buffer by the userspace
  */
-static int __fill_vb2_buffer(struct vb2_buffer *vb, struct v4l2_buffer *b,
+static int __fill_vb2_buffer(struct vb2_buffer *vb, const struct v4l2_buffer *b,
 				struct v4l2_plane *v4l2_planes)
 {
 	unsigned int plane;
@@ -695,6 +765,11 @@ static int __fill_vb2_buffer(struct vb2_buffer *vb, struct v4l2_buffer *b,
 					b->m.planes[plane].length;
 			}
 		}
+		if (b->memory == V4L2_MEMORY_DMABUF) {
+			for (plane = 0; plane < vb->num_planes; ++plane)
+				v4l2_planes[plane].m.fd =
+						b->m.planes[plane].m.fd;
+		}
 	} else {
 		/*
 		 * Single-planar buffers do not use planes array,
@@ -709,6 +784,8 @@ static int __fill_vb2_buffer(struct vb2_buffer *vb, struct v4l2_buffer *b,
 			v4l2_planes[0].m.userptr = b->m.userptr;
 			v4l2_planes[0].length = b->length;
 		}
+		if (b->memory == V4L2_MEMORY_DMABUF)
+			v4l2_planes[0].m.fd = b->m.fd;
 	}
 
 	vb->v4l2_buf.field = b->field;
@@ -806,14 +883,117 @@ static int __qbuf_mmap(struct vb2_buffer *vb, struct v4l2_buffer *b)
 }
 
 /**
+ * __qbuf_dmabuf() - handle qbuf of a DMABUF buffer
+ */
+static int __qbuf_dmabuf(struct vb2_buffer *vb, const struct v4l2_buffer *b)
+{
+	struct v4l2_plane planes[VIDEO_MAX_PLANES];
+	struct vb2_queue *q = vb->vb2_queue;
+	void *mem_priv;
+	unsigned int plane;
+	int ret;
+
+	/* Verify and copy relevant information provided by the userspace */
+	ret = __fill_vb2_buffer(vb, b, planes);
+	if (ret)
+		return ret;
+
+	for (plane = 0; plane < vb->num_planes; ++plane) {
+		struct dma_buf *dbuf = dma_buf_get(planes[plane].m.fd);
+
+		if (IS_ERR_OR_NULL(dbuf)) {
+			dprintk(1, "qbuf: invalid dmabuf fd for "
+					"plane %d\n", plane);
+			ret = PTR_ERR(dbuf);
+			goto err;
+		}
+
+		/* this doesn't get filled in until __fill_vb2_buffer(),
+		 * since it isn't known until after dma_buf_get()..
+		 */
+		planes[plane].length = dbuf->size;
+
+		/* Skip the plane if already verified */
+		if (dbuf == vb->planes[plane].dbuf) {
+			dma_buf_put(dbuf);
+			continue;
+		}
+
+		dprintk(3, "qbuf: buffer descriptor for plane %d changed, "
+				"reattaching dma buf\n", plane);
+
+		/* Release previously acquired memory if present */
+		if (vb->planes[plane].mem_priv) {
+			call_memop(q, plane, detach_dmabuf,
+					vb->planes[plane].mem_priv);
+			dma_buf_put(vb->planes[plane].dbuf);
+		}
+
+		vb->planes[plane].mem_priv = NULL;
+
+		/* Acquire each plane's memory */
+		mem_priv = q->mem_ops->attach_dmabuf(
+				q->alloc_ctx[plane], dbuf);
+		if (IS_ERR(mem_priv)) {
+			dprintk(1, "qbuf: failed acquiring dmabuf "
+					"memory for plane %d\n", plane);
+			ret = PTR_ERR(mem_priv);
+			goto err;
+		}
+
+		vb->planes[plane].dbuf = dbuf;
+		vb->planes[plane].mem_priv = mem_priv;
+	}
+
+	/*
+	 * TODO this pins the buffer (dma_buf_map_attachment()).. but
+	 * really we want to do this just before DMA, not when the
+	 * buffer is queued..
+	 */
+	 call_memop(q, plane, map_dmabuf, vb->planes[plane].mem_priv);
+
+	/*
+	 * Call driver-specific initialization on the newly acquired buffer,
+	 * if provided.
+	 */
+	ret = call_qop(q, buf_init, vb);
+	if (ret) {
+		dprintk(1, "qbuf: buffer initialization failed\n");
+		goto err;
+	}
+
+	/*
+	 * Now that everything is in order, copy relevant information
+	 * provided by userspace.
+	 */
+	for (plane = 0; plane < vb->num_planes; ++plane)
+		vb->v4l2_planes[plane] = planes[plane];
+
+	return 0;
+err:
+	/* In case of errors, release planes that were already acquired */
+	__vb2_buf_dmabuf_put(vb);
+
+	return ret;
+}
+
+/**
  * __enqueue_in_driver() - enqueue a vb2_buffer in driver for processing
  */
 static void __enqueue_in_driver(struct vb2_buffer *vb)
 {
 	struct vb2_queue *q = vb->vb2_queue;
+	void *privs[VIDEO_MAX_PLANES];
+	int plane;
 
 	vb->state = VB2_BUF_STATE_ACTIVE;
 	atomic_inc(&q->queued_count);
+
+	for (plane = 0; plane < vb->num_planes; plane++)
+		privs[plane] = vb->planes[plane].mem_priv;
+
+	call_memop(q, plane, sync_to_dev, q->alloc_ctx, privs, vb->num_planes,
+			vb->v4l2_buf.type);
 	q->ops->buf_queue(vb);
 }
 
@@ -875,6 +1055,8 @@ int vb2_qbuf(struct vb2_queue *q, struct v4l2_buffer *b)
 		ret = __qbuf_mmap(vb, b);
 	else if (q->memory == V4L2_MEMORY_USERPTR)
 		ret = __qbuf_userptr(vb, b);
+	else if (q->memory == V4L2_MEMORY_DMABUF)
+			ret = __qbuf_dmabuf(vb, b);
 	else {
 		WARN(1, "Invalid queue type\n");
 		return -EINVAL;
@@ -1046,6 +1228,7 @@ EXPORT_SYMBOL_GPL(vb2_wait_for_all_buffers);
 int vb2_dqbuf(struct vb2_queue *q, struct v4l2_buffer *b, bool nonblocking)
 {
 	struct vb2_buffer *vb = NULL;
+	int plane;
 	int ret;
 
 	if (q->fileio) {
@@ -1070,8 +1253,27 @@ int vb2_dqbuf(struct vb2_queue *q, struct v4l2_buffer *b, bool nonblocking)
 		return ret;
 	}
 
+	/*
+	 * TODO this unpins the buffer (dma_buf_unmap_attachment()).. but
+	 * really we want to do this just after DMA, not when the
+	 * buffer is dequeued..
+	 */
+	if (q->memory == V4L2_MEMORY_DMABUF)
+		for (plane = 0; plane < vb->num_planes; ++plane)
+			call_memop(q, plane, unmap_dmabuf,
+					vb->planes[plane].mem_priv);
+
 	switch (vb->state) {
 	case VB2_BUF_STATE_DONE:
+		{
+			void *privs[VIDEO_MAX_PLANES];
+
+			for (plane = 0; plane < vb->num_planes; plane++)
+				privs[plane] = vb->planes[plane].mem_priv;
+
+			call_memop(q, plane, sync_from_dev, q->alloc_ctx, privs,
+					vb->num_planes, vb->v4l2_buf.type);
+		}
 		dprintk(3, "dqbuf: Returning done buffer\n");
 		break;
 	case VB2_BUF_STATE_ERROR:

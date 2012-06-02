@@ -135,6 +135,9 @@ int usb_control_msg(struct usb_device *dev, unsigned int pipe, __u8 request,
 {
 	struct usb_ctrlrequest *dr;
 	int ret;
+#if defined(CONFIG_LINK_DEVICE_HSIC) && defined(CONFIG_UMTS_MODEM_XMM6262)
+	int limit_timeout;
+#endif
 
 	dr = kmalloc(sizeof(struct usb_ctrlrequest), GFP_NOIO);
 	if (!dr)
@@ -148,8 +151,22 @@ int usb_control_msg(struct usb_device *dev, unsigned int pipe, __u8 request,
 
 	/* dbg("usb_control_msg"); */
 
-	ret = usb_internal_control_msg(dev, pipe, dr, data, size, timeout);
+#if defined(CONFIG_LINK_DEVICE_HSIC) && defined(CONFIG_UMTS_MODEM_XMM6262)
+	/* Sometimes AP can't received the HSIC descriptor when AP L3->L0
+	 * reset-resume, then got the dpm_timeout panic caused 5sec * retry
+	 * timeout. we can get the cp dump after dpm resume.
+	 * portnum 2 is HSIC phy0 for CP.
+	 */
+	limit_timeout = (dev->portnum == 2) ? min(timeout, 1500) : timeout;
 
+	/* pr_debug("%s: dev=%s, portnum=%d, timeout=%d\n", __func__,
+		dev_name(&dev->dev), dev->portnum, limit_timeout); */
+
+	ret = usb_internal_control_msg(dev, pipe, dr, data, size,
+		limit_timeout);
+#else
+	ret = usb_internal_control_msg(dev, pipe, dr, data, size, timeout);
+#endif
 	kfree(dr);
 
 	return ret;
@@ -1857,6 +1874,11 @@ free_interfaces:
 				dev_name(&intf->dev), ret);
 			continue;
 		}
+#ifdef CONFIG_HOST_COMPLIANT_TEST
+		if (usb_get_intfdata(intf) == NULL ) {
+		       dev_info( &intf->dev, "%s : Not match interface - driver detect fail\n",__func__);
+		}
+#endif
 		create_intf_ep_devs(intf);
 	}
 

@@ -138,12 +138,18 @@ invalidate_complete_page(struct address_space *mapping, struct page *page)
 	return ret;
 }
 
+#ifdef CONFIG_MACH_P4NOTE
+static int unmap_mapcount = -99;
+#endif
 int truncate_inode_page(struct address_space *mapping, struct page *page)
 {
 	if (page_mapped(page)) {
 		unmap_mapping_range(mapping,
 				   (loff_t)page->index << PAGE_CACHE_SHIFT,
 				   PAGE_CACHE_SIZE, 0);
+#ifdef CONFIG_MACH_P4NOTE
+		unmap_mapcount = atomic_read(&(page)->_mapcount);
+#endif
 	}
 	return truncate_complete_page(mapping, page);
 }

@@ -909,11 +909,22 @@ config CC_OPTIMIZE_FOR_SIZE
 
 	  If unsure, say Y.
 
+config CC_CHECK_WARNING_STRICTLY
+	bool "Check warnings more strictly"
+	help
+	  Enabling this option will pass "-Werror" to gcc
+
 config SYSCTL
 	bool
 
 config ANON_INODES
 	bool
+
+config PANIC_TIMEOUT
+	int "Default panic timeout"
+	default 0
+	help
+	  Set default panic timeout.
 
 menuconfig EXPERT
 	bool "Configure standard kernel features (expert users)"
@@ -1080,6 +1091,15 @@ config SHMEM
 	  to userspace as tmpfs if TMPFS is enabled. Disabling this
 	  option replaces shmem and tmpfs with the much simpler ramfs code,
 	  which may be appropriate on small systems without swap.
+
+config ASHMEM
+	bool "Enable the Anonymous Shared Memory Subsystem"
+	default n
+	depends on SHMEM || TINY_SHMEM
+	help
+	  The ashmem subsystem is a new shared memory allocator, similar to
+	  POSIX SHM but with different behavior and sporting a simpler
+	  file-based API.
 
 config AIO
 	bool "Enable AIO support" if EXPERT

@@ -23,12 +23,14 @@
 static struct resource s3c_adc_resource[] = {
 	[0] = {
 		.start = SAMSUNG_PA_ADC,
-		.end   = SAMSUNG_PA_ADC + SZ_256 - 1,
+		.end   = SAMSUNG_PA_ADC + SZ_8K - 1,
 		.flags = IORESOURCE_MEM,
 	},
 	[1] = {
+#if defined(CONFIG_TOUCHSCREEN_S3C2410)
 		.start = IRQ_TC,
 		.end   = IRQ_TC,
+#endif
 		.flags = IORESOURCE_IRQ,
 	},
 	[2] = {

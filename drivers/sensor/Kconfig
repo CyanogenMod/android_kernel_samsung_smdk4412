@@ -1,0 +1,123 @@
+#
+# Sensor  drivers configuration
+#
+menuconfig SENSORS_CORE
+	bool "Sensor devices"
+	help
+	  Say Y here, and a list of sensors drivers will be displayed.
+	  Everything that didn't fit into the other categories is here. This option
+	  doesn't affect the kernel.
+
+	  If unsure, say Y.
+
+if SENSORS_CORE
+config SENSORS_AK8975C
+	tristate "AK8975 compass support"
+	default n
+	depends on I2C
+	help
+	  If you say yes here you get support for Asahi Kasei's
+	  orientation sensor AK8975.
+
+config SENSORS_BMP180
+	depends on I2C && SYSFS
+	tristate "BMP180 digital pressure sensor"
+	default n
+	help
+	  If you say yes here you get support for the Bosch Sensortec
+	  BMP180 digital pressure sensor.
+	  To compile this driver as a module, choose M here: the
+	  module will be called bmp180.
+
+config SENSORS_CM3663
+	depends on I2C
+	tristate "CM3663 ambient light and proximity input device"
+	default n
+	help
+	  This option enables proximity & light sensors using cm3663 driver.
+
+config SENSORS_PAS2M110
+	depends on I2C && GENERIC_GPIO
+	tristate "PAS2M110 ambient light and proximity input device"
+	default n
+
+config SENSORS_BMA254
+	tristate "BMA254 Acceleration Sensor Driver"
+	depends on I2C
+	default n
+	help
+	  If you say yes here you get support for Bosch-Sensortec's
+	  BMA254 Acceleration Sensor.
+
+config SENSORS_TAOS
+	depends on I2C
+	tristate "TAOS driver"
+	default n
+	help
+	  If you say yes here you get support for TAOS's
+	  TMD27723 proximity & light sensor using taos driver.
+
+config SENSORS_GP2A
+	depends on I2C
+	tristate "GP2AP020A00F driver"
+	default n
+	help
+	  This option enables proximity & light sensors using gp2ap020a00f driver.
+
+config SENSORS_GP2A_ANALOG
+	depends on I2C
+	tristate "GP2A analog driver"
+	default n
+	help
+	  This option enables proximity & light sensors using analog gp2a driver.
+
+config SENSORS_CM36651
+	depends on I2C
+	tristate "CM36651 driver"
+	default n
+	help
+	  Say Y here if you use cm36651.
+	  This option enables proximity & RGB sensors using
+	  Capella cm36651 device driver.
+
+	  Say N here if you do not use cm36651.
+
+config SENSORS_BH1721
+	depends on I2C
+	tristate "BH1721 driver"
+	default n
+	help
+	  Say Y here if you use BH1721.
+	  This option enables light sensor using
+	  ROHM BH1721 device driver.
+
+	  Say N here if you do not use BH1721.
+
+config SENSORS_K3DH
+	tristate "K3DH acceleration sensor support"
+	depends on I2C
+        default n
+	help
+	  Driver for STMicroelectronic K3DH accelerometer.
+
+config SENSORS_K3G
+	tristate "K3G driver for s5pc210"
+	depends on I2C
+	default n
+	help
+	  This option enables gyro sensors using K3G driver.
+
+config SENSORS_LSM330DLC
+	depends on I2C
+	tristate "STMicro LSM330DLC driver"
+	default n
+	help
+	  Driver for STMicro LSM330DLC
+
+config SENSORS_LPS331
+	tristate "STMicro LPS331 driver"
+	default n
+	depends on I2C
+	help
+	  Driver for STMicro LPS331
+endif

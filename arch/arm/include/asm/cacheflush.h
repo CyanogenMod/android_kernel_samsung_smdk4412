@@ -16,6 +16,7 @@
 #include <asm/shmparam.h>
 #include <asm/cachetype.h>
 #include <asm/outercache.h>
+#include <mach/smc.h>
 
 #define CACHE_COLOUR(vaddr)	((vaddr & (SHMLBA - 1)) >> PAGE_SHIFT)
 
@@ -206,6 +207,12 @@ static inline void __flush_icache_all(void)
 
 #define flush_cache_all()		__cpuc_flush_kern_all()
 
+#ifndef CONFIG_SMP
+#define flush_all_cpu_caches()		flush_cache_all()
+#else
+extern void flush_all_cpu_caches(void);
+#endif
+
 static inline void vivt_flush_cache_mm(struct mm_struct *mm)
 {
 	if (cpumask_test_cpu(smp_processor_id(), mm_cpumask(mm)))
@@ -249,7 +256,7 @@ extern void flush_cache_page(struct vm_area_struct *vma, unsigned long user_addr
  * Harvard caches are synchronised for the user space address range.
  * This is used for the ARM private sys_cacheflush system call.
  */
-#define flush_cache_user_range(vma,start,end) \
+#define flush_cache_user_range(start,end) \
 	__cpuc_coherent_user_range((start) & PAGE_MASK, PAGE_ALIGN(end))
 
 /*
@@ -344,4 +351,37 @@ static inline void flush_cache_vunmap(unsigned long start, unsigned long end)
 		flush_cache_all();
 }
 
+/*
+ * Control the full line of zero function that must be enabled
+ * only when the slaves connected on cortex-A9 AXI master port support it.
+ * The L2-310 cache controller supports this feature.
+ */
+#ifdef CONFIG_CACHE_L2X0
+static inline void __enable_cache_foz(int enable)
+{
+	int val;
+
+	asm volatile(
+	"mrc p15, 0, %0, c1, c0, 1\n"
+	: "=r" (val));
+
+	/* enable/disable Foz */
+	if (enable)
+		val |= ((1<<3));
+	else
+		val &= (~(1<<3));
+
+#ifdef CONFIG_ARM_TRUSTZONE
+	exynos_smc(SMC_CMD_REG, SMC_REG_ID_CP15(1, 0, 0, 1), val, 0);
+#else
+	asm volatile("mcr p15, 0, %0, c1, c0, 1" : : "r" (val));
+#endif
+}
+
+#define enable_cache_foz()	__enable_cache_foz(1)
+#define disable_cache_foz()	__enable_cache_foz(0)
+#else
+#define enable_cache_foz()	do { } while (0)
+#define disable_cache_foz()	do { } while (0)
+#endif
 #endif

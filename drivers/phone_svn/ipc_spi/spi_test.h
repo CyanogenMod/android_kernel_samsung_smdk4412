@@ -1,0 +1,14 @@
+#ifndef __SPI_TEST_H__
+#define __SPI_TEST_H__
+
+enum SPI_TEST_SCENARIO_T {
+	SPI_TEST_SCENARIO_NONE,
+	SPI_TEST_SCENARIO_PHYSICAL,
+	SPI_TEST_SCENARIO_MASTER_SENDING,
+	SPI_TEST_SCENARIO_SLAVE_SENDING,
+	SPI_TEST_SCENARIO_COMPLEX_SENDING,
+};
+
+extern enum SPI_TEST_SCENARIO_T spi_test_scenario_mode;
+extern void spi_test_run(enum SPI_TEST_SCENARIO_T scenario, int param);
+#endif

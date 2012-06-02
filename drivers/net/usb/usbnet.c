@@ -35,6 +35,7 @@
 
 #include <linux/module.h>
 #include <linux/init.h>
+#include <linux/if_arp.h>
 #include <linux/netdevice.h>
 #include <linux/etherdevice.h>
 #include <linux/ctype.h>
@@ -231,7 +232,9 @@ void usbnet_skb_return (struct usbnet *dev, struct sk_buff *skb)
 		return;
 	}
 
-	skb->protocol = eth_type_trans (skb, dev->net);
+	if (!skb->protocol)
+		skb->protocol = eth_type_trans(skb, dev->net);
+
 	dev->net->stats.rx_packets++;
 	dev->net->stats.rx_bytes += skb->len;
 
@@ -330,7 +333,9 @@ static int rx_submit (struct usbnet *dev, struct urb *urb, gfp_t flags)
 		usb_free_urb (urb);
 		return -ENOMEM;
 	}
-	skb_reserve (skb, NET_IP_ALIGN);
+
+	if (dev->net->type != ARPHRD_RAWIP)
+		skb_reserve(skb, NET_IP_ALIGN);
 
 	entry = (struct skb_data *) skb->cb;
 	entry->urb = urb;
@@ -367,6 +372,7 @@ static int rx_submit (struct usbnet *dev, struct urb *urb, gfp_t flags)
 			tasklet_schedule (&dev->bh);
 			break;
 		case 0:
+			usb_mark_last_busy(dev->udev);
 			__skb_queue_tail (&dev->rxq, skb);
 		}
 	} else {

@@ -40,11 +40,11 @@ static const struct snd_pcm_hardware dma_hardware = {
 				    SNDRV_PCM_FMTBIT_U16_LE |
 				    SNDRV_PCM_FMTBIT_U8 |
 				    SNDRV_PCM_FMTBIT_S8,
-	.channels_min		= 2,
-	.channels_max		= 2,
+	.channels_min		= 1,
+	.channels_max		= 6,
 	.buffer_bytes_max	= 128*1024,
 	.period_bytes_min	= PAGE_SIZE,
-	.period_bytes_max	= PAGE_SIZE*2,
+	.period_bytes_max	= PAGE_SIZE*8,
 	.periods_min		= 2,
 	.periods_max		= 128,
 	.fifo_size		= 32,
@@ -84,26 +84,36 @@ static void dma_enqueue(struct snd_pcm_substream *substream)
 	pr_debug("%s: loaded %d, limit %d\n",
 				__func__, prtd->dma_loaded, limit);
 
-	while (prtd->dma_loaded < limit) {
-		unsigned long len = prtd->dma_period;
-
-		pr_debug("dma_loaded: %d\n", prtd->dma_loaded);
-
-		if ((pos + len) > prtd->dma_end) {
-			len  = prtd->dma_end - pos;
-			pr_debug("%s: corrected dma len %ld\n", __func__, len);
-		}
-
-		ret = s3c2410_dma_enqueue(prtd->params->channel,
-			substream, pos, len);
-
+	if (s3c_dma_has_infiniteloop()) {
+		ret = s3c2410_dma_enqueue_ring(prtd->params->channel,
+				substream, pos, prtd->dma_period, limit);
 		if (ret == 0) {
-			prtd->dma_loaded++;
+			prtd->dma_loaded += limit;
 			pos += prtd->dma_period;
-			if (pos >= prtd->dma_end)
-				pos = prtd->dma_start;
-		} else
-			break;
+		}
+	} else {
+		while (prtd->dma_loaded < limit) {
+			unsigned long len = prtd->dma_period;
+
+			pr_debug("dma_loaded: %d\n", prtd->dma_loaded);
+
+			if ((pos + len) > prtd->dma_end) {
+				len  = prtd->dma_end - pos;
+				pr_debug("%s: corrected dma len %ld\n",
+						__func__, len);
+			}
+
+			ret = s3c2410_dma_enqueue(prtd->params->channel,
+					substream, pos, len);
+
+			if (ret == 0) {
+				prtd->dma_loaded++;
+				pos += prtd->dma_period;
+				if (pos >= prtd->dma_end)
+					pos = prtd->dma_start;
+			} else
+				break;
+		}
 	}
 
 	prtd->dma_pos = pos;
@@ -123,13 +133,13 @@ static void audio_buffdone(struct s3c2410_dma_chan *channel,
 
 	prtd = substream->runtime->private_data;
 
-	if (substream)
-		snd_pcm_period_elapsed(substream);
+	snd_pcm_period_elapsed(substream);
 
 	spin_lock(&prtd->lock);
 	if (prtd->state & ST_RUNNING && !s3c_dma_has_circular()) {
 		prtd->dma_loaded--;
-		dma_enqueue(substream);
+		if (!s3c_dma_has_infiniteloop())
+			dma_enqueue(substream);
 	}
 
 	spin_unlock(&prtd->lock);
@@ -191,6 +201,13 @@ static int dma_hw_params(struct snd_pcm_substream *substream,
 	prtd->dma_start = runtime->dma_addr;
 	prtd->dma_pos = prtd->dma_start;
 	prtd->dma_end = prtd->dma_start + totbytes;
+
+	pr_info("G:%s:DmaAddr=@%x Total=%d PrdSz=%d #Prds=%d dma_area=0x%x\n",
+		(substream->stream == SNDRV_PCM_STREAM_PLAYBACK) ? "P" : "C",
+		prtd->dma_start, runtime->dma_bytes,
+		params_period_bytes(params), params_periods(params),
+		(unsigned int)runtime->dma_area);
+
 	spin_unlock_irq(&prtd->lock);
 
 	return 0;
@@ -338,6 +355,7 @@ static int dma_open(struct snd_pcm_substream *substream)
 	spin_lock_init(&prtd->lock);
 
 	runtime->private_data = prtd;
+
 	return 0;
 }
 
@@ -454,12 +472,13 @@ out:
 	return ret;
 }
 
-static struct snd_soc_platform_driver samsung_asoc_platform = {
+struct snd_soc_platform_driver samsung_asoc_platform = {
 	.ops		= &dma_ops,
 	.pcm_new	= dma_new,
 	.pcm_free	= dma_free_dma_buffers,
 };
 
+#ifndef CONFIG_SND_SOC_SAMSUNG_USE_DMA_WRAPPER
 static int __devinit samsung_asoc_platform_probe(struct platform_device *pdev)
 {
 	return snd_soc_register_platform(&pdev->dev, &samsung_asoc_platform);
@@ -492,6 +511,7 @@ static void __exit samsung_asoc_exit(void)
 	platform_driver_unregister(&asoc_dma_driver);
 }
 module_exit(samsung_asoc_exit);
+#endif
 
 MODULE_AUTHOR("Ben Dooks, <ben@simtec.co.uk>");
 MODULE_DESCRIPTION("Samsung ASoC DMA Driver");

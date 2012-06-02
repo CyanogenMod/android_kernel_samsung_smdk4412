@@ -186,7 +186,7 @@ restart:	adr	r0, LC0
 		 * We might be running at a different address.  We need
 		 * to fix up various pointers.
 		 */
-		sub	r0, r0, r1		@ calculate the delta offset
+		sub  r0, r0, r1		@ calculate the delta offset
 		add	r6, r6, r0		@ _edata
 		add	r10, r10, r0		@ inflated kernel size location
 
@@ -292,7 +292,13 @@ wont_overwrite:
  *   sp  = stack pointer
  */
 		teq	r0, #0
+#ifndef CONFIG_CRYPTO_FIPS
 		beq	not_relocated
+#else
+        movw r5, #:lower16:zimage_ram_base_addr
+        movt r5, #:upper16:zimage_ram_base_addr
+        beq not_relocated_copy
+#endif
 		add	r11, r11, r0
 		add	r12, r12, r0
 
@@ -305,6 +311,11 @@ wont_overwrite:
 		add	r2, r2, r0
 		add	r3, r3, r0
 
+#ifdef CONFIG_CRYPTO_FIPS
+        movw r5, #:lower16:zimage_ram_base_addr
+        movt r5, #:upper16:zimage_ram_base_addr
+        bl copy_compressed
+#endif
 		/*
 		 * Relocate all entries in the GOT table.
 		 */
@@ -367,12 +378,39 @@ LC0:		.word	LC0			@ r1
 		.word	.L_user_stack_end	@ sp
 		.size	LC0, . - LC0
 
+#ifdef CONFIG_CRYPTO_FIPS
+        .equ   zimage_ram_base_addr, FIPS_KERNEL_RAM_BASE
+#endif
+
 #ifdef CONFIG_ARCH_RPC
 		.globl	params
 params:		ldr	r0, =0x10000100		@ params_phys for RPC
 		mov	pc, lr
 		.ltorg
 		.align
+#endif
+
+
+#ifdef CONFIG_CRYPTO_FIPS
+not_relocated_copy:
+		bl copy_compressed
+		b not_relocated
+
+copy_compressed:
+		mov r1, r5
+		add	r9, r4, #CONFIG_CRYPTO_FIPS_INTEG_OFFSET
+
+1:
+		ldmia	r1!, {r5}
+		stmia	r9!, {r5}
+		cmp	r1, r2
+		blo	1b
+
+		.rept 8
+		ldmia	r1!, {r5}
+		stmia	r9!, {r5}
+		.endr
+		mov	pc, lr
 #endif
 
 /*
@@ -656,6 +694,8 @@ proc_types:
 @		b	__arm6_mmu_cache_off
 @		b	__armv3_mmu_cache_flush
 
+#if !defined(CONFIG_CPU_V7)
+		/* This collides with some V7 IDs, preventing correct detection */
 		.word	0x00000000		@ old ARM ID
 		.word	0x0000f000
 		mov	pc, lr
@@ -664,6 +704,7 @@ proc_types:
  THUMB(		nop				)
 		mov	pc, lr
  THUMB(		nop				)
+#endif
 
 		.word	0x41007000		@ ARM7/710
 		.word	0xfff8fe00

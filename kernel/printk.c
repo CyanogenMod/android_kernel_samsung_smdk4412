@@ -43,6 +43,7 @@
 #include <linux/rculist.h>
 
 #include <asm/uaccess.h>
+#include <mach/sec_debug.h>
 
 /*
  * Architectures can override it:
@@ -52,6 +53,10 @@ void asmlinkage __attribute__((weak)) early_printk(const char *fmt, ...)
 }
 
 #define __LOG_BUF_LEN	(1 << CONFIG_LOG_BUF_SHIFT)
+
+#ifdef        CONFIG_DEBUG_LL
+extern void printascii(char *);
+#endif
 
 /* printk's without a loglevel use this.. */
 #define DEFAULT_MESSAGE_LOGLEVEL CONFIG_DEFAULT_MESSAGE_LOGLEVEL
@@ -144,7 +149,7 @@ static int console_may_schedule;
 
 #ifdef CONFIG_PRINTK
 
-static char __log_buf[__LOG_BUF_LEN];
+static char __log_buf[__LOG_BUF_LEN] __nosavedata;
 static char *log_buf = __log_buf;
 static int log_buf_len = __LOG_BUF_LEN;
 static unsigned logged_chars; /* Number of chars produced since last read+clear operation */
@@ -211,8 +216,15 @@ void __init setup_log_buf(int early)
 			new_log_buf_len);
 		return;
 	}
-
+#ifdef CONFIG_MACH_PX
+	sec_debug_aux_log(SEC_DEBUG_AUXLOG_LOGBUF_LOCK_CHANGE,
+			"+ %s: spin_lock_irqsave logbuf_lock", __func__);
+#endif
 	spin_lock_irqsave(&logbuf_lock, flags);
+#ifdef CONFIG_MACH_PX
+	sec_debug_aux_log(SEC_DEBUG_AUXLOG_LOGBUF_LOCK_CHANGE,
+			"- %s: spin_lock_irqsave logbuf_lock", __func__);
+#endif
 	log_buf_len = new_log_buf_len;
 	log_buf = new_log_buf;
 	new_log_buf_len = 0;
@@ -290,6 +302,61 @@ static inline void boot_delay_msec(void)
 }
 #endif
 
+/*
+ * Return the number of unread characters in the log buffer.
+ */
+static int log_buf_get_len(void)
+{
+	return logged_chars;
+}
+
+/*
+ * Clears the ring-buffer
+ */
+void log_buf_clear(void)
+{
+	logged_chars = 0;
+}
+
+/*
+ * Copy a range of characters from the log buffer.
+ */
+int log_buf_copy(char *dest, int idx, int len)
+{
+	int ret, max;
+	bool took_lock = false;
+
+	if (!oops_in_progress) {
+#ifdef CONFIG_MACH_PX
+		sec_debug_aux_log(SEC_DEBUG_AUXLOG_LOGBUF_LOCK_CHANGE,
+			"+ %s: spin_lock_irq logbuf_lock", __func__);
+#endif
+		spin_lock_irq(&logbuf_lock);
+#ifdef CONFIG_MACH_PX
+		sec_debug_aux_log(SEC_DEBUG_AUXLOG_LOGBUF_LOCK_CHANGE,
+			"- %s: spin_lock_irq logbuf_lock", __func__);
+#endif
+		took_lock = true;
+	}
+
+	max = log_buf_get_len();
+	if (idx < 0 || idx >= max) {
+		ret = -1;
+	} else {
+		if (len > max - idx)
+			len = max - idx;
+		ret = len;
+		idx += (log_end - max);
+		while (len-- > 0)
+			dest[len] = LOG_BUF(idx + len);
+	}
+
+	if (took_lock)
+		spin_unlock_irq(&logbuf_lock);
+
+	return ret;
+}
+
 #ifdef CONFIG_SECURITY_DMESG_RESTRICT
 int dmesg_restrict = 1;
 #else
@@ -363,7 +430,15 @@ int do_syslog(int type, char __user *buf, int len, bool from_file)
 		if (error)
 			goto out;
 		i = 0;
+#ifdef CONFIG_MACH_PX
+		sec_debug_aux_log(SEC_DEBUG_AUXLOG_LOGBUF_LOCK_CHANGE,
+			"+ %s: spin_lock_irq logbuf_lock", __func__);
+#endif
 		spin_lock_irq(&logbuf_lock);
+#ifdef CONFIG_MACH_PX
+		sec_debug_aux_log(SEC_DEBUG_AUXLOG_LOGBUF_LOCK_CHANGE,
+			"- %s: spin_lock_irq logbuf_lock", __func__);
+#endif
 		while (!error && (log_start != log_end) && i < len) {
 			c = LOG_BUF(log_start);
 			log_start++;
@@ -372,7 +447,15 @@ int do_syslog(int type, char __user *buf, int len, bool from_file)
 			buf++;
 			i++;
 			cond_resched();
+#ifdef CONFIG_MACH_PX
+			sec_debug_aux_log(SEC_DEBUG_AUXLOG_LOGBUF_LOCK_CHANGE,
+				"+ %s: spin_lock_irq logbuf_lock", __func__);
+#endif
 			spin_lock_irq(&logbuf_lock);
+#ifdef CONFIG_MACH_PX
+			sec_debug_aux_log(SEC_DEBUG_AUXLOG_LOGBUF_LOCK_CHANGE,
+				"- %s: spin_lock_irq logbuf_lock", __func__);
+#endif
 		}
 		spin_unlock_irq(&logbuf_lock);
 		if (!error)
@@ -397,7 +480,15 @@ int do_syslog(int type, char __user *buf, int len, bool from_file)
 		count = len;
 		if (count > log_buf_len)
 			count = log_buf_len;
+#ifdef CONFIG_MACH_PX
+		sec_debug_aux_log(SEC_DEBUG_AUXLOG_LOGBUF_LOCK_CHANGE,
+			"+ %s: spin_lock_irq logbuf_lock", __func__);
+#endif
 		spin_lock_irq(&logbuf_lock);
+#ifdef CONFIG_MACH_PX
+		sec_debug_aux_log(SEC_DEBUG_AUXLOG_LOGBUF_LOCK_CHANGE,
+			"- %s: spin_lock_irq logbuf_lock", __func__);
+#endif
 		if (count > logged_chars)
 			count = logged_chars;
 		if (do_clear)
@@ -417,7 +508,15 @@ int do_syslog(int type, char __user *buf, int len, bool from_file)
 			spin_unlock_irq(&logbuf_lock);
 			error = __put_user(c,&buf[count-1-i]);
 			cond_resched();
+#ifdef CONFIG_MACH_PX
+			sec_debug_aux_log(SEC_DEBUG_AUXLOG_LOGBUF_LOCK_CHANGE,
+				"+ %s: spin_lock_irq logbuf_lock", __func__);
+#endif
 			spin_lock_irq(&logbuf_lock);
+#ifdef CONFIG_MACH_PX
+			sec_debug_aux_log(SEC_DEBUG_AUXLOG_LOGBUF_LOCK_CHANGE,
+				"- %s: spin_lock_irq logbuf_lock", __func__);
+#endif
 		}
 		spin_unlock_irq(&logbuf_lock);
 		if (error)
@@ -659,6 +758,35 @@ static void call_console_drivers(unsigned start, unsigned end)
 	_call_console_drivers(start_print, end, msg_level);
 }
 
+#ifdef CONFIG_SEC_LOG
+static void (*log_char_hook)(char c);
+
+void register_log_char_hook(void (*f) (char c))
+{
+	unsigned start;
+	unsigned long flags;
+
+#ifdef CONFIG_MACH_PX
+	sec_debug_aux_log(SEC_DEBUG_AUXLOG_LOGBUF_LOCK_CHANGE,
+		"+ %s: spin_lock_irqsave logbuf_lock", __func__);
+#endif
+	spin_lock_irqsave(&logbuf_lock, flags);
+#ifdef CONFIG_MACH_PX
+	sec_debug_aux_log(SEC_DEBUG_AUXLOG_LOGBUF_LOCK_CHANGE,
+		"- %s: spin_lock_irqsave logbuf_lock", __func__);
+#endif
+
+	start = min(con_start, log_start);
+	while (start != log_end)
+		f(__log_buf[start++ & (__LOG_BUF_LEN - 1)]);
+
+	log_char_hook = f;
+
+	spin_unlock_irqrestore(&logbuf_lock, flags);
+}
+EXPORT_SYMBOL(register_log_char_hook);
+#endif
+
 static void emit_log_char(char c)
 {
 	LOG_BUF(log_end) = c;
@@ -669,6 +797,11 @@ static void emit_log_char(char c)
 		con_start = log_end - log_buf_len;
 	if (logged_chars < log_buf_len)
 		logged_chars++;
+
+#ifdef CONFIG_SEC_LOG
+	if (log_char_hook)
+		log_char_hook(c);
+#endif
 }
 
 /*
@@ -698,6 +831,21 @@ static int printk_time = 1;
 static int printk_time = 0;
 #endif
 module_param_named(time, printk_time, bool, S_IRUGO | S_IWUSR);
+
+#if defined(CONFIG_PRINTK_CPU_ID)
+static int printk_cpu_id = 1;
+#else
+static int printk_cpu_id = 0;
+#endif
+module_param_named(cpu, printk_cpu_id, bool, S_IRUGO | S_IWUSR);
+
+#if defined(CONFIG_PRINTK_PID)
+static int printk_pid = 1;
+#else
+static int printk_pid;
+#endif
+module_param_named(pid, printk_pid, bool, S_IRUGO | S_IWUSR);
+
 
 /* Check if we have any console registered that can be called early in boot. */
 static int have_callable_console(void)
@@ -860,7 +1008,15 @@ asmlinkage int vprintk(const char *fmt, va_list args)
 	}
 
 	lockdep_off();
+#ifdef CONFIG_MACH_PX
+	sec_debug_aux_log(SEC_DEBUG_AUXLOG_LOGBUF_LOCK_CHANGE,
+		"+ %s: spin_lock logbuf_lock", __func__);
+#endif
 	spin_lock(&logbuf_lock);
+#ifdef CONFIG_MACH_PX
+	sec_debug_aux_log(SEC_DEBUG_AUXLOG_LOGBUF_LOCK_CHANGE,
+		"- %s: spin_lock logbuf_lock", __func__);
+#endif
 	printk_cpu = this_cpu;
 
 	if (recursion_bug) {
@@ -871,6 +1027,10 @@ asmlinkage int vprintk(const char *fmt, va_list args)
 	/* Emit the output into the temporary buffer */
 	printed_len += vscnprintf(printk_buf + printed_len,
 				  sizeof(printk_buf) - printed_len, fmt, args);
+
+#ifdef	CONFIG_DEBUG_LL
+	printascii(printk_buf);
+#endif
 
 	p = printk_buf;
 
@@ -928,6 +1088,30 @@ asmlinkage int vprintk(const char *fmt, va_list args)
 				tlen = sprintf(tbuf, "[%5lu.%06lu] ",
 						(unsigned long) t,
 						nanosec_rem / 1000);
+
+				for (tp = tbuf; tp < tbuf + tlen; tp++)
+					emit_log_char(*tp);
+				printed_len += tlen;
+			}
+
+			if (printk_cpu_id) {
+				/* Add the cpu id */
+				char tbuf[10], *tp;
+				unsigned tlen;
+
+				tlen = sprintf(tbuf, "c%u ", printk_cpu);
+
+				for (tp = tbuf; tp < tbuf + tlen; tp++)
+					emit_log_char(*tp);
+				printed_len += tlen;
+			}
+
+			if (printk_pid) {
+				/* Add the current process id */
+				char tbuf[10], *tp;
+				unsigned tlen;
+
+				tlen = sprintf(tbuf, "%6u ", current->pid);
 
 				for (tp = tbuf; tp < tbuf + tlen; tp++)
 					emit_log_char(*tp);
@@ -1129,6 +1313,12 @@ void resume_console(void)
 	console_unlock();
 }
 
+int get_console_suspended(void)
+{
+	return console_suspended;
+}
+EXPORT_SYMBOL(get_console_suspended);
+
 /**
  * console_cpu_notify - print deferred console messages after CPU hotplug
  * @self: notifier struct
@@ -1146,7 +1336,6 @@ static int __cpuinit console_cpu_notify(struct notifier_block *self,
 	switch (action) {
 	case CPU_ONLINE:
 	case CPU_DEAD:
-	case CPU_DYING:
 	case CPU_DOWN_FAILED:
 	case CPU_UP_CANCELED:
 		console_lock();
@@ -1252,7 +1441,15 @@ void console_unlock(void)
 	console_may_schedule = 0;
 
 	for ( ; ; ) {
+#ifdef CONFIG_MACH_PX
+		sec_debug_aux_log(SEC_DEBUG_AUXLOG_LOGBUF_LOCK_CHANGE,
+			"+ %s: spin_lock_irqsave logbuf_lock", __func__);
+#endif
 		spin_lock_irqsave(&logbuf_lock, flags);
+#ifdef CONFIG_MACH_PX
+		sec_debug_aux_log(SEC_DEBUG_AUXLOG_LOGBUF_LOCK_CHANGE,
+			"- %s: spin_lock_irqsave logbuf_lock", __func__);
+#endif
 		wake_klogd |= log_start - log_end;
 		if (con_start == log_end)
 			break;			/* Nothing to print */
@@ -1502,7 +1699,15 @@ void register_console(struct console *newcon)
 		 * console_unlock(); will print out the buffered messages
 		 * for us.
 		 */
+#ifdef CONFIG_MACH_PX
+		sec_debug_aux_log(SEC_DEBUG_AUXLOG_LOGBUF_LOCK_CHANGE,
+			"+ %s: spin_lock_irqsave logbuf_lock", __func__);
+#endif
 		spin_lock_irqsave(&logbuf_lock, flags);
+#ifdef CONFIG_MACH_PX
+		sec_debug_aux_log(SEC_DEBUG_AUXLOG_LOGBUF_LOCK_CHANGE,
+			"- %s: spin_lock_irqsave logbuf_lock", __func__);
+#endif
 		con_start = log_start;
 		spin_unlock_irqrestore(&logbuf_lock, flags);
 		/*
@@ -1711,7 +1916,15 @@ void kmsg_dump(enum kmsg_dump_reason reason)
 	/* Theoretically, the log could move on after we do this, but
 	   there's not a lot we can do about that. The new messages
 	   will overwrite the start of what we dump. */
+#ifdef CONFIG_MACH_PX
+	sec_debug_aux_log(SEC_DEBUG_AUXLOG_LOGBUF_LOCK_CHANGE,
+		"+ %s: spin_lock_irqsave logbuf_lock", __func__);
+#endif
 	spin_lock_irqsave(&logbuf_lock, flags);
+#ifdef CONFIG_MACH_PX
+	sec_debug_aux_log(SEC_DEBUG_AUXLOG_LOGBUF_LOCK_CHANGE,
+		"- %s: spin_lock_irqsave logbuf_lock", __func__);
+#endif
 	end = log_end & LOG_BUF_MASK;
 	chars = logged_chars;
 	spin_unlock_irqrestore(&logbuf_lock, flags);
@@ -1735,4 +1948,12 @@ void kmsg_dump(enum kmsg_dump_reason reason)
 		dumper->dump(dumper, reason, s1, l1, s2, l2);
 	rcu_read_unlock();
 }
+#endif
+
+#ifdef CONFIG_MACH_PX
+void logbuf_force_unlock(void)
+{
+	logbuf_lock = __SPIN_LOCK_UNLOCKED(logbuf_lock);
+}
+EXPORT_SYMBOL(logbuf_force_unlock);
 #endif

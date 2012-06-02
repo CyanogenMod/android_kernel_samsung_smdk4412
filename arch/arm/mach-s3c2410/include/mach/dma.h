@@ -201,4 +201,8 @@ static inline bool s3c_dma_has_circular(void)
 	return false;
 }
 
+static inline bool s3c_dma_has_infiniteloop(void)
+{
+	return false;
+}
 #endif /* __ASM_ARCH_DMA_H */

@@ -1,0 +1,20 @@
+#
+# IR_LED
+#
+menuconfig IR_REMOCON
+	bool "IR LED driver only for the remote control"
+	help
+	  This option doesn't affect the kernel.
+
+	  If unsure, say N.
+
+if IR_REMOCON
+
+config IR_REMOCON_EUR
+	bool "IR_LED driver of EUR model"
+	depends on IR_REMOCON
+	default n
+	help
+		Say Y here to enable the driver for IR_LED of EUR model.
+
+endif

@@ -214,10 +214,10 @@
  * @OFF:     Power Off. No restrictions on transition times.
  */
 enum snd_soc_bias_level {
-	SND_SOC_BIAS_OFF,
-	SND_SOC_BIAS_STANDBY,
-	SND_SOC_BIAS_PREPARE,
-	SND_SOC_BIAS_ON,
+	SND_SOC_BIAS_OFF = 0,
+	SND_SOC_BIAS_STANDBY = 1,
+	SND_SOC_BIAS_PREPARE = 2,
+	SND_SOC_BIAS_ON = 3,
 };
 
 struct snd_jack;
@@ -598,6 +598,7 @@ struct snd_soc_codec_driver {
 	int (*volatile_register)(struct snd_soc_codec *, unsigned int);
 	int (*readable_register)(struct snd_soc_codec *, unsigned int);
 	int (*writable_register)(struct snd_soc_codec *, unsigned int);
+	short max_register;
 	short reg_cache_size;
 	short reg_cache_step;
 	short reg_word_size;
@@ -725,8 +726,10 @@ struct snd_soc_card {
 
 	/* callbacks */
 	int (*set_bias_level)(struct snd_soc_card *,
+			      struct snd_soc_dapm_context *dapm,
 			      enum snd_soc_bias_level level);
 	int (*set_bias_level_post)(struct snd_soc_card *,
+				   struct snd_soc_dapm_context *dapm,
 				   enum snd_soc_bias_level level);
 
 	long pmdown_time;
@@ -789,6 +792,7 @@ struct snd_soc_pcm_runtime  {
 	struct device dev;
 	struct snd_soc_card *card;
 	struct snd_soc_dai_link *dai_link;
+	struct snd_pcm_ops ops;
 
 	unsigned int complete:1;
 	unsigned int dev_registered:1;

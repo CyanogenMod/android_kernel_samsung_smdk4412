@@ -25,6 +25,9 @@
 #include <linux/gpio_keys.h>
 #include <linux/workqueue.h>
 #include <linux/gpio.h>
+#include <linux/irqdesc.h>
+
+extern struct class *sec_class;
 
 struct gpio_button_data {
 	struct gpio_keys_button *button;
@@ -33,15 +36,19 @@ struct gpio_button_data {
 	struct work_struct work;
 	int timer_debounce;	/* in msecs */
 	bool disabled;
+	bool key_state;
+	bool wakeup;
 };
 
 struct gpio_keys_drvdata {
 	struct input_dev *input;
+	struct device *sec_key;
 	struct mutex disable_lock;
 	unsigned int n_buttons;
 	int (*enable)(struct device *dev);
 	void (*disable)(struct device *dev);
 	struct gpio_button_data data[0];
+	/* WARNING: this area can be expanded. Do NOT add any member! */
 };
 
 /*
@@ -317,19 +324,97 @@ static struct attribute_group gpio_keys_attr_group = {
 	.attrs = gpio_keys_attrs,
 };
 
+static ssize_t key_pressed_show(struct device *dev,
+				struct device_attribute *attr, char *buf)
+{
+	struct gpio_keys_drvdata *ddata = dev_get_drvdata(dev);
+	int i;
+	int keystate = 0;
+
+	for (i = 0; i < ddata->n_buttons; i++) {
+		struct gpio_button_data *bdata = &ddata->data[i];
+		keystate |= bdata->key_state;
+	}
+
+	if (keystate)
+		sprintf(buf, "PRESS");
+	else
+		sprintf(buf, "RELEASE");
+
+	return strlen(buf);
+}
+
+/* the volume keys can be the wakeup keys in special case */
+static ssize_t wakeup_enable(struct device *dev,
+	struct device_attribute *attr, const char *buf, size_t count)
+{
+	struct gpio_keys_drvdata *ddata = dev_get_drvdata(dev);
+	int n_events = get_n_events_by_type(EV_KEY);
+	unsigned long *bits;
+	ssize_t error;
+	int i;
+
+	bits = kcalloc(BITS_TO_LONGS(n_events),
+		sizeof(*bits), GFP_KERNEL);
+	if (!bits)
+		return -ENOMEM;
+
+	error = bitmap_parselist(buf, bits, n_events);
+	if (error)
+		goto out;
+
+	for (i = 0; i < ddata->n_buttons; i++) {
+		struct gpio_button_data *button = &ddata->data[i];
+		if (test_bit(button->button->code, bits))
+			button->button->wakeup = 1;
+		else
+			button->button->wakeup = 0;
+	}
+
+out:
+	kfree(bits);
+	return count;
+}
+
+static DEVICE_ATTR(sec_key_pressed, 0664, key_pressed_show, NULL);
+static DEVICE_ATTR(wakeup_keys, 0664, NULL, wakeup_enable);
+
+static struct attribute *sec_key_attrs[] = {
+	&dev_attr_sec_key_pressed.attr,
+	&dev_attr_wakeup_keys.attr,
+	NULL,
+};
+
+static struct attribute_group sec_key_attr_group = {
+	.attrs = sec_key_attrs,
+};
+
 static void gpio_keys_report_event(struct gpio_button_data *bdata)
 {
 	struct gpio_keys_button *button = bdata->button;
 	struct input_dev *input = bdata->input;
 	unsigned int type = button->type ?: EV_KEY;
-	int state = (gpio_get_value_cansleep(button->gpio) ? 1 : 0) ^ button->active_low;
+	int state = (gpio_get_value_cansleep(button->gpio) ? 1 : 0)
+		^ button->active_low;
 
 	if (type == EV_ABS) {
 		if (state)
 			input_event(input, type, button->code, button->value);
 	} else {
+		if (bdata->wakeup && !state) {
+			input_event(input, type, button->code, !state);
+			if (button->code == KEY_POWER)
+				printk(KERN_DEBUG"[keys] f PWR %d\n", !state);
+		}
+
+		bdata->key_state = !!state;
+		bdata->wakeup = false;
+
 		input_event(input, type, button->code, !!state);
+		if (button->code == KEY_POWER)
+			printk(KERN_DEBUG"[keys]PWR %d\n", !!state);
 	}
+
 	input_sync(input);
 }
 
@@ -352,14 +437,27 @@ static irqreturn_t gpio_keys_isr(int irq, void *dev_id)
 {
 	struct gpio_button_data *bdata = dev_id;
 	struct gpio_keys_button *button = bdata->button;
+	struct irq_desc *desc = irq_to_desc(irq);
+	int state = (gpio_get_value_cansleep(button->gpio) ? 1 : 0)
+		^ button->active_low;
 
 	BUG_ON(irq != gpio_to_irq(button->gpio));
+
+	if (desc) {
+		if (0 < desc->wake_depth) {
+			bdata->wakeup = true;
+			printk(KERN_DEBUG"[keys] in the sleep\n");
+		}
+	}
 
 	if (bdata->timer_debounce)
 		mod_timer(&bdata->timer,
 			jiffies + msecs_to_jiffies(bdata->timer_debounce));
 	else
 		schedule_work(&bdata->work);
+
+	if (button->isr_hook)
+		button->isr_hook(button->code, state);
 
 	return IRQ_HANDLED;
 }
@@ -414,6 +512,9 @@ static int __devinit gpio_keys_setup_key(struct platform_device *pdev,
 	 */
 	if (!button->can_disable)
 		irqflags |= IRQF_SHARED;
+
+	if (button->wakeup)
+		irqflags |= IRQF_NO_SUSPEND;
 
 	error = request_any_context_irq(irq, gpio_keys_isr, irqflags, desc, bdata);
 	if (error < 0) {
@@ -513,6 +614,18 @@ static int __devinit gpio_keys_probe(struct platform_device *pdev)
 		goto fail2;
 	}
 
+	ddata->sec_key =
+	    device_create(sec_class, NULL, 0, ddata, "sec_key");
+	if (IS_ERR(ddata->sec_key))
+		dev_err(dev, "Failed to create sec_key device\n");
+
+	error = sysfs_create_group(&ddata->sec_key->kobj, &sec_key_attr_group);
+	if (error) {
+		dev_err(dev, "Failed to create the test sysfs: %d\n",
+			error);
+		goto fail2;
+	}
+
 	error = input_register_device(input);
 	if (error) {
 		dev_err(dev, "Unable to register input device, error: %d\n",
@@ -531,6 +644,7 @@ static int __devinit gpio_keys_probe(struct platform_device *pdev)
 
  fail3:
 	sysfs_remove_group(&pdev->dev.kobj, &gpio_keys_attr_group);
+	sysfs_remove_group(&ddata->sec_key->kobj, &sec_key_attr_group);
  fail2:
 	while (--i >= 0) {
 		free_irq(gpio_to_irq(pdata->buttons[i].gpio), &ddata->data[i]);

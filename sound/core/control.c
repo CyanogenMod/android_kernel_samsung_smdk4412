@@ -118,6 +118,8 @@ static int snd_ctl_release(struct inode *inode, struct file *file)
 	unsigned int idx;
 
 	ctl = file->private_data;
+	if (snd_BUG_ON(!ctl || !ctl->card))
+		return -ENXIO;
 	file->private_data = NULL;
 	card = ctl->card;
 	write_lock_irqsave(&card->ctl_files_rwlock, flags);

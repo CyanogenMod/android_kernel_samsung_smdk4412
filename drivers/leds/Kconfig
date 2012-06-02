@@ -5,6 +5,13 @@ config LEDS_GPIO_REGISTER
 	  As this function is used by arch code it must not be compiled as a
 	  module.
 
+config LEDS_SPFCW043
+	bool "LED support for the SPFCW043"
+	default n
+	help
+	  This option enables support for the LEDs on the SPFCW043.
+
+
 menuconfig NEW_LEDS
 	bool "LED Support"
 	help
@@ -211,6 +218,15 @@ config LEDS_LP3944
 	  To compile this driver as a module, choose M here: the
 	  module will be called leds-lp3944.
 
+config LEDS_AN30259A
+	tristate "LED driver for panasonic AN30259A RGB LED"
+	depends on I2C
+	help
+	  This option enables support for AN30259A RGB LED chips
+	  accessed via the I2C bus.
+	  AN30259A has three channel LED driver. By synchronous clock
+	  function, combined operation is possible.
+
 config LEDS_LP5521
 	tristate "LED Support for N.S. LP5521 LED driver chip"
 	depends on LEDS_CLASS && I2C
@@ -399,6 +415,31 @@ config LEDS_ASIC3
 	  cannot be used. This driver supports hardware blinking with an on+off
 	  period from 62ms to 125s. Say Y to enable LEDs on the HP iPAQ hx4700.
 
+config LEDS_MAX77693
+	bool "LED support for the MAX77693"
+	depends on LEDS_CLASS
+	depends on MFD_MAX77693
+	default y
+	help
+	  This option enables support for the LEDs on the MAX77693.
+
+config LEDS_MAX8997
+	tristate "MAX8997 LED support"
+	depends on LEDS_CLASS
+	default n
+	help
+	  This option enables support for the LEDs on the Max8997.
+	  You may control the hard drive or power LEDs on the Max8997
+	  function. Using this driver can support the brightness of LED
+	  by controling current of the Max8997.
+
+config LEDS_AAT1290A
+	bool "LED support for the AAT1290A"
+	depends on LEDS_CLASS
+	default n
+	help
+	  This option enables support for the LEDs on the AAT1290A.
+
 config LEDS_TRIGGERS
 	bool "LED Trigger support"
 	depends on LEDS_CLASS
@@ -465,6 +506,12 @@ config LEDS_TRIGGER_DEFAULT_ON
 	help
 	  This allows LEDs to be initialised in the ON state.
 	  If unsure, say Y.
+
+config LEDS_TRIGGER_SLEEP
+	tristate "LED Sleep Mode Trigger"
+	depends on LEDS_TRIGGERS && HAS_EARLYSUSPEND
+	help
+	  This turns LEDs on when the screen is off but the cpu still running.
 
 comment "iptables trigger is under Netfilter config (LED target)"
 	depends on LEDS_TRIGGERS

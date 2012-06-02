@@ -563,4 +563,6 @@ config KEYBOARD_W90P910
 	  To compile this driver as a module, choose M here: the
 	  module will be called w90p910_keypad.
 
+source "drivers/input/keyboard/cypress/Kconfig"
+
 endif

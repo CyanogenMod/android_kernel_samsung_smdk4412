@@ -62,7 +62,6 @@ static DEFINE_MUTEX(rfcomm_mutex);
 #define rfcomm_lock()	mutex_lock(&rfcomm_mutex)
 #define rfcomm_unlock()	mutex_unlock(&rfcomm_mutex)
 
-static unsigned long rfcomm_event;
 
 static LIST_HEAD(session_list);
 
@@ -120,7 +119,6 @@ static inline void rfcomm_schedule(void)
 {
 	if (!rfcomm_thread)
 		return;
-	set_bit(RFCOMM_SCHED_WAKEUP, &rfcomm_event);
 	wake_up_process(rfcomm_thread);
 }
 
@@ -411,11 +409,19 @@ static int __rfcomm_dlc_open(struct rfcomm_dlc *d, bdaddr_t *src, bdaddr_t *dst,
 			return err;
 	}
 
+	/* After L2sock created, increase refcnt immediately
+	* It can make connection drop in rfcomm_security_cfm because of refcnt.
+	*/
+	rfcomm_session_hold(s);
+
 	dlci = __dlci(!s->initiator, channel);
 
 	/* Check if DLCI already exists */
-	if (rfcomm_dlc_get(s, dlci))
+	if (rfcomm_dlc_get(s, dlci)) {
+		/* decrement refcnt */
+		rfcomm_session_put(s);
 		return -EBUSY;
+	}
 
 	rfcomm_dlc_clear_state(d);
 
@@ -430,6 +436,9 @@ static int __rfcomm_dlc_open(struct rfcomm_dlc *d, bdaddr_t *src, bdaddr_t *dst,
 
 	d->mtu = s->mtu;
 	d->cfc = (s->cfc == RFCOMM_CFC_UNKNOWN) ? 0 : s->cfc;
+
+	/* decrement refcnt */
+	rfcomm_session_put(s);
 
 	if (s->state == BT_CONNECTED) {
 		if (rfcomm_check_security(d))
@@ -466,7 +475,6 @@ static int __rfcomm_dlc_close(struct rfcomm_dlc *d, int err)
 
 	switch (d->state) {
 	case BT_CONNECT:
-	case BT_CONFIG:
 		if (test_and_clear_bit(RFCOMM_DEFER_SETUP, &d->flags)) {
 			set_bit(RFCOMM_AUTH_REJECT, &d->flags);
 			rfcomm_schedule();
@@ -1148,6 +1156,7 @@ static int rfcomm_recv_ua(struct rfcomm_session *s, u8 dlci)
 			if (list_empty(&s->dlcs)) {
 				s->state = BT_DISCONN;
 				rfcomm_send_disc(s, 0);
+				rfcomm_session_clear_timer(s);
 			}
 
 			break;
@@ -1164,7 +1173,7 @@ static int rfcomm_recv_ua(struct rfcomm_session *s, u8 dlci)
 			/* When socket is closed and we are not RFCOMM
 			 * initiator rfcomm_process_rx already calls
 			 * rfcomm_session_put() */
-			if (s->sock->sk->sk_state != BT_CLOSED)
+			if (s->sock->sk->sk_state != BT_CLOSED && !s->initiator)
 				if (list_empty(&s->dlcs))
 					rfcomm_session_put(s);
 			break;
@@ -1855,7 +1864,10 @@ static inline void rfcomm_process_rx(struct rfcomm_session *s)
 	/* Get data directly from socket receive queue without copying it. */
 	while ((skb = skb_dequeue(&sk->sk_receive_queue))) {
 		skb_orphan(skb);
-		rfcomm_recv_frame(s, skb);
+		if (!skb_linearize(skb))
+			rfcomm_recv_frame(s, skb);
+		else
+			kfree_skb(skb);
 	}
 
 	if (sk->sk_state == BT_CLOSED) {
@@ -2038,19 +2050,18 @@ static int rfcomm_run(void *unused)
 
 	rfcomm_add_listener(BDADDR_ANY);
 
-	while (!kthread_should_stop()) {
+	while (1) {
 		set_current_state(TASK_INTERRUPTIBLE);
-		if (!test_bit(RFCOMM_SCHED_WAKEUP, &rfcomm_event)) {
-			/* No pending events. Let's sleep.
-			 * Incoming connections and data will wake us up. */
-			schedule();
-		}
-		set_current_state(TASK_RUNNING);
+
+		if (kthread_should_stop())
+			break;
 
 		/* Process stuff */
-		clear_bit(RFCOMM_SCHED_WAKEUP, &rfcomm_event);
 		rfcomm_process_sessions();
+
+		schedule();
 	}
+	__set_current_state(TASK_RUNNING);
 
 	rfcomm_kill_listener();
 

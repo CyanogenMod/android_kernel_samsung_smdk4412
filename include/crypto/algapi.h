@@ -304,6 +304,7 @@ static inline void blkcipher_walk_init(struct blkcipher_walk *walk,
 	walk->in.sg = src;
 	walk->out.sg = dst;
 	walk->total = nbytes;
+	walk->flags = 0;
 }
 
 static inline void ablkcipher_walk_init(struct ablkcipher_walk *walk,

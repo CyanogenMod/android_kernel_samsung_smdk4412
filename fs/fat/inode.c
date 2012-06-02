@@ -242,6 +242,71 @@ static const struct address_space_operations fat_aops = {
 	.bmap		= _fat_bmap
 };
 
+int _fat_fallocate(struct inode *inode, loff_t len)
+{
+	struct super_block *sb = inode->i_sb;
+	struct msdos_sb_info *sbi = MSDOS_SB(sb);
+	int err;
+	sector_t nblocks, iblock;
+	unsigned short offset;
+
+	if (!S_ISREG(inode->i_mode)) {
+		printk(KERN_ERR "_fat_fallocate: supported only for regular files\n");
+		return -EOPNOTSUPP;
+	}
+
+	if (IS_IMMUTABLE(inode)) {
+		return -EPERM;
+	}
+
+	mutex_lock(&inode->i_mutex);
+
+	/* file is already big enough */
+	if (len <= i_size_read(inode)) {
+		mutex_unlock(&inode->i_mutex);
+		return 0;
+	}
+
+	nblocks = (len + sb->s_blocksize - 1 ) >> sb->s_blocksize_bits;
+	iblock = (MSDOS_I(inode)->mmu_private + sb->s_blocksize - 1) >> sb->s_blocksize_bits;
+
+	/* validate new size */
+	err = inode_newsize_ok(inode, len);
+	if (err) {
+		mutex_unlock(&inode->i_mutex);
+		return err;
+	}
+
+	/* check for available blocks on last cluster */
+	offset = (unsigned long)iblock & (sbi->sec_per_clus - 1);
+	if (offset) {
+		iblock += min((unsigned long) (sbi->sec_per_clus - offset),
+				(unsigned long) (nblocks - iblock));
+	}
+
+	/* now allocate new clusters */
+	while (iblock < nblocks) {
+		err = fat_add_cluster(inode);
+		if (err) {
+			break;
+		}
+
+		iblock += min((unsigned long) sbi->sec_per_clus,
+				(unsigned long) (nblocks - iblock));
+	}
+
+	/* update inode informations */
+	len = min(len, (loff_t)(iblock << sb->s_blocksize_bits));
+	i_size_write(inode, len);
+	MSDOS_I(inode)->mmu_private = len;
+	inode->i_mtime = inode->i_ctime = CURRENT_TIME_SEC;
+	mark_inode_dirty(inode);
+
+	mutex_unlock(&inode->i_mutex);
+
+	return err;
+}
+
 /*
  * New FAT inode stuff. We do the following:
  *	a) i_ino is constant and has nothing with on-disk location.
@@ -1245,6 +1310,7 @@ int fat_fill_super(struct super_block *sb, void *data, int silent, int isvfat,
 	struct inode *root_inode = NULL, *fat_inode = NULL;
 	struct buffer_head *bh;
 	struct fat_boot_sector *b;
+	struct fat_boot_bsx *bsx;
 	struct msdos_sb_info *sbi;
 	u16 logical_sector_size;
 	u32 total_sectors, total_clusters, fat_clusters, rootdir_sectors;
@@ -1390,6 +1456,8 @@ int fat_fill_super(struct super_block *sb, void *data, int silent, int isvfat,
 			goto out_fail;
 		}
 
+		bsx = (struct fat_boot_bsx *)(bh->b_data + FAT32_BSX_OFFSET);
+
 		fsinfo = (struct fat_boot_fsinfo *)fsinfo_bh->b_data;
 		if (!IS_FSINFO(fsinfo)) {
 			fat_msg(sb, KERN_WARNING, "Invalid FSINFO signature: "
@@ -1405,7 +1473,13 @@ int fat_fill_super(struct super_block *sb, void *data, int silent, int isvfat,
 		}
 
 		brelse(fsinfo_bh);
+	} else {
+		bsx = (struct fat_boot_bsx *)(bh->b_data + FAT16_BSX_OFFSET);
 	}
+
+	/* interpret volume ID as a little endian 32 bit integer */
+	sbi->vol_id = (((u32)bsx->vol_id[0]) | ((u32)bsx->vol_id[1] << 8) |
+		((u32)bsx->vol_id[2] << 16) | ((u32)bsx->vol_id[3] << 24));
 
 	sbi->dir_per_block = sb->s_blocksize / sizeof(struct msdos_dir_entry);
 	sbi->dir_per_block_bits = ffs(sbi->dir_per_block) - 1;

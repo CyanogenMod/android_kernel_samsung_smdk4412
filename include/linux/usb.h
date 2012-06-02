@@ -968,6 +968,9 @@ extern int usb_disabled(void);
 
 /* The following flags are used internally by usbcore and HCDs */
 #define URB_DIR_IN		0x0200	/* Transfer from device to host */
+#ifdef CONFIG_HOST_COMPLIANT_TEST
+#define URB_HCD_DRIVER_TEST	0x0400  /* Do NOT hand back or free this URB. */
+#endif
 #define URB_DIR_OUT		0
 #define URB_DIR_MASK		URB_DIR_IN
 
@@ -1419,6 +1422,7 @@ extern int usb_string(struct usb_device *dev, int index,
 /* wrappers that also update important state inside usbcore */
 extern int usb_clear_halt(struct usb_device *dev, int pipe);
 extern int usb_reset_configuration(struct usb_device *dev);
+extern void usb_force_disconnect(struct usb_device *udev);
 extern int usb_set_interface(struct usb_device *dev, int ifnum, int alternate);
 extern void usb_reset_endpoint(struct usb_device *dev, unsigned int epaddr);
 

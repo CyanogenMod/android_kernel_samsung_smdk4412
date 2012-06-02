@@ -63,6 +63,11 @@ static __inline__ bool s3c_dma_has_circular(void)
 	return true;
 }
 
+static inline bool s3c_dma_has_infiniteloop(void)
+{
+	return false;
+}
+
 #define S3C2410_DMAF_CIRCULAR		(1 << 0)
 
 #include <plat/dma.h>

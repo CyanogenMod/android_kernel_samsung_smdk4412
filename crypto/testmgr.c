@@ -30,13 +30,21 @@
 
 #include "internal.h"
 
-#ifdef CONFIG_CRYPTO_MANAGER_DISABLE_TESTS
+#ifndef CONFIG_CRYPTO_MANAGER_TESTS
 
 /* a perfect nop */
 int alg_test(const char *driver, const char *alg, u32 type, u32 mask)
 {
 	return 0;
 }
+
+#ifdef CONFIG_CRYPTO_FIPS
+bool in_fips_err()
+{
+	return false;
+}
+EXPORT_SYMBOL_GPL(in_fips_err);
+#endif
 
 #else
 
@@ -64,6 +72,12 @@ int alg_test(const char *driver, const char *alg, u32 type, u32 mask)
 */
 #define ENCRYPT 1
 #define DECRYPT 0
+
+#ifdef CONFIG_CRYPTO_FIPS
+#define FIPS_ERR 1
+#define FIPS_NO_ERR 0
+static int IN_FIPS_ERROR = FIPS_NO_ERR;
+#endif
 
 struct tcrypt_result {
 	struct completion completion;
@@ -125,6 +139,18 @@ struct alg_test_desc {
 };
 
 static unsigned int IDX[8] = { IDX1, IDX2, IDX3, IDX4, IDX5, IDX6, IDX7, IDX8 };
+
+#ifdef CONFIG_CRYPTO_FIPS
+bool in_fips_err()
+{
+	return (IN_FIPS_ERROR == FIPS_ERR);
+}
+
+void set_in_fips_err()
+{
+	IN_FIPS_ERROR = FIPS_ERR;
+}
+#endif
 
 static void hexdump(unsigned char *buf, unsigned int len)
 {
@@ -1692,7 +1718,9 @@ static const struct alg_test_desc alg_test_descs[] = {
 	}, {
 		.alg = "ccm(aes)",
 		.test = alg_test_aead,
+#ifdef CONFIG_CRYPTO_CCM
 		.fips_allowed = 1,
+#endif
 		.suite = {
 			.aead = {
 				.enc = {
@@ -2061,7 +2089,9 @@ static const struct alg_test_desc alg_test_descs[] = {
 	}, {
 		.alg = "gcm(aes)",
 		.test = alg_test_aead,
+#ifdef CONFIG_CRYPTO_GCM
 		.fips_allowed = 1,
+#endif
 		.suite = {
 			.aead = {
 				.enc = {
@@ -2077,7 +2107,6 @@ static const struct alg_test_desc alg_test_descs[] = {
 	}, {
 		.alg = "ghash",
 		.test = alg_test_hash,
-		.fips_allowed = 1,
 		.suite = {
 			.hash = {
 				.vecs = ghash_tv_template,
@@ -2268,6 +2297,9 @@ static const struct alg_test_desc alg_test_descs[] = {
 	}, {
 		.alg = "rfc4106(gcm(aes))",
 		.test = alg_test_aead,
+#ifdef CONFIG_CRYPTO_GCM
+		.fips_allowed = 1,
+#endif
 		.suite = {
 			.aead = {
 				.enc = {
@@ -2285,7 +2317,9 @@ static const struct alg_test_desc alg_test_descs[] = {
 
 		.alg = "rfc4309(ccm(aes))",
 		.test = alg_test_aead,
+#ifdef CONFIG_CRYPTO_CCM
 		.fips_allowed = 1,
+#endif
 		.suite = {
 			.aead = {
 				.enc = {
@@ -2530,7 +2564,10 @@ int alg_test(const char *driver, const char *alg, u32 type, u32 mask)
 {
 	int i;
 	int j;
-	int rc;
+	int rc = 0;
+#ifdef CONFIG_CRYPTO_FIPS
+	fips_enabled = 1;
+#endif
 
 	if ((type & CRYPTO_ALG_TYPE_MASK) == CRYPTO_ALG_TYPE_CIPHER) {
 		char nalg[CRYPTO_MAX_ALG_NAME];
@@ -2555,11 +2592,6 @@ int alg_test(const char *driver, const char *alg, u32 type, u32 mask)
 	if (i < 0 && j < 0)
 		goto notest;
 
-	if (fips_enabled && ((i >= 0 && !alg_test_descs[i].fips_allowed) ||
-			     (j >= 0 && !alg_test_descs[j].fips_allowed)))
-		goto non_fips_alg;
-
-	rc = 0;
 	if (i >= 0)
 		rc |= alg_test_descs[i].test(alg_test_descs + i, driver,
 					     type, mask);
@@ -2567,23 +2599,52 @@ int alg_test(const char *driver, const char *alg, u32 type, u32 mask)
 		rc |= alg_test_descs[j].test(alg_test_descs + j, driver,
 					     type, mask);
 
+	if (fips_enabled && ((i >= 0 && !alg_test_descs[i].fips_allowed) ||
+			     (j >= 0 && !alg_test_descs[j].fips_allowed)))
+		goto non_fips_alg;
+
 test_done:
-	if (fips_enabled && rc)
-		panic("%s: %s alg self test failed in fips mode!\n", driver, alg);
+	if (fips_enabled && rc) {
+		printk(KERN_INFO
+			"FIPS: %s: %s alg self test failed\n",
+			driver, alg);
+#ifdef CONFIG_CRYPTO_FIPS
+		IN_FIPS_ERROR = FIPS_ERR;
+#endif
+		return rc;
+	}
 
 	if (fips_enabled && !rc)
-		printk(KERN_INFO "alg: self-tests for %s (%s) passed\n",
-		       driver, alg);
+		printk(KERN_INFO "FIPS: self-tests for %s (%s) passed\n",
+			driver, alg);
 
 	return rc;
 
 notest:
-	printk(KERN_INFO "alg: No test for %s (%s)\n", alg, driver);
+	printk(KERN_INFO "FIPS: No test for %s (%s)\n", alg, driver);
 	return 0;
 non_fips_alg:
-	return -EINVAL;
+	if (!rc)
+		printk(KERN_INFO
+			"FIPS: self-tests for non-FIPS %s (%s) passed\n",
+			driver, alg);
+	else
+		printk(KERN_INFO
+			"FIPS: self-tests for non-FIPS %s (%s) failed\n",
+			alg, driver);
+	return rc;
 }
 
-#endif /* CONFIG_CRYPTO_MANAGER_DISABLE_TESTS */
+int testmgr_crypto_proc_init(void)
+{
+#ifdef CONFIG_CRYPTO_FIPS
+	crypto_init_proc(&IN_FIPS_ERROR);
+#else
+	crypto_init_proc();
+#endif
+	return 0;
+}
+
+#endif /* CONFIG_CRYPTO_MANAGER_TESTS */
 
 EXPORT_SYMBOL_GPL(alg_test);

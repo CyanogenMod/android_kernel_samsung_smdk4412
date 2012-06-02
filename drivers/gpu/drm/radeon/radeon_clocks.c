@@ -96,7 +96,7 @@ uint32_t radeon_legacy_get_memory_clock(struct radeon_device *rdev)
  * Read XTAL (ref clock), SCLK and MCLK from Open Firmware device
  * tree. Hopefully, ATI OF driver is kind enough to fill these
  */
-static bool __devinit radeon_read_clocks_OF(struct drm_device *dev)
+static bool radeon_read_clocks_OF(struct drm_device *dev)
 {
 	struct radeon_device *rdev = dev->dev_private;
 	struct device_node *dp = rdev->pdev->dev.of_node;
@@ -166,7 +166,7 @@ static bool __devinit radeon_read_clocks_OF(struct drm_device *dev)
 	return true;
 }
 #else
-static bool __devinit radeon_read_clocks_OF(struct drm_device *dev)
+static bool radeon_read_clocks_OF(struct drm_device *dev)
 {
 	return false;
 }
@@ -334,7 +334,7 @@ void radeon_get_clock_info(struct drm_device *dev)
 
 	if (!rdev->clock.default_sclk)
 		rdev->clock.default_sclk = radeon_get_engine_clock(rdev);
-	if ((!rdev->clock.default_mclk) && rdev->asic->get_memory_clock)
+	if ((!rdev->clock.default_mclk) && rdev->asic->pm.get_memory_clock)
 		rdev->clock.default_mclk = radeon_get_memory_clock(rdev);
 
 	rdev->pm.current_sclk = rdev->clock.default_sclk;

@@ -1,0 +1,12 @@
+config SND_SOC_MC1N2
+	tristate
+	depends on SND_SOC && I2C
+	select SND_HWDEP
+
+config SND_SOC_USE_EXTERNAL_MIC_BIAS
+	bool "Use External Mic Bias"
+
+config SND_SOC_MC1N2_DEBUG
+	bool "MC-1N2 verbose debug messages while core driver call"
+	select SND_DEBUG
+	depends on SND_SOC_MC1N2

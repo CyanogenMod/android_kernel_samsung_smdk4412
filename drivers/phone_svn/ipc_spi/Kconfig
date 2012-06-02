@@ -1,0 +1,9 @@
+#
+# OneDRAM configuration
+#
+config DPRAM_BUILT_IN
+	tristate "onedram driver built-in"
+
+config SVNET_WHITELIST
+	bool "svnet uses whitelist via onedram"
+	default n

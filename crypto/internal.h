@@ -51,7 +51,14 @@ extern struct rw_semaphore crypto_alg_sem;
 extern struct blocking_notifier_head crypto_chain;
 
 #ifdef CONFIG_PROC_FS
+#ifdef CONFIG_CRYPTO_FIPS
+void set_in_fips_err(void);
+void __init crypto_init_proc(int *fips_error);
+void do_integrity_check(void);
+int testmgr_crypto_proc_init(void);
+#else
 void __init crypto_init_proc(void);
+#endif
 void __exit crypto_exit_proc(void);
 #else
 static inline void crypto_init_proc(void)
@@ -138,4 +145,3 @@ static inline void crypto_notify(unsigned long val, void *v)
 }
 
 #endif	/* _CRYPTO_INTERNAL_H */
-

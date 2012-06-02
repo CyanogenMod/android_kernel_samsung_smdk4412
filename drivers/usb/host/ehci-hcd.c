@@ -885,12 +885,32 @@ static irqreturn_t ehci_irq (struct usb_hcd *hcd)
 					ehci->reset_done[i] == 0))
 				continue;
 
+#if defined(CONFIG_LINK_DEVICE_HSIC)
+			/* FIXME: Debugging
+			 * HSIC with XMM6262 don't use the remote wakeup,
+			 * but someitme EHCI got the PCD and we have a doubt
+			 * whether remote wakeup or not. So, we find the irq
+			 * from XMM6262, print out the port status.
+			 */
+			printk(KERN_DEBUG "mif: %s port %d,"
+				"pcd status 0x%x, ehci port status 0x%x, "
+				"suspend_ports %lu, reset_done %lu\n",
+				__func__, i + 1, status, pstatus,
+				ehci->suspended_ports, ehci->reset_done[i]);
+#endif
+
 			/* start 20 msec resume signaling from this port,
 			 * and make khubd collect PORT_STAT_C_SUSPEND to
 			 * stop that signaling.  Use 5 ms extra for safety,
 			 * like usb_port_resume() does.
 			 */
+#ifdef CONFIG_LINK_DEVICE_HSIC
+			/* ensure suspend bit clear by adding 5 msec delay. */
+			ehci->reset_done[i] = jiffies + msecs_to_jiffies(30);
+#else
 			ehci->reset_done[i] = jiffies + msecs_to_jiffies(25);
+#endif
+
 			ehci_dbg (ehci, "port %d remote wakeup\n", i + 1);
 			mod_timer(&hcd->rh_timer, ehci->reset_done[i]);
 		}

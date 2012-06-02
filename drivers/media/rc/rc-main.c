@@ -1126,7 +1126,8 @@ out_table:
 out_dev:
 	device_del(&dev->dev);
 out_unlock:
-	mutex_unlock(&dev->lock);
+	if (mutex_is_locked(&dev->lock))
+		mutex_unlock(&dev->lock);
 	return rc;
 }
 EXPORT_SYMBOL_GPL(rc_register_device);

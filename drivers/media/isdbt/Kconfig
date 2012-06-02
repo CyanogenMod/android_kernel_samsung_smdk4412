@@ -1,0 +1,5 @@
+config ISDBT_FC8100
+	boolean "ISDBT - DRIVER FC8100"
+	default n
+	---help---
+	Isdbt driver for fci8100

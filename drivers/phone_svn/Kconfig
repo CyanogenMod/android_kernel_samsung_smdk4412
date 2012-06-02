@@ -1,0 +1,71 @@
+#
+#
+#
+
+menuconfig SAMSUNG_PHONE_SVNET
+	tristate "Samsung Phone Interface - SVN"
+	default n
+	---help---
+
+if SAMSUNG_PHONE_SVNET
+
+menuconfig PHONE_ONEDRAM
+	tristate "OneDRAM"
+	depends on SAMSUNG_PHONE_SVNET
+	default n
+	help
+	  Say Y to enable OneDRAM Interface support.
+
+config PHONE_IPC_SPI
+	bool "IPC SPI"
+	depends on SAMSUNG_PHONE_SVNET
+	default n
+	help
+	  Say Y to enable IPC-SPI Interface support.
+
+menuconfig PHONE_IPC_HSI
+	tristate "IPC HSI"
+	depends on SAMSUNG_PHONE_SVNET
+	default n
+	help
+	  Say Y to enable MIPI-HSI Interface support.
+
+config PHONE_SVNET
+	tristate "Samsung Virtual Network"
+	depends on SAMSUNG_PHONE_SVNET
+	default n
+	help
+	  Say Y to enable Samsung Virtual Network support
+
+menuconfig PHONE_LOOPBACK_TEST
+	tristate "SPI LoopBack Test"
+	depends on SAMSUNG_PHONE_SVNET
+	default n
+
+menuconfig PHONE_STORAGE
+	tristate "DGS Storage"
+	depends on SAMSUNG_PHONE_SVNET
+	default n
+
+config SVNET_WHITELIST
+	bool "svnet uses whitelist via onedram"
+	default n
+	---help---
+	  By default, n
+
+config CHN_CMCC_SPI_SPRD
+        tristate "Samsung M0-TD CP SPRD"
+	depends on SAMSUNG_PHONE_SVNET
+        default n
+
+config SEC_MODEM_M0_TD
+        tristate "Samsung M0-TD modemctl driver"
+        depends on SAMSUNG_PHONE_SVNET
+        default n
+
+config WORKQUEUE_FRONT
+	tristate "IPC_SPI workqueue front"
+	depends on SAMSUNG_PHONE_SVNET
+	default n
+
+endif # SAMSUNG_PHONE_SVNET

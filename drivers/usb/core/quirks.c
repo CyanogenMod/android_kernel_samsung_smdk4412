@@ -147,6 +147,21 @@ static const struct usb_device_id usb_quirk_list[] = {
 	/* INTEL VALUE SSD */
 	{ USB_DEVICE(0x8086, 0xf1a5), .driver_info = USB_QUIRK_RESET_RESUME },
 
+	/* Samsung CMC221 LTE Modem */
+	{ USB_DEVICE(0x04e8, 0x6999), .driver_info = USB_QUIRK_NO_GET_STATUS },
+
+	/* IMC_BOOT - XMM6260, XMM6262 */
+	{ USB_DEVICE(0x058b, 0x0041), .driver_info = USB_QUIRK_HSIC_TUNE },
+
+	/* IMC_MAIN - XMM6260, XMM6262 */
+	{ USB_DEVICE(0x1519, 0x0020), .driver_info = USB_QUIRK_HSIC_TUNE },
+
+	/* STE_BOOT - M7400 */
+	{ USB_DEVICE(0x04cc, 0x7400), .driver_info = USB_QUIRK_HSIC_TUNE },
+
+	/* STE_MAIN - M7400 */
+	{ USB_DEVICE(0x04cc, 0x2333), .driver_info = USB_QUIRK_HSIC_TUNE },
+
 	{ }  /* terminating entry must be last */
 };
 

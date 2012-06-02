@@ -1,0 +1,5 @@
+config 2MIC_FM34_WE395
+	bool "Forte Media 2MIC driver"
+	default n
+	help
+	  This is Forte media voice solution devices.

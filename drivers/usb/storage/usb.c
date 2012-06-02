@@ -907,6 +907,9 @@ int usb_stor_probe1(struct us_data **pus,
 	/*
 	 * Allow 16-byte CDBs and thus > 2TB
 	 */
+#ifdef CONFIG_USB_HOST_NOTIFY
+	host->by_usb = 1;
+#endif
 	host->max_cmd_len = 16;
 	host->sg_tablesize = usb_stor_sg_tablesize(intf);
 	*pus = us = host_to_us(host);

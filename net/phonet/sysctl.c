@@ -28,7 +28,7 @@
 #include <linux/init.h>
 
 #define DYNAMIC_PORT_MIN	0x40
-#define DYNAMIC_PORT_MAX	0x7f
+#define DYNAMIC_PORT_MAX	0xff
 
 static DEFINE_SEQLOCK(local_port_range_lock);
 static int local_port_range_min[2] = {0, 0};

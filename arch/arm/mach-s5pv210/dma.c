@@ -30,6 +30,71 @@
 
 static u64 dma_dmamask = DMA_BIT_MASK(32);
 
+static struct resource s5pv210_mdma_resource[] = {
+	[0] = {
+		.start  = S5PV210_PA_MDMA,
+		.end    = S5PV210_PA_MDMA + SZ_4K,
+		.flags	= IORESOURCE_MEM,
+	},
+	[1] = {
+		.start	= IRQ_MDMA,
+		.end	= IRQ_MDMA,
+		.flags	= IORESOURCE_IRQ,
+	},
+};
+
+static struct s3c_pl330_platdata s5pv210_mdma_pdata = {
+	.peri = {
+		/* The DMAC can have max 8 channel so there
+		 * can be 8 M<->M requests served at any time.
+		 */
+		[0] = DMACH_MTOM_0,
+		[1] = DMACH_MTOM_1,
+		[2] = DMACH_MTOM_2,
+		[3] = DMACH_MTOM_3,
+		[4] = DMACH_MTOM_4,
+		[5] = DMACH_MTOM_5,
+		[6] = DMACH_MTOM_6,
+		[7] = DMACH_MTOM_7,
+		[8] = DMACH_MAX,
+		[9] = DMACH_MAX,
+		[10] = DMACH_MAX,
+		[11] = DMACH_MAX,
+		[12] = DMACH_MAX,
+		[13] = DMACH_MAX,
+		[14] = DMACH_MAX,
+		[15] = DMACH_MAX,
+		[16] = DMACH_MAX,
+		[17] = DMACH_MAX,
+		[18] = DMACH_MAX,
+		[19] = DMACH_MAX,
+		[20] = DMACH_MAX,
+		[21] = DMACH_MAX,
+		[22] = DMACH_MAX,
+		[23] = DMACH_MAX,
+		[24] = DMACH_MAX,
+		[25] = DMACH_MAX,
+		[26] = DMACH_MAX,
+		[27] = DMACH_MAX,
+		[28] = DMACH_MAX,
+		[29] = DMACH_MAX,
+		[30] = DMACH_MAX,
+		[31] = DMACH_MAX,
+	},
+};
+
+struct platform_device s5pv210_device_mdma = {
+	.name		= "s3c-pl330",
+	.id		= 0,
+	.num_resources	= ARRAY_SIZE(s5pv210_mdma_resource),
+	.resource	= s5pv210_mdma_resource,
+	.dev		= {
+		.dma_mask = &dma_dmamask,
+		.coherent_dma_mask = DMA_BIT_MASK(32),
+		.platform_data = &s5pv210_mdma_pdata,
+	},
+};
+
 static struct resource s5pv210_pdma0_resource[] = {
 	[0] = {
 		.start  = S5PV210_PA_PDMA0,
@@ -80,9 +145,9 @@ static struct s3c_pl330_platdata s5pv210_pdma0_pdata = {
 	},
 };
 
-static struct platform_device s5pv210_device_pdma0 = {
+struct platform_device s5pv210_device_pdma0 = {
 	.name		= "s3c-pl330",
-	.id		= 0,
+	.id		= 1,
 	.num_resources	= ARRAY_SIZE(s5pv210_pdma0_resource),
 	.resource	= s5pv210_pdma0_resource,
 	.dev		= {
@@ -142,9 +207,9 @@ static struct s3c_pl330_platdata s5pv210_pdma1_pdata = {
 	},
 };
 
-static struct platform_device s5pv210_device_pdma1 = {
+struct platform_device s5pv210_device_pdma1 = {
 	.name		= "s3c-pl330",
-	.id		= 1,
+	.id		= 2,
 	.num_resources	= ARRAY_SIZE(s5pv210_pdma1_resource),
 	.resource	= s5pv210_pdma1_resource,
 	.dev		= {
@@ -155,6 +220,7 @@ static struct platform_device s5pv210_device_pdma1 = {
 };
 
 static struct platform_device *s5pv210_dmacs[] __initdata = {
+	&s5pv210_device_mdma,
 	&s5pv210_device_pdma0,
 	&s5pv210_device_pdma1,
 };

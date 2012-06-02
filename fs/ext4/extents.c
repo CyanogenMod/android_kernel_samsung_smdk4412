@@ -2469,10 +2469,6 @@ ext4_ext_rm_leaf(handle_t *handle, struct inode *inode,
 		if (uninitialized && num)
 			ext4_ext_mark_uninitialized(ex);
 
-		err = ext4_ext_dirty(handle, inode, path + depth);
-		if (err)
-			goto out;
-
 		/*
 		 * If the extent was completely released,
 		 * we need to remove it from the leaf
@@ -2493,6 +2489,10 @@ ext4_ext_rm_leaf(handle_t *handle, struct inode *inode,
 			}
 			le16_add_cpu(&eh->eh_entries, -1);
 		}
+
+		err = ext4_ext_dirty(handle, inode, path + depth);
+		if (err)
+			goto out;
 
 		ext_debug("new extent: %u:%u:%llu\n", block, num,
 				ext4_ext_pblock(ex));

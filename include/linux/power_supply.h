@@ -14,6 +14,7 @@
 #define __LINUX_POWER_SUPPLY_H__
 
 #include <linux/device.h>
+#include <linux/wakelock.h>
 #include <linux/workqueue.h>
 #include <linux/leds.h>
 
@@ -53,6 +54,7 @@ enum {
 	POWER_SUPPLY_HEALTH_OVERVOLTAGE,
 	POWER_SUPPLY_HEALTH_UNSPEC_FAILURE,
 	POWER_SUPPLY_HEALTH_COLD,
+	POWER_SUPPLY_HEALTH_UNDERVOLTAGE,
 };
 
 enum {
@@ -130,6 +132,18 @@ enum power_supply_type {
 	POWER_SUPPLY_TYPE_USB_DCP,	/* Dedicated Charging Port */
 	POWER_SUPPLY_TYPE_USB_CDP,	/* Charging Downstream Port */
 	POWER_SUPPLY_TYPE_USB_ACA,	/* Accessory Charger Adapters */
+	POWER_SUPPLY_TYPE_OTG,
+	POWER_SUPPLY_TYPE_DOCK,
+	POWER_SUPPLY_TYPE_MISC,
+	POWER_SUPPLY_TYPE_WIRELESS,
+};
+
+enum {
+	POWER_SUPPLY_VBUS_UNKNOWN = 0,
+	POWER_SUPPLY_VBUS_UVLO,
+	POWER_SUPPLY_VBUS_WEAK,
+	POWER_SUPPLY_VBUS_OVLO,
+	POWER_SUPPLY_VBUS_GOOD,
 };
 
 union power_supply_propval {
@@ -163,6 +177,9 @@ struct power_supply {
 	/* private */
 	struct device *dev;
 	struct work_struct changed_work;
+	spinlock_t changed_lock;
+	bool changed;
+	struct wake_lock work_wake_lock;
 
 #ifdef CONFIG_LEDS_TRIGGERS
 	struct led_trigger *charging_full_trig;

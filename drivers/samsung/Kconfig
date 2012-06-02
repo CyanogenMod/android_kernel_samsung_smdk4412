@@ -1,0 +1,31 @@
+#
+#
+#
+
+menuconfig SAMSUNG_MODULES
+	tristate "Samsung Kernel Modules"
+	default n
+	help
+	  Say Y to enable Samsung kernel modules. j4fs and param
+	  modules are included.
+
+menuconfig FM_RADIO
+	tristate "FM Radio Driver"
+	depends on SAMSUNG_MODULES
+	default n
+	help
+	  Say Y to enable FM Radio Driver
+
+menuconfig FM_SI4709
+	tristate "Si4709 FM radio"
+	depends on FM_RADIO
+	default n
+	help
+	  Say Y to enable Si4709 FM radio support.
+
+ menuconfig FM_SI4705
+	tristate "Si4705 FM radio"
+	depends on FM_RADIO
+	default n
+	help
+	  Say Y to enable Si4705 FM radio support.

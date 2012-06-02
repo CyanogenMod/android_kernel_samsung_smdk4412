@@ -37,6 +37,13 @@
 #include <linux/nsproxy.h>
 #include <linux/backing-dev.h>
 
+#ifdef CONFIG_WTL_ENCRYPTION_FILTER
+#define ENC_NAME_FILTER_MAX_INSTANCE 5
+#define ENC_NAME_FILTER_MAX_LEN (256*5)
+#define ENC_EXT_FILTER_MAX_INSTANCE 60
+#define ENC_EXT_FILTER_MAX_LEN 16
+#endif
+
 /* Version verification for shared data structures w/ userspace */
 #define ECRYPTFS_VERSION_MAJOR 0x00
 #define ECRYPTFS_VERSION_MINOR 0x04
@@ -379,6 +386,10 @@ struct ecryptfs_mount_crypt_stat {
 #define ECRYPTFS_GLOBAL_ENCFN_USE_MOUNT_FNEK   0x00000020
 #define ECRYPTFS_GLOBAL_ENCFN_USE_FEK          0x00000040
 #define ECRYPTFS_GLOBAL_MOUNT_AUTH_TOK_ONLY    0x00000080
+#ifdef CONFIG_WTL_ENCRYPTION_FILTER
+#define ECRYPTFS_ENABLE_FILTERING              0x00000100
+#define ECRYPTFS_ENABLE_NEW_PASSTHROUGH        0x00000200
+#endif
 	u32 flags;
 	struct list_head global_auth_tok_list;
 	struct mutex global_auth_tok_list_mutex;
@@ -389,6 +400,14 @@ struct ecryptfs_mount_crypt_stat {
 	unsigned char global_default_fn_cipher_name[
 		ECRYPTFS_MAX_CIPHER_NAME_SIZE + 1];
 	char global_default_fnek_sig[ECRYPTFS_SIG_SIZE_HEX + 1];
+#ifdef CONFIG_WTL_ENCRYPTION_FILTER
+	int max_name_filter_len;
+	char enc_filter_name[ENC_NAME_FILTER_MAX_INSTANCE]
+				[ENC_NAME_FILTER_MAX_LEN];
+	char enc_filter_ext[ENC_EXT_FILTER_MAX_INSTANCE]
+				[ENC_EXT_FILTER_MAX_LEN];
+#endif
+
 };
 
 /* superblock private data. */
@@ -767,5 +786,12 @@ ecryptfs_parse_tag_70_packet(char **filename, size_t *filename_size,
 			     char *data, size_t max_packet_size);
 int ecryptfs_derive_iv(char *iv, struct ecryptfs_crypt_stat *crypt_stat,
 		       loff_t offset);
+
+#ifdef CONFIG_WTL_ENCRYPTION_FILTER
+extern int is_file_name_match(struct ecryptfs_mount_crypt_stat *mcs,
+	struct dentry *fp_dentry);
+extern int is_file_ext_match(struct ecryptfs_mount_crypt_stat *mcs,
+	char *str);
+#endif
 
 #endif /* #ifndef ECRYPTFS_KERNEL_H */

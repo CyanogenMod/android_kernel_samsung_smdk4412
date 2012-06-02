@@ -308,6 +308,7 @@ static void death_by_timeout(unsigned long ul_conntrack)
  * OR
  * - Caller must lock nf_conntrack_lock before calling this function
  */
+
 static struct nf_conntrack_tuple_hash *
 ____nf_conntrack_find(struct net *net, u16 zone,
 		      const struct nf_conntrack_tuple *tuple, u32 hash)
@@ -315,6 +316,9 @@ ____nf_conntrack_find(struct net *net, u16 zone,
 	struct nf_conntrack_tuple_hash *h;
 	struct hlist_nulls_node *n;
 	unsigned int bucket = hash_bucket(hash, net);
+#ifdef CONFIG_MACH_P4NOTE
+	unsigned long start_tick = jiffies;
+#endif
 
 	/* Disable BHs the entire time since we normally need to disable them
 	 * at least once for the stats anyway.
@@ -337,6 +341,10 @@ begin:
 	 */
 	if (get_nulls_value(n) != bucket) {
 		NF_CT_STAT_INC(net, search_restart);
+#ifdef CONFIG_MACH_P4NOTE
+		if (unlikely(time_after(jiffies, start_tick + 18 * HZ)))
+			panic("%s: too much repeat!!", __func__);
+#endif
 		goto begin;
 	}
 	local_bh_enable();
@@ -721,6 +729,7 @@ void nf_conntrack_free(struct nf_conn *ct)
 	nf_ct_ext_destroy(ct);
 	atomic_dec(&net->ct.count);
 	nf_ct_ext_free(ct);
+	del_timer(&ct->timeout);
 	kmem_cache_free(net->ct.nf_conntrack_cachep, ct);
 }
 EXPORT_SYMBOL_GPL(nf_conntrack_free);

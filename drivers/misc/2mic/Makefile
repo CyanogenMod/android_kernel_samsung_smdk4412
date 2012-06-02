@@ -1,0 +1,1 @@
+obj-$(CONFIG_2MIC_FM34_WE395)	+= fm34_we395.o

@@ -406,6 +406,11 @@ struct fsg_common {
 	 */
 	char inquiry_string[8 + 16 + 4 + 1];
 
+#ifdef CONFIG_USB_ANDROID_SAMSUNG_COMPOSITE
+	char vendor_string[8 + 1];
+	char product_string[16 + 1];
+#endif
+
 	struct kref		ref;
 };
 
@@ -775,8 +780,17 @@ static int do_read(struct fsg_common *common)
 
 	/* Carry out the file reads */
 	amount_left = common->data_size_from_cmnd;
-	if (unlikely(amount_left == 0))
+	if (unlikely(amount_left == 0)) {
+		/* Wait for the next buffer to become available */
+		bh = common->next_buffhd_to_fill;
+		while (bh->state != BUF_STATE_EMPTY) {
+			rc = sleep_thread(common);
+			if (rc)
+				return rc;
+		}
+		bh->inreq->length = 0;
 		return -EIO;		/* No default reply */
+	}
 
 	for (;;) {
 		/*
@@ -793,9 +807,22 @@ static int do_read(struct fsg_common *common)
 		amount = min((loff_t)amount,
 			     curlun->file_length - file_offset);
 		partial_page = file_offset & (PAGE_CACHE_SIZE - 1);
-		if (partial_page > 0)
-			amount = min(amount, (unsigned int)PAGE_CACHE_SIZE -
-					     partial_page);
+		if (common->gadget->speed != USB_SPEED_SUPER) {
+			if (partial_page > 0)
+				amount = min(amount, (unsigned int)PAGE_CACHE_SIZE -
+						partial_page);
+		}
+
+		if (common->gadget->speed == USB_SPEED_SUPER) {
+			/* The packet should be multiple of MPS, which is 1024. */
+			if (amount < amount_left) {
+				unsigned mod = amount % common->bulk_out_maxpacket;
+				if (mod && (amount - mod)) {
+					// not a multiple of maxpacket
+					amount -= mod;
+				}
+			}
+		}
 
 		/* Wait for the next buffer to become available */
 		bh = common->next_buffhd_to_fill;
@@ -876,7 +903,7 @@ static int do_write(struct fsg_common *common)
 	int			get_some_more;
 	u32			amount_left_to_req, amount_left_to_write;
 	loff_t			usb_offset, file_offset, file_offset_tmp;
-	unsigned int		amount;
+	unsigned int		amount, diff;
 	unsigned int		partial_page;
 	ssize_t			nwritten;
 	int			rc;
@@ -946,9 +973,12 @@ static int do_write(struct fsg_common *common)
 			amount = min((loff_t)amount,
 				     curlun->file_length - usb_offset);
 			partial_page = usb_offset & (PAGE_CACHE_SIZE - 1);
-			if (partial_page > 0)
-				amount = min(amount,
-	(unsigned int)PAGE_CACHE_SIZE - partial_page);
+			if (common->gadget->speed != USB_SPEED_SUPER) {
+				if (partial_page > 0)
+					amount = min(amount,
+						(unsigned int) PAGE_CACHE_SIZE -
+						partial_page);
+			}
 
 			if (amount == 0) {
 				get_some_more = 0;
@@ -967,6 +997,17 @@ static int do_write(struct fsg_common *common)
 				 */
 				get_some_more = 0;
 				continue;
+			}
+
+			if (common->gadget->speed == USB_SPEED_SUPER) {
+				/* The packet should be multiple of MPS, which is 1024. */
+				if (amount < amount_left_to_write) {
+					unsigned mod = amount % common->bulk_out_maxpacket;
+					if (mod && (amount - mod)) {
+						// not a multiple of maxpacket
+						amount -= mod;
+					}
+				}
 			}
 
 			/* Get the next buffer */
@@ -1008,6 +1049,12 @@ static int do_write(struct fsg_common *common)
 			}
 
 			amount = bh->outreq->actual;
+			if (amount > bh->outreq->length) {
+				diff = amount - bh->outreq->length;
+				amount = bh->outreq->length;
+			} else {
+				diff = 0;
+			}
 			if (curlun->file_length - file_offset < amount) {
 				LERROR(curlun,
 				       "write %u @ %llu beyond end %llu\n",
@@ -1039,6 +1086,15 @@ static int do_write(struct fsg_common *common)
 			file_offset += nwritten;
 			amount_left_to_write -= nwritten;
 			common->residue -= nwritten;
+
+			if (diff) {
+				LDBG(curlun, "host sent too much data: %d\n", diff);
+				LDBG(curlun, "data_size=%d residue=%d amt_left=%d\n",
+					common->data_size, common->residue, common->usb_amount_left);
+				common->data_size = common->residue;
+				common->usb_amount_left = 0;
+				break;
+			}
 
 			/* If an error occurred, report it and its position */
 			if (nwritten < amount) {
@@ -1200,6 +1256,9 @@ static int do_inquiry(struct fsg_common *common, struct fsg_buffhd *bh)
 {
 	struct fsg_lun *curlun = common->curlun;
 	u8	*buf = (u8 *) bh->buf;
+#if defined(CONFIG_USB_ANDROID_SAMSUNG_COMPOSITE)
+	static char new_product_name[16 + 1];
+#endif
 
 	if (!curlun) {		/* Unsupported LUNs are okay */
 		common->bad_lun_okay = 1;
@@ -1217,6 +1276,23 @@ static int do_inquiry(struct fsg_common *common, struct fsg_buffhd *bh)
 	buf[5] = 0;		/* No special options */
 	buf[6] = 0;
 	buf[7] = 0;
+
+#if defined(CONFIG_USB_ANDROID_SAMSUNG_COMPOSITE)
+	strncpy(new_product_name, common->product_string, 16);
+	new_product_name[16] = '\0';
+	if (common->product_string[0] &&
+	    strlen(common->product_string) <= 11 && /* check string length */
+	    common->lun > 0) {
+		strncat(new_product_name, " Card", 16);
+		new_product_name[16] = '\0';
+	}
+
+	snprintf(common->inquiry_string,
+		sizeof common->inquiry_string,
+		"%-8s%-16s%04x",
+		common->vendor_string,
+		new_product_name, 1);
+#endif
 	memcpy(buf + 8, common->inquiry_string, sizeof common->inquiry_string);
 	return 36;
 }
@@ -2330,6 +2406,17 @@ static int enable_endpoint(struct fsg_common *common, struct usb_ep *ep,
 	int	rc;
 
 	ep->driver_data = common;
+
+	if (common->gadget->speed == USB_SPEED_SUPER) {
+		if (ep == common->fsg->bulk_in)
+			ep->maxburst = fsg_ss_bulk_in_comp_desc.bMaxBurst;
+		else if (ep == common->fsg->bulk_out)
+			ep->maxburst = fsg_ss_bulk_out_comp_desc.bMaxBurst;
+		else
+			ep->maxburst = 0;
+	} else
+		ep->maxburst = 0;
+
 	rc = usb_ep_enable(ep, d);
 	if (rc)
 		ERROR(common, "can't enable %s, result %d\n", ep->name, rc);
@@ -2396,14 +2483,22 @@ reset:
 	fsg = common->fsg;
 
 	/* Enable the endpoints */
-	d = fsg_ep_desc(common->gadget,
+	if (gadget_is_superspeed(common->gadget) &&
+	    common->gadget->speed == USB_SPEED_SUPER)
+		d = &fsg_ss_bulk_in_desc;
+	else
+		d = fsg_ep_desc(common->gadget,
 			&fsg_fs_bulk_in_desc, &fsg_hs_bulk_in_desc);
 	rc = enable_endpoint(common, fsg->bulk_in, d);
 	if (rc)
 		goto reset;
 	fsg->bulk_in_enabled = 1;
 
-	d = fsg_ep_desc(common->gadget,
+	if (gadget_is_superspeed(common->gadget) &&
+	    common->gadget->speed == USB_SPEED_SUPER)
+		d = &fsg_ss_bulk_out_desc;
+	else
+		d = fsg_ep_desc(common->gadget,
 			&fsg_fs_bulk_out_desc, &fsg_hs_bulk_out_desc);
 	rc = enable_endpoint(common, fsg->bulk_out, d);
 	if (rc)
@@ -2779,6 +2874,9 @@ static struct fsg_common *fsg_common_init(struct fsg_common *common,
 		curlun->ro = lcfg->cdrom || lcfg->ro;
 		curlun->initially_ro = curlun->ro;
 		curlun->removable = lcfg->removable;
+#ifdef CONFIG_USB_ANDROID_SAMSUNG_COMPOSITE
+		curlun->nofua = lcfg->nofua;
+#endif
 		curlun->dev.release = fsg_lun_release;
 		curlun->dev.parent = &gadget->dev;
 		/* curlun->dev.driver = &fsg_driver.driver; XXX */
@@ -2855,6 +2953,15 @@ buffhds_first_it:
 				     ? "File-Stor Gadget"
 				     : "File-CD Gadget"),
 		 i);
+
+#ifdef	CONFIG_USB_ANDROID_SAMSUNG_COMPOSITE
+	/* Default INQUIRY strings */
+	strncpy(common->vendor_string, "SAMSUNG",
+			sizeof(common->vendor_string) - 1);
+	strncpy(common->product_string, "File-Stor Gadget",
+			sizeof(common->product_string) - 1);
+	common->product_string[sizeof(common->product_string) - 1] = '\0';
+#endif
 
 	/*
 	 * Some peripheral controllers are known not to be able to
@@ -2976,6 +3083,7 @@ static void fsg_unbind(struct usb_configuration *c, struct usb_function *f)
 	fsg_common_put(common);
 	usb_free_descriptors(fsg->function.descriptors);
 	usb_free_descriptors(fsg->function.hs_descriptors);
+	usb_free_descriptors(fsg->function.ss_descriptors);
 	kfree(fsg);
 }
 
@@ -3026,6 +3134,28 @@ static int fsg_bind(struct usb_configuration *c, struct usb_function *f)
 		}
 	}
 
+	if (gadget_is_superspeed(gadget)) {
+		unsigned	max_burst;
+
+		/* Calculate bMaxBurst, we know packet size is 1024 */
+		max_burst = min_t(unsigned, FSG_BUFLEN / 1024, 15);
+
+		fsg_ss_bulk_in_desc.bEndpointAddress =
+			fsg_fs_bulk_in_desc.bEndpointAddress;
+		fsg_ss_bulk_in_comp_desc.bMaxBurst = max_burst;
+
+		fsg_ss_bulk_out_desc.bEndpointAddress =
+			fsg_fs_bulk_out_desc.bEndpointAddress;
+		fsg_ss_bulk_out_comp_desc.bMaxBurst = max_burst;
+
+		f->ss_descriptors = usb_copy_descriptors(fsg_ss_function);
+		if (unlikely(!f->ss_descriptors)) {
+			usb_free_descriptors(f->hs_descriptors);
+			usb_free_descriptors(f->descriptors);
+			return -ENOMEM;
+		}
+	}
+
 	return 0;
 
 autoconf_fail:
@@ -3052,7 +3182,7 @@ static int fsg_bind_config(struct usb_composite_dev *cdev,
 	if (unlikely(!fsg))
 		return -ENOMEM;
 
-	fsg->function.name        = FSG_DRIVER_DESC;
+	fsg->function.name        = "mass_storage";
 	fsg->function.strings     = fsg_strings_array;
 	fsg->function.bind        = fsg_bind;
 	fsg->function.unbind      = fsg_unbind;

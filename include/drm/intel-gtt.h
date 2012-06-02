@@ -13,6 +13,12 @@ const struct intel_gtt {
 	unsigned int gtt_mappable_entries;
 	/* Whether i915 needs to use the dmar apis or not. */
 	unsigned int needs_dmar : 1;
+	/* Whether we idle the gpu before mapping/unmapping */
+	unsigned int do_idle_maps : 1;
+	/* Share the scratch page dma with ppgtts. */
+	dma_addr_t scratch_page_dma;
+	/* for ppgtt PDE access */
+	u32 __iomem *gtt;
 } *intel_gtt_get(void);
 
 void intel_gtt_chipset_flush(void);
