@@ -4365,7 +4365,7 @@ static void __init exynos_c2c_reserve(void)
 }
 #endif
 
-MACHINE_START(SMDK4212, "SMDK4X12")
+MACHINE_START(SMDK4212, "smdk4x12")
 	.boot_params	= S5P_PA_SDRAM + 0x100,
 	.init_irq	= exynos4_init_irq,
 	.map_io		= smdk4x12_map_io,
@@ -4376,7 +4376,7 @@ MACHINE_START(SMDK4212, "SMDK4X12")
 #endif
 MACHINE_END
 
-MACHINE_START(SMDK4412, "SMDK4X12")
+MACHINE_START(SMDK4412, "smdk4x12")
 	.boot_params	= S5P_PA_SDRAM + 0x100,
 	.init_irq	= exynos4_init_irq,
 	.map_io		= smdk4x12_map_io,
