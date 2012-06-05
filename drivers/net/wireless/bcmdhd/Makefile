@@ -7,8 +7,7 @@ DHDCFLAGS = -Wall -Wstrict-prototypes -Dlinux -DBCMDRIVER                     \
         -DMMC_SDIO_ABORT -DBCMSDIO -DBCMLXSDMMC -DBCMPLATFORM_BUS -DWLP2P     \
         -DNEW_COMPAT_WIRELESS -DWIFI_ACT_FRAME -DARP_OFFLOAD_SUPPORT          \
         -DKEEP_ALIVE -DCSCAN -DPKT_FILTER_SUPPORT                             \
-        -DEMBEDDED_PLATFORM
-#-DPNO_SUPPORT
+        -DEMBEDDED_PLATFORM -DPNO_SUPPORT
 
 # distinguish between the 43xx chip
 ifeq ($(CONFIG_BCM4334),m)
