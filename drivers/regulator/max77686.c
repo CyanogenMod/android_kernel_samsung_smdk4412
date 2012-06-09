@@ -316,7 +316,7 @@ static int max77686_reg_enable(struct regulator_dev *rdev)
 	if (ret)
 		return ret;
 
-	printk(PMIC_DEBUG "%s: id=%d, pattern=%x\n",
+	pr_info("%s: id=%d, pattern=%x\n",
 		__func__, rdev_get_id(rdev), pattern);
 
 	return max77686_update_reg(i2c, reg, pattern, mask);
@@ -332,7 +332,7 @@ static int max77686_reg_disable(struct regulator_dev *rdev)
 	if (ret)
 		return ret;
 
-	printk(PMIC_DEBUG "%s: id=%d, pattern=%x\n",
+	pr_info("%s: id=%d, pattern=%x\n",
 		__func__, rdev_get_id(rdev), pattern);
 
 	return max77686_update_reg(i2c, reg, ~mask, mask);
@@ -401,7 +401,7 @@ static int max77686_get_voltage(struct regulator_dev *rdev)
 	val >>= shift;
 	val &= mask;
 
-	printk(PMIC_REG_DEBUG "%s: id=%d, val=%x\n",
+	pr_debug("%s: id=%d, val=%x\n",
 		__func__, rid, val);
 
 	return max77686_list_voltage(rdev, val);
@@ -472,7 +472,7 @@ static int max77686_set_voltage(struct regulator_dev *rdev,
 	/* Test code for HDMI debug */
 	if (!gpio_get_value(GPIO_HDMI_EN))
 #endif
-		printk(PMIC_REG_DEBUG "max77686: id=%d, org=%x, val=%x",
+		pr_debug("max77686: id=%d, org=%x, val=%x",
 			rdev_get_id(rdev), org, i);
 
 	ret = max77686_update_reg(i2c, reg, i << shift, mask << shift);
@@ -633,7 +633,7 @@ static int max77686_set_ramp_rate(struct i2c_client *i2c, int rate)
 		break;
 	}
 
-	printk(PMIC_DEBUG "%s: ramp_delay=%d, data=0x%x\n", __func__, ramp_delay, data);
+	pr_debug("%s: ramp_delay=%d, data=0x%x\n", __func__, ramp_delay, data);
 
 	max77686_update_reg(i2c, MAX77686_REG_BUCK2CTRL1, data, 0xC0);
 	max77686_update_reg(i2c, MAX77686_REG_BUCK3CTRL1, data, 0xC0);
@@ -652,7 +652,7 @@ static __devinit int max77686_pmic_probe(struct platform_device *pdev)
 	int i, ret, size;
 	u8 data = 0;
 
-	printk(PMIC_DEBUG "%s\n", __func__);
+	pr_info("%s\n", __func__);
 
 	if (!pdata) {
 		dev_err(pdev->dev.parent, "No platform init data supplied.\n");
@@ -682,7 +682,7 @@ static __devinit int max77686_pmic_probe(struct platform_device *pdev)
 
 	max77686_read_reg(i2c, MAX77686_REG_DEVICE_ID, &data);
 	max77686->device_id = (data & 0x7);
-	printk(PMIC_DEBUG "%s: DEVICE ID=0x%x\n", __func__, data);
+	pr_info("%s: DEVICE ID=0x%x\n", __func__, data);
 
 	/*
 	 * TODO
@@ -776,7 +776,7 @@ static __devinit int max77686_pmic_probe(struct platform_device *pdev)
 			regulators[id].n_voltages =
 				(desc->max - desc->min) / desc->step + 1;
 
-			printk(PMIC_DEBUG "%s: desc=%p, id=%d, n_vol=%d, max=%d, min=%d, step=%d\n",
+			pr_info("%s: desc=%p, id=%d, n_vol=%d, max=%d, min=%d, step=%d\n",
 					__func__, desc, id, regulators[id].n_voltages,
 					desc->max, desc->min, desc->step);
 		}
@@ -852,7 +852,7 @@ static struct platform_driver max77686_pmic_driver = {
 
 static int __init max77686_pmic_init(void)
 {
-	printk(PMIC_DEBUG "%s\n", __func__);
+	pr_info("%s\n", __func__);
 
 	return platform_driver_register(&max77686_pmic_driver);
 }
