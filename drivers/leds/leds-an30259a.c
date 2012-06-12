@@ -140,7 +140,7 @@ struct i2c_client *b_client;
 #ifdef SEC_LED_SPECIFIC
 extern struct class *sec_class;
 struct device *led_dev;
-int hacksung_enable_fade;
+int led_enable_fade;
 /*path : /sys/class/sec/led/led_pattern*/
 /*path : /sys/class/sec/led/led_blink*/
 /*path : /sys/class/sec/led/led_fade*/
@@ -410,7 +410,7 @@ static void an30259a_set_led_blink(enum an30259a_led_enum led,
 	} else
 		leds_on(led, true, true, brightness);
 
-	if (hacksung_enable_fade == 1) {
+	if (led_enable_fade == 1) {
 		leds_set_slope_mode(client, led, 0, 15, 7, 0,
 					(delay_on_time + AN30259A_TIME_UNIT - 1) /
 					AN30259A_TIME_UNIT,
@@ -527,7 +527,7 @@ static ssize_t store_an30259a_led_fade(struct device *dev,
 		return count;
 	}
 
-	hacksung_enable_fade = enabled;
+	led_enable_fade = enabled;
 
 	printk(KERN_DEBUG "led_fade is called\n");
 
@@ -840,7 +840,7 @@ static int __devinit an30259a_probe(struct i2c_client *client,
 	}
 
 #ifdef SEC_LED_SPECIFIC
-	hacksung_enable_fade = 1;
+	led_enable_fade = 1;
 	
 	led_dev = device_create(sec_class, NULL, 0, data, "led");
 	if (IS_ERR(led_dev)) {
