@@ -408,12 +408,12 @@ static void an30259a_set_led_blink(enum an30259a_led_enum led,
 	} else
 		leds_on(led, true, true, brightness);
 
-	leds_set_slope_mode(client, led, 0, 15, 15, 0,
+	leds_set_slope_mode(client, led, 0, 15, 7, 0,
 				(delay_on_time + AN30259A_TIME_UNIT - 1) /
 				AN30259A_TIME_UNIT,
 				(delay_off_time + AN30259A_TIME_UNIT - 1) /
 				AN30259A_TIME_UNIT,
-				0, 0, 0, 0);
+				1, 1, 1, 1);
 }
 
 static ssize_t store_an30259a_led_br_lev(struct device *dev,
@@ -825,8 +825,17 @@ exit:
 static int __devexit an30259a_remove(struct i2c_client *client)
 {
 	struct an30259a_data *data = i2c_get_clientdata(client);
+    
 	int i;
 	dev_dbg(&client->adapter->dev, "%s\n", __func__);
+	
+	// clear leds on shutdown
+	an30259a_set_led_blink(LED_R, 0, 0, 0);
+	an30259a_set_led_blink(LED_G, 0, 0, 0);
+	an30259a_set_led_blink(LED_B, 0, 0, 0);
+	leds_i2c_write_all(data->client);	
+	msleep(200);
+	
 #ifdef SEC_LED_SPECIFIC
 	sysfs_remove_group(&led_dev->kobj, &sec_led_attr_group);
 #endif
