@@ -41,7 +41,7 @@
 #define SAMSUNG_MFC_DEV_NAME           "/dev/s3c-mfc"
 
 #if defined(CONFIG_CPU_EXYNOS4212) || defined(CONFIG_CPU_EXYNOS4412)
-#define SUPPORT_SLICE_ENCODING        1
+#define SUPPORT_SLICE_ENCODING        0 // This is originally 1, but breaks video recording on AOSP :(
 #else
 #define SUPPORT_SLICE_ENCODING        0
 #endif
