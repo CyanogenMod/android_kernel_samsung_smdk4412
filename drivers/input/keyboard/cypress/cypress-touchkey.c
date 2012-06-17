@@ -1138,7 +1138,18 @@ static ssize_t touchkey_led_control(struct device *dev,
 	return size;
 }
 
-static ssize_t touch_led_force_disable(struct device *dev,
+static ssize_t touch_led_force_disable_show(struct device *dev,
+        struct device_attribute *attr, char *buf)
+{
+    int ret;
+
+    ret = sprintf(buf, "%d\n", touch_led_disabled);
+    pr_info("[Touchkey] %s: touch_led_disabled=%d\n", __func__, touch_led_disabled);
+
+    return ret;
+}
+
+static ssize_t touch_led_force_disable_store(struct device *dev,
         struct device_attribute *attr, const char *buf,
         size_t size)
 {
@@ -1162,9 +1173,20 @@ static ssize_t touch_led_force_disable(struct device *dev,
     return size;
 }
 static DEVICE_ATTR(force_disable, S_IRUGO | S_IWUSR | S_IWGRP,
-        NULL, touch_led_force_disable);
+        touch_led_force_disable_show, touch_led_force_disable_store);
 
-static ssize_t touch_led_set_timeout(struct device *dev,
+static ssize_t touch_led_timeout_show(struct device *dev,
+        struct device_attribute *attr, char *buf)
+{
+    int ret;
+
+    ret = sprintf(buf, "%d\n", touch_led_timeout);
+    pr_info("[Touchkey] %s: touch_led_timeout=%d\n", __func__, touch_led_timeout);
+
+    return ret;
+}
+
+static ssize_t touch_led_timeout_store(struct device *dev,
         struct device_attribute *attr, const char *buf,
         size_t size)
 {
@@ -1182,7 +1204,7 @@ static ssize_t touch_led_set_timeout(struct device *dev,
     return size;
 }
 static DEVICE_ATTR(timeout, S_IRUGO | S_IWUSR | S_IWGRP,
-        NULL, touch_led_set_timeout);
+        touch_led_timeout_show, touch_led_timeout_store);
 
 void touch_led_timedout(unsigned long ptr)
 {
