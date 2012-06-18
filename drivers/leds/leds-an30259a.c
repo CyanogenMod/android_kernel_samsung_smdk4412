@@ -512,6 +512,17 @@ static ssize_t store_an30259a_led_blink(struct device *dev,
 	return count;
 }
 
+static ssize_t show_an30259a_led_fade(struct device *dev,
+                    struct device_attribute *attr, char *buf)
+{
+    int ret;
+
+    ret = sprintf(buf, "%d\n", led_enable_fade);
+    pr_info("[LED] %s: led_fade=%d\n", __func__, led_enable_fade);
+
+    return ret;
+}
+
 static ssize_t store_an30259a_led_fade(struct device *dev,
 					struct device_attribute *devattr,
 					const char *buf, size_t count)
@@ -533,7 +544,6 @@ static ssize_t store_an30259a_led_fade(struct device *dev,
 
 	return count;
 }
-
 
 static ssize_t store_led_r(struct device *dev,
 	struct device_attribute *devattr, const char *buf, size_t count)
@@ -715,7 +725,7 @@ static DEVICE_ATTR(led_pattern, 0664, NULL, \
 					store_an30259a_led_pattern);
 static DEVICE_ATTR(led_blink, 0664, NULL, \
 					store_an30259a_led_blink);
-static DEVICE_ATTR(led_fade, 0664, NULL, \
+static DEVICE_ATTR(led_fade, 0664, show_an30259a_led_fade, \
 					store_an30259a_led_fade);
 static DEVICE_ATTR(led_br_lev, 0664, NULL, \
 					store_an30259a_led_br_lev);
