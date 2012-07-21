@@ -802,6 +802,7 @@ static int s5c73m3_get_phone_fw_version(struct v4l2_subdev *sd)
 	int err = 0;
 	int retVal = 0;
 	int fw_requested = 1;
+	int copied_fw_binary = 0;
 
 	if (state->sensor_fw[0] == 'O') {
 		sprintf(fw_path, "SlimISP_G%c.bin",
@@ -895,19 +896,25 @@ request_fw:
 			CHECK_ERR(retVal);
 			retVal = s5c73m3_get_sensor_fw_binary(sd);
 			CHECK_ERR(retVal);
+			copied_fw_binary = 1;
 			goto request_fw;
 		}
-
-		memcpy(state->phone_fw,
-			camfw_info[state->fw_index].ver,
-			S5C73M3_FW_VER_LEN);
 	}
+
+	if (copied_fw_binary) {
+		memcpy(state->phone_fw,
+			state->sensor_fw,
+			S5C73M3_FW_VER_LEN);
+		state->phone_fw[S5C73M3_FW_VER_LEN+1] = ' ';
+	} else {
 	memcpy(state->phone_fw,
 		camfw_info[state->fw_index].ver,
 		S5C73M3_FW_VER_LEN);
 	state->phone_fw[S5C73M3_FW_VER_LEN+1] = ' ';
-
-	memcpy(sysfs_phone_fw, state->phone_fw, sizeof(state->phone_fw));
+	}
+	memcpy(sysfs_phone_fw,
+		state->phone_fw,
+		sizeof(state->phone_fw));
 	cam_dbg("Phone_version = %s(index=%d)\n",
 		state->phone_fw, state->fw_index);
 
@@ -1083,6 +1090,17 @@ static int s5c73m3_check_fw(struct v4l2_subdev *sd, int download)
 #else
 		err = s5c73m3_get_sensor_fw_binary(sd);
 		CHECK_ERR(err);
+
+		memcpy(state->phone_fw,
+			state->sensor_fw,
+			S5C73M3_FW_VER_LEN);
+		state->phone_fw[S5C73M3_FW_VER_LEN+1] = ' ';
+
+		memcpy(sysfs_phone_fw,
+			state->phone_fw,
+			sizeof(state->phone_fw));
+		cam_dbg("Changed to Phone_version = %s\n",
+			state->phone_fw);
 #endif
 	}
 

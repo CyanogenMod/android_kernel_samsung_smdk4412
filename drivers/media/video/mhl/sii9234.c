@@ -1655,10 +1655,32 @@ void sii9234_process_msc_work(struct work_struct *work)
 			}
 			break;
 		case CBUS_WRITE_STAT:
+			pr_debug("sii9234: cbus_command_response"
+					"CBUS_WRITE_STAT\n");
+			cbus_read_reg(sii9234, CBUS_MSC_FIRST_DATA_IN_REG,
+					&p_msc_pkt->data_1);
 			break;
 		case CBUS_SET_INT:
+			if ((p_msc_pkt->offset == MHL_RCHANGE_INT) &&
+				(p_msc_pkt->data_1 == MHL_INT_DSCR_CHG)) {
+				/* Write burst final step...
+				   Req->GRT->Write->DSCR */
+				pr_debug("sii9234: MHL_RCHANGE_INT &"
+						"MHL_INT_DSCR_CHG\n");
+			} else if (p_msc_pkt->offset == MHL_RCHANGE_INT &&
+				p_msc_pkt->data_1 == MHL_INT_DCAP_CHG) {
+				sii9234_enqueue_msc_work(sii9234,
+						CBUS_WRITE_STAT,
+						MHL_STATUS_REG_CONNECTED_RDY,
+						MHL_STATUS_DCAP_READY, 0x0);
+			}
 			break;
 		case CBUS_WRITE_BURST:
+			pr_debug("sii9234: cbus_command_response"
+					"MHL_WRITE_BURST\n");
+			p_msc_pkt->command = CBUS_IDLE;
+			sii9234_enqueue_msc_work(sii9234, CBUS_SET_INT,
+					MHL_RCHANGE_INT, MHL_INT_DSCR_CHG, 0x0);
 			break;
 		case CBUS_READ_DEVCAP:
 			ret = cbus_read_reg(sii9234,

@@ -3253,6 +3253,8 @@ static int __devinit mms_ts_probe(struct i2c_client *client,
 		info->max_y = 1280;
 	}
 
+	i2c_set_clientdata(client, info);
+
 	info->callbacks.inform_charger = melfas_ta_cb;
 	if (info->register_cb)
 		info->register_cb(&info->callbacks);
@@ -3260,7 +3262,6 @@ static int __devinit mms_ts_probe(struct i2c_client *client,
 	info->pdata->power(true);
 	msleep(100);
 
-	i2c_set_clientdata(client, info);
 	ret = i2c_master_recv(client, buf, 1);
 	if (ret < 0) {		/* tsp connect check */
 		pr_err("%s: i2c fail...tsp driver unload [%d], Add[%d]\n",

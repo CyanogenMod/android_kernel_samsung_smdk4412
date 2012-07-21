@@ -79,11 +79,7 @@
 #define CM36651_CANCELATION
 #ifdef CM36651_CANCELATION
 #define CANCELATION_FILE_PATH	"/efs/prox_cal"
-#ifndef CONFIG_MACH_M0
-#define CANCELATION_THRESHOLD	7
-#else
-#define CANCELATION_THRESHOLD	6
-#endif
+#define CANCELATION_THRESHOLD	9
 #endif
 
 #define PROX_READ_NUM	40
@@ -375,14 +371,10 @@ static int proximity_store_cancelation(struct device *dev, bool do_calib)
 	int err = 0;
 
 	if (do_calib) {
-#ifndef CONFIG_MACH_M0
 		mutex_lock(&cm36651->read_lock);
 		cm36651_i2c_read_byte(cm36651, CM36651_PS,
 			&ps_reg_setting[2][1]);
 		mutex_unlock(&cm36651->read_lock);
-#else
-		ps_reg_setting[2][1] = 7;
-#endif
 		ps_reg_setting[1][1] = CANCELATION_THRESHOLD;
 	} else { /* reset */
 		ps_reg_setting[2][1] = 0;
