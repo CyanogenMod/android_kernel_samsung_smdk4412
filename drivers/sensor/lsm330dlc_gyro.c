@@ -93,8 +93,8 @@
 #define MIN_ST		175
 #define MAX_ST		875
 #define FIFO_TEST_WTM	0x1F
-#define MIN_ZERO_RATE	-1714
-#define MAX_ZERO_RATE	1714 /* 30*1000/17.5 */
+#define MIN_ZERO_RATE	-3142
+#define MAX_ZERO_RATE	3142 /* 55*1000/17.5 */
 
 /* max and min entry */
 #define MAX_ENTRY	20

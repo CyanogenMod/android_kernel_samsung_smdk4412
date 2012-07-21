@@ -209,7 +209,7 @@ static struct s3c64xx_spi_csinfo spi1_csi[] = {
 	[0] = {
 		.line = EXYNOS4_GPB(5),
 		.set_level = gpio_set_value,
-		.fb_delay = 0x2,
+		.fb_delay = 0x00,
 	},
 };
 
@@ -1396,9 +1396,11 @@ static struct samsung_battery_platform_data samsung_battery_pdata = {
 
 #if defined(CONFIG_TARGET_LOCALE_KOR) || defined(CONFIG_MACH_M0_CTC)
 	.abstimer_charge_duration = 8 * 60 * 60,
+	.abstimer_charge_duration_wpc = 8 * 60 * 60,
 	.abstimer_recharge_duration = 2 * 60 * 60,
 #else
 	.abstimer_charge_duration = 6 * 60 * 60,
+	.abstimer_charge_duration_wpc = 8 * 60 * 60,
 	.abstimer_recharge_duration = 1.5 * 60 * 60,
 #endif
 
@@ -2032,6 +2034,9 @@ static void __init exynos4_reserve_mem(void)
 		{
 			.name = "fimc0",
 			.size = CONFIG_VIDEO_SAMSUNG_MEMSIZE_FIMC0 * SZ_1K,
+			{
+				.alignment = 1 << 20,
+			},
 			.start = 0
 		},
 #endif
@@ -2180,7 +2185,8 @@ static void __init exynos4_reserve_mem(void)
 		"s5p-smem/mfc=mfc-secure;"
 		"s5p-smem/fimc=ion;"
 		"s5p-smem/mfc-shm=mfc-normal;"
-		"s5p-smem/fimd=fimd;";
+		"s5p-smem/fimd=fimd;"
+		"s5p-smem/fimc0=fimc0";
 
 		s5p_cma_region_reserve(regions, regions_secure, 0, map);
 }
@@ -2743,13 +2749,8 @@ static void __init midas_machine_init(void)
 	/* 400 kHz for initialization of MMC Card  */
 	__raw_writel((__raw_readl(EXYNOS4_CLKDIV_FSYS3) & 0xfffffff0)
 		     | 0x9, EXYNOS4_CLKDIV_FSYS3);
-#if defined(CONFIG_MACH_M0) && defined(CONFIG_TARGET_LOCALE_EUR)
-	__raw_writel((__raw_readl(EXYNOS4_CLKDIV_FSYS2) & 0x00f0fff0)
-		     | 0x10008, EXYNOS4_CLKDIV_FSYS2);
-#else
 	__raw_writel((__raw_readl(EXYNOS4_CLKDIV_FSYS2) & 0xfff0fff0)
 		     | 0x80008, EXYNOS4_CLKDIV_FSYS2);
-#endif
 	__raw_writel((__raw_readl(EXYNOS4_CLKDIV_FSYS1) & 0xfff0fff0)
 		     | 0x80008, EXYNOS4_CLKDIV_FSYS1);
 }

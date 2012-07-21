@@ -487,6 +487,13 @@ static int __devinit mshci_s3c_probe(struct platform_device *pdev)
 	if (pdata->cd_type == S3C_MSHCI_CD_PERMANENT) {
 		host->quirks |= MSHCI_QUIRK_BROKEN_PRESENT_BIT;
 		host->mmc->caps |= MMC_CAP_NONREMOVABLE;
+		if (pdata->int_power_gpio) {
+			gpio_set_value(pdata->int_power_gpio, 1);
+			s3c_gpio_cfgpin(pdata->int_power_gpio,
+					S3C_GPIO_OUTPUT);
+			s3c_gpio_setpull(pdata->int_power_gpio,
+					S3C_GPIO_PULL_NONE);
+		}
 	}
 
 	/* IF SD controller's WP pin donsn't connected with SD card and there

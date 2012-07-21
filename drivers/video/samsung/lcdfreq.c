@@ -50,12 +50,7 @@ struct lcdfreq_info {
 	struct notifier_block	pm_noti;
 	struct notifier_block	reboot_noti;
 
-	unsigned long		time_stamp[LCDFREQ_LEVEL_END];
-	unsigned long		previous_time;
-	unsigned long		current_time;
-
 	struct delayed_work	work;
-	u32			count;
 
 	struct early_suspend	early_suspend;
 };
@@ -108,7 +103,7 @@ int set_div(struct s3cfb_global *ctrl, u32 div)
 	} while (count);
 /*	} while (time_before(jiffies, timeout)); */
 
-	dev_err(ctrl->dev, "%s fail\n", __func__);
+	dev_err(ctrl->dev, "%s fail, div=%d\n", __func__, div);
 
 	return -EINVAL;
 }
@@ -121,11 +116,12 @@ static int set_lcdfreq_div(struct device *dev, enum lcdfreq_level_idx level)
 
 	struct lcdfreq_info *lcdfreq = fbdev->data;
 
-	u32 div = 0, ret = 0;
+	u32 div, ret;
 
 	mutex_lock(&lcdfreq->lock);
 
 	if (unlikely(fbdev->system_state == POWER_OFF || !lcdfreq->enable)) {
+		dev_err(dev, "%s reject. %d, %d\n", __func__, fbdev->system_state, lcdfreq->enable);
 		ret = -EINVAL;
 		goto exit;
 	}
@@ -135,7 +131,7 @@ static int set_lcdfreq_div(struct device *dev, enum lcdfreq_level_idx level)
 	ret = set_div(fbdev, div);
 
 	if (ret) {
-		dev_info(dev, "fail to change lcd freq\n");
+		dev_err(dev, "fail to change lcd freq\n");
 		goto exit;
 	}
 
@@ -193,7 +189,6 @@ static int lcdfreq_lock_free(struct device *dev)
 		mutex_lock(&lcdfreq->lock);
 		atomic_dec(&lcdfreq->usage);
 		mutex_unlock(&lcdfreq->lock);
-		lcdfreq->count = 0;
 		cancel_delayed_work(&lcdfreq->work);
 	}
 
@@ -229,7 +224,7 @@ int get_divider(struct fb_info *fb)
 
 	for (i = 0; i < LCDFREQ_LEVEL_END; i++) {
 		lcdfreq->table[i].cmu_clkdiv--;
-		dev_info(fb->dev, "%dHz divider is %d\n",
+		dev_info(fb->dev, "%dHZ divider is %d\n",
 		lcdfreq->table[i].hz, lcdfreq->table[i].cmu_clkdiv);
 	}
 
@@ -255,6 +250,11 @@ static ssize_t level_show(struct device *dev,
 	struct s3cfb_window *win = fb->par;
 	struct s3cfb_global *fbdev = get_fimd_global(win->id);
 	struct lcdfreq_info *lcdfreq = fbdev->data;
+
+	if (unlikely(fbdev->system_state == POWER_OFF || !lcdfreq->enable)) {
+		dev_err(dev, "%s reject. %d, %d\n", __func__, fbdev->system_state, lcdfreq->enable);
+		return -EINVAL;
+	}
 
 	return sprintf(buf, "%dHZ, div=%d\n", lcdfreq->table[lcdfreq->level].hz, get_div(fbdev));
 }
@@ -298,12 +298,10 @@ static ssize_t usage_show(struct device *dev,
 
 static DEVICE_ATTR(level, S_IRUGO|S_IWUSR, level_show, level_store);
 static DEVICE_ATTR(usage, S_IRUGO, usage_show, NULL);
-static DEVICE_ATTR(time_stamp, S_IRUGO, NULL, NULL);
 
 static struct attribute *lcdfreq_attributes[] = {
 	&dev_attr_level.attr,
 	&dev_attr_usage.attr,
-	&dev_attr_time_stamp.attr,
 	NULL,
 };
 
@@ -390,17 +388,13 @@ static void lcdfreq_status_work(struct work_struct *work)
 	struct lcdfreq_info *lcdfreq =
 		container_of(work, struct lcdfreq_info, work.work);
 
-
 	u32 hz = lcdfreq->table[lcdfreq->level].hz;
 
 	cancel_delayed_work(&lcdfreq->work);
 
-	if (!(lcdfreq->count % 2))
-		dev_info(lcdfreq->dev, "\thz=%d, usage=%d\n", hz, atomic_read(&lcdfreq->usage));
+	dev_info(lcdfreq->dev, "\tHZ=%d, usage=%d\n", hz, atomic_read(&lcdfreq->usage));
 
-	schedule_delayed_work(&lcdfreq->work, HZ*60);
-
-	lcdfreq->count++;
+	schedule_delayed_work(&lcdfreq->work, HZ*120);
 }
 
 int lcdfreq_init(struct fb_info *fb)
@@ -425,7 +419,6 @@ int lcdfreq_init(struct fb_info *fb)
 
 	lcdfreq->dev = fb->dev;
 	lcdfreq->level = LEVEL_NORMAL;
-	lcdfreq->previous_time = lcdfreq->current_time = jiffies;
 
 	vclk = (lcd->freq *
 			(var->left_margin + var->right_margin

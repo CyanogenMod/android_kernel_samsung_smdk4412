@@ -61,10 +61,10 @@ void secmem_crypto_deregister(void);
 #define SECMEM_IOC_GET_ADDR		_IOWR('S', 6, int)
 #define SECMEM_IOC_RELEASE_ADDR		_IOWR('S', 7, int)
 #if defined(CONFIG_CPU_EXYNOS5250)
-#define SECMEM_IOC_GET_FD_PHYS_ADDR    _IOWR('S', 8, int)
+#define SECMEM_IOC_GET_FD_PHYS_ADDR	_IOWR('S', 8, int)
 #endif
 
 #define SECMEM_IOC_MFC_MAGIC_KEY	_IOWR('S', 9, int)
-
+#define SECMEM_IOC_TEXT_CHUNKINFO	_IOWR('S', 10, struct secchunk_info)
 
 #endif /* __ASM_ARCH_SECMEM_H */

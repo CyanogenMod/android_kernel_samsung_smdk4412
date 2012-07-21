@@ -806,22 +806,10 @@ int melfas_power(int on)
 	printk(KERN_DEBUG "[TSP] %s %s\n", __func__, on ? "on" : "off");
 
 	if (on) {
+		/* Analog-Panel Power */
 		regulator_enable(regulator);
-#if defined(GPIO_OLED_DET)
-#if defined(CONFIG_MACH_SLP_PQ)
-		if (system_rev != 0x3)	/* M0_P_Rev0.0 */
-#endif
-		{	/*TODO: will remove after divide regulator */
-			ret = gpio_request(GPIO_OLED_DET, "OLED_DET");
-			if (ret)
-				pr_err("failed to request gpio(OLED_DET)\n");
-			s3c_gpio_setpull(GPIO_OLED_DET, S3C_GPIO_PULL_NONE);
-			s3c_gpio_cfgpin(GPIO_OLED_DET, S3C_GPIO_SFN(0xf));
-			gpio_free(GPIO_OLED_DET);
-
-			TSP_VDD_18V(1);
-		}
-#endif
+		/* IO Logit Power */
+		TSP_VDD_18V(1);
 	} else {
 		/*
 		 * TODO: If there is a case the regulator must be disabled
@@ -829,25 +817,7 @@ int melfas_power(int on)
 		 */
 		if (regulator_is_enabled(regulator)) {
 			regulator_disable(regulator);
-#if defined(GPIO_OLED_DET)
-#if defined(CONFIG_MACH_SLP_PQ)
-			if (system_rev != 0x3)	/* M0_P_Rev0.0 */
-#endif
-			{	/*TODO: will remove after divide regulator */
-				ret = gpio_request(GPIO_OLED_DET, "OLED_DET");
-				if (ret)
-					pr_err
-					    ("failed to request gpio(OLED_DET)\n");
-				s3c_gpio_cfgpin(GPIO_OLED_DET, S3C_GPIO_OUTPUT);
-				s3c_gpio_setpull(GPIO_OLED_DET,
-						 S3C_GPIO_PULL_NONE);
-				gpio_direction_output(GPIO_OLED_DET,
-						      GPIO_LEVEL_LOW);
-				gpio_free(GPIO_OLED_DET);
-
-				TSP_VDD_18V(0);
-			}
-#endif
+			TSP_VDD_18V(0);
 		}
 	}
 

@@ -279,6 +279,26 @@ static long secmem_ioctl(struct file *filp, unsigned int cmd, unsigned long arg)
 		*(uint32_t *)(mfc_shm_virtaddr + 0xC) = MFC_SEC_MAGIC_CHUNK3;
 		break;
 	}
+
+	case SECMEM_IOC_TEXT_CHUNKINFO:
+	{
+		struct cma_info info;
+		struct secchunk_info minfo;
+
+		if (cma_info(&info, secmem.this_device, "fimc0"))
+			return -EINVAL;
+
+		minfo.base = info.lower_bound;
+		minfo.size = info.total_size;
+
+		printk("[minfo base] : 0x%x", minfo.base);
+		printk("[minfo size] : 0x%x", minfo.size);
+
+		if (copy_to_user((void __user *)arg, &minfo, sizeof(minfo)))
+			return -EFAULT;
+		break;
+	}
+
 	default:
 		return -ENOTTY;
 	}

@@ -78,7 +78,7 @@ int s3c_ielcd_logic_stop(void)
 	return 0;
 }
 
-int s3c_ielcd_start(void)
+int s3c_ielcd_display_on(void)
 {
 	unsigned int cfg;
 
@@ -90,7 +90,7 @@ int s3c_ielcd_start(void)
 }
 
 #if 0
-int s3c_ielcd_stop(void)
+int s3c_ielcd_display_off(void)
 {
 	unsigned int cfg;
 
@@ -102,13 +102,13 @@ int s3c_ielcd_stop(void)
 	return 0;
 }
 #else
-int s3c_ielcd_stop(void)
+int s3c_ielcd_display_off(void)
 {
-	unsigned int cfg = 0, ielcd_count = 0;
+	unsigned int cfg, ielcd_count = 0;
 
 	cfg = s3c_ielcd_readl(S3C_VIDCON0);
 	cfg |= S3C_VIDCON0_ENVID_ENABLE;
-	cfg &= ~S3C_VIDCON0_ENVID_F_ENABLE;
+	cfg &= ~(S3C_VIDCON0_ENVID_F_ENABLE);
 
 	s3c_ielcd_writel(cfg, S3C_VIDCON0);
 
@@ -121,7 +121,6 @@ int s3c_ielcd_stop(void)
 		if (!(s3c_ielcd_readl(S3C_VIDCON1) & 0xffff0000))
 			return 0;
 	} while (1);
-
 }
 #endif
 
@@ -136,31 +135,26 @@ int s3c_ielcd_init_global(struct s3cfb_global *ctrl)
 	s3cfb_set_timing(ielcd_fbdev);
 	s3cfb_set_lcd_size(ielcd_fbdev);
 
-	s3c_ielcd_writel(0, S3C_DITHMODE);
-
+	/* vclock divider setting , same as FIMD */
 	cfg = readl(ctrl->regs + S3C_VIDCON0);
-	cfg &= ~(S3C_VIDCON0_VIDOUT_MASK | S3C_VIDCON0_VCLKEN_MASK | S3C_VIDCON0_ENVID_F_ENABLE);
+	cfg &= ~(S3C_VIDCON0_VIDOUT_MASK | S3C_VIDCON0_VCLKEN_MASK);
 	cfg |= S3C_VIDCON0_VIDOUT_RGB;
-#ifdef CONFIG_FB_S5P_MIPI_DSIM
 	cfg |= S3C_VIDCON0_VCLKEN_NORMAL;
-#else
-	cfg |= S3C_VIDCON0_VCLKEN_FREERUN;
-#endif
 	s3c_ielcd_writel(cfg, S3C_VIDCON0);
 
-	/* s3c_ielcd_writel(1<<5, S3C_VIDINTCON0); */ /* for what? */
-
-	s3cfb_set_vsync_interrupt(ielcd_fbdev, 0);
-	s3cfb_set_global_interrupt(ielcd_fbdev, 0);
-
+	/* window0 position setting , fixed */
 	s3c_ielcd_writel(0, S3C_VIDOSD0A);
+
+	/* window0 position setting */
 	cfg = S3C_VIDOSD_RIGHT_X(ctrl->lcd->width - 1);
 	cfg |= S3C_VIDOSD_BOTTOM_Y(ctrl->lcd->height - 1);
 	s3c_ielcd_writel(cfg, S3C_VIDOSD0B);
+
+	/* window0 osd size setting */
 	s3c_ielcd_writel((ctrl->lcd->width * ctrl->lcd->height), S3C_VIDOSD0C);
 
-	cfg = S3C_WINCON_DATAPATH_LOCAL | S3C_WINCON_BPPMODE_32BPP;
-	cfg |= S3C_WINCON_INRGB_RGB;
+	/* window0 setting , fixed */
+	cfg = S3C_WINCON_DATAPATH_LOCAL | S3C_WINCON_BPPMODE_32BPP | S3C_WINCON_INRGB_RGB;
 	s3c_ielcd_writel(cfg, S3C_WINCON0);
 
 	s3cfb_window_on(ielcd_fbdev, 0);

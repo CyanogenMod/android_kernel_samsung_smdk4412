@@ -32,6 +32,9 @@
 #include <linux/sensor/k3g.h>
 #include <linux/sensor/k3dh.h>
 #include <linux/sensor/ak8975.h>
+#if defined(CONFIG_MACH_P8LTE)
+#include <linux/platform_data/lte_modem_bootloader.h>
+#endif
 #include <linux/sensor/cm3663.h>
 #include <linux/pn544.h>
 #ifdef CONFIG_SND_SOC_U1_MC1N2
@@ -106,6 +109,9 @@
 #include <mach/dev.h>
 #include <mach/regs-clock.h>
 #include <mach/exynos-ion.h>
+#if defined(CONFIG_MACH_P8LTE)
+#include <mach/gpio.h>
+#endif
 
 #ifdef CONFIG_FB_S5P_MIPI_DSIM
 #include <mach/mipi_ddi.h>
@@ -286,6 +292,39 @@ static struct s3c2410_uartcfg smdkc210_uartcfgs[] __initdata = {
 
 #ifdef CONFIG_MACH_PX
 
+#ifdef CONFIG_SEC_MODEM_P8LTE
+#define LTE_MODEM_SPI_BUS_NUM   0
+#define LTE_MODEM_SPI_CS        0
+#define LTE_MODEM_SPI_MAX_CLK   (500*1000)
+struct lte_modem_bootloader_platform_data lte_modem_bootloader_pdata = {
+		.name = "lte_modem_int",
+		.gpio_lte2ap_status = GPIO_LTE2AP_STATUS,
+};
+/*struct lte_modem_bootloader_platform_data lte_modem_bootloader_pdata = {
+	.name = "lte_modem_bootloader",
+	.gpio_lte2ap_status = GPIO_LTE2AP_STATUS,
+	.gpio_lte_active = GPIO_LTE_ACTIVE,
+};*/
+
+static struct s3c64xx_spi_csinfo spi0_csi_lte[] = {
+	[0] = {
+		.line = EXYNOS4_GPB(1), /*S5PV310_GPB(1),*/
+		.set_level = gpio_set_value,
+	},
+};
+
+static struct spi_board_info spi0_board_info_lte[] __initdata = {
+	{
+		.modalias = "lte_modem_spi",
+		.platform_data = &lte_modem_bootloader_pdata,
+		.max_speed_hz = LTE_MODEM_SPI_MAX_CLK,
+		.bus_num = LTE_MODEM_SPI_BUS_NUM,
+		.chip_select = LTE_MODEM_SPI_CS,
+		.mode = SPI_MODE_0,
+		.controller_data = &spi0_csi_lte[0],
+	}
+};
+#endif
 static struct platform_device p4w_wlan_ar6000_pm_device = {
 	.name				= "wlan_ar6000_pm_dev",
 	.id					= 1,
@@ -1983,7 +2022,7 @@ ssize_t front_camera_type_show(struct device *dev,
 		struct device_attribute *attr, char *buf)
 {
 	/* Change camera type properly */
-#ifdef CONFIG_MACH_P8
+#if defined(CONFIG_MACH_P8) || defined(CONFIG_MACH_P8LTE)
 	char cam_type[] = "SLSI_S5K5BAFX";
 #else
 	char cam_type[] = "SILICONFILE_SR200PC20";
@@ -2147,7 +2186,9 @@ static struct s3c_sdhci_platdata exynos4_hsmmc3_pdata __initdata = {
 	.cd_type = S3C_SDHCI_CD_EXTERNAL,
 	.clk_type = S3C_SDHCI_CLK_DIV_EXTERNAL,
 	.host_caps = MMC_CAP_4_BIT_DATA,
+#if defined(CONFIG_MACH_P8LTE)
 	.pm_flags = S3C_SDHCI_PM_IGNORE_SUSPEND_RESUME,
+#endif
 #ifdef CONFIG_MACH_PX
 	.ext_cd_init = register_wlan_status_notify,
 	.ext_pdev = register_wlan_pdev
@@ -2470,7 +2511,6 @@ static struct s3c_fb_platdata smdkc210_lcd0_pdata __initdata = {
 	.setup_gpio = exynos4_fimd0_gpio_setup_24bpp,
 };
 #endif
-
 #ifdef CONFIG_S3C64XX_DEV_SPI0
 static struct s3c64xx_spi_csinfo spi0_csi[] = {
 	[0] = {
@@ -2492,7 +2532,6 @@ static struct spi_board_info spi0_board_info[] __initdata = {
 	}
 };
 #endif
-
 #ifdef CONFIG_FB_S5P
 
 #ifdef CONFIG_FB_S5P_AMS369FG06
@@ -3265,7 +3304,7 @@ static void u1_sound_init(void)
 #endif
 
 /* IR_LED */
-#ifdef CONFIG_IR_REMOCON
+#ifdef CONFIG_IR_REMOCON_GPIO
 
 static struct platform_device ir_remote_device = {
 	.name = "ir_rc",
@@ -3291,7 +3330,7 @@ static void ir_rc_init_hw(void)
 	gpio_set_value(GPIO_IRDA_nINT, 0);
 
 	s3c_gpio_cfgpin(GPIO_IRDA_EN, S3C_GPIO_OUTPUT);
-	S3C_gpio_setpull(GPIO_IRDA_EN, S3C_GPIO_PULL_NONE);
+	s3c_gpio_setpull(GPIO_IRDA_EN, S3C_GPIO_PULL_NONE);
 	gpio_set_value(GPIO_IRDA_EN, 0);
 }
 #endif
@@ -4224,10 +4263,10 @@ static void ts_read_ta_status(bool *ta_status)
 #define MXT768E_MAX_MT_FINGERS		10
 #define MXT768E_CHRGTIME_BATT		64
 #define MXT768E_CHRGTIME_CHRG		64
-#define MXT768E_THRESHOLD_BATT		50
-#define MXT768E_THRESHOLD_CHRG		48
-#define MXT768E_CALCFG_BATT		210
-#define MXT768E_CALCFG_CHRG		242
+#define MXT768E_THRESHOLD_BATT		30
+#define MXT768E_THRESHOLD_CHRG		40
+#define MXT768E_CALCFG_BATT		242
+#define MXT768E_CALCFG_CHRG		114
 
 #define MXT768E_ATCHCALSTHR_NORMAL			50
 #define MXT768E_ATCHFRCCALTHR_NORMAL		50
@@ -4235,12 +4274,12 @@ static void ts_read_ta_status(bool *ta_status)
 #define MXT768E_ATCHFRCCALTHR_WAKEUP		8
 #define MXT768E_ATCHFRCCALRATIO_WAKEUP		136
 
-#define MXT768E_IDLESYNCSPERX_BATT		38
-#define MXT768E_IDLESYNCSPERX_CHRG		40
-#define MXT768E_ACTVSYNCSPERX_BATT		38
-#define MXT768E_ACTVSYNCSPERX_CHRG		40
+#define MXT768E_IDLESYNCSPERX_BATT		21
+#define MXT768E_IDLESYNCSPERX_CHRG		38
+#define MXT768E_ACTVSYNCSPERX_BATT		21
+#define MXT768E_ACTVSYNCSPERX_CHRG		38
 
-#define MXT768E_IDLEACQINT_BATT			24
+#define MXT768E_IDLEACQINT_BATT			255
 #define MXT768E_IDLEACQINT_CHRG			24
 #define MXT768E_ACTACQINT_BATT			255
 #define MXT768E_ACTACQINT_CHRG			255
@@ -4324,10 +4363,10 @@ static u8 t47_config_e[] = { PROCI_STYLUS_T47,
 };
 
 static u8 t48_config_e[] = {PROCG_NOISESUPPRESSION_T48,
-	3, 0, MXT768E_CALCFG_BATT, 0, 0, 0, 0, 0, 0, 0,
-	176, 15, 0, 6, 6, 0, 0, 48, 4, 64,
-	0, 0, 20, 0, 0, 0, 0, 15, 0, 0,
-	0, 0, 0, 0, 112, MXT768E_THRESHOLD_CHRG, 2, 16, 2, 80,
+	3, 0, MXT768E_CALCFG_BATT, 60, 0, 0, 0, 0, 0, 0,
+	112, 15, 0, 6, 6, 0, 0, 48, 4, 64,
+	0, 0, 9, 0, 0, 0, 0, 5, 0, 0,
+	0, 0, 0, 0, 112, MXT768E_THRESHOLD_BATT, 2, 16, 2, 81,
 	MXT768E_MAX_MT_FINGERS, 20, 40, 250, 250, 5, 5, 143, 50, 136,
 	30, 12, MXT768E_TCHHYST_CHRG, 0, 0, 0, 0, 0, 0, 0,
 	0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
@@ -4335,10 +4374,10 @@ static u8 t48_config_e[] = {PROCG_NOISESUPPRESSION_T48,
 };
 
 static u8 t48_config_chrg_e[] = {PROCG_NOISESUPPRESSION_T48,
-	3, 0, MXT768E_CALCFG_CHRG, 0, 0, 0, 0, 0, 0, 0,
-	112, 15, 0, 6, 6, 0, 0, 44, 4, 64,
+	3, 0, MXT768E_CALCFG_CHRG, 15, 0, 0, 0, 0, 3, 5,
+	96, 20, 0, 6, 6, 0, 0, 48, 4, 64,
 	0, 0, 20, 0, 0, 0, 0, 15, 0, 0,
-	0, 0, 0, 0, 112, MXT768E_THRESHOLD_CHRG, 2, 16, 8, 80,
+	0, 0, 0, 0, 96, MXT768E_THRESHOLD_CHRG, 2, 10, 5, 81,
 	MXT768E_MAX_MT_FINGERS, 20, 40, 251, 251, 6, 6, 144, 50, 136,
 	30, 12, MXT768E_TCHHYST_CHRG, 0, 0, 0, 0, 0, 0, 0,
 	0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
@@ -5451,23 +5490,20 @@ static struct s3cfb_lcd s6f1202a = {
 static int lcd_power_on(struct lcd_device *ld, int enable)
 {
 	if (enable) {
-		gpio_set_value(GPIO_LCD_EN, GPIO_LEVEL_HIGH);
-		mdelay(10);
-		gpio_set_value(GPIO_LCD_LDO_EN, GPIO_LEVEL_HIGH);
-		msleep(30);
 		/* LVDS_N_SHDN to high*/
 		gpio_set_value(GPIO_LVDS_NSHDN, GPIO_LEVEL_HIGH);
-		msleep(300);
+		if (lcdtype == 2) /* BOE_NT51008 */
+			msleep(200);
+		else              /* HYDIS_NT51008 & SMD_S6F1202A02 */
+			msleep(300);
+
 	} else {
 		/* For backlight hw spec timming(T4) */
 		msleep(220);
+
 		/* LVDS_nSHDN low*/
 		gpio_set_value(GPIO_LVDS_NSHDN, GPIO_LEVEL_LOW);
 		msleep(20);
-		/* Disable LVDS Panel Power, 1.2, 1.8, display 3.3V */
-		gpio_set_value(GPIO_LCD_LDO_EN, GPIO_LEVEL_LOW);
-		gpio_set_value(GPIO_LCD_EN, GPIO_LEVEL_LOW);
-		msleep(300);
 	}
 	return 0;
 }
@@ -5834,9 +5870,6 @@ static void __init mipi_fb_init(void)
 	printk(KERN_INFO "%s :: fb_platform_data.hw_ver = 0x%x\n",
 	       __func__, fb_platform_data.hw_ver);
 
-	fb_platform_data.mipi_is_enabled = 1;
-	fb_platform_data.interface_mode = FIMD_CPU_INTERFACE;
-
 	dsim_pd = (struct s5p_platform_dsim *)
 	    s5p_device_dsim.dev.platform_data;
 
@@ -5976,17 +6009,20 @@ static void __init smdkc210_usbgadget_init(void)
 		pdata->phy_tune_mask |= 0xf;
 		pdata->phy_tune |= 0xb;
 
+#if defined(CONFIG_MACH_P8LTE)
+		/* squelch threshold tune [13:11] (001 : +10%) */
+		pdata->phy_tune_mask |= 0x7 << 11;
+		pdata->phy_tune |= 0x1 << 11;
+#elif defined(CONFIG_TARGET_LOCALE_P2EUR_TEMP)
+		/* P2 EUR OPEN */
+		/*squelch threshold tune [13:11] (000 : +15%) */
+		pdata->phy_tune_mask |= 0x7 << 11;
+		pdata->phy_tune |= 0x0 << 11;
+#endif
 		printk(KERN_DEBUG "usb: %s tune_mask=0x%x, tune=0x%x\n",
 			__func__, pdata->phy_tune_mask, pdata->phy_tune);
 	}
 
-#if defined(CONFIG_MACH_P8LTE)
-	/* squelch threshold tune [13:11] (001 : +10%) */
-	pdata->phy_tune_mask |= 0x7 << 11;
-	pdata->phy_tune |= 0x1 << 11;
-	printk(KERN_DEBUG "usb: %s apply squelch threshold tune tune_mask=0x%x, tune=0x%x\n",
-			__func__, pdata->phy_tune_mask, pdata->phy_tune);
-#endif
 }
 #endif
 
@@ -6271,8 +6307,9 @@ void smdk_accessory_power(u8 token, bool active)
 #elif defined(CONFIG_MACH_P8LTE)
 	if (system_rev >= 2)
 		gpio_acc_5v = GPIO_ACCESSORY_OUT_5V;
-#elif defined(CONFIG_MACH_P8)	/* for checking p8 3g and wifi */
-	if (system_rev >= 4)
+	/*for checking p8 3g and wifi*/
+#elif defined(CONFIG_MACH_P8) || defined(CONFIG_MACH_P8LTE)
+if (system_rev >= 4)
 		gpio_acc_5v = GPIO_ACCESSORY_OUT_5V;
 #endif
 
@@ -6460,6 +6497,13 @@ static void px_usb_otg_en(int active)
 }
 #endif
 
+#ifdef CONFIG_INTERNAL_MODEM_IF
+struct platform_device sec_idpram_pm_device = {
+	.name	= "idparam_pm",
+	.id	= -1,
+};
+#endif
+
 struct acc_con_platform_data acc_con_pdata = {
 	.otg_en = px_usb_otg_en,
 	.acc_power = smdk_accessory_power,
@@ -6519,6 +6563,11 @@ static struct platform_device *smdkc210_devices[] __initdata = {
 	&pmem_device,
 	&pmem_gpu1_device,
 #endif
+
+#ifdef CONFIG_INTERNAL_MODEM_IF
+	&sec_idpram_pm_device,
+#endif
+
 #ifdef CONFIG_FB_S5P
 	&s3c_device_fb,
 #endif
@@ -6742,7 +6791,7 @@ static struct platform_device *smdkc210_devices[] __initdata = {
 #if (defined(CONFIG_30PIN_CONN) && defined(CONFIG_USB_HOST_NOTIFY))
 	&host_notifier_device,
 #endif
-#if defined(CONFIG_IR_REMOCON)
+#if defined(CONFIG_IR_REMOCON_GPIO)
 /* IR_LED */
 	&ir_remote_device,
 /* IR_LED */
@@ -7097,7 +7146,7 @@ static void __init universal_tsp_init(void)
 	gpio_export(gpio, 0);
 #endif
 
-#if defined(CONFIG_MACH_P8)
+#if defined(CONFIG_MACH_P8) || defined(CONFIG_MACH_P8LTE)
 	/* TSP_INT: XMDMADDR_7 */
 	gpio = GPIO_TSP_INT_18V;
 	gpio_request(gpio, "TSP_INT_18V");
@@ -7107,6 +7156,11 @@ static void __init universal_tsp_init(void)
 #endif
 	s3c_gpio_cfgpin(gpio, S3C_GPIO_SFN(0xf));
 	s3c_gpio_setpull(gpio, S3C_GPIO_PULL_UP);
+
+#if defined(CONFIG_MACH_P8LTE)
+s5p_register_gpio_interrupt(gpio);
+#endif
+
 #if defined(CONFIG_TOUCHSCREEN_MXT1386)	\
 	&& defined(CONFIG_RMI4_I2C)
 	i2c_devs3_mxt[0].irq = gpio_to_irq(gpio);
@@ -7163,6 +7217,9 @@ static void __init smdkc210_machine_init(void)
 #elif defined(CONFIG_MACH_P8)
 	p8_config_gpio_table();
 	exynos4_sleep_gpio_table_set = p8_config_sleep_gpio_table;
+#elif defined(CONFIG_MACH_P8LTE)
+	p8lte_config_gpio_table();
+	exynos4_sleep_gpio_table_set = p8lte_config_sleep_gpio_table;
 #else /* CONFIG_MACH_P4 */
 	p4_config_gpio_table();
 	exynos4_sleep_gpio_table_set = p4_config_sleep_gpio_table;
@@ -7461,6 +7518,11 @@ static void __init smdkc210_machine_init(void)
 	s5p_device_fimg2d.dev.parent = &exynos4_device_pd[PD_LCD0].dev;
 #endif
 #endif
+#ifdef CONFIG_SEC_MODEM_P8LTE
+	spi_register_board_info(spi0_board_info_lte, ARRAY_SIZE(spi0_board_info_lte));
+	modem_p8ltevzw_init();
+#endif
+
 #ifdef CONFIG_USB_EHCI_S5P
 	smdkc210_ehci_init();
 #endif
@@ -7535,7 +7597,7 @@ static void __init smdkc210_machine_init(void)
 #endif
 
 	cam_init();
-#if defined(CONFIG_IR_REMOCON)
+#if defined(CONFIG_IR_REMOCON_GPIO)
 /* IR_LED */
 	ir_rc_init_hw();
 /* IR_LED */

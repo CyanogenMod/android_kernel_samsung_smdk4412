@@ -295,16 +295,20 @@ int fimg2d_add_command(struct fimg2d_control *info, struct fimg2d_context *ctx,
 		if (copy_from_user(&cmd->image[i], buf[i],
 					sizeof(struct fimg2d_image))) {
 			if ((blit->dst) && (type == ADDR_USER))
-				if (!down_write_trylock(&page_alloc_slow_rwsem))
-					return -EAGAIN;
+				if (!down_write_trylock(&page_alloc_slow_rwsem)) {
+					ret = -EAGAIN;
+					goto err_user;
+				}
 			ret = -EFAULT;
 			goto err_user;
 		}
 	}
 
 	if ((blit->dst) && (type == ADDR_USER))
-		if (!down_write_trylock(&page_alloc_slow_rwsem))
-			return -EAGAIN;
+		if (!down_write_trylock(&page_alloc_slow_rwsem)) {
+			ret = -EAGAIN;
+			goto err_user;
+		}
 
 	cmd->ctx = ctx;
 	cmd->op = blit->op;

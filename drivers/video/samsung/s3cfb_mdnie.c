@@ -146,14 +146,22 @@ int s3c_mdnie_init_global(struct s3cfb_global *s3cfb_ctrl)
 	return 0;
 }
 
-int s3c_mdnie_start(struct s3cfb_global *ctrl)
+int s3c_mdnie_display_on(struct s3cfb_global *ctrl)
 {
-	s3c_ielcd_start();
+	s3c_ielcd_display_on();
 
 	if (!IS_ERR_OR_NULL(g_mdnie))
 		g_mdnie->enable = TRUE;
 
 	return 0;
+}
+
+int s3c_mdnie_display_off(void)
+{
+	if (!IS_ERR_OR_NULL(g_mdnie))
+		g_mdnie->enable = FALSE;
+
+	return s3c_ielcd_display_off();
 }
 
 int s3c_mdnie_off(void)
@@ -164,14 +172,6 @@ int s3c_mdnie_off(void)
 	s3c_ielcd_logic_stop();
 
 	return 0;
-}
-
-int s3c_mdnie_stop(void)
-{
-	if (!IS_ERR_OR_NULL(g_mdnie))
-		g_mdnie->enable = FALSE;
-
-	return s3c_ielcd_stop();
 }
 
 int s3c_mdnie_hw_init(void)

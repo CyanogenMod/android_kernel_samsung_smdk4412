@@ -1008,12 +1008,11 @@ static int mmc_blk_err_check(struct mmc_card *card,
 	    brq->data.error) {
 #if defined(CONFIG_MACH_M0) || defined(CONFIG_MACH_P4NOTE) || \
 		defined(CONFIG_MACH_C1_USA_ATT)
-		/* dh0421.hwang */
 		if (mmc_card_mmc(card)) {
-			printk(KERN_ERR "[TEST] brq->sbc.opcode=%d,"
+			pr_err("brq->sbc.opcode=%d,"
 					"brq->cmd.opcode=%d.\n",
 					brq->sbc.opcode, brq->cmd.opcode);
-			printk(KERN_ERR "[TEST] brq->sbc.error=%d,"
+			pr_err("brq->sbc.error=%d,"
 					"brq->cmd.error=%d, brq->stop.error=%d,"
 					"brq->data.error=%d.\n", brq->sbc.error,
 					brq->cmd.error, brq->stop.error,
@@ -1934,35 +1933,21 @@ snd_packed_rd:
 #if defined(CONFIG_MACH_M0) || defined(CONFIG_MACH_P4NOTE) || \
 		defined(CONFIG_MACH_C1_USA_ATT)
 	/*
-	 * dh0421.hwang
 	 * It's for Engineering DEBUGGING only
 	 * This has to be removed before PVR(guessing)
 	 * Please refer mshci reg dumps
 	 */
 	if (mmc_card_mmc(card) && status != 3) {
-		printk(KERN_ERR "[TEST] CMD aborting case in"
+		pr_err("CMD aborting case in "
 				"MMC's block layer ret %d.\n", ret);
-		printk(KERN_ERR "%s: CMD%d, ARG=0x%x.\n",
+		pr_err("%s: CMD%d, ARG=0x%x.\n",
 				req->rq_disk->disk_name,
 				brq->cmd.opcode,
 				brq->cmd.arg);
-		printk(KERN_ERR "[TEST] If PACKED_NONE,"
-				"confirm end_request done\n");
-		printk(KERN_ERR "packed CMD type = %d.\n",
+		pr_err("packed CMD type = %d.\n",
 				mq_rq ?	mq_rq->packed_cmd : -1);
-		printk(KERN_ERR "[TEST] mmc%d, request returns %d.\n",
+		pr_err("mmc%d, request returns %d.\n",
 				card->host->index, status);
-		printk(KERN_ERR "[TEST] err means...\n");
-		printk(KERN_ERR "\t1: MMC_BLK_PARTIAL.\n");
-		printk(KERN_ERR "\t2: MMC_BLK_CMD_ERR.\n");
-		printk(KERN_ERR "\t3: MMC_BLK_RETRY.\n");
-		printk(KERN_ERR "\t4: MMC_BLK_ABORT.\n");
-		printk(KERN_ERR "\t5: MMC_BLK_DATA_ERR.\n");
-		printk(KERN_ERR "\t6: MMC_BLK_ECC_ERR.\n");
-		if (!rqc) {
-			panic("[TEST] mmc%d, returns %d.\n",
-					card->host->index, status);
-		}
 	}
 #endif
 

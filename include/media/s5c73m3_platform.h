@@ -19,4 +19,5 @@ struct s5c73m3_platform_data {
 	void (*set_vdd_core)(int);
 	bool (*is_vdd_core_set)(void);
 	int (*is_isp_reset)(void);
+	int (*power_on_off)(int);
 };

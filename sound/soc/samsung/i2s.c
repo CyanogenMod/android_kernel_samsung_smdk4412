@@ -784,7 +784,11 @@ static int i2s_startup(struct snd_pcm_substream *substream,
 			i2s->addr + I2SMOD);
 	}
 #else
-	if (!is_opened(other) && !srp_active(i2s, IS_OPENED))
+	if (!is_opened(other)
+#if defined(CONFIG_SND_SAMSUNG_RP)
+		&& !srp_active(i2s, IS_OPENED)
+#endif
+		)
 		i2s_clk_enable(i2s, true);
 
 	if (i2s->reg_saved) {

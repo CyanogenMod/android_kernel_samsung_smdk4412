@@ -5886,9 +5886,6 @@ static void __init mipi_fb_init(void)
 	printk(KERN_INFO "%s :: fb_platform_data.hw_ver = 0x%x\n",
 	       __func__, fb_platform_data.hw_ver);
 
-	fb_platform_data.mipi_is_enabled = 1;
-	fb_platform_data.interface_mode = FIMD_CPU_INTERFACE;
-
 	dsim_pd = (struct s5p_platform_dsim *)
 	    s5p_device_dsim.dev.platform_data;
 

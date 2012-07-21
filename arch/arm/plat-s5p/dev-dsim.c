@@ -36,19 +36,9 @@ static struct dsim_config dsim_info = {
 	.e_no_data_lane = DSIM_DATA_LANE_4,
 	.e_byte_clk = DSIM_PLL_OUT_DIV8,
 
-#ifdef CONFIG_MACH_JENGA
-	.p = 3,
-	.m = 75,
-	.s = 0,
-#endif
-
 	.pll_stable_time = 500,		/* D-PHY PLL stable time spec :min = 200usec ~ max 400usec */
 
-#ifdef CONFIG_MACH_JENGA
-	.esc_clk = 10 * 1000000,	/* escape clk : 10MHz */
-#else
 	.esc_clk = 20 * 1000000,	/* escape clk : 10MHz */
-#endif
 
 	.stop_holding_cnt = 0,		/* stop state holding counter after bta change count 0 ~ 0xfff */
 	.bta_timeout = 0xff,		/* bta timeout 0 ~ 0xff */
@@ -96,7 +86,6 @@ static struct s5p_platform_dsim dsim_platform_data = {
 
 	/* default platform revision is 0(evt0). */
 	.platform_rev = 0,
-	.cfg_gpio = exynos4_dsim_gpio_setup_24bpp,
 };
 
 struct platform_device s5p_device_dsim = {

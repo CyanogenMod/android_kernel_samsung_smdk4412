@@ -32,15 +32,6 @@
 
 #define DIV_FSYS3	(S5P_VA_CMU + 0x0C54C)
 
-#if defined(CONFIG_MACH_M0) && defined(CONFIG_TARGET_LOCALE_EUR)
-#define EPLL_CON0_F	(S5P_VA_CMU + 0x0C110)
-
-void print_epll_con0(void)
-{
-	pr_info("EPLL_CON0 : 0x%x\n",__raw_readl(EPLL_CON0_F));
-}
-#endif
-
 void exynos4_setup_mshci_cfg_gpio(struct platform_device *dev, int width)
 {
 	unsigned int gpio;

@@ -2664,14 +2664,25 @@ static inline void hci_link_key_request_evt(struct hci_dev *hdev, struct sk_buff
 			BT_DBG("%s ignoring unauthenticated key", hdev->name);
 			goto not_found;
 		}
-
-		if (key->type == HCI_LK_COMBINATION && key->pin_len < 16 &&
-				conn->pending_sec_level == BT_SECURITY_HIGH) {
-			BT_DBG("%s ignoring key unauthenticated for high \
-							security", hdev->name);
-			goto not_found;
-		}
-
+		/* - This is mgmt only. hciops doesn't checking like this. -
+		* If device is pre 2.1 & security level is high, combination key type is required.
+		* (core spec 4.0 GAP 1671p)
+		* And 16 digit PIN is recommended. (but not mandatory)
+		* Now, Google API only support high & low level for outgoing.
+		* So if application use high level security, 16 digit PIN is needed. (mgmt based)
+		* But Google is still using hciops, There is no problem in their platform.
+		* This can make confusion to 3rd party developer.
+		* Disable this part for same action with hciops.
+		* and this should be checked after google's update.
+		*/
+		/*
+		*if (key->type == HCI_LK_COMBINATION && key->pin_len < 16 &&
+		*		conn->pending_sec_level == BT_SECURITY_HIGH) {
+		*	BT_DBG("%s ignoring key unauthenticated for high \
+		*					security", hdev->name);
+		*	goto not_found;
+		*}
+		*/
 		conn->key_type = key->type;
 		conn->pin_length = key->pin_len;
 	}
@@ -2914,9 +2925,7 @@ static inline void hci_sync_conn_complete_evt(struct hci_dev *hdev, struct sk_bu
 	case 0x1c:	/* SCO interval rejected */
 	case 0x1a:	/* Unsupported Remote Feature */
 	case 0x1f:	/* Unspecified error */
-		if (conn->out && conn->attempt < 2) {
-			/* wbs */
-			if (!conn->hdev->is_wbs)
+		if (conn->out && conn->attempt < 2 && !conn->hdev->is_wbs) {
 				conn->pkt_type = (hdev->esco_type & SCO_ESCO_MASK) |
 					(hdev->esco_type & EDR_ESCO_MASK);
 			hci_setup_sync(conn, conn->link->handle);

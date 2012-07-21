@@ -646,6 +646,27 @@ config ANDROID_WIP
 	  This enables 'work in progress' hacks for android issues.
 	  Please remove it later.
 
+config COMPACTION_RETRY
+	bool "retry compaction once more after direct reclaim fails"
+	default n
+	depends on COMPACTION
+	help
+	  This enables compaction retry in android.
+	  If fails to get pages even with direct reclaim,
+	  we give one more try to allocate pages with forced compaction.
+	  This might avoid oom-killer invocation.
+	  with many free pages being already there.
+
+config COMPACTION_RETRY_DEBUG
+	bool "debug information for COMPACTION_RETRY"
+	default n
+	depends on COMPACTION_RETRY
+	help
+	  This enables debug feature for compaction retry.
+	  This shows us the buddy information
+	  before and after compation retrial.
+	  This should be turned off later.
+
 # machine support
 
 menu "EXYNOS4 Machines"

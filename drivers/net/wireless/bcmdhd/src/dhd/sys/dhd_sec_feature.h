@@ -40,12 +40,18 @@
 #define HW_OOB
 #endif
 
-#ifdef CONFIG_MACH_U1 /* Q1 also uses this feature */
+/* Q1 also uses this feature */
+#if defined(CONFIG_MACH_U1) || defined(CONFIG_MACH_TRATS)
 #ifdef CONFIG_MACH_Q1_BD
 #define HW_OOB
 #endif
 #define USE_CID_CHECK
 #define WRITE_MACADDR
+#endif
+
+#ifdef CONFIG_MACH_GC1
+#undef USE_CID_CHECK
+#define READ_MACADDR
 #endif
 
 /* REGION CODE */
@@ -106,3 +112,6 @@
 #define BCMWAPI_WAI
 #endif
 
+#if !defined(READ_MACADDR) && !defined(WRITE_MACADDR) && !defined(RDWR_KORICS_MACADDR) && !defined(RDWR_MACADDR)
+#define GET_MAC_FROM_OTP
+#endif

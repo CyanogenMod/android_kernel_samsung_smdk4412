@@ -368,6 +368,10 @@ static int s5k6a3_power_on(void)
 	}
 	CAM_CHECK_ERR_RET(ret, "cfg mclk");
 
+	/* VT_RESET */
+	ret = gpio_direction_output(GPIO_CAM_VT_nRST, 1);
+	CAM_CHECK_ERR_RET(ret, "output GPIO_CAM_VT_nRST");
+
 	/* VT_CORE_1.8V */
 	regulator = regulator_get(NULL, "vt_cam_1.8v");
 	if (IS_ERR(regulator))
@@ -375,19 +379,6 @@ static int s5k6a3_power_on(void)
 	ret = regulator_enable(regulator);
 	regulator_put(regulator);
 	CAM_CHECK_ERR_RET(ret, "enable vt_cam_1.8v");
-	udelay(1000);
-
-	/* VT_RESET */
-	ret = gpio_direction_output(GPIO_CAM_VT_nRST, 1);
-	CAM_CHECK_ERR_RET(ret, "output GPIO_CAM_VT_nRST");
-	udelay(600);
-
-	ret = gpio_direction_output(GPIO_CAM_VT_nRST, 0);
-	CAM_CHECK_ERR_RET(ret, "output GPIO_CAM_VT_nRST");
-	udelay(600);
-
-	ret = gpio_direction_output(GPIO_CAM_VT_nRST, 1);
-	CAM_CHECK_ERR_RET(ret, "output GPIO_CAM_VT_nRST");
 
 	gpio_free(GPIO_CAM_IO_EN);
 	gpio_free(GPIO_CAM_VT_nRST);
@@ -943,6 +934,7 @@ static struct s5c73m3_platform_data s5c73m3_plat = {
 	.set_vdd_core = s5c73m3_set_vdd_core,
 	.is_vdd_core_set = s5c73m3_is_vdd_core_set,
 	.is_isp_reset = s5c73m3_is_isp_reset,
+	.power_on_off = s5c73m3_power,
 };
 
 static struct i2c_board_info s5c73m3_i2c_info = {

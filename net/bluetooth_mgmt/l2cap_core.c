@@ -1919,9 +1919,9 @@ static void l2cap_ack_timeout(unsigned long arg)
 {
 	struct l2cap_chan *chan = (void *) arg;
 
-	bh_lock_sock(chan->sk);
+	spin_lock_bh(&((chan->sk)->sk_lock.slock));
 	l2cap_send_ack(chan);
-	bh_unlock_sock(chan->sk);
+	spin_unlock_bh(&((chan->sk)->sk_lock.slock));
 }
 
 static inline void l2cap_ertm_init(struct l2cap_chan *chan)

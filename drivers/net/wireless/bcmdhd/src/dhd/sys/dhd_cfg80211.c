@@ -507,10 +507,6 @@ int wl_cfg80211_set_btcoex_dhcp(struct net_device *dev, char *command)
 	int i;
 #endif
 
-#ifdef PASS_ALL_MCAST_PKTS
-		char iovbuf[20];
-		uint32 allmultivar = 0;
-#endif
 
 	/* Figure out powermode 1 or o command */
 	strncpy((char *)&powermode_val, command + strlen("BTCOEXMODE") +1, 1);
@@ -530,13 +526,6 @@ int wl_cfg80211_set_btcoex_dhcp(struct net_device *dev, char *command)
 				dhd_pktfilter_offload_enable(dhd, dhd->pktfilter[i],
 					0, dhd_master_mode);
 			}
-			
-#ifdef PASS_ALL_MCAST_PKTS
-						allmultivar = 1;
-						bcm_mkiovar("allmulti", (char *)&allmultivar, 4, iovbuf, sizeof(iovbuf));
-						dhd_wl_ioctl_cmd(dhd, WLC_SET_VAR, iovbuf, sizeof(iovbuf), TRUE, 0);
-						WL_ERR(("DHCP is progressing , allmulti value = %d \n", allmultivar));
-#endif /* PASS_ALL_MCAST_PKTS */
 		}
 #endif
 
@@ -594,13 +583,6 @@ int wl_cfg80211_set_btcoex_dhcp(struct net_device *dev, char *command)
 				dhd_pktfilter_offload_enable(dhd, dhd->pktfilter[i],
 					1, dhd_master_mode);
 			}
-
-#ifdef PASS_ALL_MCAST_PKTS
-			allmultivar = 0;
-			bcm_mkiovar("allmulti", (char *)&allmultivar, 4, iovbuf, sizeof(iovbuf));
-			dhd_wl_ioctl_cmd(dhd, WLC_SET_VAR, iovbuf, sizeof(iovbuf), TRUE, 0);
-			WL_ERR(("DHCP is complete , allmulti value = %d \n", allmultivar));
-#endif /* PASS_ALL_MCAST_PKTS */
 		}
 #endif
 

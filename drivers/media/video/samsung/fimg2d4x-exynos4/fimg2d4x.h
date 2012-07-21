@@ -172,6 +172,7 @@ struct fimg2d_blend_coeff {
 	enum fimg2d_coeff d_coeff;
 };
 
+void fimg2d4x_sw_reset(struct fimg2d_control *info);
 void fimg2d4x_reset(struct fimg2d_control *info);
 void fimg2d4x_enable_irq(struct fimg2d_control *info);
 void fimg2d4x_disable_irq(struct fimg2d_control *info);

@@ -477,12 +477,14 @@ static void exynos_interrupt_enable(struct s5p_tmu_info *info, int enable)
  */
 static int exynos_tc_volt(struct s5p_tmu_info *info, int enable)
 {
-	struct s5p_platform_tmu *data = info->dev->platform_data;
+	struct s5p_platform_tmu *data;
 	static int usage;
 	int ret = 0;
 
 	if (!info)
 		return -EPERM;
+
+	data = info->dev->platform_data;
 
 	if (enable == usage) {
 		pr_debug("TMU: already is %s.\n",
@@ -1351,10 +1353,12 @@ static int s5p_tmu_suspend(struct platform_device *pdev, pm_message_t state)
 static int s5p_tmu_resume(struct platform_device *pdev)
 {
 	struct s5p_tmu_info *info = platform_get_drvdata(pdev);
-	struct s5p_platform_tmu *data = info->dev->platform_data;
+	struct s5p_platform_tmu *data;
 
 	if (!info)
 		return -EAGAIN;
+
+	data = info->dev->platform_data;
 
 	/* restore tmu register value */
 	__raw_writel(info->reg_save[0], info->tmu_base + EXYNOS4_TMU_CONTROL);

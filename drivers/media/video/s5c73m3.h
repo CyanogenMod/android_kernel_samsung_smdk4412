@@ -450,10 +450,10 @@ struct s5c73m3_state {
 #define ERR_STATUS_FROM_INIT		(1<<0x4)
 #define ERR_STATUS_I2C_CIS_STREAM_OFF	(1<<0x5)
 #define ERR_STATUS_I2C_N_CMD_OVER	(1<<0x6)
-#define ERR_STATUS_I2C_N_CMD_MISMATCH0	(1<<0x7)
-#define ERR_STATUS_I2C_N_CMD_MISMATCH1	(1<<0x8)
-#define ERR_STATUS_EXCEPTION		(1<<0x9)
-
+#define ERROR_STATUS_I2C_N_CMD_MISMATCH    (1<<0x7)
+#define ERROR_STATUS_CHECK_BIN_CRC    (1<<0x8)
+#define ERROR_STATUS_EXCEPTION    (1<<0x9)
+#define ERROR_STATUS_INIF_INIT_STATE    (0x8)
 
 #ifdef CONFIG_VIDEO_S5C73M3_SPI
 extern int s5c73m3_spi_write(const u8 *addr, const int len, const int txSize);

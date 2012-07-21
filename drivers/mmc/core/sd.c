@@ -934,7 +934,7 @@ static int mmc_sd_init_card(struct mmc_host *host, u32 ocr,
 	if (!mmc_host_is_spi(host)) {
 		err = mmc_send_relative_addr(host, &card->rca);
 		if (err)
-			return err;
+			goto free_card;
 
 		mmc_set_bus_mode(host, MMC_BUSMODE_PUSHPULL);
 	}
@@ -942,7 +942,7 @@ static int mmc_sd_init_card(struct mmc_host *host, u32 ocr,
 	if (!oldcard) {
 		err = mmc_sd_get_csd(host, card);
 		if (err)
-			return err;
+			goto free_card;
 
 		mmc_decode_cid(card);
 	}
@@ -953,7 +953,7 @@ static int mmc_sd_init_card(struct mmc_host *host, u32 ocr,
 	if (!mmc_host_is_spi(host)) {
 		err = mmc_select_card(card);
 		if (err)
-			return err;
+			goto free_card;
 	}
 
 	err = mmc_sd_setup_card(host, card, oldcard != NULL);

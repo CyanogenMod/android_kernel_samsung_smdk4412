@@ -62,4 +62,9 @@ struct aat1290a_led_platform_data {
 	void (*torch_en) (int onoff);
 	void (*torch_set) (int onoff);
 };
+
+ssize_t aat1290a_power(struct device *dev,
+			struct device_attribute *attr, const char *buf,
+			size_t count);
+
 #endif

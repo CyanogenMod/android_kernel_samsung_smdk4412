@@ -38,8 +38,14 @@
 #include "fimg2d_clk.h"
 #include "fimg2d_ctx.h"
 #include "fimg2d_helper.h"
+#include "fimg2d_cache.h"
 
 #define CTX_TIMEOUT	msecs_to_jiffies(1000)
+#define LV1_SHIFT		20
+#define LV2_BASE_MASK		0x3ff
+#define LV2_PT_MASK		0xff000
+#define LV2_SHIFT		12
+#define LV1_DESC_MASK		0x3
 
 static struct fimg2d_control *info;
 
@@ -58,7 +64,13 @@ static DECLARE_WORK(fimg2d_work, fimg2d_worker);
 static irqreturn_t fimg2d_irq(int irq, void *dev_id)
 {
 	fimg2d_debug("irq\n");
-	info->stop(info);
+	if (!atomic_read(&info->clkon)) {
+		fimg2d_clk_on(info);
+		info->stop(info);
+		fimg2d_clk_off(info);
+	} else {
+		info->stop(info);
+	}
 
 	return IRQ_HANDLED;
 }
@@ -67,6 +79,8 @@ static int fimg2d_sysmmu_fault_handler(enum S5P_SYSMMU_INTERRUPT_TYPE itype,
 		unsigned long pgtable_base, unsigned long fault_addr)
 {
 	struct fimg2d_bltcmd *cmd;
+	unsigned long *pgd;
+	unsigned long *lv1d, *lv2d;
 
 	if (itype == SYSMMU_PAGEFAULT) {
 		printk(KERN_ERR "[%s] sysmmu page fault(0x%lx), pgd(0x%lx)\n",
@@ -91,11 +105,20 @@ static int fimg2d_sysmmu_fault_handler(enum S5P_SYSMMU_INTERRUPT_TYPE itype,
 
 	fimg2d_dump_command(cmd);
 
-next:
-	fimg2d_clk_dump(info);
-	info->dump(info);
+	pgd = (unsigned long *)cmd->ctx->mm->pgd;
+	lv1d = pgd + (fault_addr >> LV1_SHIFT);
+	printk(KERN_ERR " Level 1 descriptor(0x%lx)\n", *lv1d);
+	if ((*lv1d & LV1_DESC_MASK) != 0x1) {
+		fimg2d_clean_outer_pagetable(cmd->ctx->mm, fault_addr, 4);
+		goto next;
+	}
 
-	BUG();
+	lv2d = (unsigned long *)phys_to_virt(*lv1d & ~LV2_BASE_MASK) +
+			((fault_addr & LV2_PT_MASK) >> LV2_SHIFT);
+	printk(KERN_ERR " Level 2 descriptor(0x%lx)\n", *lv2d);
+	fimg2d_clean_outer_pagetable(cmd->ctx->mm, fault_addr, 4);
+next:
+
 	return 0;
 }
 
@@ -106,8 +129,6 @@ static void fimg2d_context_wait(struct fimg2d_context *ctx)
 			atomic_set(&info->active, 1);
 			queue_work(info->work_q, &fimg2d_work);
 			printk(KERN_ERR "[%s] ctx %p cmd wait timeout\n", __func__, ctx);
-			if (info->err)
-				break;
 		}
 	}
 }
@@ -188,11 +209,8 @@ static long fimg2d_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 
 	switch (cmd) {
 	case FIMG2D_BITBLT_BLIT:
-		if (info->err) {
-			printk(KERN_ERR "[%s] device error, do sw fallback\n",
-					__func__);
+		if (info->secure)
 			return -EFAULT;
-		}
 
 		if (copy_from_user(&blit, (void *)arg, sizeof(blit)))
 			return -EFAULT;
@@ -245,6 +263,24 @@ static long fimg2d_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 			return -EFAULT;
 		break;
 
+	case FIMG2D_BITBLT_SECURE:
+		if (copy_from_user(&info->secure,
+				   (unsigned int *)arg,
+				   sizeof(unsigned int))) {
+			printk(KERN_ERR
+				"[%s] failed to FIMG2D_BITBLT_SECURE: copy_from_user error\n\n",
+				__func__);
+			return -EFAULT;
+		}
+
+		while (1) {
+			if (fimg2d_queue_is_empty(&info->cmd_q))
+				break;
+			mdelay(2);
+		}
+
+		break;
+
 	default:
 		printk(KERN_ERR "[%s] unknown ioctl\n", __func__);
 		ret = -EFAULT;
@@ -278,6 +314,7 @@ static int fimg2d_setup_controller(struct fimg2d_control *info)
 	atomic_set(&info->busy, 0);
 	atomic_set(&info->nctx, 0);
 	atomic_set(&info->active, 0);
+	info->secure = 0;
 
 	spin_lock_init(&info->bltlock);
 

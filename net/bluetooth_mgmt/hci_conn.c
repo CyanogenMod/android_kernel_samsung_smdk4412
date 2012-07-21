@@ -222,7 +222,7 @@ void hci_setup_sync(struct hci_conn *conn, __u16 handle)
 	if (conn->hdev->is_wbs) {
 		/* Transparent Data */
 		uint16_t voice_setting = hdev->voice_setting | ACF_TRANS;
-		cp.max_latency    = cpu_to_le16(0x000A);
+		cp.max_latency    = cpu_to_le16(0x000D);
 		cp.pkt_type = cpu_to_le16(ESCO_WBS);
 		cp.voice_setting  = cpu_to_le16(voice_setting);
 		/* Retransmission Effort */

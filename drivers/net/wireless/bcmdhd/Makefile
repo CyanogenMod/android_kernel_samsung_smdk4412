@@ -1,7 +1,7 @@
 # bcmdhd
 DHDCFLAGS = -Wall -Wstrict-prototypes -Dlinux -DBCMDRIVER                     \
         -DBCMDONGLEHOST -DUNRELEASEDCHIP -DBCMDMA32 -DWLBTAMP -DBCMFILEIMAGE  \
-        -DDHDTHREAD -DDHD_GPL -DDHD_SCHED -DDHD_DEBUG -DBDC -DTOE    \
+        -DDHDTHREAD -DDHD_GPL -DDHD_SCHED -DDHD_DEBUG -DBDC                   \
         -DDHD_BCMEVENTS -DSHOW_EVENTS -DDONGLEOVERLAYS -DBCMDBG               \
         -DCUSTOMER_HW_SAMSUNG -DOOB_INTR_ONLY                                 \
         -DMMC_SDIO_ABORT -DBCMSDIO -DBCMLXSDMMC -DBCMPLATFORM_BUS -DWLP2P     \
@@ -84,7 +84,7 @@ endif
 
 # For SLP feature
 ifeq ($(CONFIG_SLP),y)
-DHDCFLAGS += -DSLP_PATH -DWRITE_MACADDR
+DHDCFLAGS += -DSLP_PATH -DWRITE_MACADDR -DCUSTOMER_HW_SLP
 endif
 
 # 5GHz channels setting

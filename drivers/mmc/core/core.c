@@ -2373,12 +2373,9 @@ int mmc_flush_cache(struct mmc_card *card)
 			(card->ext_csd.cache_ctrl & 1)) {
 		err = mmc_switch(card, EXT_CSD_CMD_SET_NORMAL,
 				EXT_CSD_FLUSH_CACHE, 1, 0);
-		if (err) {
+		if (err)
 			pr_err("%s: cache flush error %d\n",
 					mmc_hostname(card->host), err);
-			panic("[TEST] mmc%d, %s returns %d.\n",
-					host->index, __func__, err);
-		}
 	}
 
 	return err;

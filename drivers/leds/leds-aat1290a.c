@@ -125,7 +125,7 @@ static long aat1290a_ioctl(struct file *file,
 	return 0;
 }
 
-static ssize_t aat1290a_power(struct device *dev,
+ssize_t aat1290a_power(struct device *dev,
 			struct device_attribute *attr, const char *buf,
 			size_t count)
 {

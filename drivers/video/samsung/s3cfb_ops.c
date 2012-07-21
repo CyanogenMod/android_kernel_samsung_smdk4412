@@ -104,15 +104,12 @@ int s3cfb_draw_logo(struct fb_info *fb)
 #else /* #ifdef RGB_BOOTSCREEN */
 	u8 *logo_virt_buf;
 
-	if (bootloaderfb)
-		printk(KERN_INFO "Bootloader sent 'bootloaderfb' to Kernel Successfully : %d", bootloaderfb);
-	else {
-		bootloaderfb = BOOT_FB_BASE_ADDR;
-		printk(KERN_ERR "Fail to get 'bootloaderfb' from Bootloader. so we must set  this value as %d", bootloaderfb);
+	if (bootloaderfb) {
+		logo_virt_buf = phys_to_virt(bootloaderfb);
+		memcpy(fb->screen_base, logo_virt_buf, fb->var.yres * fb->fix.line_length);
+		printk(KERN_INFO "Bootloader sent 'bootloaderfb' : %08X\n", bootloaderfb);
 	}
 
-	logo_virt_buf = phys_to_virt(bootloaderfb);
-	memcpy(fb->screen_base, logo_virt_buf, fb->var.yres * fb->fix.line_length);
 #endif /* #ifdef RGB_BOOTSCREEN */
 #endif
 #endif
@@ -393,7 +390,8 @@ int s3cfb_map_default_video_memory(struct s3cfb_global *fbdev,
 			(unsigned int)fix->smem_start,
 			(unsigned int)fb->screen_base, fix->smem_len);
 
-	memset(fb->screen_base, 0, fix->smem_len);
+	if (bootloaderfb)
+		memset(fb->screen_base, 0, fix->smem_len);
 	win->owner = DMA_MEM_FIMD;
 
 	return 0;
@@ -552,10 +550,14 @@ int s3cfb_check_var(struct fb_var_screeninfo *var, struct fb_info *fb)
 void s3cfb_set_win_params(struct s3cfb_global *fbdev, int id)
 {
 	s3cfb_set_window_control(fbdev, id);
+#if defined(CONFIG_CPU_EXYNOS4212) || defined(CONFIG_CPU_EXYNOS4412)
+	s3cfb_set_oneshot(fbdev, id);
+#else
 	s3cfb_set_window_position(fbdev, id);
 	s3cfb_set_window_size(fbdev, id);
 	s3cfb_set_buffer_address(fbdev, id);
 	s3cfb_set_buffer_size(fbdev, id);
+#endif
 
 	if (id > 0) {
 		s3cfb_set_alpha_blending(fbdev, id);
@@ -1031,22 +1033,32 @@ int s3cfb_pan_display(struct fb_var_screeninfo *var, struct fb_info *fb)
 {
 	struct s3cfb_window *win = fb->par;
 	struct s3cfb_global *fbdev = get_fimd_global(win->id);
+	struct s3c_platform_fb *pdata = to_fb_plat(fbdev->dev);
+
+	if (win->id == pdata->default_win)
+		spin_lock(&fbdev->slock);
 
 #ifdef CONFIG_EXYNOS_DEV_PD
 	if (unlikely(fbdev->system_state == POWER_OFF) || fbdev->regs == 0) {
 		dev_err(fbdev->dev, "%s::system_state is POWER_OFF, fb%d\n", __func__, win->id);
-		return 0;
+		if (win->id == pdata->default_win)
+			spin_unlock(&fbdev->slock);
+		return -EINVAL;
 	}
 #endif
 
 	if (var->yoffset + var->yres > var->yres_virtual) {
 		dev_err(fbdev->dev, "invalid yoffset value\n");
+		if (win->id == pdata->default_win)
+			spin_unlock(&fbdev->slock);
 		return -EINVAL;
 	}
 
 #if defined(CONFIG_CPU_EXYNOS4210)
 	if (unlikely(var->xoffset + var->xres > var->xres_virtual)) {
 		dev_err(fbdev->dev, "invalid xoffset value\n");
+		if (win->id == pdata->default_win)
+			spin_unlock(&fbdev->slock);
 		return -EINVAL;
 	}
 	fb->var.xoffset = var->xoffset;
@@ -1059,6 +1071,8 @@ int s3cfb_pan_display(struct fb_var_screeninfo *var, struct fb_info *fb)
 
 	s3cfb_set_buffer_address(fbdev, win->id);
 
+	if (win->id == pdata->default_win)
+		spin_unlock(&fbdev->slock);
 	return 0;
 }
 
@@ -1143,6 +1157,10 @@ int s3cfb_ioctl(struct fb_info *fb, unsigned int cmd, unsigned long arg)
 				   sizeof(p.user_window)))
 			ret = -EFAULT;
 		else {
+#if defined(CONFIG_CPU_EXYNOS4212) || defined(CONFIG_CPU_EXYNOS4412)
+			win->x = p.user_window.x;
+			win->y = p.user_window.y;
+#else
 			if (p.user_window.x < 0)
 				p.user_window.x = 0;
 
@@ -1160,6 +1178,7 @@ int s3cfb_ioctl(struct fb_info *fb, unsigned int cmd, unsigned long arg)
 				win->y = p.user_window.y;
 
 			s3cfb_set_window_position(fbdev, win->id);
+#endif
 		}
 		break;
 

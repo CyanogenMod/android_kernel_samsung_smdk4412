@@ -1038,9 +1038,7 @@ static int exynos4212_clock_suspend(void)
 {
 	s3c_pm_do_save(exynos4212_clock_save, ARRAY_SIZE(exynos4212_clock_save));
 	s3c_pm_do_save(exynos4212_vpll_save, ARRAY_SIZE(exynos4212_vpll_save));
-#if defined(CONFIG_MACH_M0) && defined(CONFIG_TARGET_LOCALE_EUR)
 	s3c_pm_do_save(exynos4212_epll_save, ARRAY_SIZE(exynos4212_epll_save));
-#endif
 
 	return 0;
 }
@@ -1050,9 +1048,7 @@ static void exynos4212_clock_resume(void)
 	unsigned int tmp;
 
 	s3c_pm_do_restore_core(exynos4212_vpll_save, ARRAY_SIZE(exynos4212_vpll_save));
-#if defined(CONFIG_MACH_M0) && defined(CONFIG_TARGET_LOCALE_EUR)
 	s3c_pm_do_restore_core(exynos4212_epll_save, ARRAY_SIZE(exynos4212_epll_save));
-#endif
 
 	/* waiting epll & vpll locking time */
 	do {

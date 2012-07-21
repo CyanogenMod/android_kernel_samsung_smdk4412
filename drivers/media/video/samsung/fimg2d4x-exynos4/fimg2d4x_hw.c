@@ -28,6 +28,17 @@ static const int msk_oprmode		= (int)MSK_ARGB;
 static const int premult_round_mode	= (int)PREMULT_ROUND_1;	/* (A+1)*B) >> 8 */
 static const int blend_round_mode	= (int)BLEND_ROUND_0;	/* (A+1)*B) >> 8 */
 
+void fimg2d4x_sw_reset(struct fimg2d_control *info)
+{
+	wr(FIMG2D_SOFT_RESET, FIMG2D_SOFT_RESET_REG);
+	/* turn off wince option */
+	wr(0x0, FIMG2D_BLEND_FUNCTION_REG);
+
+	/* set default repeat mode to reflect(mirror) */
+	wr(FIMG2D_SRC_REPEAT_REFLECT, FIMG2D_SRC_REPEAT_MODE_REG);
+	wr(FIMG2D_MSK_REPEAT_REFLECT, FIMG2D_MSK_REPEAT_MODE_REG);
+}
+
 void fimg2d4x_reset(struct fimg2d_control *info)
 {
 #ifdef SOFT_RESET_ENABLED

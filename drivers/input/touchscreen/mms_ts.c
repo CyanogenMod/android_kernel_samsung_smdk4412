@@ -3212,6 +3212,19 @@ static int __devinit mms_ts_probe(struct i2c_client *client,
 #endif
 	touch_is_pressed = 0;
 
+#if defined(CONFIG_MACH_M0) || defined(CONFIG_MACH_C1)
+	gpio_request(GPIO_OLED_DET, "OLED_DET");
+	ret = gpio_get_value(GPIO_OLED_DET);
+	printk(KERN_DEBUG
+	"[TSP] OLED_DET = %d\n", ret);
+
+	if (ret == 0) {
+		printk(KERN_DEBUG
+		"[TSP] device wasn't connected to board\n");
+		return -EIO;
+	}
+#endif
+
 	if (!i2c_check_functionality(adapter, I2C_FUNC_I2C))
 		return -EIO;
 

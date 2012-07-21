@@ -1620,7 +1620,6 @@ static void mshci_cmd_irq(struct mshci_host *host, u32 intmask)
 		host->error_state = 1;
 #if defined(CONFIG_MACH_M0) || defined(CONFIG_MACH_P4NOTE) || \
 		defined(CONFIG_MACH_C1_USA_ATT)
-		/* dh0421.hwang */
 		if (host->mmc && host->mmc->card)
 			mshci_dumpregs(host);
 #endif
@@ -1662,11 +1661,8 @@ static void mshci_data_irq(struct mshci_host *host, u32 intmask, u8 intr_src)
 			printk(KERN_ERR "%s: Host timeout error\n",
 						mmc_hostname(host->mmc));
 			host->data->error = -ETIMEDOUT;
-#if 1	/* debugging for Host timeout error */
+			/* debugging for Host timeout error */
 			mshci_dumpregs(host);
-			panic("[TEST] %s: HTO error interrupt occured\n",
-					mmc_hostname(host->mmc));
-#endif
 		} else if (intmask & INTMSK_DRTO) {
 			printk(KERN_ERR "%s: Data read timeout error\n",
 						mmc_hostname(host->mmc));
@@ -1709,7 +1705,6 @@ static void mshci_data_irq(struct mshci_host *host, u32 intmask, u8 intr_src)
 		host->error_state = 1;
 #if defined(CONFIG_MACH_M0) || defined(CONFIG_MACH_P4NOTE) || \
 		defined(CONFIG_MACH_C1_USA_ATT)
-		/* dh0421.hwang */
 		if (host->mmc && host->mmc->card)
 			mshci_dumpregs(host);
 #endif

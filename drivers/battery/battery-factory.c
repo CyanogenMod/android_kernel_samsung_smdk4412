@@ -50,6 +50,8 @@ static struct device_attribute battery_attrs[] = {
 	BATTERY_ATTR(siop_activated),
 	BATTERY_ATTR(wc_status),
 	BATTERY_ATTR(wpc_pin_state),
+	BATTERY_ATTR(factory_mode),
+	BATTERY_ATTR(update),
 
 	/* not use */
 	BATTERY_ATTR(batt_vol_adc),
@@ -82,6 +84,8 @@ enum {
 	SIOP_ACTIVATED,
 	WC_STATUS,
 	WPC_PIN_STATE,
+	FACTORY_MODE,
+	UPDATE,
 
 	/* not use */
 	BATT_VOL_ADC,
@@ -207,6 +211,10 @@ static ssize_t battery_show_property(struct device *dev,
 #endif
 		i += scnprintf(buf + i, PAGE_SIZE - i, "%d\n", val);
 		break;
+	case FACTORY_MODE:
+		i += scnprintf(buf + i, PAGE_SIZE - i, "%d\n",
+						info->factory_mode);
+		break;
 	case BATT_VOL_ADC:
 	case BATT_VOL_ADC_CAL:
 	case BATT_VOL_ADC_AVER:
@@ -290,6 +298,22 @@ static ssize_t battery_store_property(struct device *dev,
 				"activated" : "deactivated"));
 			ret = count;
 		}
+		break;
+	case FACTORY_MODE:
+		if (sscanf(buf, "%d\n", &x) == 1) {
+			if (x)
+				info->factory_mode = true;
+			else
+				info->factory_mode = false;
+
+			pr_info("%s: factory mode %s\n", __func__,
+				(info->factory_mode ? "set" : "clear"));
+			ret = count;
+		}
+		break;
+	case UPDATE:
+		pr_info("%s: battery update\n", __func__);
+		ret = count;
 		break;
 	default:
 		ret = -EINVAL;

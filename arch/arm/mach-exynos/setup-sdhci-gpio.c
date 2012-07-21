@@ -163,7 +163,7 @@ void exynos4_setup_sdhci3_cfg_gpio(struct platform_device *dev, int width)
 		s5p_gpio_set_drvstr(gpio, S5P_GPIO_DRVSTR_LV2);
 #elif defined(CONFIG_MACH_MIDAS)
 		s3c_gpio_setpull(gpio, S3C_GPIO_PULL_NONE);
-		s5p_gpio_set_drvstr(gpio, S5P_GPIO_DRVSTR_LV4);
+		s5p_gpio_set_drvstr(gpio, S5P_GPIO_DRVSTR_LV2);
 #elif defined(CONFIG_MACH_PX)
 		s3c_gpio_setpull(gpio, S3C_GPIO_PULL_NONE);
 		s5p_gpio_set_drvstr(gpio, S5P_GPIO_DRVSTR_LV4);
@@ -185,7 +185,7 @@ void exynos4_setup_sdhci3_cfg_gpio(struct platform_device *dev, int width)
 		s5p_gpio_set_drvstr(gpio, S5P_GPIO_DRVSTR_LV2);
 #elif defined(CONFIG_MACH_MIDAS)
 		s3c_gpio_setpull(gpio, S3C_GPIO_PULL_NONE);
-		s5p_gpio_set_drvstr(gpio, S5P_GPIO_DRVSTR_LV4);
+		s5p_gpio_set_drvstr(gpio, S5P_GPIO_DRVSTR_LV2);
 #elif defined(CONFIG_MACH_PX)
 		s3c_gpio_setpull(gpio, S3C_GPIO_PULL_UP);
 		s5p_gpio_set_drvstr(gpio, S5P_GPIO_DRVSTR_LV4);

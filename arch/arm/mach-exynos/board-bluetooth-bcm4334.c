@@ -116,6 +116,7 @@ static int bcm4334_bt_rfkill_set_power(void *data, bool blocked)
 					bt_uart_on_table);
 #endif
 		gpio_set_value(GPIO_BT_EN, 1);
+		bt_is_running = 1;
 		msleep(50);
 	} else {
 		pr_info("[BT] Bluetooth Power Off.\n");

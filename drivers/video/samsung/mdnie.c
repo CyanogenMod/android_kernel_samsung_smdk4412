@@ -48,6 +48,8 @@
 #else	/* CONFIG_CPU_EXYNOS4210 */
 #if defined(CONFIG_FB_S5P_S6E8AA0)
 #include "mdnie_table_c1m0.h"
+#elif defined(CONFIG_FB_S5P_S6E63M0)
+#include "mdnie_table_c1m0.h"
 #elif defined(CONFIG_FB_S5P_S6C1372)
 #include "mdnie_table_p4note.h"
 #elif defined(CONFIG_FB_S5P_S6D6AA1)
@@ -72,7 +74,7 @@
 #define DIM_BACKLIGHT_VALUE		16
 #define CABC_CUTOFF_BACKLIGHT_VALUE	40	/* 2.5% */
 #elif defined(CONFIG_FB_S5P_S6C1372)
-#define MAX_BACKLIGHT_VALUE		1329
+#define MAX_BACKLIGHT_VALUE		1441 //90%
 #define MID_BACKLIGHT_VALUE		784
 #define LOW_BACKLIGHT_VALUE		16
 #define DIM_BACKLIGHT_VALUE		16
@@ -104,15 +106,16 @@ struct class *mdnie_class;
 
 struct mdnie_info *g_mdnie;
 
+#ifdef CONFIG_MACH_P4NOTE
+static struct mdnie_backlight_value b_value;
+#endif
+
 int mdnie_send_sequence(struct mdnie_info *mdnie, const unsigned short *seq)
 {
 	int ret = 0, i = 0;
 	const unsigned short *wbuf;
 
-	if (!mdnie->enable) {
-		dev_err(mdnie->dev, "do not configure mDNIe after LCD/mDNIe power off\n");
-		return -EPERM;
-	} else if (IS_ERR_OR_NULL(seq)) {
+	if (IS_ERR_OR_NULL(seq)) {
 		dev_err(mdnie->dev, "mdnie sequence is null\n");
 		return -EPERM;
 	}
@@ -135,12 +138,12 @@ int mdnie_send_sequence(struct mdnie_info *mdnie, const unsigned short *seq)
 	return ret;
 }
 
-void set_mdnie_value(struct mdnie_info *mdnie)
+void set_mdnie_value(struct mdnie_info *mdnie, u8 force)
 {
 	u8 idx;
 
-	if (!mdnie->enable) {
-		dev_err(mdnie->dev, "do not configure mDNIe after LCD/mDNIe power off\n");
+	if ((!mdnie->enable) && (!force)) {
+		dev_err(mdnie->dev, "mdnie states is off\n");
 		return;
 	}
 
@@ -152,7 +155,7 @@ void set_mdnie_value(struct mdnie_info *mdnie)
 		mdnie->tone = TONE_NORMAL;
 
 	if (mdnie->tunning) {
-		dev_info(mdnie->dev, "mDNIe tunning mode is enabled\n");
+		dev_info(mdnie->dev, "mdnie tunning mode is enabled\n");
 		return;
 	}
 
@@ -200,7 +203,9 @@ void set_mdnie_value(struct mdnie_info *mdnie)
 			tunning_table[mdnie->cabc][mdnie->mode][mdnie->scenario].name);
 	}
 
+#if defined(CONFIG_TDMB) || defined(CONFIG_TARGET_LOCALE_NTT)
 etc:
+#endif
 	if (!IS_ERR_OR_NULL(etc_table[mdnie->cabc][mdnie->outdoor][mdnie->tone].seq)) {
 		mdnie_send_sequence(mdnie, etc_table[mdnie->cabc][mdnie->outdoor][mdnie->tone].seq);
 		dev_info(mdnie->dev, "%s\n", etc_table[mdnie->cabc][mdnie->outdoor][mdnie->tone].name);
@@ -213,6 +218,34 @@ exit:
 }
 
 #if defined(CONFIG_FB_MDNIE_PWM)
+#ifdef CONFIG_MACH_P4NOTE
+static int get_backlight_level_from_brightness(unsigned int brightness)
+{
+	unsigned int value;
+
+	/* brightness tuning*/
+	if (brightness >= MID_BRIGHTNESS_LEVEL)
+		value = (brightness - MID_BRIGHTNESS_LEVEL) * (b_value.max-b_value.mid) / (MAX_BRIGHTNESS_LEVEL-MID_BRIGHTNESS_LEVEL) + b_value.mid;
+	else if (brightness >= LOW_BRIGHTNESS_LEVEL)
+		value = (brightness - LOW_BRIGHTNESS_LEVEL) * (b_value.mid-b_value.low) / (MID_BRIGHTNESS_LEVEL-LOW_BRIGHTNESS_LEVEL) + b_value.low;
+	else if (brightness >= DIM_BRIGHTNESS_LEVEL)
+		value = (brightness - DIM_BRIGHTNESS_LEVEL) * (b_value.low-b_value.dim) / (LOW_BRIGHTNESS_LEVEL-DIM_BRIGHTNESS_LEVEL) + b_value.dim;
+	else if (brightness > 0)
+		value = b_value.dim;
+	else
+		return 0;
+
+	if (value > 1600)
+		value = 1600;
+
+	if (value < 16)
+		value = 1;
+	else
+		value = value >> 4;
+
+	return value;
+}
+#else
 static int get_backlight_level_from_brightness(unsigned int brightness)
 {
 	unsigned int value;
@@ -227,7 +260,7 @@ static int get_backlight_level_from_brightness(unsigned int brightness)
 	else if (brightness > 0)
 		value = DIM_BACKLIGHT_VALUE;
 	else
-		value = brightness;
+		return 0;
 
 	if (value > 1600)
 		value = 1600;
@@ -239,6 +272,7 @@ static int get_backlight_level_from_brightness(unsigned int brightness)
 
 	return value;
 }
+#endif
 
 #if defined(CONFIG_CPU_EXYNOS4210)
 static void mdnie_pwm_control(struct mdnie_info *mdnie, int value)
@@ -283,8 +317,7 @@ static void mdnie_pwm_control_cabc(struct mdnie_info *mdnie, int value)
 
 	mutex_unlock(&mdnie->dev_lock);
 }
-#endif
-#if defined(CONFIG_CPU_EXYNOS4212) || defined(CONFIG_CPU_EXYNOS4412)
+#elif defined(CONFIG_CPU_EXYNOS4212) || defined(CONFIG_CPU_EXYNOS4412)
 static void mdnie_pwm_control(struct mdnie_info *mdnie, int value)
 {
 	mutex_lock(&mdnie->dev_lock);
@@ -328,6 +361,11 @@ static void mdnie_pwm_control_cabc(struct mdnie_info *mdnie, int value)
 	mutex_unlock(&mdnie->dev_lock);
 }
 #endif
+
+void set_mdnie_pwm_value(struct mdnie_info *mdnie, int value)
+{
+	mdnie_pwm_control(mdnie, value);
+}
 
 static int update_brightness(struct mdnie_info *mdnie)
 {
@@ -413,7 +451,7 @@ static ssize_t mode_store(struct device *dev,
 	mdnie->mode = value;
 	mutex_unlock(&mdnie->lock);
 
-	set_mdnie_value(mdnie);
+	set_mdnie_value(mdnie, 0);
 #if defined(CONFIG_FB_MDNIE_PWM)
 	if ((mdnie->enable) && (mdnie->bd_enable))
 		update_brightness(mdnie);
@@ -454,7 +492,7 @@ static ssize_t scenario_store(struct device *dev,
 	mdnie->scenario = value;
 	mutex_unlock(&mdnie->lock);
 
-	set_mdnie_value(mdnie);
+	set_mdnie_value(mdnie, 0);
 #if defined(CONFIG_FB_MDNIE_PWM)
 	if ((mdnie->enable) && (mdnie->bd_enable))
 		update_brightness(mdnie);
@@ -492,7 +530,7 @@ static ssize_t outdoor_store(struct device *dev,
 	mdnie->outdoor = value;
 	mutex_unlock(&mdnie->lock);
 
-	set_mdnie_value(mdnie);
+	set_mdnie_value(mdnie, 0);
 
 	return count;
 }
@@ -527,7 +565,7 @@ static ssize_t cabc_store(struct device *dev,
 	mdnie->cabc = value;
 	mutex_unlock(&mdnie->lock);
 
-	set_mdnie_value(mdnie);
+	set_mdnie_value(mdnie, 0);
 	if ((mdnie->enable) && (mdnie->bd_enable))
 		update_brightness(mdnie);
 
@@ -609,7 +647,7 @@ static ssize_t negative_store(struct device *dev,
 		mdnie->negative = value;
 		mutex_unlock(&mdnie->lock);
 
-		set_mdnie_value(mdnie);
+		set_mdnie_value(mdnie, 0);
 	}
 	return count;
 }
@@ -756,6 +794,22 @@ static int mdnie_probe(struct platform_device *pdev)
 #endif
 #endif
 
+#if defined(CONFIG_FB_S5P_S6C1372)
+	check_lcd_type();
+	dev_info(mdnie->dev, "lcdtype = %d\n", pdata->display_type);
+	if (pdata->display_type == 1) {
+		b_value.max = 1441;
+		b_value.mid = 784;
+		b_value.low = 16;
+		b_value.dim = 16;
+	} else {
+		b_value.max = 1137;	/* 71% */
+		b_value.mid = 482;	/* 38% */
+		b_value.low = 16;	/* 1% */
+		b_value.dim = 16;	/* 1% */
+	}
+#endif
+
 #if defined(CONFIG_FB_S5P_S6F1202A)
 	if (pdata->display_type == 0) {
 		memcpy(tunning_table, tunning_table_hy, sizeof(tunning_table));
@@ -777,7 +831,7 @@ static int mdnie_probe(struct platform_device *pdev)
 
 	g_mdnie = mdnie;
 
-	set_mdnie_value(mdnie);
+	set_mdnie_value(mdnie, 0);
 
 	dev_info(mdnie->dev, "registered successfully\n");
 

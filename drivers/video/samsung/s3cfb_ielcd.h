@@ -23,8 +23,8 @@
 int s3c_ielcd_hw_init(void);
 int s3c_ielcd_logic_start(void);
 int s3c_ielcd_logic_stop(void);
-int s3c_ielcd_start(void);
-int s3c_ielcd_stop(void);
+int s3c_ielcd_display_on(void);
+int s3c_ielcd_display_off(void);
 
 
 int s3c_ielcd_init_global(struct s3cfb_global *ctrl);

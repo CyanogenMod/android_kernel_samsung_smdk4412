@@ -20,7 +20,7 @@
 #define V1_255_calc_param	(V1_255_div_1000 / VREG_OUT_1000)
 #endif
 
-#ifdef CONFIG_MACH_Q1_BD
+#if defined(CONFIG_S6E8AA0_AMS529HA01)
 #define VREG_OUT_1000		4600
 #else
 #ifdef CONFIG_AID_DIMMING

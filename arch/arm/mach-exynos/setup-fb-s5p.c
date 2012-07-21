@@ -36,17 +36,10 @@
 struct platform_device; /* don't need the contents */
 
 #ifdef CONFIG_FB_S5P
-#if !defined(CONFIG_FB_S5P_MIPI_DSIM)
-static void s3cfb_gpio_setup_24bpp(unsigned int start, unsigned int size,
-		unsigned int cfg, s5p_gpio_drvstr_t drvstr)
+
+void s3cfb_set_display_path(void)
 {
 	u32 reg;
-
-	s3c_gpio_cfgrange_nopull(start, size, cfg);
-
-	for (; size > 0; size--, start++)
-		s5p_gpio_set_drvstr(start, drvstr);
-
 #ifdef CONFIG_FB_S5P_MDNIE
 	reg = __raw_readl(S3C_VA_SYS + 0x0210);
 	reg &= ~(1<<13);
@@ -60,6 +53,16 @@ static void s3cfb_gpio_setup_24bpp(unsigned int start, unsigned int size,
 	reg |= (1<<1);
 	__raw_writel(reg, S3C_VA_SYS + 0x0210);
 #endif
+}
+
+#if !defined(CONFIG_FB_S5P_MIPI_DSIM)
+static void s3cfb_gpio_setup_24bpp(unsigned int start, unsigned int size,
+		unsigned int cfg, s5p_gpio_drvstr_t drvstr)
+{
+	s3c_gpio_cfgrange_nopull(start, size, cfg);
+
+	for (; size > 0; size--, start++)
+		s5p_gpio_set_drvstr(start, drvstr);
 }
 #endif
 
@@ -95,7 +98,7 @@ void s3cfb_cfg_gpio(struct platform_device *pdev)
 	s3cfb_gpio_setup_24bpp(EXYNOS4_GPF2(0), 8, S3C_GPIO_SFN(2), S5P_GPIO_DRVSTR_LV1);
 	s3cfb_gpio_setup_24bpp(EXYNOS4_GPF3(0), 4, S3C_GPIO_SFN(2), S5P_GPIO_DRVSTR_LV1);
 }
-#elif defined(CONFIG_FB_S5P_LD9040) || defined(CONFIG_FB_S5P_S6C1372) || defined(CONFIG_FB_S5P_S6F1202A)
+#elif defined(CONFIG_FB_S5P_LD9040) || defined(CONFIG_FB_S5P_S6F1202A)
 void s3cfb_cfg_gpio(struct platform_device *pdev)
 {
 	s3cfb_gpio_setup_24bpp(EXYNOS4_GPF0(0), 8, S3C_GPIO_SFN(2), S5P_GPIO_DRVSTR_LV4);
@@ -103,26 +106,19 @@ void s3cfb_cfg_gpio(struct platform_device *pdev)
 	s3cfb_gpio_setup_24bpp(EXYNOS4_GPF2(0), 8, S3C_GPIO_SFN(2), S5P_GPIO_DRVSTR_LV4);
 	s3cfb_gpio_setup_24bpp(EXYNOS4_GPF3(0), 4, S3C_GPIO_SFN(2), S5P_GPIO_DRVSTR_LV4);
 }
+#elif defined(CONFIG_FB_S5P_S6C1372)
+void s3cfb_cfg_gpio(struct platform_device *pdev)
+{
+	s3cfb_gpio_setup_24bpp(EXYNOS4_GPF0(0), 8, S3C_GPIO_SFN(2), S5P_GPIO_DRVSTR_LV2);
+	s3cfb_gpio_setup_24bpp(EXYNOS4_GPF1(0), 8, S3C_GPIO_SFN(2), S5P_GPIO_DRVSTR_LV2);
+	s3cfb_gpio_setup_24bpp(EXYNOS4_GPF2(0), 8, S3C_GPIO_SFN(2), S5P_GPIO_DRVSTR_LV2);
+	s3cfb_gpio_setup_24bpp(EXYNOS4_GPF3(0), 4, S3C_GPIO_SFN(2), S5P_GPIO_DRVSTR_LV2);
+}
 #else
 void s3cfb_cfg_gpio(struct platform_device *pdev)
 {
-	u32 reg;
-
-#ifdef CONFIG_FB_S5P_MDNIE
-	reg = __raw_readl(S3C_VA_SYS + 0x0210);
-	reg &= ~(1<<13);
-	reg &= ~(1<<12);
-	reg &= ~(3<<10);
-	reg |= (1<<0);
-	reg &= ~(1<<1);
-	__raw_writel(reg, S3C_VA_SYS + 0x0210);
-#else
-	reg = __raw_readl(S3C_VA_SYS + 0x0210);
-	reg |= (1<<1);
-	__raw_writel(reg, S3C_VA_SYS + 0x0210);
-#endif
-
-	return;
+	/* do not modify this #else function,
+	if you want another rgb gpio configuration plz add another one */
 }
 #endif
 #endif
@@ -169,6 +165,7 @@ int s3cfb_lcd_off(struct platform_device *pdev)
 {
 	return 0;
 }
+
 #elif defined(CONFIG_FB_S5P_LTE480WV)
 int s3cfb_backlight_on(struct platform_device *pdev)
 {
@@ -735,9 +732,7 @@ unsigned int get_clk_rate(struct platform_device *pdev, struct clk *sclk)
 	struct s3cfb_lcd *lcd = (struct s3cfb_lcd *)pdata->lcd;
 	struct s3cfb_lcd_timing *timing = &lcd->timing;
 	u32 src_clk, vclk, div, rate;
-#if defined(CONFIG_MACH_MIDAS) && defined(CONFIG_FB_S5P_S6E8AA0)
 	u32 vclk_limit, div_limit, fimd_div;
-#endif
 
 	src_clk = clk_get_rate(sclk);
 
@@ -750,7 +745,6 @@ unsigned int get_clk_rate(struct platform_device *pdev, struct clk *sclk)
 
 	div = DIV_ROUND_CLOSEST(src_clk, vclk);
 
-#if defined(CONFIG_MACH_MIDAS) && defined(CONFIG_FB_S5P_S6E8AA0)
 	vclk_limit = (40 *
 		(timing->h_bp + timing->h_fp + timing->h_sw + lcd->width) *
 		(timing->v_bp + timing->v_fp + timing->v_sw + lcd->height));
@@ -759,6 +753,7 @@ unsigned int get_clk_rate(struct platform_device *pdev, struct clk *sclk)
 
 	fimd_div = gcd(div, div_limit);
 
+#if defined(CONFIG_MACH_MIDAS) && defined(CONFIG_FB_S5P_S6E8AA0) && !defined(CONFIG_S6E8AA0_AMS529HA01)
 	div /= fimd_div;
 #endif
 

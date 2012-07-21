@@ -46,7 +46,6 @@ static char *supply_list[] = {
 };
 
 #if defined(CONFIG_TARGET_LOCALE_KOR) || defined(CONFIG_MACH_M0_CTC)
-static void battery_notify_full_state(struct battery_info *info);
 static bool battery_terminal_check_support(struct battery_info *info);
 static void battery_error_control(struct battery_info *info);
 #endif
@@ -111,14 +110,6 @@ static int battery_get_temper(struct battery_info *info)
 		temper = value.intval;
 		break;
 	case TEMPER_AP_ADC:
-#if defined(CONFIG_MACH_S2PLUS)
-		if (system_rev < 2) {
-			pr_info("%s: adc fixed as 30.0\n", __func__);
-			temper = 300;
-			mutex_unlock(&info->ops_lock);
-			return temper;
-		}
-#endif
 #if defined(CONFIG_S3C_ADC)
 		adc = adc_max = adc_min = adc_total = 0;
 		for (cnt = 0; cnt < CNT_ADC_SAMPLE; cnt++) {
@@ -293,7 +284,14 @@ void battery_update_info(struct battery_info *info)
 	value.intval = SOC_TYPE_ADJUSTED;
 	info->psy_fuelgauge->get_property(info->psy_fuelgauge,
 					  POWER_SUPPLY_PROP_CAPACITY, &value);
-	info->battery_soc = value.intval;
+
+	if ((info->cable_type == POWER_SUPPLY_TYPE_BATTERY) &&
+		(info->battery_soc < value.intval) && (info->monitor_count))
+		pr_info("%s: new soc(%d) is bigger than prev soc(%d)"
+					" in discharging state\n", __func__,
+					value.intval, info->battery_soc);
+	else
+		info->battery_soc = value.intval;
 
 	value.intval = SOC_TYPE_RAW;
 	info->psy_fuelgauge->get_property(info->psy_fuelgauge,
@@ -301,12 +299,10 @@ void battery_update_info(struct battery_info *info)
 	info->battery_r_s_delta = value.intval - info->battery_raw_soc;
 	info->battery_raw_soc = value.intval;
 
-#if defined(CONFIG_TARGET_LOCALE_KOR) || defined(CONFIG_MACH_M0_CTC)
 	value.intval = SOC_TYPE_FULL;
 	info->psy_fuelgauge->get_property(info->psy_fuelgauge,
 					  POWER_SUPPLY_PROP_CAPACITY, &value);
 	info->battery_full_soc = value.intval;
-#endif
 
 	value.intval = VOLTAGE_TYPE_VCELL;
 	info->psy_fuelgauge->get_property(info->psy_fuelgauge,
@@ -355,7 +351,7 @@ update_finish:
 		break;
 	}
 
-	pr_debug("%s: state(%d), type(%d), "
+	pr_info("%s: state(%d), type(%d), "
 		 "health(%d), present(%d), "
 		 "cable(%d), curr(%d), "
 		 "soc(%d), raw(%d), "
@@ -382,19 +378,8 @@ void battery_control_info(struct battery_info *info,
 	case POWER_SUPPLY_PROP_CURRENT_MAX:
 	case POWER_SUPPLY_PROP_CURRENT_NOW:
 #if defined(CONFIG_CHARGER_MAX8922_U1)
-#if defined(CONFIG_MACH_S2PLUS)
-		if (system_rev >= 2) {
-			info->psy_sub_charger->set_property(
-						info->psy_sub_charger,
-						property, &value);
-		} else {
-			info->psy_charger->set_property(info->psy_charger,
-						property, &value);
-		}
-#else
 		info->psy_sub_charger->set_property(info->psy_sub_charger,
 						property, &value);
-#endif
 #else
 		info->psy_charger->set_property(info->psy_charger,
 						property, &value);
@@ -419,6 +404,20 @@ static void samsung_battery_alarm_start(struct alarm *alarm)
 
 	wake_lock(&info->monitor_wake_lock);
 	schedule_work(&info->monitor_work);
+}
+
+static void battery_notify_full_state(struct battery_info *info)
+{
+	union power_supply_propval value;
+
+	if ((info->recharge_phase && info->full_charged_state) ||
+		((info->battery_raw_soc > info->battery_full_soc) &&
+		(info->battery_soc == 100))) {
+		/* notify full state to fuel guage */
+		value.intval = POWER_SUPPLY_STATUS_FULL;
+		info->psy_fuelgauge->set_property(info->psy_fuelgauge,
+			POWER_SUPPLY_PROP_STATUS, &value);
+	}
 }
 
 static void battery_monitor_interval(struct battery_info *info)
@@ -518,10 +517,16 @@ static bool battery_abstimer_cond(struct battery_info *info)
 	ktime = alarm_get_elapsed_realtime();
 	current_time = ktime_to_timespec(ktime);
 
-	if (info->recharge_phase)
+	if (info->recharge_phase) {
 		abstimer_duration = info->pdata->abstimer_recharge_duration;
-	else
-		abstimer_duration = info->pdata->abstimer_charge_duration;
+	} else {
+		if (info->cable_type == POWER_SUPPLY_TYPE_WIRELESS)
+			abstimer_duration =
+				info->pdata->abstimer_charge_duration_wpc;
+		else
+			abstimer_duration =
+				info->pdata->abstimer_charge_duration;
+	}
 
 	if ((current_time.tv_sec - info->charge_start_time) >
 	    abstimer_duration) {
@@ -1294,9 +1299,7 @@ monitor_finish:
 	/* icon indicator */
 	battery_indicator_icon(info);
 
-#if defined(CONFIG_TARGET_LOCALE_KOR) || defined(CONFIG_MACH_M0_CTC)
 	battery_notify_full_state(info);
-#endif
 
 	/* dynamic battery polling interval */
 	battery_interval_calulation(info);
@@ -1426,20 +1429,6 @@ static void battery_error_work(struct work_struct *work)
 }
 
 #if defined(CONFIG_TARGET_LOCALE_KOR) || defined(CONFIG_MACH_M0_CTC)
-static void battery_notify_full_state(struct battery_info *info)
-{
-	union power_supply_propval value;
-
-	if ((info->recharge_phase && info->full_charged_state) ||
-		((info->battery_raw_soc > info->battery_full_soc) &&
-		(info->battery_soc == 100))) {
-		/* notify full state to fuel guage */
-		value.intval = POWER_SUPPLY_STATUS_FULL;
-		info->psy_fuelgauge->set_property(info->psy_fuelgauge,
-			POWER_SUPPLY_PROP_STATUS, &value);
-	}
-}
-
 static bool battery_terminal_check_support(struct battery_info *info)
 {
 	int full_mode;
@@ -1724,11 +1713,8 @@ static __devinit int samsung_battery_probe(struct platform_device *pdev)
 	pr_info("%s: Recharge voltage: %d\n", __func__,
 				info->pdata->recharge_voltage);
 #if defined(CONFIG_S3C_ADC)
-#if defined(CONFIG_MACH_S2PLUS)
-	if (system_rev >= 2)
-#endif
-		/* adc register */
-		info->adc_client = s3c_adc_register(pdev, NULL, NULL, 0);
+	/* adc register */
+	info->adc_client = s3c_adc_register(pdev, NULL, NULL, 0);
 
 	if (IS_ERR(info->adc_client)) {
 		pr_err("%s: fail to register adc\n", __func__);

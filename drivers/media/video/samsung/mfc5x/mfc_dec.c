@@ -2388,6 +2388,12 @@ int mfc_exec_decoding(struct mfc_inst_ctx *ctx, union mfc_args *args)
 
 			offset = CheckMPEG4StartCode(stream_vir+consumed,
 					dec_ctx->streamsize - consumed);
+
+			if (offset == -1) {
+				mfc_warn("No start code in remained bitstream: %d\n", offset);
+				return ret;
+			}
+
 			if (offset > 4)
 				consumed += offset;
 

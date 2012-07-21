@@ -90,6 +90,7 @@ struct battery_info {
 	unsigned int battery_soc;
 	unsigned int battery_raw_soc;
 	int battery_r_s_delta;
+	int battery_full_soc;
 
 	/* temperature */
 	int battery_temper;
@@ -132,10 +133,12 @@ struct battery_info {
 	unsigned int battery_test_mode;
 	unsigned int battery_error_test;
 
+	/* factory mode */
+	bool factory_mode;
+
 #if defined(CONFIG_TARGET_LOCALE_KOR) || defined(CONFIG_MACH_M0_CTC)
 	bool is_unspec_phase;
 	bool is_unspec_recovery;
-	int battery_full_soc;
 	unsigned int prev_cable_type;
 	unsigned int prev_battery_health;
 	unsigned int prev_charge_virt_state;
@@ -171,9 +174,7 @@ enum voltage_type {
 enum soc_type {
 	SOC_TYPE_ADJUSTED	= 0,
 	SOC_TYPE_RAW		= 1,
-#if defined(CONFIG_TARGET_LOCALE_KOR) || defined(CONFIG_MACH_M0_CTC)
 	SOC_TYPE_FULL		= 2,
-#endif
 };
 
 /*
@@ -312,6 +313,7 @@ struct samsung_battery_platform_data {
 	/* Recharge sceanario */
 	unsigned int recharge_voltage;
 	unsigned int abstimer_charge_duration;
+	unsigned int abstimer_charge_duration_wpc;
 	unsigned int abstimer_recharge_duration;
 
 	/* cable detect */

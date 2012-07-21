@@ -160,6 +160,7 @@ struct rfcomm_session {
 	unsigned long    flags;
 	atomic_t         refcnt;
 	int              initiator;
+	int              acceptor_inc;
 
 	/* Default DLC parameters */
 	int    cfc;

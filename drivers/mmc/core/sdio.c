@@ -1058,9 +1058,6 @@ static const struct mmc_bus_ops mmc_sdio_ops = {
 	.alive = mmc_sdio_alive,
 };
 
-#if defined(CONFIG_MACH_M0) && defined(CONFIG_TARGET_LOCALE_EUR)
-extern void print_epll_con0(void);
-#endif
 /*
  * Starting point for SDIO card init.
  */
@@ -1076,11 +1073,6 @@ int mmc_attach_sdio(struct mmc_host *host)
 	err = mmc_send_io_op_cond(host, 0, &ocr);
 	if (err)
 		return err;
-
-#if defined(CONFIG_MACH_M0) && defined(CONFIG_TARGET_LOCALE_EUR)
-	/* a sdio module is detected. print EPLL */
-	print_epll_con0();
-#endif
 
 	mmc_attach_bus(host, &mmc_sdio_ops);
 	if (host->ocr_avail_sdio)

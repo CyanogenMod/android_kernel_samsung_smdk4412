@@ -648,6 +648,8 @@ static void max77686_rtc_enable_wtsr(struct max77686_rtc_info *info, bool enable
 	dev_info(info->dev, "%s: %s WTSR\n", __func__,
 			enable ? "enable" : "disable");
 
+	max77686_rtc_update(info, MAX77686_RTC_READ);
+
 	ret = max77686_update_reg(info->rtc, MAX77686_WTSR_SMPL_CNTL, val, mask);
 	if (ret < 0) {
 		dev_err(info->dev, "%s: fail to update WTSR reg(%d)\n",
@@ -673,6 +675,8 @@ static void max77686_rtc_enable_smpl(struct max77686_rtc_info *info, bool enable
 	dev_info(info->dev, "%s: %s SMPL\n", __func__,
 			enable ? "enable" : "disable");
 
+	max77686_rtc_update(info, MAX77686_RTC_READ);
+
 	ret = max77686_update_reg(info->rtc, MAX77686_WTSR_SMPL_CNTL, val, mask);
 	if (ret < 0) {
 		dev_err(info->dev, "%s: fail to update SMPL reg(%d)\n",
@@ -681,10 +685,6 @@ static void max77686_rtc_enable_smpl(struct max77686_rtc_info *info, bool enable
 	}
 
 	max77686_rtc_update(info, MAX77686_RTC_WRITE);
-
-	val = 0;
-	max77686_read_reg(info->rtc, MAX77686_WTSR_SMPL_CNTL, &val);
-	pr_info("%s: WTSR_SMPL(0x%02x)\n", __func__, val);
 }
 #endif /* MAX77686_RTC_WTSR_SMPL */
 
@@ -715,6 +715,8 @@ static int max77686_rtc_init_reg(struct max77686_rtc_info *info)
 		data_alm2[RTC_WEEKDAY]);
 #endif
 
+	max77686_rtc_update(info, MAX77686_RTC_READ);
+
 	ret = max77686_read_reg(info->rtc, MAX77686_RTC_CONTROL, &buf);
 	if (ret < 0) {
 		dev_err(info->dev, "%s: fail to read control reg(%d)\n",
@@ -722,15 +724,30 @@ static int max77686_rtc_init_reg(struct max77686_rtc_info *info)
 		return ret;
 	}
 
+	if (buf & (1 << MODEL24_SHIFT)) {
+		dev_info(info->dev, "%s: bypass init\n", __func__);
+		return ret;
+	}
+
 	/* Set RTC control register : Binary mode, 24hour mdoe */
 	data[0] = (1 << BCD_EN_SHIFT) | (1 << MODEL24_SHIFT);
 	data[1] = (0 << BCD_EN_SHIFT) | (1 << MODEL24_SHIFT);
 
-	info->rtc_24hr_mode = 1;
-
 	ret = max77686_bulk_write(info->rtc, MAX77686_RTC_CONTROLM, 2, data);
 	if (ret < 0) {
 		dev_err(info->dev, "%s: fail to write controlm reg(%d)\n",
+				__func__, ret);
+		return ret;
+	}
+
+	max77686_rtc_update(info, MAX77686_RTC_WRITE);
+
+	/* Mask control register */
+	max77686_rtc_update(info, MAX77686_RTC_READ);
+
+	ret = max77686_update_reg(info->rtc, MAX77686_RTC_CONTROLM, 0x0, 0x3);
+	if (ret < 0) {
+		dev_err(info->dev, "%s: fail to mask CONTROLM reg(%d)\n",
 				__func__, ret);
 		return ret;
 	}
@@ -775,6 +792,7 @@ static int __devinit max77686_rtc_probe(struct platform_device *pdev)
 #if defined(CONFIG_RTC_ALARM_BOOT)
 	info->irq2 = max77686->irq_base + MAX77686_RTCIRQ_RTCA2;
 #endif
+	info->rtc_24hr_mode = 1;
 
 	platform_set_drvdata(pdev, info);
 
@@ -861,6 +879,8 @@ static void max77686_rtc_shutdown(struct platform_device *pdev)
 
 	for (i = 0; i < 3; i++) {
 		max77686_rtc_enable_wtsr(info, false);
+
+		max77686_rtc_update(info, MAX77686_RTC_READ);
 		max77686_read_reg(info->rtc, MAX77686_WTSR_SMPL_CNTL, &val);
 		pr_info("%s: WTSR_SMPL reg(0x%02x)\n", __func__, val);
 		if (val & WTSR_EN_MASK)

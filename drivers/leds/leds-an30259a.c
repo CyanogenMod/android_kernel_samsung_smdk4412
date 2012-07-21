@@ -77,6 +77,7 @@
 #define LED_R_CURRENT		0x28
 #define LED_G_CURRENT		0x28
 #define LED_B_CURRENT		0x28
+#define LED_MAX_CURRENT		0xFF
 #define LED_OFF				0x00
 
 #define	MAX_NUM_LEDS	3
@@ -85,17 +86,17 @@ static struct an30259_led_conf led_conf[] = {
 	{
 		.name = "led_r",
 		.brightness = LED_OFF,
-		.max_brightness = 0x3C,
+		.max_brightness = LED_R_CURRENT,
 		.flags = 0,
 	}, {
 		.name = "led_g",
 		.brightness = LED_OFF,
-		.max_brightness = 0x3C,
+		.max_brightness = LED_G_CURRENT,
 		.flags = 0,
 	}, {
 		.name = "led_b",
 		.brightness = LED_OFF,
-		.max_brightness = 0x3C,
+		.max_brightness = LED_B_CURRENT,
 		.flags = 0,
 	}
 };
@@ -394,8 +395,20 @@ static void an30259a_set_led_blink(enum an30259a_led_enum led,
 	struct i2c_client *client;
 	client = b_client;
 
+	if (brightness == LED_OFF) {
+		leds_on(led, false, false, brightness);
+		return;
+	}
+
+	if (brightness > LED_MAX_CURRENT)
+		brightness = LED_MAX_CURRENT;
+
+	/* In user case, LED current is restricted to less than 2mA */
+	brightness = (brightness * LED_R_CURRENT) / LED_MAX_CURRENT + 1;
+
 	if (delay_on_time > SLPTT_MAX_VALUE)
 		delay_on_time = SLPTT_MAX_VALUE;
+
 	if (delay_off_time > SLPTT_MAX_VALUE)
 		delay_off_time = SLPTT_MAX_VALUE;
 
@@ -403,9 +416,6 @@ static void an30259a_set_led_blink(enum an30259a_led_enum led,
 		leds_on(led, true, false, brightness);
 		if (brightness == LED_OFF)
 			leds_on(led, false, false, brightness);
-		return;
-	} else if (brightness == LED_OFF) {
-		leds_on(led, false, false, brightness);
 		return;
 	} else
 		leds_on(led, true, true, brightness);
