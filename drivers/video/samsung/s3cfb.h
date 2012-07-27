@@ -178,6 +178,10 @@ struct s3cfb_global {
 	unsigned int		wq_count;
 	struct fb_info		**fb;
 
+	ktime_t      vsync_timestamp;
+	int      vsync_state;
+	struct task_struct  *vsync_thread;
+
 	atomic_t		enabled_win;
 	enum s3cfb_output_t	output;
 	enum s3cfb_rgb_mode_t	rgb_mode;
