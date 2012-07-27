@@ -1082,15 +1082,32 @@ int s3cfb_cursor(struct fb_info *fb, struct fb_cursor *cursor)
 	return 0;
 }
 
+int s3cfb_vsync_timestamp_changed(struct s3cfb_global *fbdev, ktime_t prev_timestamp)
+{
+	return !ktime_equal(prev_timestamp, fbdev->vsync_timestamp);
+}
+
 int s3cfb_wait_for_vsync(struct s3cfb_global *fbdev)
 {
+	ktime_t prev_timestamp;
+	int ret;
+
 	dev_dbg(fbdev->dev, "waiting for VSYNC interrupt\n");
 
-	sleep_on_timeout(&fbdev->wq, HZ / 10);
+	prev_timestamp = fbdev->vsync_timestamp;
+
+	ret = wait_event_interruptible_timeout(fbdev->wq, 
+				s3cfb_vsync_timestamp_changed(fbdev, prev_timestamp),
+				msecs_to_jiffies(100));
+
+	if (ret == 0)
+		return -ETIMEDOUT;
+	if (ret < 0)
+		return ret;
 
 	dev_dbg(fbdev->dev, "got a VSYNC interrupt\n");
 
-	return 0;
+	return ret;
 }
 
 int s3cfb_ioctl(struct fb_info *fb, unsigned int cmd, unsigned long arg)
@@ -1129,23 +1146,32 @@ int s3cfb_ioctl(struct fb_info *fb, unsigned int cmd, unsigned long arg)
 		break;
 
 	case FBIO_WAITFORVSYNC:
-		if (fbdev->regs == 0)
+        pr_info("CODEWORKX: FBIO_WAITFORVSYNC");
+		if (fbdev->regs == 0) {
+            pr_info("CODEWORKX: fbdev->regs == 0, return");
 			return 0;
+        }
 #if defined(CONFIG_CPU_EXYNOS4212) || defined(CONFIG_CPU_EXYNOS4412)
 		/* Enable Vsync */
 #ifdef CONFIG_CPU_EXYNOS4412
-		if (!fbdev->regs)
+		if (!fbdev->regs) {
+            pr_info("CODEWORKX: !fbdev->regs, return");
 			return ret;
+        }
 #endif
+        pr_info("CODEWORKX: set vsync interrupt = 1");
 		s3cfb_set_global_interrupt(fbdev, 1);
 		s3cfb_set_vsync_interrupt(fbdev, 1);
 #endif
 		/* Wait for Vsync */
 		s3cfb_wait_for_vsync(fbdev);
-		if (fbdev->regs == 0)
+		if (fbdev->regs == 0) {
+            pr_info("CODEWORKX: fbdev->regs == 0, return");
 			return 0;
+        }
 #if defined(CONFIG_CPU_EXYNOS4212) || defined(CONFIG_CPU_EXYNOS4412)
 		/* Disable Vsync */
+        pr_info("CODEWORKX: set vsync interrupt = 0");
 		s3cfb_set_global_interrupt(fbdev, 0);
 		s3cfb_set_vsync_interrupt(fbdev, 0);
 #endif
@@ -1214,13 +1240,18 @@ int s3cfb_ioctl(struct fb_info *fb, unsigned int cmd, unsigned long arg)
 		break;
 
 	case S3CFB_SET_VSYNC_INT:
-		if (get_user(p.vsync, (int __user *)arg))
+        pr_info("CODEWORKX: S3CFB_SET_VSYNC_INT");
+		if (get_user(p.vsync, (int __user *)arg)) {
 			ret = -EFAULT;
-		else {
+            pr_info("CODEWORKX: ret = EFAULT");
+        } else {
 #ifdef CONFIG_CPU_EXYNOS4412
-			if (!fbdev->regs)
+			if (!fbdev->regs) {
+                pr_info("CODEWORKX: !fbdev->regs, return");
 				return ret;
+            }
 #endif
+            pr_info("CODEWORKX: set vsync interrupt = %d", p.vsync);
 			s3cfb_set_global_interrupt(fbdev, p.vsync);
 			s3cfb_set_vsync_interrupt(fbdev, p.vsync);
 		}
