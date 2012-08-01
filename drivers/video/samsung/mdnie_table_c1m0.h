@@ -6,7 +6,7 @@
 
 static const unsigned short tune_cyanogenmod[] = {
 	0x0000, 0x0000, /*BANK 0*/
-	0x0008, 0x000c, /*Dither8 UC4 ABC2 CP1 | CC8 MCM4 SCR2 SCC1 | CS8 DE4 DNR2 HDR1*/
+	0x0008, 0x0088, /*Dither8 UC4 ABC2 CP1 | CC8 MCM4 SCR2 SCC1 | CS8 DE4 DNR2 HDR1*/
 	0x0030, 0x0000, /*FA cs1 de8 hdr2 fa1*/
 	0x0092, 0x0040, /*DE pe*/
 	0x0093, 0x0040, /*DE pf*/
@@ -19,7 +19,7 @@ static const unsigned short tune_cyanogenmod[] = {
 	0x00b0, 0x1010, /*CS hg ry*/
 	0x00b1, 0x1010, /*CS hg gc*/
 	0x00b2, 0x1010, /*CS hg bm*/
-	0x00b3, 0x1204, /*CS weight grayTH*/
+	0x00b3, 0x1404, /*CS weight grayTH*/
 	0x00ff, 0x0000, /*Mask Release*/
 	END_SEQ, 0x0000,
 };
