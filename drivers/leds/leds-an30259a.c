@@ -74,9 +74,9 @@
 #define LED_IMAX_SHIFT			6
 #define AN30259A_CTN_RW_FLG		0x80
 
-#define LED_R_CURRENT		0x32 //0x28
-#define LED_G_CURRENT		0x32 //0x28
-#define LED_B_CURRENT		0x32 //0x28
+#define LED_R_CURRENT		0x28
+#define LED_G_CURRENT		0x28
+#define LED_B_CURRENT		0x28
 #define LED_MAX_CURRENT		0xFF
 #define LED_OFF				0x00
 
@@ -404,7 +404,7 @@ static void an30259a_set_led_blink(enum an30259a_led_enum led,
 		brightness = LED_MAX_CURRENT;
 
 	/* In user case, LED current is restricted to less than 2mA */
-	brightness = (brightness * LED_R_CURRENT) / LED_MAX_CURRENT + 1;
+	//brightness = (brightness * LED_R_CURRENT) / LED_MAX_CURRENT + 1;
 
 	if (delay_on_time > SLPTT_MAX_VALUE)
 		delay_on_time = SLPTT_MAX_VALUE;
