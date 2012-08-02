@@ -289,7 +289,7 @@ static void umts_modem_cfg_gpio(void)
 	unsigned gpio_cp_dump_int = umts_modem_data.gpio_cp_dump_int;
 	unsigned gpio_ap_dump_int = umts_modem_data.gpio_ap_dump_int;
 	unsigned gpio_flm_uart_sel = umts_modem_data.gpio_flm_uart_sel;
-	/* unsigned irq_phone_active = umts_modem_res[0].start; */
+	unsigned irq_phone_active = umts_modem_res[0].start;
 
 	if (gpio_reset_req_n) {
 		err = gpio_request(gpio_reset_req_n, "RESET_REQ_N");
@@ -336,7 +336,7 @@ static void umts_modem_cfg_gpio(void)
 			       "PHONE_ACTIVE", err);
 		}
 		gpio_direction_input(gpio_phone_active);
-		pr_err(LOG_TAG "check phone active = %d\n", gpio_phone_active);
+		pr_err(LOG_TAG "check phone active = %d\n", irq_phone_active);
 	}
 
 	if (gpio_cp_dump_int) {
