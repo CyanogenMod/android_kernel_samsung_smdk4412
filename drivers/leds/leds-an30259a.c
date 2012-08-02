@@ -74,9 +74,9 @@
 #define LED_IMAX_SHIFT			6
 #define AN30259A_CTN_RW_FLG		0x80
 
-#define LED_R_CURRENT		0x28
-#define LED_G_CURRENT		0x28
-#define LED_B_CURRENT		0x28
+#define LED_R_CURRENT		0x32 //0x28
+#define LED_G_CURRENT		0x32 //0x28
+#define LED_B_CURRENT		0x32 //0x28
 #define LED_MAX_CURRENT		0xFF
 #define LED_OFF				0x00
 
