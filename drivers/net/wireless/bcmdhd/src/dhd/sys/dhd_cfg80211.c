@@ -507,7 +507,6 @@ int wl_cfg80211_set_btcoex_dhcp(struct net_device *dev, char *command)
 	int i;
 #endif
 
-
 	/* Figure out powermode 1 or o command */
 	strncpy((char *)&powermode_val, command + strlen("BTCOEXMODE") +1, 1);
 	WL_ERR(("%s: DHCP session Enter\n", __FUNCTION__));

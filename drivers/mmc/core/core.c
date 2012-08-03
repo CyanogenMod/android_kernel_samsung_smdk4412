@@ -268,8 +268,8 @@ static void mmc_wait_for_req_done(struct mmc_host *host,
 		wait_for_completion(&mrq->completion);
 
 	cmd = mrq->cmd;
-	if (!cmd->error || !cmd->retries ||
-	    mmc_card_removed(host->card))
+
+	if (mmc_card_removed(host->card))
 		return;
 
 	/* if card is mmc type and nonremovable, and there are erros after

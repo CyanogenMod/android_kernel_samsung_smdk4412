@@ -1627,6 +1627,22 @@ static void pairing_complete_cb(struct hci_conn *conn, u8 status)
 		pairing_complete(cmd, status);
 }
 
+static void le_connect_complete_cb(struct hci_conn *conn, u8 status)
+{
+	struct pending_cmd *cmd;
+
+	BT_DBG("status %u", status);
+
+	if (!status)
+		return;
+
+	cmd = find_pairing(conn);
+	if (!cmd)
+		BT_DBG("Unable to find a pending command");
+	else
+		pairing_complete(cmd, mgmt_status(status));
+}
+
 static int pair_device(struct sock *sk, u16 index, void *data, u16 len)
 {
 	struct hci_dev *hdev;
@@ -1687,9 +1703,10 @@ static int pair_device(struct sock *sk, u16 index, void *data, u16 len)
 		goto unlock;
 	}
 
-	/* For LE, just connecting isn't a proof that the pairing finished */
 	if (cp->addr.type == MGMT_ADDR_BREDR)
 		conn->connect_cfm_cb = pairing_complete_cb;
+	else
+		conn->connect_cfm_cb = le_connect_complete_cb;
 
 	conn->security_cfm_cb = pairing_complete_cb;
 	conn->disconn_cfm_cb = pairing_complete_cb;

@@ -1532,6 +1532,9 @@ int pl330_update(const struct pl330_info *pi)
 
 			id = pl330->events[ev];
 
+			if (id == -1) /* Released? */
+				continue;
+
 			thrd = &pl330->channels[id];
 
 			active = _thrd_active(thrd);

@@ -31,6 +31,7 @@
 
 #include <wldev_common.h>
 #include <bcmutils.h>
+#include <wl_iw.h>
 
 #define htod32(i) i
 #define htod16(i) i
@@ -41,13 +42,13 @@
 
 #define	WLDEV_ERROR(args)						\
 	do {										\
-		printk(KERN_ERR "WLDEV-ERROR) %s : ", __func__);	\
+		printk(KERN_ERR "WLDEV-INFO2) %s : ", __func__);	\
 		printk args;							\
 	} while (0)
 
 #define	WLDEV_INFO(args)						\
 	do {								\
-		printk(KERN_INFO "WLDEV-ERROR) %s : ", __func__);	\
+		printk(KERN_INFO "WLDEV-INFO) %s : ", __func__);	\
 		printk args;					\
 	} while (0)
 
@@ -300,6 +301,10 @@ int wldev_get_rssi(
 		return error;
 
 	*prssi = dtoh32(scb_val.val);
+	/* when the return value is zero. skip overrinding code */
+	if (*prssi > WL_IW_RSSI_INVALID)
+		*prssi = WL_IW_RSSI_MAXVAL;
+
 	return error;
 }
 

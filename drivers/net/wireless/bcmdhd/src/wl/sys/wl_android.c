@@ -129,9 +129,10 @@ typedef struct cmd_tlv {
 #define CMD_OKC_ENABLE		"OKC_ENABLE"
 #endif
 
-#ifdef BCM4334_CHIP		//ampdu_mpdu
+#ifdef SUPPORT_AMPDU_MPDU_CMD
 #define CMD_AMPDU_MPDU "AMPDU_MPDU"
 #endif
+
 #ifdef VSDB
 #define CMD_CHANGE_RL 	"CHANGE_RL"
 #define CMD_RESTORE_RL  "RESTORE_RL"
@@ -234,11 +235,11 @@ static int wl_android_set_suspendopt(struct net_device *dev, char *command, int 
 	if (!dhd_download_fw_on_driverload) {
 #endif /* CUSTOMER_HW_SAMSUNG */
 		suspend_flag = *(command + strlen(CMD_SETSUSPENDOPT) + 1) - '0';
-	
+
 		if (suspend_flag != 0)
 			suspend_flag = 1;
 		ret_now = net_os_set_suspend_disable(dev, suspend_flag);
-	
+
 		if (ret_now != suspend_flag) {
 			if (!(ret = net_os_set_suspend(dev, ret_now)))
 				DHD_INFO(("%s: Suspend Flag %d -> %d\n",
@@ -407,13 +408,9 @@ static int wl_android_get_country_rev(
 			__func__, error));
 		return -1;
 	} else {
-		DHD_INFO(("%s: get country '%c%c %d'\n",
-			__func__, cspec.ccode[0], cspec.ccode[1], cspec.rev));
+		DHD_INFO(("%s: get country '%s %d'\n", __func__, smbuf, smbuf[WLC_CNTRY_BUF_SZ]));
 	}
-
-	bytes_written = snprintf(command, total_len, "%c%c %d",
-		cspec.ccode[0], cspec.ccode[1], cspec.rev);
-
+	bytes_written = snprintf(command, total_len, "%s %s %d", CMD_COUNTRYREV_GET, smbuf, smbuf[WLC_CNTRY_BUF_SZ]);
 	return bytes_written;
 }
 #endif /* ROAM_API */
@@ -706,20 +703,6 @@ static int wl_android_set_fwpath(struct net_device *net, char *command, int tota
 	return 0;
 }
 
-static int my_atoi(const char *string_num)
-{
-	int int_val=0;
-        for(;; string_num++) {
-		switch (*string_num) {
-		        case '0'...'9' :
-				    int_val = 10 * int_val + (*string_num-'0');
-				    break;
-			default:
-			        return int_val;
-		}
-	}
-	return int_val;
-}
 
 static int
 wl_android_set_auto_channel(struct net_device *dev, const char* string_num,
@@ -737,7 +720,7 @@ wl_android_set_auto_channel(struct net_device *dev, const char* string_num,
 	/* Auto channel select */
 	wl_uint32_list_t request;
 
-	channel = my_atoi(string_num);
+	channel = bcm_atoi(string_num);
 	DHD_INFO(("%s : HAPD_AUTO_CHANNEL = %d\n", __FUNCTION__, channel));
 
 	if (channel == 20)
@@ -794,7 +777,7 @@ wl_android_set_max_num_sta(struct net_device *dev, const char* string_num)
 {
 	int max_assoc;
 
-	max_assoc = my_atoi(string_num);
+	max_assoc = bcm_atoi(string_num);
 	DHD_INFO(("%s : HAPD_MAX_NUM_STA = %d\n", __FUNCTION__, max_assoc));
 	wldev_iovar_setint(dev, "maxassoc", max_assoc);
 	return 1;
@@ -823,7 +806,7 @@ wl_android_set_hide_ssid(struct net_device *dev, const char* string_num)
 	int hide_ssid;
 	int enable = 0;
 
-	hide_ssid = my_atoi(string_num);
+	hide_ssid = bcm_atoi(string_num);
 	DHD_INFO(("%s: HAPD_HIDE_SSID = %d\n", __FUNCTION__, hide_ssid));
 	if (hide_ssid)
 		enable = 1;
@@ -926,7 +909,8 @@ wl_android_ch_res_rl(struct net_device *dev, bool change)
 }
 #endif
 
-#ifdef BCM4334_CHIP		//ampdu_mpdu
+#ifdef SUPPORT_AMPDU_MPDU_CMD
+/* CMD_AMPDU_MPDU */
 static int
 wl_android_set_ampdu_mpdu(struct net_device *dev, const char* string_num)
 {
@@ -946,7 +930,7 @@ wl_android_set_ampdu_mpdu(struct net_device *dev, const char* string_num)
 		DHD_ERROR(("%s : ampdu_mpdu set error. %d\n", __FUNCTION__, err));
 		return -1;
 	}
-	
+
 	return 0;
 }
 #endif
@@ -1060,6 +1044,7 @@ int wl_android_priv_cmd(struct net_device *net, struct ifreq *ifr, int cmd)
 	else if (strnicmp(command, CMD_SETBAND, strlen(CMD_SETBAND)) == 0) {
 		uint band = *(command + strlen(CMD_SETBAND) + 1) - '0';
 		bytes_written = wldev_set_band(net, band);
+		wl_update_wiphybands(NULL);
 	}
 	else if (strnicmp(command, CMD_GETBAND, strlen(CMD_GETBAND)) == 0) {
 		bytes_written = wl_android_get_band(net, command, priv_cmd.total_len);
@@ -1189,7 +1174,8 @@ int wl_android_priv_cmd(struct net_device *net, struct ifreq *ifr, int cmd)
 		bytes_written = wl_android_get_assoc_res_ies(net, command);
 	}
 #endif /* BCMCCX */
-#ifdef BCM4334_CHIP		//ampdu_mpdu
+#ifdef SUPPORT_AMPDU_MPDU_CMD
+	/* CMD_AMPDU_MPDU */
 	else if (strnicmp(command, CMD_AMPDU_MPDU,strlen(CMD_AMPDU_MPDU)) == 0) {
 		int skip = strlen(CMD_AMPDU_MPDU) + 1;
 		bytes_written = wl_android_set_ampdu_mpdu(net, (const char*)command+skip);
@@ -1426,6 +1412,10 @@ int dhd_os_check_wakelock(void *dhdp);
 static int wifi_suspend(struct platform_device *pdev, pm_message_t state)
 {
 	DHD_TRACE(("##> %s\n", __FUNCTION__));
+#if defined(BCMHOST)
+	if (dhd_os_check_wakelock(bcmsdh_get_drvdata()))
+		return -EBUSY;
+#endif
 #if (LINUX_VERSION_CODE <= KERNEL_VERSION(2, 6, 39)) && defined(OOB_INTR_ONLY) && 1
 	bcmsdh_oob_intr_set(0);
 #endif /* (OOB_INTR_ONLY) */

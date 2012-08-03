@@ -51,7 +51,7 @@ extern void dhdsdio_isr(void * args);
 
 #if defined(CONFIG_PM_SLEEP) && defined(CUSTOMER_HW_SLP)
 /*SLP_wakelock_alternative_code*/
-struct device *pm_dev; 
+struct device *pm_dev;
 #endif /* CONFIG_PM_SLEEP && CUSTOMER_HW_SLP */
 /**
  * SDIO Host Controller info
@@ -188,6 +188,10 @@ int bcmsdh_probe(struct device *dev)
 
 	/* Get customer specific OOB IRQ parametres: IRQ number as IRQ type */
 	irq = dhd_customer_oob_irq_map(&irq_flags);
+#if defined(BCMHOST)
+	/* Do not disable this IRQ during suspend */
+	irq_flags |= IRQF_NO_SUSPEND;
+#endif
 	if  (irq < 0) {
 		SDLX_MSG(("%s: Host irq is not defined\n", __FUNCTION__));
 		return 1;
@@ -237,7 +241,7 @@ int bcmsdh_probe(struct device *dev)
 
 #if defined(CONFIG_PM_SLEEP) && defined(CUSTOMER_HW_SLP)
 	/*SLP_wakelock_alternative_code*/
-	pm_dev=sdhc->dev; 
+	pm_dev=sdhc->dev;
 	ret = device_init_wakeup(pm_dev, 1);
 	printf("%s : device_init_wakeup(pm_dev) enable, ret = %d\n", __func__, ret);
 #endif /* CONFIG_PM_SLEEP && CUSTOMER_HW_SLP */

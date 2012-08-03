@@ -1137,8 +1137,7 @@ wl_cfgp2p_has_ie(u8 *ie, u8 **tlvs, u32 *tlvs_len, const u8 *oui, u32 oui_len, u
 
 	/* If the contents match the SAMSUNG OUI */
 	if (ie[TLV_LEN_OFF] >= oui_len + 1 &&
-	        !bcmp(&ie[TLV_BODY_OFF], oui, oui_len) &&
-	        !bcmp(oui, SAMSUNG_OUI, SAMSUNG_OUI_LEN)) {
+		!bcmp(&ie[TLV_BODY_OFF], oui, oui_len)) { 
 		return TRUE;
 	}
 
@@ -1318,7 +1317,7 @@ s32 wl_cfgp2p_p2p_listen_suspend(void)
 		if ((ret = wl_add_remove_eventmsg(netdev, WLC_E_P2P_PROBREQ_MSG, enable)) != BCME_OK) {
 			CFGP2P_ERR((" failed to %s WLC_E_P2P_PROPREQ_MSG\n", enable? "set":"unset" ));
 		}
-			
+
 	}
 exit:
 	return ret;
@@ -1369,8 +1368,10 @@ wl_cfgp2p_listen_complete(struct wl_priv *wl, struct net_device *ndev,
 #ifdef WL_CFG80211_VSDB_PRIORITIZE_SCAN_REQUEST
 			wl_clr_drv_status(wl, FAKE_REMAINING_ON_CHANNEL, ndev);
 #endif /* WL_CFG80211_VSDB_PRIORITIZE_SCAN_REQUEST */
-			cfg80211_remain_on_channel_expired(ndev, wl->last_roc_id,
-				&wl->remain_on_chan, wl->remain_on_chan_type, GFP_KERNEL);
+			if (ndev && (ndev->ieee80211_ptr != NULL)) {
+				cfg80211_remain_on_channel_expired(ndev, wl->last_roc_id,
+					&wl->remain_on_chan, wl->remain_on_chan_type, GFP_KERNEL);
+			}
 		}
 		if (wl_add_remove_eventmsg(netdev, WLC_E_P2P_PROBREQ_MSG, false) != BCME_OK) {
 			CFGP2P_ERR((" failed to unset WLC_E_P2P_PROPREQ_MSG\n"));
@@ -1442,7 +1443,7 @@ wl_cfgp2p_discover_listen(struct wl_priv *wl, s32 channel, u32 duration_ms)
 		/* Clear WLC_E_P2P_PROBREQ_MSG in case of early suspend and p2p ie != 0 */
 		enable = false;
 	}
-	
+
 	if (wl_add_remove_eventmsg(netdev, WLC_E_P2P_PROBREQ_MSG, enable) != BCME_OK) {
 			CFGP2P_ERR((" failed to set WLC_E_P2P_PROPREQ_MSG\n"));
 	}
@@ -1730,7 +1731,7 @@ wl_cfgp2p_supported(struct wl_priv *wl, struct net_device *ndev)
 	ret = wldev_iovar_getint(ndev, "p2p",
 	               &p2p_supported);
 	if (ret < 0) {
-		CFGP2P_ERR(("wl p2p error %d\n", ret));
+		CFGP2P_ERR(("wl p2p supported IOVAR = %d\n", ret));
 		return 0;
 	}
 	if (p2p_supported == 1) {
