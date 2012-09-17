@@ -442,7 +442,7 @@ endchoice
 
 config VIDEO_S5K4E5
         tristate "S5K4E5 supporting camera driver"
-	depends on VIDEO_V4L2 && ((VIDEO_FIMC_MIPI || VIDEO_S5P_MIPI_CSIS) && VIDEO_EXYNOS_FIMC_IS) || VIDEO_EXYNOS5_FIMC_IS 
+	depends on VIDEO_V4L2 && ((VIDEO_FIMC_MIPI || VIDEO_S5P_MIPI_CSIS) && VIDEO_EXYNOS_FIMC_IS) || VIDEO_EXYNOS5_FIMC_IS
         ---help---
           This driver supports S5K4E5 sensor.
 choice
@@ -478,7 +478,7 @@ endchoice
 
 config VIDEO_S5K6A3
 	tristate "S5K6A3 supporting camera driver"
-	depends on VIDEO_V4L2 && ((VIDEO_FIMC_MIPI || VIDEO_S5P_MIPI_CSIS) && VIDEO_EXYNOS_FIMC_IS) || VIDEO_EXYNOS5_FIMC_IS 
+	depends on VIDEO_V4L2 && ((VIDEO_FIMC_MIPI || VIDEO_S5P_MIPI_CSIS) && VIDEO_EXYNOS_FIMC_IS) || VIDEO_EXYNOS5_FIMC_IS
 	---help---
 	  This driver supports S5K6A3 sensor.
 choice
@@ -529,6 +529,12 @@ config VIDEO_S5K5BAFX
 	depends on I2C && VIDEO_V4L2 && VIDEO_FIMC_MIPI
 	---help---
 	  This driver supports S5K5BAFX SoC camera module
+
+config VIDEO_S5K5BBGX
+	tristate "S5K5BBGX supporting camera driver"
+	depends on I2C && VIDEO_V4L2 && TARGET_LOCALE_NA && VIDEO_FIMC_MIPI
+	---help---
+	  This driver supports S5K5BBGX SoC camera module
 
 config VIDEO_S5K5CCGX_COMMON
 	tristate "S5K5CCGX supporting camera driver"

@@ -18,6 +18,10 @@
 #define L1_CACHE_SIZE		SZ_64K
 #define L2_CACHE_SIZE		SZ_1M
 #define LINE_FLUSH_THRESHOLD	SZ_1K
+#define L1_DESCRIPTOR_SIZE	SZ_16K
+
+/* Get Modified virtual address to use 1MB page */
+#define GET_MVA(V, P) ((V & 0xfff00000) | (P & 0x000fffff))
 
 /**
  * cache_opr - [kernel] cache operation mode
@@ -92,5 +96,11 @@ static inline void fimg2d_dma_unsync_inner(unsigned long addr, size_t size, int 
 }
 
 void fimg2d_clean_outer_pagetable(struct mm_struct *mm, unsigned long addr, size_t size);
+void fimg2d_clean_outer_pagetable_clone(unsigned long *pgd_clone, unsigned long addr, size_t size);
+void fimg2d_clean_inner_pagetable_clone(unsigned long *pgd_clone, unsigned long addr, size_t size);
 void fimg2d_dma_sync_outer(struct mm_struct *mm, unsigned long addr, size_t size, enum cache_opr opr);
 enum pt_status fimg2d_check_pagetable(struct mm_struct *mm, unsigned long addr, size_t size);
+enum pt_status fimg2d_migrate_pagetable(unsigned long *pgd_clone,
+					unsigned long vaddr, unsigned long paddr, size_t size);
+void fimg2d_mmutable_value_replace(struct fimg2d_bltcmd *cmd,
+					unsigned long fault_addr, unsigned long l2d_value);

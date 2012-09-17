@@ -871,10 +871,10 @@ static void s5p_hdmi_print_phy_config(void)
 
 	printk(KERN_WARNING "read buffer :\n");
 
-	for (i = 1; i < size; i++) {
+	for (i = 0; i < size; i++) {
 		printk("0x%02x", read_buffer[i]);
 
-		if (i % 8)
+		if ((i+1) % 8)
 			printk(" ");
 		else
 			printk("\n");
@@ -1145,6 +1145,58 @@ void s5p_hdmi_reg_sw_reset(void)
 
 	s5p_hdmi_ctrl_clock(0);
 }
+
+#ifdef CONFIG_HDMI_TX_STRENGTH
+int s5p_hdmi_phy_set_tx_strength(u8 ch, u8 *value)
+{
+	u8 buff[2];
+
+	if (ch & TX_EMP_LVL) { /* REG10 BIT7:4 */
+		buff[0] = HDMI_PHY_I2C_REG10;
+		buff[1] = (value[TX_EMP_LVL_VAL] & 0x0f) << 4;
+		if (s5p_hdmi_i2c_phy_write(PHY_I2C_ADDRESS, 2, buff) != 0)
+			goto err_exit;
+	}
+
+	if (ch & TX_AMP_LVL) { /* REG10 BIT3:0, REG0F BIT7 */
+		buff[0] = HDMI_PHY_I2C_REG10;
+		buff[1] = (value[TX_AMP_LVL_VAL] & 0x0e) >> 1;
+		if (s5p_hdmi_i2c_phy_write(PHY_I2C_ADDRESS, 2, buff) != 0)
+			goto err_exit;
+		buff[0] = HDMI_PHY_I2C_REG0F;
+		buff[1] = (value[TX_AMP_LVL_VAL] & 0x01) << 7;
+		if (s5p_hdmi_i2c_phy_write(PHY_I2C_ADDRESS, 2, buff) != 0)
+			goto err_exit;
+	}
+
+	if (ch & TX_LVL_CH0) { /* REG04 BIT7:6 */
+		buff[0] = HDMI_PHY_I2C_REG04;
+		buff[1] = (value[TX_LVL_CH0_VAL] & 0x3) << 6;
+		if (s5p_hdmi_i2c_phy_write(PHY_I2C_ADDRESS, 2, buff) != 0)
+			goto err_exit;
+	}
+
+	if (ch & TX_LVL_CH1) { /* REG13 BIT1:0 */
+		buff[0] = HDMI_PHY_I2C_REG13;
+		buff[1] = (value[TX_LVL_CH1_VAL] & 0x3);
+		if (s5p_hdmi_i2c_phy_write(PHY_I2C_ADDRESS, 2, buff) != 0)
+			goto err_exit;
+	}
+
+	if (ch & TX_LVL_CH2) { /* REG17 BIT1:0 */
+		buff[0] = HDMI_PHY_I2C_REG17;
+		buff[1] = (value[TX_LVL_CH2_VAL] & 0x3);
+		if (s5p_hdmi_i2c_phy_write(PHY_I2C_ADDRESS, 2, buff) != 0)
+			goto err_exit;
+	}
+
+	return 0;
+
+err_exit:
+	pr_err("%s: failed to set tx strength\n", __func__);
+	return -1;
+}
+#endif
 
 int s5p_hdmi_phy_power(bool on)
 {

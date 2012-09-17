@@ -7,10 +7,18 @@ config FB_S5P
 	select FB_CFB_FILLRECT
 	select FB_CFB_COPYAREA
 	select FB_CFB_IMAGEBLIT
+	select SYNC
+	select SW_SYNC
+	select SW_SYNC_USER
 	depends on FB && (ARCH_S5PV210 || ARCH_EXYNOS4) && !FB_S3C
 	default n
 	help
 	  This enables support for Samsung Display Controller (FIMD)
+
+config FB_S5P_SYSMMU
+	bool "S5P FIMD SYSMMU enable"
+	depends on FB_S5P
+	default n
 
 config FB_S5P_SPLASH_SCREEN
 	bool "SPLASH_SCREEN on LCD"
@@ -24,6 +32,10 @@ config FB_S5P_LCD_INIT
 
 config FB_S5P_DEBUG
 	bool "S5P Framebuffer debug messages"
+	depends on FB_S5P
+
+config FB_S5P_VSYNC_THREAD
+	bool "S5P Framebuffer vsync thread"
 	depends on FB_S5P
 
 config FB_S5P_TRACE_UNDERRUN
@@ -111,6 +123,21 @@ endif # FIMD_EXT_SUPPORT
 
 choice
 depends on FB_S5P
+prompt "Select RGB Order"
+default FB_BGRA_ORDER
+config FB_BGRA_ORDER
+	bool "BGRA8888"
+	help
+	  This enables use BGRA order.
+
+config FB_RGBA_ORDER
+	bool "RGBA8888"
+	help
+	  This enables use RGBA order.
+endchoice
+
+choice
+depends on FB_S5P
 prompt "Select LCD Type"
 default FB_S5P_AMS369FG06
 config FB_S5P_LTE480WV
@@ -180,6 +207,12 @@ config FB_S5P_LMS501KF03
 	help
 	  This enables support for Samsung LMS501KF03 5.01" WVGA TFT LCD panel
 
+config FB_S5P_LMS501XX
+	bool "LMS501XX MIPI LCD"
+	depends on FB_S5P_MIPI_DSIM
+	help
+	  This enables support for Samsung LMS501XX 5.01" WVGA TFT LCD panel
+
 config FB_S5P_DUMMY_MIPI_LCD
 	bool "DUMMY MIPI LCD"
 	depends on FB_S5P_MIPI_DSIM
@@ -192,6 +225,18 @@ config FB_S5P_S6E8AA0
        ---help---
          This enables support for Samsung S6E8AA0 MIPI LCD
 
+config FB_S5P_EA8061
+       bool "EA8061 MIPI LCD"
+       depends on FB_S5P_MIPI_DSIM
+       ---help---
+         This enables support for Samsung EA8061 MIPI LCD
+
+config FB_S5P_S6EVR02
+       bool "S6EVR02 MIPI LCD"
+       depends on FB_S5P_MIPI_DSIM
+       ---help---
+         This enables support for Samsung S6EVR02 MIPI LCD
+
 config FB_S5P_S6E8AB0
        bool "S6E8AB0 MIPI LCD"
        depends on MACH_PX && FB_S5P_MIPI_DSIM
@@ -199,7 +244,7 @@ config FB_S5P_S6E8AB0
          This enables support for Samsung S6E8AB0 MIPI LCD
 
 config FB_S5P_S6D6AA1
-       bool "S6E8AB0 MIPI LCD"
+       bool "S6D6AA1 MIPI LCD"
        depends on FB_S5P_MIPI_DSIM
        ---help---
          This enables support for Samsung S6D6AA1 MIPI LCD

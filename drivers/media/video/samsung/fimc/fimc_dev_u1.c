@@ -682,7 +682,7 @@ struct fimc_control *fimc_register_controller(struct platform_device *pdev)
 		clk_put(fimc_src_clk);
 		return NULL;
 	}
-	clk_set_rate(sclk_fimc_lclk, FIMC_CLK_RATE);
+	clk_set_rate(sclk_fimc_lclk, fimc_clk_rate());
 	clk_put(sclk_fimc_lclk);
 	clk_put(fimc_src_clk);
 
@@ -1418,6 +1418,30 @@ static int fimc_init_global(struct platform_device *pdev)
 
 	return 0;
 }
+
+#ifdef CONFIG_DRM_EXYNOS_FIMD_WB
+static BLOCKING_NOTIFIER_HEAD(fimc_notifier_client_list);
+
+int fimc_register_client(struct notifier_block *nb)
+{
+	return blocking_notifier_chain_register(
+			&fimc_notifier_client_list, nb);
+}
+EXPORT_SYMBOL(fimc_register_client);
+
+int fimc_unregister_client(struct notifier_block *nb)
+{
+	return blocking_notifier_chain_unregister(
+			&fimc_notifier_client_list, nb);
+}
+EXPORT_SYMBOL(fimc_unregister_client);
+
+int fimc_send_event(unsigned long val, void *v)
+{
+	return blocking_notifier_call_chain(
+			&fimc_notifier_client_list, val, v);
+}
+#endif
 
 static int fimc_show_log_level(struct device *dev,
 		struct device_attribute *attr, char *buf)

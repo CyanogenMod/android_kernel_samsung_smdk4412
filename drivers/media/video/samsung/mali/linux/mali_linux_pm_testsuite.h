@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2010 ARM Limited. All rights reserved.
+ * Copyright (C) 2010-2012 ARM Limited. All rights reserved.
  * 
  * This program is free software and is provided to you under the terms of the GNU General Public License version 2
  * as published by the Free Software Foundation, and any use by you of this program is subject to the terms of such GNU licence.
@@ -10,9 +10,7 @@
 #ifndef __MALI_LINUX_PM_TESTSUITE_H__
 #define __MALI_LINUX_PM_TESTSUITE_H__
 
-#if USING_MALI_PMM
-#if MALI_POWER_MGMT_TEST_SUITE
-#ifdef CONFIG_PM
+#if MALI_POWER_MGMT_TEST_SUITE && defined(CONFIG_PM)
 
 typedef enum
 {
@@ -29,9 +27,6 @@ extern unsigned int pwr_mgmt_status_reg;
 extern unsigned int is_mali_pmm_testsuite_enabled;
 extern unsigned int is_mali_pmu_present;
 
-#endif /* CONFIG_PM */
-#endif /* MALI_POWER_MGMT_TEST_SUITE */
-#endif /* USING_MALI_PMM */
+#endif /* MALI_POWER_MGMT_TEST_SUITE && defined(CONFIG_PM) */
+
 #endif /* __MALI_LINUX_PM_TESTSUITE_H__ */
-
-

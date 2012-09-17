@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2010 ARM Limited. All rights reserved.
+ * Copyright (C) 2010, 2012 ARM Limited. All rights reserved.
  * 
  * This program is free software and is provided to you under the terms of the GNU General Public License version 2
  * as published by the Free Software Foundation, and any use by you of this program is subject to the terms of such GNU licence.
@@ -27,7 +27,6 @@
 #else
 	#define MALI_PANIC(fmt, args...) 
 #endif
-
 
 /* The file include several useful macros for error checking, debugging and printing.
  * - MALI_PRINTF(...)           Do not use this function: Will be included in Release builds.
@@ -129,7 +128,9 @@
 	} while (0)
 
 #ifdef DEBUG
+#ifndef mali_debug_level
 extern int mali_debug_level;
+#endif
 
 #define MALI_DEBUG_CODE(code) code
 #define MALI_DEBUG_PRINT(level, args)  do { \
