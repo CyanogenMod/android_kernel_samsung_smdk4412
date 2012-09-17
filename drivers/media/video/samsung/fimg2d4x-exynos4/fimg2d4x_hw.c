@@ -16,6 +16,7 @@
 #include "fimg2d.h"
 #include "fimg2d4x.h"
 #include "fimg2d_clk.h"
+#include "fimg2d_cache.h"
 
 #define wr(d, a)	writel((d), info->regs + (a))
 #define rd(a)		readl(info->regs + (a))
@@ -124,7 +125,13 @@ void fimg2d4x_set_src_image(struct fimg2d_control *info, struct fimg2d_image *s)
 {
 	unsigned long cfg;
 
-	wr(FIMG2D_ADDR(s->addr.start), FIMG2D_SRC_BASE_ADDR_REG);
+	if ((s->addr.type == ADDR_USER_CONTIG) && (s->order < ARGB_ORDER_END)) {
+		wr(FIMG2D_ADDR(GET_MVA(s->addr.start, s->plane2.start)),
+				FIMG2D_SRC_BASE_ADDR_REG);
+	} else {
+		wr(FIMG2D_ADDR(s->addr.start), FIMG2D_SRC_BASE_ADDR_REG);
+	}
+
 	wr(FIMG2D_STRIDE(s->stride), FIMG2D_SRC_STRIDE_REG);
 
 	if (s->order < ARGB_ORDER_END) {	/* argb */
@@ -173,7 +180,13 @@ void fimg2d4x_set_dst_image(struct fimg2d_control *info, struct fimg2d_image *d)
 {
 	unsigned long cfg;
 
-	wr(FIMG2D_ADDR(d->addr.start), FIMG2D_DST_BASE_ADDR_REG);
+	if ((d->addr.type == ADDR_USER_CONTIG) && (d->order < ARGB_ORDER_END)) {
+		wr(FIMG2D_ADDR(GET_MVA(d->addr.start, d->plane2.start)),
+				FIMG2D_DST_BASE_ADDR_REG);
+	} else {
+		wr(FIMG2D_ADDR(d->addr.start), FIMG2D_DST_BASE_ADDR_REG);
+	}
+
 	wr(FIMG2D_STRIDE(d->stride), FIMG2D_DST_STRIDE_REG);
 
 	if (d->order < ARGB_ORDER_END) {

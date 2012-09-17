@@ -258,6 +258,9 @@ static void fimc_reset_cfg(struct fimc_control *ctrl)
 {
 	int i;
 	u32 cfg[][2] = {
+#ifdef CONFIG_SLP
+		{ 0x008, 0x20010480 },
+#endif
 		{ 0x018, 0x00000000 }, { 0x01c, 0x00000000 },
 		{ 0x020, 0x00000000 }, { 0x024, 0x00000000 },
 		{ 0x028, 0x00000000 }, { 0x02c, 0x00000000 },
@@ -1253,7 +1256,11 @@ int fimc_hwset_disable_capture(struct fimc_control *ctrl)
 
 void fimc_wait_disable_capture(struct fimc_control *ctrl)
 {
+#ifdef CONFIG_VIDEO_S5K5BBGX
+	unsigned long timeo = jiffies + 60; /* more 40 ms */
+#else
 	unsigned long timeo = jiffies + 40; /* timeout of 200 ms */
+#endif
 	u32 cfg;
 	if (!ctrl || !ctrl->cap)
 		return;

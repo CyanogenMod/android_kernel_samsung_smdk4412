@@ -33,9 +33,17 @@
 #define MOD_SG_OFFSET		21
 #define MOD_SG_MASK		0x7
 
+#define LOCKING_OFFSET		7
+#define LOCKING_MASK		0x1F
+
+#define EMA_OFFSET		6
+#define EMA_MASK		0x1
+
 #define DEFAULT_ASV_GROUP	1
 
 #define CHIP_ID_REG		(S5P_VA_CHIPID + 0x4)
+
+unsigned int exynos_armclk_max;
 
 struct asv_judge_table exynos4x12_limit[] = {
 	/* HPM, IDS */

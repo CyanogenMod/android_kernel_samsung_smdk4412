@@ -124,6 +124,56 @@ static void s5p_iommu_domain_destroy(struct iommu_domain *domain)
 	domain->priv = NULL;
 }
 
+#ifdef CONFIG_DRM_EXYNOS_IOMMU
+static int s5p_iommu_attach_device(struct iommu_domain *domain,
+				   struct device *dev)
+{
+	int ret;
+	struct s5p_iommu_domain *s5p_domain = domain->priv;
+	struct sysmmu_drvdata *data = NULL;
+
+	mutex_lock(&s5p_domain->lock);
+
+	/*
+	 * get sysmmu_drvdata to dev.
+	 * owner device was set to sysmmu->platform_data at machine code.
+	 */
+	data = get_sysmmu_data(dev, data);
+	if (!data)
+		return -EFAULT;
+
+	mutex_unlock(&s5p_domain->lock);
+
+	ret = s5p_sysmmu_enable(dev, virt_to_phys(s5p_domain->pgtable));
+	if (ret)
+		return ret;
+
+	return 0;
+}
+
+static void s5p_iommu_detach_device(struct iommu_domain *domain,
+				    struct device *dev)
+{
+	struct sysmmu_drvdata *data = NULL;
+	struct s5p_iommu_domain *s5p_domain = domain->priv;
+
+	mutex_lock(&s5p_domain->lock);
+
+	/*
+	 * get sysmmu_drvdata to dev.
+	 * owner device was set to sysmmu->platform_data at machine code.
+	 */
+	data = get_sysmmu_data(dev, data);
+	if (!data) {
+		dev_err(dev, "failed to detach device.\n");
+		return;
+	}
+
+	s5p_sysmmu_disable(dev);
+
+	mutex_unlock(&s5p_domain->lock);
+}
+#else
 static int s5p_iommu_attach_device(struct iommu_domain *domain,
 				   struct device *dev)
 {
@@ -168,6 +218,7 @@ static void s5p_iommu_detach_device(struct iommu_domain *domain,
 	}
 
 }
+#endif
 
 static bool section_available(struct iommu_domain *domain,
 			      unsigned long *lv1entry)
@@ -349,6 +400,92 @@ mapping_done:
 	return ret;
 }
 
+#ifdef CONFIG_DRM_EXYNOS_IOMMU
+static int s5p_iommu_unmap(struct iommu_domain *domain, unsigned long iova,
+			   int gfp_order)
+{
+	struct s5p_iommu_domain *s5p_domain = domain->priv;
+	struct sysmmu_drvdata *data;
+	struct list_head *sysmmu_list, *pos;
+	unsigned long *entry;
+	int num_entry;
+
+	BUG_ON(s5p_domain->pgtable == NULL);
+
+	mutex_lock(&s5p_domain->lock);
+
+	entry = s5p_domain->pgtable + (iova >> S5P_SECTION_SHIFT);
+
+	if (gfp_order >= S5P_SECTION_ORDER) {
+		num_entry = 1 << (gfp_order - S5P_SECTION_ORDER);
+		while (num_entry--) {
+			if (S5P_SECTION_LV1_ENTRY(*entry)) {
+				MAKE_FAULT_ENTRY(*entry);
+			} else if (S5P_PAGE_LV1_ENTRY(*entry)) {
+				unsigned long *lv2beg, *lv2end;
+				lv2beg = phys_to_virt(
+						*entry & S5P_LV2TABLE_MASK);
+				lv2end = lv2beg + S5P_LV2TABLE_ENTRIES;
+				while (lv2beg != lv2end) {
+					MAKE_FAULT_ENTRY(*lv2beg);
+					lv2beg++;
+				}
+			}
+			entry++;
+		}
+	} else {
+		entry = GET_LV2ENTRY(*entry, iova);
+
+		BUG_ON(S5P_LPAGE_LV2_ENTRY(*entry) &&
+						(gfp_order < S5P_LPAGE_ORDER));
+
+		num_entry = 1 << gfp_order;
+
+		while (num_entry--) {
+			MAKE_FAULT_ENTRY(*entry);
+			entry++;
+		}
+	}
+
+	sysmmu_list = get_sysmmu_list();
+
+	/*
+	 * invalidate tlb entries to iova(device address) to each iommu
+	 * registered in sysmmu_list.
+	 *
+	 * P.S. a device using iommu was set to data->owner at machine code
+	 * and enabled iommu was added in sysmmu_list at sysmmu probe
+	 */
+	list_for_each(pos, sysmmu_list) {
+		unsigned int page_size, count;
+
+		/*
+		 * get entry count and page size to device address space
+		 * mapped with iommu page table and invalidate each entry.
+		 */
+		if (gfp_order >= S5P_SECTION_ORDER) {
+			count = 1 << (gfp_order - S5P_SECTION_ORDER);
+			page_size = S5P_SECTION_SIZE;
+		} else if (gfp_order >= S5P_LPAGE_ORDER) {
+			count = 1 << (gfp_order - S5P_LPAGE_ORDER);
+			page_size = S5P_LPAGE_SIZE;
+		} else {
+			count = 1 << (gfp_order - S5P_SPAGE_ORDER);
+			page_size = S5P_SPAGE_SIZE;
+		}
+
+		data = list_entry(pos, struct sysmmu_drvdata, node);
+		if (data)
+			s5p_sysmmu_tlb_invalidate_entry(data->owner, iova,
+							count, page_size);
+	}
+
+	mutex_unlock(&s5p_domain->lock);
+
+	return 0;
+}
+#else
+
 static int s5p_iommu_unmap(struct iommu_domain *domain, unsigned long iova,
 			   int gfp_order)
 {
@@ -400,6 +537,7 @@ static int s5p_iommu_unmap(struct iommu_domain *domain, unsigned long iova,
 
 	return 0;
 }
+#endif
 
 static phys_addr_t s5p_iommu_iova_to_phys(struct iommu_domain *domain,
 					  unsigned long iova)

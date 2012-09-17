@@ -44,6 +44,7 @@ struct mipi_lcd_driver {
 struct dsim_ops {
 	u8	(*cmd_write)(void *ptr, u32 data0, u32 data1, u32 data2);
 	int	(*cmd_read)(void *ptr, u8 addr, u16 count, u8 *buf);
+	int	(*cmd_dcs_read)(void *ptr, u8 addr, u16 count, u8 *buf);
 	void	(*suspend)(void);
 	void	(*resume)(void);
 };
@@ -78,6 +79,8 @@ struct dsim_global {
 	struct delayed_work	dsim_work;
 	struct delayed_work	check_hs_toggle_work;
 	unsigned int		dsim_toggle_per_frame_count;
+
+	spinlock_t slock;
 
 	struct dsim_ops		*ops;
 };

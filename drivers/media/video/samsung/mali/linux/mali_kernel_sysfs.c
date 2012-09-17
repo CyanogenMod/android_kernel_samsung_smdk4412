@@ -356,7 +356,7 @@ int mali_sysfs_register(struct mali_dev *device, dev_t dev, const char *mali_dev
 			debugfs_create_file("state_dump", 0400, mali_debugfs_dir, NULL, &mali_seq_internal_state_fops);
 #endif
 
-			debugfs_create_file("memory_usage", 0400, mali_debugfs_dir, NULL, &memory_usage_fops);
+			debugfs_create_file("memory_usage", 0444, mali_debugfs_dir, NULL, &memory_usage_fops);
 		}
 	}
 

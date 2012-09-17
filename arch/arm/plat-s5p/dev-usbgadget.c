@@ -168,6 +168,14 @@ static struct android_usb_product usb_products[] = {
 		.functions	= usb_functions_mtp,
 	},
 #endif
+	{
+/* debug mode : using MS Composite*/
+#ifdef CONFIG_USB_ANDROID_SAMSUNG_DEBUG_MTP
+		.product_id     = SAMSUNG_KIES_PRODUCT_ID,
+		.num_functions  = ARRAY_SIZE(usb_functions_mtp_acm_adb),
+		.functions      = usb_functions_mtp_acm_adb,
+#endif
+	},
 #if	defined(CONFIG_USB_ANDROID_MASS_STORAGE) && defined(CONFIG_USB_ANDROID_ADB)
 	{
 		.product_id	= SAMSUNG_UMS_PRODUCT_ID,
