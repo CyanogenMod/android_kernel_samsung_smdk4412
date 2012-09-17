@@ -21,8 +21,6 @@
 
 #include "s3cfb.h"
 
-#define LCDFREQ_LIMIT_HZ	40
-
 enum lcdfreq_level_idx {
 	LEVEL_NORMAL,
 	LEVEL_LIMIT,
@@ -217,30 +215,44 @@ int get_divider(struct fb_info *fb)
 
 	fimd_div = gcd(lcdfreq->table[LEVEL_NORMAL].cmu_clkdiv, lcdfreq->table[LEVEL_LIMIT].cmu_clkdiv);
 
+	if ((!fimd_div) || (fimd_div > 16)) {
+		dev_info(fb->dev, "%s skip, %d\n", __func__, __LINE__);
+		goto err;
+	}
+
 	lcdfreq->table[LEVEL_NORMAL].cmu_clkdiv /= fimd_div;
 	lcdfreq->table[LEVEL_LIMIT].cmu_clkdiv /= fimd_div;
 
 	dev_info(fb->dev, "%s rate is %d, fimd divider=%d\n", clk->name, rate, fimd_div);
 
+	fimd_div--;
 	for (i = 0; i < LCDFREQ_LEVEL_END; i++) {
-		lcdfreq->table[i].cmu_clkdiv--;
-		dev_info(fb->dev, "%dHZ divider is %d\n",
+		if (lcdfreq->table[i].cmu_clkdiv > 16) {
+			dev_info(fb->dev, "%s skip, %d\n", __func__, __LINE__);
+			goto err;
+		}
+		dev_info(fb->dev, "%dhz div is %d\n",
 		lcdfreq->table[i].hz, lcdfreq->table[i].cmu_clkdiv);
+		lcdfreq->table[i].cmu_clkdiv--;
 	}
 
 	reg = (readl(fbdev->regs + S3C_VIDCON0) & (S3C_VIDCON0_CLKVAL_F(0xff))) >> 6;
-	reg++;
-
-	if (fimd_div != reg)
-		return -EINVAL;
+	if (fimd_div != reg) {
+		dev_info(fb->dev, "%s skip, %d\n", __func__, __LINE__);
+		goto err;
+	}
 
 	reg = (readl(sclk->reg_div.reg)) >> sclk->reg_div.shift;
 	reg &= 0xf;
-
-	if (lcdfreq->table[LEVEL_NORMAL].cmu_clkdiv != reg)
-		return -EINVAL;
+	if (lcdfreq->table[LEVEL_NORMAL].cmu_clkdiv != reg) {
+		dev_info(fb->dev, "%s skip, %d\n", __func__, __LINE__);
+		goto err;
+	}
 
 	return 0;
+
+err:
+	return -EINVAL;
 }
 
 static ssize_t level_show(struct device *dev,
@@ -256,7 +268,7 @@ static ssize_t level_show(struct device *dev,
 		return -EINVAL;
 	}
 
-	return sprintf(buf, "%dHZ, div=%d\n", lcdfreq->table[lcdfreq->level].hz, get_div(fbdev));
+	return sprintf(buf, "%dhz, div=%d\n", lcdfreq->table[lcdfreq->level].hz, get_div(fbdev));
 }
 
 static ssize_t level_store(struct device *dev,
@@ -296,12 +308,61 @@ static ssize_t usage_show(struct device *dev,
 	return sprintf(buf, "%d\n", atomic_read(&lcdfreq->usage));
 }
 
+#if 0
+static ssize_t freq_show(struct device *dev,
+		struct device_attribute *attr, char *buf)
+{
+	struct fb_info *fb = dev_get_drvdata(dev);
+	struct s3cfb_window *win = fb->par;
+	struct s3cfb_global *fbdev = get_fimd_global(win->id);
+	struct s3cfb_lcd *lcd = fbdev->lcd;
+
+	return sprintf(buf, "%dhz, hfp=%d, hbp=%d, hsw=%d, div=%d\n", lcd->freq,
+	lcd->timing.h_fp, lcd->timing.h_bp, lcd->timing.h_sw, get_div(fbdev)+1);
+}
+
+extern void s5p_dsim_set_lcd_freq_change(struct s3cfb_lcd_timing *timing);
+
+static ssize_t freq_store(struct device *dev,
+		struct device_attribute *attr, const char *buf, size_t count)
+{
+	struct fb_info *fb = dev_get_drvdata(dev);
+	struct s3cfb_window *win = fb->par;
+	struct s3cfb_global *fbdev = get_fimd_global(win->id);
+	struct s3cfb_lcd *lcd = fbdev->lcd;
+	struct s3cfb_lcd_timing *timing = &lcd->timing;
+	struct fb_var_screeninfo *var = &fb->var;
+
+	lcd->freq_limit = 0;
+	sscanf(buf, "%d %d %d %d", &lcd->freq,
+		&timing->h_fp, &timing->h_bp, &timing->h_sw);
+
+	var->hsync_len = timing->h_sw;
+	var->left_margin = timing->h_bp;
+	var->right_margin = timing->h_fp;
+
+	var->pixclock = (lcd->freq *
+		(var->left_margin + var->right_margin
+		+ var->hsync_len + var->xres) *
+		(var->upper_margin + var->lower_margin
+		+ var->vsync_len + var->yres));
+	var->pixclock = KHZ2PICOS(var->pixclock/1000);
+
+	s5p_dsim_set_lcd_freq_change(timing);
+
+	return count;
+}
+
+static DEVICE_ATTR(freq, S_IRUGO|S_IWUSR, freq_show, freq_store);
+#endif
+
 static DEVICE_ATTR(level, S_IRUGO|S_IWUSR, level_show, level_store);
 static DEVICE_ATTR(usage, S_IRUGO, usage_show, NULL);
 
 static struct attribute *lcdfreq_attributes[] = {
 	&dev_attr_level.attr,
 	&dev_attr_usage.attr,
+/*	&dev_attr_freq.attr, */
 	NULL,
 };
 
@@ -323,7 +384,7 @@ static void lcdfreq_early_suspend(struct early_suspend *h)
 	atomic_set(&lcdfreq->usage, 0);
 	mutex_unlock(&lcdfreq->lock);
 
-	return ;
+	return;
 }
 
 static void lcdfreq_late_resume(struct early_suspend *h)
@@ -392,7 +453,7 @@ static void lcdfreq_status_work(struct work_struct *work)
 
 	cancel_delayed_work(&lcdfreq->work);
 
-	dev_info(lcdfreq->dev, "\tHZ=%d, usage=%d\n", hz, atomic_read(&lcdfreq->usage));
+	dev_info(lcdfreq->dev, "\thz=%d, usage=%d\n", hz, atomic_read(&lcdfreq->usage));
 
 	schedule_delayed_work(&lcdfreq->work, HZ*120);
 }
@@ -405,14 +466,19 @@ int lcdfreq_init(struct fb_info *fb)
 	struct fb_var_screeninfo *var = &fb->var;
 
 	struct lcdfreq_info *lcdfreq = NULL;
-	u32 vclk = 0;
-	int ret;
+	u32 vclk;
+	int ret = 0;
 
 	lcdfreq = kzalloc(sizeof(struct lcdfreq_info), GFP_KERNEL);
 	if (!lcdfreq) {
 		pr_err("fail to allocate for lcdfreq\n");
 		ret = -ENOMEM;
 		goto err_1;
+	}
+
+	if (!lcd->freq_limit) {
+		ret = -EINVAL;
+		goto err_2;
 	}
 
 	fbdev->data = lcdfreq;
@@ -430,7 +496,7 @@ int lcdfreq_init(struct fb_info *fb)
 	lcdfreq->table[LEVEL_NORMAL].pixclock = var->pixclock;
 	lcdfreq->table[LEVEL_NORMAL].hz = lcd->freq;
 
-	vclk = (LCDFREQ_LIMIT_HZ *
+	vclk = (lcd->freq_limit *
 			(var->left_margin + var->right_margin
 			+ var->hsync_len + var->xres) *
 			(var->upper_margin + var->lower_margin
@@ -438,11 +504,11 @@ int lcdfreq_init(struct fb_info *fb)
 	lcdfreq->table[LEVEL_LIMIT].level = LEVEL_LIMIT;
 	lcdfreq->table[LEVEL_LIMIT].vclk = vclk;
 	lcdfreq->table[LEVEL_LIMIT].pixclock = KHZ2PICOS(vclk/1000);
-	lcdfreq->table[LEVEL_LIMIT].hz = LCDFREQ_LIMIT_HZ;
+	lcdfreq->table[LEVEL_LIMIT].hz = lcd->freq_limit;
 
 	ret = get_divider(fb);
 	if (ret < 0) {
-		pr_err("fail to init lcd freq switch");
+		pr_err("skip lcd freq switch init");
 		fbdev->data = NULL;
 		goto err_1;
 	}
@@ -489,4 +555,3 @@ err_1:
 	return ret;
 
 }
-

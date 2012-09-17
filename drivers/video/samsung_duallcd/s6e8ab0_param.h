@@ -1,0 +1,201 @@
+#ifndef __S6E8AB0_PARAM_H__
+#define __S6E8AB0_PARAM_H__
+
+
+#define GAMMA_PARAM_SIZE	25
+#define ACL_PARAM_SIZE	ARRAY_SIZE(SEQ_ACL_CUTOFF_40)
+#define ELVSS_PARAM_SIZE	ARRAY_SIZE(SEQ_ELVSS_44)
+
+static const unsigned char SEQ_APPLY_LEVEL_2_KEY[] = {
+	0xF0,
+	0x5A, 0x5A
+};
+
+static const unsigned char SEQ_SLEEP_OUT[] = {
+	0x11,
+	0x00, 0x00
+};
+
+static const unsigned char SEQ_APPLY_MTP_KEY[] = {
+	0xF1,
+	0x5A, 0x5A
+};
+
+static const unsigned char SEQ_PANEL_CONDITION_SET[] = {
+	0xF8,
+	0x01, 0x8E, 0x00, 0x00, 0x00, 0xAC, 0x00, 0x9E, 0x8D, 0x1F,
+	0x4E, 0x9C, 0x7D, 0x3F, 0x10, 0x00, 0x20, 0x02, 0x10, 0x7D,
+	0x10, 0x00, 0x00, 0x02, 0x08, 0x10, 0x34, 0x34, 0x34, 0xC0,
+	0xC1, 0x01, 0x00, 0xC1, 0x82, 0x00, 0xC8, 0xC1, 0xE3, 0x01
+};
+
+static const unsigned char SEQ_GAMMA_SELECT[] = {
+	0x26, 0x01,
+	0x00
+};
+
+static const unsigned char SEQ_GAMMA_UPDATE[] = {
+	0xF7, 0x03,
+	0x00
+};
+
+static const unsigned char SEQ_ETC_PWRCTL[] = {
+	0xF4,
+	0x0B, 0x0A, 0x06, 0x0B, 0x33, 0x02
+};
+
+static const unsigned char SEQ_ETC_SOURCE_CONTROL[] = {
+	0xF6,
+	0x04, 0x00, 0x02
+};
+
+static const unsigned char SEQ_ELVSS_DEFAULT[] = {
+	0xB1,
+	0x04, 0x00
+};
+
+static const unsigned char SEQ_ETC_NVM_SETTING[] = {
+	0xD9,
+	0x14, 0x5C, 0x20, 0x0C, 0x0F, 0x41, 0x00, 0x10, 0x11, 0x12,
+	0xA8, 0x55, 0x00, 0x00, 0x00, 0x00, 0x80, 0xCB, 0xED, 0x7F,
+	0xAF
+};
+
+static unsigned char SEQ_VREGOUT_SET[] = {
+	0xD1,
+	0xA2, 0x25, 0x44, 0x01, 0x0B, 0x00, 0x00, 0x40, 0x0D, 0x00,
+	0x00
+};
+
+static const unsigned char SEQ_DISPLAY_ON[] = {
+	0x29,
+	0x00, 0x00
+};
+
+static const unsigned char SEQ_DISPLAY_OFF[] = {
+	0x28,
+	0x00, 0x00
+};
+
+static const unsigned char SEQ_STANDBY_ON[] = {
+	0x10,
+	0x00, 0x00
+};
+
+static const unsigned char SEQ_POWER_CONTROL[] = {
+	0xF5,
+	0x50, 0x33, 0x33, 0x00, 0x43, 0x85
+};
+
+enum {
+	GAMMA_30CD,
+	GAMMA_40CD,
+	GAMMA_50CD,
+	GAMMA_60CD,
+	GAMMA_70CD,
+	GAMMA_80CD,
+	GAMMA_90CD,
+	GAMMA_100CD,
+	GAMMA_110CD,
+	GAMMA_120CD,
+	GAMMA_130CD,
+	GAMMA_140CD,
+	GAMMA_150CD,
+	GAMMA_160CD,
+	GAMMA_170CD,
+	GAMMA_180CD,
+	GAMMA_190CD,
+	GAMMA_200CD,
+	GAMMA_210CD,
+	GAMMA_220CD,
+	GAMMA_230CD,
+	GAMMA_240CD,
+	GAMMA_250CD,
+	GAMMA_MAX
+};
+
+static const unsigned int candela_table[GAMMA_MAX] = {
+	 30,  40,  50,  60,  70,  80,  90, 100, 110, 120,
+	130, 140, 150, 160, 170, 180, 190, 200, 210, 220,
+	230, 240, 250
+};
+
+enum {
+	ACL_STATUS_0P = 0,
+	ACL_STATUS_40P,
+	ACL_STATUS_MAX
+};
+
+enum {
+	ELVSS_28 = 0,
+	ELVSS_34,
+	ELVSS_40,
+	ELVSS_44,
+	ELVSS_STATUS_MAX,
+};
+
+const unsigned char SEQ_ACL_ON[] = {
+	0xC0, 0x01,
+	0x00
+};
+
+const unsigned char SEQ_ACL_OFF[] = {
+	0xC0, 0x00,
+	0x00
+};
+
+const unsigned char SEQ_ACL_CUTOFF_40[] = {
+	0xC1,
+	0x4D, 0x96, 0x1D, 0x00, 0x00,
+	0x04, 0xFF, 0x00, 0x00, 0x03,
+	0x1F, 0x00, 0x00, 0x00, 0x00,
+	0x00, 0x00, 0x00, 0x21, 0x37,
+	0x37, 0x37, 0x37, 0x37, 0x37,
+	0x37, 0x37, 0x1D, 0x4D, 0x96
+};
+
+const unsigned char *ACL_CUTOFF_TABLE[ACL_STATUS_MAX] = {
+	SEQ_ACL_OFF,
+	SEQ_ACL_CUTOFF_40,
+};
+
+const unsigned char SEQ_ELVSS_ON[] = {
+	0xB1,
+	0x84, 0x15
+};
+
+const unsigned char SEQ_ELVSS_32[] = {
+	0xB2,
+	0x0B, 0x0B, 0x0B, 0x0B, 0x0B
+};
+
+const unsigned char SEQ_ELVSS_38[] = {
+	0xB2,
+	0x08, 0x08, 0x08, 0x08, 0x08
+};
+
+const unsigned char SEQ_ELVSS_40[] = {
+	0xB2,
+	0x04, 0x04, 0x04, 0x04, 0x04
+};
+
+const unsigned char SEQ_ELVSS_44[] = {
+	0xB2,
+	0x00, 0x00, 0x00, 0x00, 0x00
+};
+
+const unsigned char *ELVSS_TABLE[ELVSS_STATUS_MAX] = {
+	SEQ_ELVSS_32,
+	SEQ_ELVSS_38,
+	SEQ_ELVSS_40,
+	SEQ_ELVSS_44,
+};
+
+enum {
+	LCD_TYPE_DEFAULT = 0,
+	LCD_TYPE_A2_M3,
+	LCD_TYPE_A2_SM2,
+	LCD_TYPE_MAX,
+};
+
+#endif /* __S6E8AB0_PARAM_H__ */
