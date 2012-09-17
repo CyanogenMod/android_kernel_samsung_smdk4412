@@ -303,7 +303,7 @@ static int s5p_tvout_fb_blank(int blank_mode, struct fb_info *fb)
 
 	tvout_dbg("change blank mode\n");
 
-#ifdef CONFIG_HAS_EARLYSUSPEND
+#if defined(CONFIG_HAS_EARLYSUSPEND) && defined(CLOCK_GATING_ON_EARLY_SUSPEND)
 	s5p_tvout_mutex_lock();
 #endif
 	switch (fb->node) {
@@ -336,12 +336,12 @@ static int s5p_tvout_fb_blank(int blank_mode, struct fb_info *fb)
 		goto err_fb_blank;
 	}
 
-#ifdef CONFIG_HAS_EARLYSUSPEND
+#if defined(CONFIG_HAS_EARLYSUSPEND) && defined(CLOCK_GATING_ON_EARLY_SUSPEND)
 	s5p_tvout_mutex_unlock();
 #endif
 	return 1;
 err_fb_blank:
-#ifdef CONFIG_HAS_EARLYSUSPEND
+#if defined(CONFIG_HAS_EARLYSUSPEND) && defined(CLOCK_GATING_ON_EARLY_SUSPEND)
 	s5p_tvout_mutex_unlock();
 #endif
 	return -1;
@@ -356,7 +356,7 @@ static int s5p_tvout_fb_set_par(struct fb_info *fb)
 
 	tvout_dbg("[fb%d] set_par\n", win->id);
 
-#ifdef CONFIG_HAS_EARLYSUSPEND
+#if defined(CONFIG_HAS_EARLYSUSPEND) && defined(CLOCK_GATING_ON_EARLY_SUSPEND)
 	s5p_tvout_mutex_lock();
 #endif
 	if (!fb->fix.smem_start) {
@@ -390,7 +390,7 @@ static int s5p_tvout_fb_set_par(struct fb_info *fb)
 	s5p_mixer_ctrl_set_src_win_pos(layer, src_x, src_y, w, h);
 	s5p_mixer_ctrl_set_alpha_blending(layer, win->alpha.mode,
 				win->alpha.value);
-#ifdef CONFIG_HAS_EARLYSUSPEND
+#if defined(CONFIG_HAS_EARLYSUSPEND) && defined(CLOCK_GATING_ON_EARLY_SUSPEND)
 	s5p_tvout_mutex_unlock();
 #endif
 	return 0;
@@ -472,7 +472,7 @@ static int s5p_tvout_fb_ioctl(struct fb_info *fb, unsigned int cmd,
 	} p;
 
 	tvout_dbg("\n");
-#ifdef CONFIG_HAS_EARLYSUSPEND
+#if defined(CONFIG_HAS_EARLYSUSPEND) && defined(CLOCK_GATING_ON_EARLY_SUSPEND)
 	s5p_tvout_mutex_lock();
 #endif
 	switch (fb->node) {
@@ -552,13 +552,13 @@ static int s5p_tvout_fb_ioctl(struct fb_info *fb, unsigned int cmd,
 			s5p_mixer_ctrl_scaling(layer, p.user_scaling);
 		break;
 	}
-#ifdef CONFIG_HAS_EARLYSUSPEND
+#if defined(CONFIG_HAS_EARLYSUSPEND) && defined(CLOCK_GATING_ON_EARLY_SUSPEND)
 	s5p_tvout_mutex_unlock();
 #endif
 
 	return 0;
 err_fb_ioctl:
-#ifdef CONFIG_HAS_EARLYSUSPEND
+#if defined(CONFIG_HAS_EARLYSUSPEND) && defined(CLOCK_GATING_ON_EARLY_SUSPEND)
 	s5p_tvout_mutex_unlock();
 #endif
 	return -1;

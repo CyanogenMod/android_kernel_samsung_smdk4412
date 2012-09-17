@@ -45,6 +45,12 @@ do {								\
 #endif
 #endif
 
+/*
+#if defined(CONFIG_MACH_T0) || defined(CONFIG_MACH_M3)
+#define	__CONFIG_HDMI_SUPPORT_FULL_RANGE__
+#endif
+*/
+
 #define S5PTV_FB_CNT	2
 #define S5PTV_VP_BUFF_CNT	4
 #define S5PTV_VP_BUFF_SIZE	(4*1024*1024)
@@ -52,6 +58,10 @@ do {								\
 #define to_tvout_plat(d) (to_platform_device(d)->dev.platform_data)
 
 #define HDMI_START_NUM 0x1000
+
+#ifdef CONFIG_CPU_EXYNOS4210
+#define CLOCK_GATING_ON_EARLY_SUSPEND
+#endif
 
 enum s5p_tvout_disp_mode {
 	TVOUT_NTSC_M = 0,

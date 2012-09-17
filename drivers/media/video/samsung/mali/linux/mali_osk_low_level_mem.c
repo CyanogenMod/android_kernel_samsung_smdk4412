@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2010 ARM Limited. All rights reserved.
+ * Copyright (C) 2010-2012 ARM Limited. All rights reserved.
  * 
  * This program is free software and is provided to you under the terms of the GNU General Public License version 2
  * as published by the Free Software Foundation, and any use by you of this program is subject to the terms of such GNU licence.
@@ -76,12 +76,7 @@ static void _allocation_list_item_release(AllocationList * item);
 
 
 /* Variable declarations */
-#if LINUX_VERSION_CODE <= KERNEL_VERSION(2,6,36)
-spinlock_t allocation_list_spinlock = SPIN_LOCK_UNLOCKED;
-#else
-DEFINE_SPINLOCK(allocation_list_spinlock);
-#endif
-
+static DEFINE_SPINLOCK(allocation_list_spinlock);
 static AllocationList * pre_allocated_memory = (AllocationList*) NULL ;
 static int pre_allocated_memory_size_current  = 0;
 #ifdef MALI_OS_MEMORY_KERNEL_BUFFER_SIZE_IN_MB
@@ -124,9 +119,9 @@ static u32 _kernel_page_allocate(void)
 {
 	struct page *new_page;
 	u32 linux_phys_addr;
-	
+
 	new_page = alloc_page(GFP_HIGHUSER | __GFP_ZERO | __GFP_REPEAT | __GFP_NOWARN | __GFP_COLD);
-	
+
 	if ( NULL == new_page )
 	{
 		return 0;
@@ -145,7 +140,7 @@ static void _kernel_page_release(u32 physical_address)
 	#if 1
 	dma_unmap_page(NULL, physical_address, PAGE_SIZE, DMA_BIDIRECTIONAL);
 	#endif
-	
+
 	unmap_page = pfn_to_page( physical_address >> PAGE_SHIFT );
 	MALI_DEBUG_ASSERT_POINTER( unmap_page );
 	__free_page( unmap_page );
@@ -155,19 +150,19 @@ static AllocationList * _allocation_list_item_get(void)
 {
 	AllocationList *item = NULL;
 	unsigned long flags;
-	
+
 	spin_lock_irqsave(&allocation_list_spinlock,flags);
 	if ( pre_allocated_memory )
 	{
 		item = pre_allocated_memory;
 		pre_allocated_memory = pre_allocated_memory->next;
 		pre_allocated_memory_size_current -= PAGE_SIZE;
-		
+
 		spin_unlock_irqrestore(&allocation_list_spinlock,flags);
 		return item;
 	}
 	spin_unlock_irqrestore(&allocation_list_spinlock,flags);
-	
+
 	item = _mali_osk_malloc( sizeof(AllocationList) );
 	if ( NULL == item)
 	{
@@ -197,7 +192,7 @@ static void _allocation_list_item_release(AllocationList * item)
 		return;
 	}
 	spin_unlock_irqrestore(&allocation_list_spinlock,flags);
-	
+
 	_kernel_page_release(item->physaddr);
 	_mali_osk_free( item );
 }
@@ -244,7 +239,6 @@ static void mali_kernel_memory_vma_close(struct vm_area_struct * vma)
 	_mali_uk_mem_munmap_s args = {0, };
 	mali_memory_allocation * descriptor;
 	mali_vma_usage_tracker * vma_usage_tracker;
-	MappingInfo *mappingInfo;
 	MALI_DEBUG_PRINT(3, ("Close called on vma %p\n", vma));
 
 	vma_usage_tracker = (mali_vma_usage_tracker*)vma->vm_private_data;
@@ -254,11 +248,6 @@ static void mali_kernel_memory_vma_close(struct vm_area_struct * vma)
 
 	vma_usage_tracker->references--;
 
-	descriptor = (mali_memory_allocation *)vma_usage_tracker->cookie;
-
-	mappingInfo = (MappingInfo *)descriptor->process_addr_mapping_info;
-	mappingInfo->vma = vma;
-
 	if (0 != vma_usage_tracker->references)
 	{
 		MALI_DEBUG_PRINT(3, ("Ignoring this close, %d references still exists\n", vma_usage_tracker->references));
@@ -267,6 +256,8 @@ static void mali_kernel_memory_vma_close(struct vm_area_struct * vma)
 
 	/** @note args->context unused, initialized to 0.
 	 * Instead, we use the memory_session from the cookie */
+
+	descriptor = (mali_memory_allocation *)vma_usage_tracker->cookie;
 
 	args.cookie = (u32)descriptor;
 	args.mapping = descriptor->mapping;

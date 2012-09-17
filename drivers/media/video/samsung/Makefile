@@ -11,8 +11,27 @@ else
 obj-$(CONFIG_VIDEO_FIMG2D3X)	+= fimg2d3x/
 obj-$(CONFIG_VIDEO_FIMG2D4X)	+= fimg2d4x/
 endif
+
+ifeq ($(CONFIG_MACH_U1), y)
 obj-$(CONFIG_VIDEO_UMP)		+= ump/
+else ifeq ($(CONFIG_MACH_SMDKC210), y)
+obj-$(CONFIG_VIDEO_UMP)		+= ump/
+else ifeq ($(CONFIG_MACH_SMDKV310), y)
+obj-$(CONFIG_VIDEO_UMP)		+= ump/
+else
+obj-$(CONFIG_VIDEO_UMP)		+= ump/
+endif
+
 obj-$(CONFIG_VIDEO_TSI)		+= tsi/
+
+ifeq ($(CONFIG_MACH_U1), y)
 obj-$(CONFIG_VIDEO_MALI400MP)	+= mali/
+else ifeq ($(CONFIG_MACH_SMDKC210), y)
+obj-$(CONFIG_VIDEO_MALI400MP)	+= mali/
+else ifeq ($(CONFIG_MACH_SMDKV310), y)
+obj-$(CONFIG_VIDEO_MALI400MP)	+= mali/
+else
+obj-$(CONFIG_VIDEO_MALI400MP)	+= mali/
+endif
 
 EXTRA_CFLAGS += -Idrivers/media/video

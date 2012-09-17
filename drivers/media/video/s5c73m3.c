@@ -29,6 +29,7 @@
 
 #ifdef S5C73M3_BUSFREQ_OPP
 #include <mach/dev.h>
+#include <plat/cpu.h>
 #endif
 
 #ifdef CONFIG_VIDEO_SAMSUNG_V4L2
@@ -37,7 +38,10 @@
 #endif
 
 #include <linux/regulator/machine.h>
+
+#ifdef CONFIG_LEDS_AAT1290A
 #include <linux/leds-aat1290a.h>
+#endif
 
 #include <media/s5c73m3_platform.h>
 #include "s5c73m3.h"
@@ -70,12 +74,16 @@ static const struct s5c73m3_frmsizeenum preview_frmsizes[] = {
 	{ S5C73M3_PREVIEW_QVGA,	320,	240,	0x01 },
 	{ S5C73M3_PREVIEW_CIF,	352,	288,	0x0E },
 	{ S5C73M3_PREVIEW_VGA,	640,	480,	0x02 },
-	{ S5C73M3_PREVIEW_800X600,	800,	600,	0x09 },
 	{ S5C73M3_PREVIEW_880X720,	880,	720,	0x03 },
 	{ S5C73M3_PREVIEW_960X720,	960,	720,	0x04 },
 	{ S5C73M3_PREVIEW_1008X672,	1008,	672,	0x0F },
 	{ S5C73M3_PREVIEW_1184X666,	1184,	666,	0x05 },
 	{ S5C73M3_PREVIEW_720P,	1280,	720,	0x06 },
+#ifdef CONFIG_MACH_T0
+	{ S5C73M3_PREVIEW_1280X960,	1280,	960,	0x09 },
+#else
+	{ S5C73M3_PREVIEW_800X600,	800,	600,	0x09 },
+#endif
 	{ S5C73M3_VDIS_720P,	1536,	864,	0x07 },
 	{ S5C73M3_PREVIEW_1080P,	1920,	1080,	0x0A},
 	{ S5C73M3_VDIS_1080P,	2304,	1296,	0x0C},
@@ -113,6 +121,7 @@ static const struct s5c73m3_effectenum s5c73m3_effects[] = {
 	{IMAGE_EFFECT_POINT_RED_YELLOW, S5C73M3_IMAGE_EFFECT_POINT_RED_YELLOW},
 	{IMAGE_EFFECT_POINT_COLOR_3, S5C73M3_IMAGE_EFFECT_POINT_COLOR_3},
 	{IMAGE_EFFECT_POINT_GREEN, S5C73M3_IMAGE_EFFECT_POINT_GREEN},
+	{IMAGE_EFFECT_CARTOONIZE, S5C73M3_IMAGE_EFFECT_CARTOONIZE},
 };
 
 static struct s5c73m3_control s5c73m3_ctrls[] = {
@@ -397,19 +406,19 @@ void s5c73m3_make_CRC_table(u32 *table, u32 id)
 {
 	u32 i, j, k;
 
-	for(i = 0; i < 256; ++i) {
+	for (i = 0; i < 256; ++i) {
 		k = i;
-		for(j = 0; j < 8; ++j) {
-			if(k & 1)
+		for (j = 0; j < 8; ++j) {
+			if (k & 1)
 				k = (k >> 1) ^ id;
-			else 
+			else
 				k >>= 1;
 		}
 		table[i] = k;
 	}
 }
 
-static int s5c73m3_reset_module(struct v4l2_subdev *sd, bool powerReset) 
+static int s5c73m3_reset_module(struct v4l2_subdev *sd, bool powerReset)
 {
 	struct s5c73m3_state *state = to_state(sd);
 	int err = 0;
@@ -468,7 +477,7 @@ static int s5c73m3_set_mode(struct v4l2_subdev *sd)
 	cam_trace("E\n");
 
 	if (state->format_mode != V4L2_PIX_FMT_MODE_CAPTURE) {
-		if (state->hdr_mode) {
+		if (state->hdr_mode || state->yuv_snapshot) {
 			err = s5c73m3_writeb(sd, S5C73M3_IMG_OUTPUT,
 				S5C73M3_HDR_OUTPUT);
 			CHECK_ERR(err);
@@ -574,13 +583,23 @@ static int s5c73m3_get_sensor_fw_binary(struct v4l2_subdev *sd)
 	mm_segment_t old_fs;
 	long ret = 0;
 	char fw_path[25] = {0,};
-	u8 mem0 =0, mem1 = 0;
+	u8 mem0 = 0, mem1 = 0;
 	u32 CRC = 0;
 	u32 DataCRC = 0;
 	u32 IntOriginalCRC = 0;
 	u32 crc_index = 0;
 	int retryCnt = 2;
 
+#ifdef CONFIG_MACH_T0
+	if (state->sensor_fw[1] == 'D') {
+		sprintf(fw_path, "/data/cfw/SlimISP_%cK.bin",
+			state->sensor_fw[0]);
+	} else {
+		sprintf(fw_path, "/data/cfw/SlimISP_%c%c.bin",
+			state->sensor_fw[0],
+			state->sensor_fw[1]);
+	}
+#else
 	if (state->sensor_fw[0] == 'O') {
 		sprintf(fw_path, "/data/cfw/SlimISP_G%c.bin",
 			state->sensor_fw[1]);
@@ -592,6 +611,7 @@ static int s5c73m3_get_sensor_fw_binary(struct v4l2_subdev *sd)
 		state->sensor_fw[0],
 		state->sensor_fw[1]);
 	}
+#endif
 
 	/* Make CRC Table */
 	s5c73m3_make_CRC_table((u32 *)&crc_table, 0xEDB88320);
@@ -664,7 +684,7 @@ static int s5c73m3_get_sensor_fw_binary(struct v4l2_subdev *sd)
 
 retry:
 	memset(data_memory, 0, sizeof(data_memory));
-	mem0 =0, mem1 = 0;
+	mem0 = 0, mem1 = 0;
 	CRC = 0;
 	DataCRC = 0;
 	IntOriginalCRC = 0;
@@ -684,7 +704,7 @@ retry:
 	CHECK_ERR(err);
 
 	CRC = ~CRC;
-	for(crc_index = 0;crc_index < (state->sensor_size-4)/2;crc_index++) {
+	for (crc_index = 0; crc_index < (state->sensor_size-4)/2; crc_index++) {
 		/*low byte*/
 		mem0 = (unsigned char)(data_memory[crc_index*2] & 0x00ff);
 		/*high byte*/
@@ -823,7 +843,7 @@ static int s5c73m3_get_sensor_fw_version(struct v4l2_subdev *sd)
 	err = s5c73m3_write(sd, 0x3010, 0x00A4, 0x0183);
 	CHECK_ERR(err);
 
-	for (i = 0; i < 6; i++) {
+	for (i = 0; i < 5; i++) {
 		err = s5c73m3_read(sd, 0x0000, 0x06+i*2, &sensor_type);
 		CHECK_ERR(err);
 		state->sensor_type[i*2] = sensor_type&0x00ff;
@@ -950,6 +970,16 @@ static int s5c73m3_get_phone_fw_version(struct v4l2_subdev *sd)
 	int retVal = 0;
 	int fw_requested = 1;
 
+#ifdef CONFIG_MACH_T0
+	if (state->sensor_fw[1] == 'D') {
+		sprintf(fw_path, "SlimISP_%cK.bin",
+			state->sensor_fw[0]);
+	} else {
+		sprintf(fw_path, "SlimISP_%c%c.bin",
+			state->sensor_fw[0],
+			state->sensor_fw[1]);
+	}
+#else
 	if (state->sensor_fw[0] == 'O') {
 		sprintf(fw_path, "SlimISP_G%c.bin",
 			state->sensor_fw[1]);
@@ -961,6 +991,8 @@ static int s5c73m3_get_phone_fw_version(struct v4l2_subdev *sd)
 			state->sensor_fw[0],
 			state->sensor_fw[1]);
 	}
+#endif
+
 	sprintf(fw_path_in_data, "/data/cfw/%s",
 		fw_path);
 
@@ -1184,7 +1216,14 @@ static int s5c73m3_check_fw_date(struct v4l2_subdev *sd)
 		phone_date,
 		strcmp((char *)&sensor_date, (char *)&phone_date));
 
+#ifdef CONFIG_MACH_T0
+	if (state->sensor_fw[1] == 'D')
+		return -1;
+	else
+		return strcmp((char *)&sensor_date, (char *)&phone_date);
+#else
 	return strcmp((char *)&sensor_date, (char *)&phone_date);
+#endif
 }
 
 static int s5c73m3_check_fw(struct v4l2_subdev *sd, int download)
@@ -1210,9 +1249,9 @@ static int s5c73m3_check_fw(struct v4l2_subdev *sd, int download)
 	/* retVal = 0 : Same Version
 	retVal < 0 : Phone Version is latest Version than sensorFW.
 	retVal > 0 : Sensor Version is latest version than phoenFW. */
-	if (retVal <= 0||download) {
+	if (retVal <= 0 || download) {
 		cam_dbg("Loading From PhoneFW......\n");
-	
+
 		/* In case that there is no FW in phone and FW needs to be
 		downloaded from F-ROM, ISP power reset is required before
 		loading FW to ISP for F-ROM to work properly.*/
@@ -1276,7 +1315,16 @@ static int s5c73m3_set_flash(struct v4l2_subdev *sd, int val, int recording)
 {
 	struct s5c73m3_state *state = to_state(sd);
 	int err;
+	u16 pre_flash = false;
 	cam_dbg("E, value %d\n", val);
+
+	s5c73m3_read(sd, 0x0009, S5C73M3_STILL_PRE_FLASH | 0x5000, &pre_flash);
+	if (pre_flash) {
+		err = s5c73m3_writeb(sd, S5C73M3_STILL_MAIN_FLASH
+			, S5C73M3_STILL_MAIN_FLASH_CANCEL);
+		CHECK_ERR(err);
+		state->isflash = S5C73M3_ISNEED_FLASH_UNDEFINED;
+	}
 
 retry:
 	switch (val) {
@@ -1452,6 +1500,31 @@ static int s5c73m3_set_contrast(struct v4l2_subdev *sd,
 	return 0;
 }
 
+static int s5c73m3_set_sharpness(struct v4l2_subdev *sd,
+	struct v4l2_control *ctrl)
+{
+	int err;
+	int sharpness = 0;
+	int temp_sharpness = 0;
+	cam_dbg("E, value %d\n", ctrl->value);
+
+	if (ctrl->value < 0 || ctrl->value > 4) {
+		cam_warn("invalid value, %d\n", ctrl->value);
+		ctrl->value = 2;
+	}
+	temp_sharpness = ctrl->value - 2;
+	if (temp_sharpness < 0)
+		sharpness = (temp_sharpness * (-1)) + 2;
+	else
+		sharpness = temp_sharpness;
+	err = s5c73m3_writeb(sd, S5C73M3_SHARPNESS,
+		sharpness);
+	CHECK_ERR(err);
+
+	cam_trace("X\n");
+	return 0;
+}
+
 static int s5c73m3_set_whitebalance(struct v4l2_subdev *sd, int val)
 {
 	struct s5c73m3_state *state = to_state(sd);
@@ -1591,6 +1664,12 @@ retry:
 	case SCENE_MODE_CANDLE_LIGHT:
 		err = s5c73m3_writeb(sd, S5C73M3_SCENE_MODE,
 			S5C73M3_SCENE_MODE_CANDLE);
+		CHECK_ERR(err);
+		break;
+
+	case SCENE_MODE_LOW_LIGHT:
+		err = s5c73m3_writeb(sd, S5C73M3_SCENE_MODE,
+			S5C73M3_SCENE_MODE_LOW_LIGHT);
 		CHECK_ERR(err);
 		break;
 
@@ -2143,7 +2222,21 @@ static int s5c73m3_set_frame_rate(struct v4l2_subdev *sd, int fps)
 		return 0;
 	}
 
+	cam_dbg("E, value %d\n", fps);
+
 	switch (fps) {
+	case 120:
+		err = s5c73m3_writeb(sd, S5C73M3_AE_MODE,
+			S5C73M3_FIXED_120FPS); /* 120fps */
+		break;
+	case 90:
+		err = s5c73m3_writeb(sd, S5C73M3_AE_MODE,
+			S5C73M3_FIXED_90FPS); /* 90fps */
+		break;
+	case 60:
+		err = s5c73m3_writeb(sd, S5C73M3_AE_MODE,
+			S5C73M3_FIXED_60FPS); /* 60fps */
+		break;
 	case 30:
 		err = s5c73m3_writeb(sd, S5C73M3_AE_MODE,
 			S5C73M3_FIXED_30FPS); /* 30fps */
@@ -2159,6 +2252,10 @@ static int s5c73m3_set_frame_rate(struct v4l2_subdev *sd, int fps)
 	case 10:
 		err = s5c73m3_writeb(sd, S5C73M3_AE_MODE,
 			S5C73M3_FIXED_10FPS); /* 10fps */
+		break;
+	case 7:
+		err = s5c73m3_writeb(sd, S5C73M3_AE_MODE,
+			S5C73M3_FIXED_7FPS); /* 7fps */
 		break;
 	default:
 		err = s5c73m3_writeb(sd, S5C73M3_AE_MODE,
@@ -2292,6 +2389,19 @@ static int s5c73m3_get_lux(struct v4l2_subdev *sd,
 	return err;
 }
 
+static int s5c73m3_set_low_light_mode(struct v4l2_subdev *sd, int val)
+{
+	int err;
+	cam_dbg("E, value %d\n", val);
+
+	err = s5c73m3_writeb(sd, S5C73M3_AE_LOW_LIGHT_MODE, val);
+
+	CHECK_ERR(err);
+
+	cam_trace("X\n");
+	return 0;
+}
+
 static int s5c73m3_s_ctrl(struct v4l2_subdev *sd, struct v4l2_control *ctrl)
 {
 	struct s5c73m3_state *state = to_state(sd);
@@ -2354,6 +2464,10 @@ static int s5c73m3_s_ctrl(struct v4l2_subdev *sd, struct v4l2_control *ctrl)
 
 	case V4L2_CID_CAMERA_CONTRAST:
 		err = s5c73m3_set_contrast(sd, ctrl);
+		break;
+
+	case V4L2_CID_CAMERA_SHARPNESS:
+		err = s5c73m3_set_sharpness(sd, ctrl);
 		break;
 
 	case V4L2_CID_CAMERA_WHITE_BALANCE:
@@ -2429,6 +2543,16 @@ static int s5c73m3_s_ctrl(struct v4l2_subdev *sd, struct v4l2_control *ctrl)
 		err = 0;
 		break;
 
+	case V4L2_CID_CAMERA_FAST_MODE:
+		state->fast_mode = ctrl->value;
+		err = 0;
+		break;
+
+	case V4L2_CID_CAMERA_YUV_SNAPSHOT:
+		state->yuv_snapshot = ctrl->value;
+		err = 0;
+		break;
+
 	case V4L2_CID_CAMERA_HYBRID_CAPTURE:
 		err = s5c73m3_set_hybrid_capture(sd);
 		break;
@@ -2448,6 +2572,10 @@ static int s5c73m3_s_ctrl(struct v4l2_subdev *sd, struct v4l2_control *ctrl)
 
 	case V4L2_CID_CAMERA_CAF_START_STOP:
 		err = s5c73m3_stop_af_lens(sd, ctrl->value);
+		break;
+
+	case V4L2_CID_CAMERA_LOW_LIGHT_MODE:
+		err = s5c73m3_set_low_light_mode(sd, ctrl->value);
 		break;
 
 	default:
@@ -2557,6 +2685,16 @@ static int s5c73m3_load_fw(struct v4l2_subdev *sd)
 	mm_segment_t old_fs;
 	long fsize = 0, nread;
 
+#ifdef CONFIG_MACH_T0
+	if (state->sensor_fw[1] == 'D') {
+		sprintf(fw_path, "SlimISP_%cK.bin",
+			state->sensor_fw[0]);
+	} else {
+		sprintf(fw_path, "SlimISP_%c%c.bin",
+			state->sensor_fw[0],
+			state->sensor_fw[1]);
+	}
+#else
 	if (state->sensor_fw[0] == 'O') {
 		sprintf(fw_path, "SlimISP_G%c.bin",
 			state->sensor_fw[1]);
@@ -2568,6 +2706,8 @@ static int s5c73m3_load_fw(struct v4l2_subdev *sd)
 			state->sensor_fw[0],
 			state->sensor_fw[1]);
 	}
+#endif
+
 	sprintf(fw_path_in_data, "/data/cfw/%s",
 		fw_path);
 
@@ -2661,14 +2801,22 @@ static int s5c73m3_set_frmsize(struct v4l2_subdev *sd)
 	int err ;
 	cam_trace("E\n");
 
-	if (state->format_mode != V4L2_PIX_FMT_MODE_CAPTURE) {
+	if (state->fast_mode == FAST_MODE_SUBSAMPLING_HALF) {
+		cam_dbg("S5C73M3_FAST_MODE_SUBSAMPLING_HALF\n");
 		err = s5c73m3_writeb(sd, S5C73M3_CHG_MODE,
-			S5C73M3_YUV_MODE | state->preview->reg_val |
-			(state->sensor_mode<<8));
+			S5C73M3_FAST_MODE_SUBSAMPLING_HALF
+			| state->preview->reg_val | (state->sensor_mode<<8));
+		CHECK_ERR(err);
+	} else if (state->fast_mode == FAST_MODE_SUBSAMPLING_QUARTER) {
+		cam_dbg("S5C73M3_FAST_MODE_SUBSAMPLING_QUARTER\n");
+		err = s5c73m3_writeb(sd, S5C73M3_CHG_MODE,
+			S5C73M3_FAST_MODE_SUBSAMPLING_QUARTER
+			| state->preview->reg_val | (state->sensor_mode<<8));
 		CHECK_ERR(err);
 	} else {
+		cam_dbg("S5C73M3_DEFAULT_MODE\n");
 		err = s5c73m3_writeb(sd, S5C73M3_CHG_MODE,
-			S5C73M3_INTERLEAVED_MODE
+			S5C73M3_DEFAULT_MODE
 			| state->capture->reg_val | state->preview->reg_val
 			|(state->sensor_mode<<8));
 		CHECK_ERR(err);
@@ -2825,7 +2973,7 @@ static int s5c73m3_enum_framesizes(struct v4l2_subdev *sd,
 		return -EINVAL;
 
 	fsize->type = V4L2_FRMSIZE_TYPE_DISCRETE;
-	if (state->hdr_mode) {
+	if (state->hdr_mode || state->yuv_snapshot) {
 		fsize->discrete.width = state->capture->width;
 		fsize->discrete.height = state->capture->height;
 	} else {
@@ -3239,24 +3387,29 @@ static int s5c73m3_read_vdd_core(struct v4l2_subdev *sd)
 	CHECK_ERR(err);
 
 	if (read_val & 0x200) {
-		state->pdata->set_vdd_core(1150000);
 		strcpy(sysfs_isp_core, "1.15V");
+		state->pdata->set_vdd_core(1150000);
 		vdd_core_val = 1150000;
 	} else if (read_val & 0x800) {
-		state->pdata->set_vdd_core(1100000);
 		strcpy(sysfs_isp_core, "1.10V");
-		vdd_core_val = 1100000;
-	} else if (read_val & 0x2000) {
+#ifdef CONFIG_MACH_M3
+		state->pdata->set_vdd_core(1150000);
+		vdd_core_val = 1150000;
+#else
 		state->pdata->set_vdd_core(1100000);
+		vdd_core_val = 1100000;
+#endif
+	} else if (read_val & 0x2000) {
 		strcpy(sysfs_isp_core, "1.05V");
+		state->pdata->set_vdd_core(1100000);
 		vdd_core_val = 1100000;
 	} else if (read_val & 0x8000) {
-		state->pdata->set_vdd_core(1000000);
 		strcpy(sysfs_isp_core, "1.00V");
+		state->pdata->set_vdd_core(1000000);
 		vdd_core_val = 1000000;
 	} else {
-		state->pdata->set_vdd_core(1150000);
 		strcpy(sysfs_isp_core, "1.15V");
+		state->pdata->set_vdd_core(1150000);
 		vdd_core_val = 1150000;
 	}
 
@@ -3423,7 +3576,11 @@ static ssize_t s5c73m3_camera_rear_flash(struct device *dev,
 	struct device_attribute *attr, const char *buf,
 	size_t count)
 {
+#ifdef CONFIG_LEDS_AAT1290A
 	return aat1290a_power(dev, attr, buf, count);
+#else
+	return count;
+#endif
 }
 
 static ssize_t s5c73m3_camera_isp_core_show(struct device *dev,
@@ -3471,7 +3628,10 @@ static int __devinit s5c73m3_probe(struct i2c_client *client,
 
 #ifdef S5C73M3_BUSFREQ_OPP
 	/* lock bus frequency */
-	dev_lock(bus_dev, s5c73m3_dev, 400200);
+	if (samsung_rev() >= EXYNOS4412_REV_2_0)
+		dev_lock(bus_dev, s5c73m3_dev, 440220);
+	else
+		dev_lock(bus_dev, s5c73m3_dev, 400200);
 #endif
 
 	if (s5c73m3_dev)

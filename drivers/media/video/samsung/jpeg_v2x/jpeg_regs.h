@@ -23,7 +23,7 @@ void jpeg_set_enc_in_fmt(void __iomem *base,
 					enum jpeg_frame_format in_fmt);
 void jpeg_set_enc_out_fmt(void __iomem *base,
 					enum jpeg_stream_format out_fmt);
-void jpeg_set_enc_tbl(void __iomem *base);
+void jpeg_set_enc_tbl(void __iomem *base, enum jpeg_img_quality_level level);
 void jpeg_set_interrupt(void __iomem *base);
 void jpeg_clean_interrupt(void __iomem *base);
 unsigned int jpeg_get_int_status(void __iomem *base);

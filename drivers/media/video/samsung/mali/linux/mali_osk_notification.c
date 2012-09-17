@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2010 ARM Limited. All rights reserved.
+ * Copyright (C) 2010-2012 ARM Limited. All rights reserved.
  * 
  * This program is free software and is provided to you under the terms of the GNU General Public License version 2
  * as published by the Free Software Foundation, and any use by you of this program is subject to the terms of such GNU licence.
@@ -15,8 +15,6 @@
 
 #include "mali_osk.h"
 #include "mali_kernel_common.h"
-#include "mali_pmm.h"
-#include "mali_pmm_state.h"
 
 /* needed to detect kernel version specific code */
 #include <linux/version.h>
@@ -67,12 +65,8 @@ _mali_osk_notification_t *_mali_osk_notification_create( u32 type, u32 size )
 	/* OPT Recycling of notification objects */
     _mali_osk_notification_wrapper_t *notification;
 
-	if (MALI_PMM_NOTIFICATION_TYPE == type) {
-		if (size != sizeof(mali_pmm_message_t))
-			return NULL;
-	}
-
-	notification = (_mali_osk_notification_wrapper_t *)kmalloc( sizeof(_mali_osk_notification_wrapper_t) + size, GFP_KERNEL );
+	notification = (_mali_osk_notification_wrapper_t *)kmalloc( sizeof(_mali_osk_notification_wrapper_t) + size,
+	                                                            GFP_KERNEL | __GFP_HIGH | __GFP_REPEAT);
     if (NULL == notification)
     {
 		MALI_DEBUG_PRINT(1, ("Failed to create a notification object\n"));
@@ -92,7 +86,6 @@ _mali_osk_notification_t *_mali_osk_notification_create( u32 type, u32 size )
 	}
 
 	/* set up the non-allocating fields */
-	notification->data.magic_code = 0x31415926;
 	notification->data.notification_type = type;
 	notification->data.result_buffer_size = size;
 
@@ -107,8 +100,6 @@ void _mali_osk_notification_delete( _mali_osk_notification_t *object )
 
     notification = container_of( object, _mali_osk_notification_wrapper_t, data );
 
-	/* Remove from the list */
-	list_del(&notification->list);
 	/* Free the container */
 	kfree(notification);
 }
@@ -169,15 +160,7 @@ _mali_osk_errcode_t _mali_osk_notification_queue_dequeue( _mali_osk_notification
 		wrapper_object = list_entry(queue->head.next, _mali_osk_notification_wrapper_t, list);
 		*result = &(wrapper_object->data);
 		list_del_init(&wrapper_object->list);
-
-		if (wrapper_object->data.magic_code != 0x31415926) {
-			MALI_PRINT(("SEC WARNING : list entry magic_code not match : %x\n", wrapper_object->data.magic_code));
-			MALI_PRINT(("SEC WARNING : list entry notification type : %x\n", wrapper_object->data.notification_type));
-			MALI_PRINT(("SEC WARNING : list entry result buffer size : %x\n", wrapper_object->data.result_buffer_size));
-			MALI_PRINT(("SEC WARNING : list entry result buffer : %x\n", wrapper_object->data.result_buffer));
-		} else {
-			ret = _MALI_OSK_ERR_OK;
-		}
+		ret = _MALI_OSK_ERR_OK;
 	}
 
 	up(&queue->mutex);
