@@ -188,7 +188,7 @@ int s3c_mdnie_hw_init(void)
 		return -ENOENT;
 	}
 
-	printk(KERN_INFO "%s : 0x%p\n", __func__, s3c_mdnie_base);
+	/* printk(KERN_INFO "%s : 0x%p\n", __func__, s3c_mdnie_base); */
 
 	return 0;
 }

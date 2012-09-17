@@ -15,6 +15,10 @@
 #define aid_180nit_110nit_F8_18th	0x42
 #define aid_180nit_110nit_F8_1st	0x59
 #define aid_100nit_20nit_F8_1st	0x59
+#define aid_108nit_F8_18th		0x38
+#define aid_106nit_F8_18th		0x2F
+#define aid_104nit_F8_18th		0x25
+#define aid_102nit_F8_18th		0x1C
 #define aid_100nit_F8_18th		0x12
 #define aid_90nit_F8_18th		0x22
 #define aid_80nit_F8_18th		0x32
@@ -36,6 +40,10 @@
 #define AOR40_BASE_130		200
 #define AOR40_BASE_120		186
 #define AOR40_BASE_110		171
+#define AOR40_BASE_108		156
+#define AOR40_BASE_106		143
+#define AOR40_BASE_104		130
+#define AOR40_BASE_102		120
 #define base_20to100			110
 
 const struct rgb_offset_info aid_rgb_fix_table[] = {
@@ -47,6 +55,10 @@ const struct rgb_offset_info aid_rgb_fix_table[] = {
 	{GAMMA_130CD, IV_15, CI_RED, 1}, {GAMMA_130CD, IV_15, CI_GREEN, -1}, {GAMMA_130CD, IV_15, CI_BLUE, 5},
 	{GAMMA_120CD, IV_15, CI_RED, 1}, {GAMMA_120CD, IV_15, CI_GREEN, -1}, {GAMMA_120CD, IV_15, CI_BLUE, 5},
 	{GAMMA_110CD, IV_15, CI_RED, 1}, {GAMMA_110CD, IV_15, CI_GREEN, -1}, {GAMMA_110CD, IV_15, CI_BLUE, 5},
+	{GAMMA_108CD, IV_15, CI_RED, 1}, {GAMMA_110CD, IV_15, CI_GREEN, -1}, {GAMMA_110CD, IV_15, CI_BLUE, 5},
+	{GAMMA_106CD, IV_15, CI_RED, 1}, {GAMMA_110CD, IV_15, CI_GREEN, -1}, {GAMMA_110CD, IV_15, CI_BLUE, 5},
+	{GAMMA_104CD, IV_15, CI_RED, 1}, {GAMMA_110CD, IV_15, CI_GREEN, -1}, {GAMMA_110CD, IV_15, CI_BLUE, 5},
+	{GAMMA_102CD, IV_15, CI_RED, 1}, {GAMMA_110CD, IV_15, CI_GREEN, -1}, {GAMMA_110CD, IV_15, CI_BLUE, 5},
 	{GAMMA_100CD, IV_15, CI_RED, -2}, {GAMMA_100CD, IV_15, CI_GREEN, -3},
 	{GAMMA_90CD, IV_15, CI_RED, -6}, {GAMMA_90CD, IV_15, CI_GREEN, -7},
 	{GAMMA_80CD, IV_15, CI_RED, -10}, {GAMMA_80CD, IV_15, CI_GREEN, -12},
@@ -101,6 +113,26 @@ static unsigned char aid_command_90[] = {
 
 static unsigned char aid_command_100[] = {
 	aid_100nit_F8_18th,
+	aid_100nit_20nit_F8_1st,
+};
+
+static unsigned char aid_command_102[] = {
+	aid_102nit_F8_18th,
+	aid_100nit_20nit_F8_1st,
+};
+
+static unsigned char aid_command_104[] = {
+	aid_104nit_F8_18th,
+	aid_100nit_20nit_F8_1st,
+};
+
+static unsigned char aid_command_106[] = {
+	aid_106nit_F8_18th,
+	aid_100nit_20nit_F8_1st,
+};
+
+static unsigned char aid_command_108[] = {
+	aid_108nit_F8_18th,
 	aid_100nit_20nit_F8_1st,
 };
 
@@ -214,6 +246,10 @@ static unsigned char *aid_command_table[GAMMA_MAX] = {
 	aid_command_80,
 	aid_command_90,
 	aid_command_100,
+	aid_command_102,
+	aid_command_104,
+	aid_command_106,
+	aid_command_108,
 	aid_command_110,
 	aid_command_120,
 	aid_command_130,

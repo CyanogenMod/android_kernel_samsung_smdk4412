@@ -104,7 +104,7 @@ struct ump_uk_dmabuf {
 	void		*ctx;
 	int		fd;
 	size_t		size;
-	uint32_t	ump_handle;
+	uint32_t	secure_id;
 };
 #endif
 
