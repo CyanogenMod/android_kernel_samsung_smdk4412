@@ -24,7 +24,20 @@
 
 #define LOOP_CNT			10
 
+#define MIF_LOCK_FLAG			0
+#define INT_LOCK_FLAG			1
+#define G3D_LOCK_FLAG			2
+#define ARM_LOCK_FLAG			3
+
 extern unsigned int exynos_result_of_asv;
+extern unsigned int exynos_armclk_max;
+extern unsigned int exynos_special_flag;
+extern bool exynos_dynamic_ema;
+
+static inline unsigned int is_special_flag(void)
+{
+	return exynos_special_flag;
+}
 
 enum exynos4x12_abb_member {
 	ABB_INT,

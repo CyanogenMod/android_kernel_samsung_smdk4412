@@ -28,6 +28,10 @@ typedef struct ump_dd_mem
 	void * ctx;
 	void * backend_info;
 	int is_cached;
+#ifdef CONFIG_DMA_SHARED_BUFFER
+	struct dma_buf_attachment *import_attach;
+	struct sg_table *sgt;
+#endif
 } ump_dd_mem;
 
 

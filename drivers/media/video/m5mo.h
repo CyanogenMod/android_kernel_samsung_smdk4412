@@ -80,6 +80,7 @@ enum m5mo_prev_frmsize {
 enum m5mo_cap_frmsize {
 	M5MO_CAPTURE_VGA,	/* 640 x 480 */
 	M5MO_CAPTURE_WVGA,	/* 800 x 480 */
+	M5MO_CAPTURE_SXGA,    /*1280 x 960*/
 	M5MO_CAPTURE_W1MP,	/* 1600 x 960 */
 	M5MO_CAPTURE_2MP,	/* UXGA - 1600 x 1200 */
 	M5MO_CAPTURE_W2MP,	/* 2048 x 1232 */

@@ -477,16 +477,27 @@ static int g2d_remove(struct platform_device *dev)
 #if defined(CONFIG_HAS_EARLYSUSPEND)
 void g2d_early_suspend(struct early_suspend *h)
 {
+	int i = 0;
+
 	atomic_set(&g2d_dev->ready_to_run, 0);
 
 	/* wait until G2D running is finished */
 	while(1) {
 		if (!atomic_read(&g2d_dev->in_use))
 			break;
-		
+
 		msleep_interruptible(2);
+
+		i++;
+		/* Timeout 1sec */
+		if (i > 500) {
+			g2d_clk_enable(g2d_dev);
+			g2d_reset(g2d_dev);
+			g2d_clk_disable(g2d_dev);
+			break;
+		}
 	}
-	
+
 	g2d_sysmmu_off(g2d_dev);
 
 #if defined(CONFIG_EXYNOS_DEV_PD)
@@ -513,25 +524,37 @@ void g2d_late_resume(struct early_suspend *h)
 #if !defined(CONFIG_HAS_EARLYSUSPEND)
 static int g2d_suspend(struct platform_device *dev, pm_message_t state)
 {
+	int i = 0;
+
 	atomic_set(&g2d_dev->ready_to_run, 0);
 
 	/* wait until G2D running is finished */
 	while(1) {
 		if (!atomic_read(&g2d_dev->in_use))
 			break;
-		
+
 		msleep_interruptible(2);
+
+		i++;
+		/* Timeout 1sec */
+		if (i > 500) {
+			g2d_clk_enable(g2d_dev);
+			g2d_reset(g2d_dev);
+			g2d_clk_disable(g2d_dev);
+			break;
+		}
 	}
-	
+
 	g2d_sysmmu_off(g2d_dev);
-	
+
 #if defined(CONFIG_EXYNOS_DEV_PD)
 	/* disable the power domain */
 	pm_runtime_put(g2d_dev->dev);
-#endif	
+#endif
 
 	return 0;
 }
+
 static int g2d_resume(struct platform_device *pdev)
 {
 

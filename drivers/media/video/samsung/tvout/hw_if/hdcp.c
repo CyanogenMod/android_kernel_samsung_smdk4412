@@ -379,7 +379,9 @@ static int s5p_hdcp_read_bcaps(void)
 	if (s5p_ddc_read(HDCP_Bcaps, BCAPS_SIZE, &bcaps) < 0)
 		goto bcaps_read_err;
 
-	if (s5p_hdmi_ctrl_status() == false || !s5p_hdmi_reg_get_hpd_status() || on_stop_process)
+	if (s5p_hdmi_ctrl_status() == false ||
+		!s5p_hdmi_reg_get_hpd_status() ||
+		on_stop_process)
 		goto bcaps_read_err;
 
 	writeb(bcaps, hdmi_base + S5P_HDMI_HDCP_BCAPS);
@@ -532,7 +534,8 @@ static void s5p_hdcp_reset_auth(void)
 	unsigned long spin_flags;
 
 	if (s5p_hdmi_ctrl_status() == false ||
-            !s5p_hdmi_reg_get_hpd_status() || on_stop_process)
+		!s5p_hdmi_reg_get_hpd_status() ||
+		on_stop_process)
 		return;
 	spin_lock_irqsave(&hdcp_info.reset_lock, spin_flags);
 
@@ -956,9 +959,12 @@ check_ri_err:
 
 static void s5p_hdcp_work(void *arg)
 {
+	s5p_tvout_mutex_lock();
 	if (!hdcp_info.hdcp_enable || s5p_hdmi_ctrl_status() == false ||
-	    !s5p_hdmi_reg_get_hpd_status() || on_stop_process)
+	    !s5p_hdmi_reg_get_hpd_status() || on_stop_process) {
+		s5p_tvout_mutex_unlock();
 		return;
+	}
 
 	if (hdcp_info.event & HDCP_EVENT_READ_BKSV_START) {
 		if (s5p_hdcp_bksv() < 0)
@@ -987,13 +993,16 @@ static void s5p_hdcp_work(void *arg)
 		else
 			hdcp_info.event &= ~HDCP_EVENT_CHECK_RI_START;
 	}
+	s5p_tvout_mutex_unlock();
 	return;
 work_err:
 	if (!hdcp_info.hdcp_enable || s5p_hdmi_ctrl_status() == false ||
 	    !s5p_hdmi_reg_get_hpd_status() || on_stop_process)	{
+		s5p_tvout_mutex_unlock();
 		return;
 	}
 	s5p_hdcp_reset_auth();
+	s5p_tvout_mutex_unlock();
 }
 
 irqreturn_t s5p_hdcp_irq_handler(int irq, void *dev_id)
@@ -1120,4 +1129,9 @@ int s5p_hdcp_encrypt_stop(bool on)
 	spin_unlock_irqrestore(&hdcp_info.reset_lock, spin_flags);
 
 	return 0;
+}
+
+void s5p_hdcp_flush_work(void)
+{
+	flush_workqueue(hdcp_wq);
 }

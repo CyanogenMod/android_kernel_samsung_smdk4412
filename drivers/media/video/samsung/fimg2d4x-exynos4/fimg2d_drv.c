@@ -46,6 +46,8 @@
 #define LV2_PT_MASK		0xff000
 #define LV2_SHIFT		12
 #define LV1_DESC_MASK		0x3
+#define LV2_VALUE_META		0xc7f
+#define LV2_VALUE_BASE_MASK	0xfff
 
 static struct fimg2d_control *info;
 
@@ -116,7 +118,12 @@ static int fimg2d_sysmmu_fault_handler(enum S5P_SYSMMU_INTERRUPT_TYPE itype,
 	lv2d = (unsigned long *)phys_to_virt(*lv1d & ~LV2_BASE_MASK) +
 			((fault_addr & LV2_PT_MASK) >> LV2_SHIFT);
 	printk(KERN_ERR " Level 2 descriptor(0x%lx)\n", *lv2d);
-	fimg2d_clean_outer_pagetable(cmd->ctx->mm, fault_addr, 4);
+	if (*lv2d == 0) {
+		fimg2d_mmutable_value_replace(cmd, fault_addr,
+			(info->dbuffer_addr & ~LV2_VALUE_BASE_MASK) | LV2_VALUE_META);
+		info->fault_addr = fault_addr;
+	} else
+		fimg2d_clean_outer_pagetable(cmd->ctx->mm, fault_addr, 4);
 next:
 
 	return 0;
@@ -161,6 +168,8 @@ static int fimg2d_open(struct inode *inode, struct file *file)
 			ctx, (unsigned long *)ctx->mm->pgd,
 			(unsigned long *)init_mm.pgd);
 
+	ctx->pgd_clone = kzalloc(L1_DESCRIPTOR_SIZE, GFP_KERNEL);
+
 	fimg2d_add_context(info, ctx);
 	return 0;
 }
@@ -178,6 +187,7 @@ static int fimg2d_release(struct inode *inode, struct file *file)
 	}
 	fimg2d_del_context(info, ctx);
 
+	kfree(ctx->pgd_clone);
 	kfree(ctx);
 	return 0;
 }
@@ -223,7 +233,8 @@ static long fimg2d_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 			dev_lock(info->bus_dev, info->dev, 160160);
 #endif
 #endif
-		if ((blit.dst) && (dst.addr.type == ADDR_USER))
+		if ((blit.dst) && (dst.addr.type == ADDR_USER)
+				&& (blit.seq_no == SEQ_NO_BLT_SKIA))
 			if (!down_write_trylock(&page_alloc_slow_rwsem))
 				ret = -EAGAIN;
 
@@ -238,7 +249,9 @@ static long fimg2d_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 		perf_print(ctx, blit.seq_no);
 		perf_clear(ctx);
 #endif
-		if ((blit.dst) && (dst.addr.type == ADDR_USER) && ret != -EAGAIN)
+		if ((blit.dst) && (dst.addr.type == ADDR_USER)
+				&& (blit.seq_no == SEQ_NO_BLT_SKIA)
+				&& ret != -EAGAIN)
 			up_write(&page_alloc_slow_rwsem);
 
 #ifdef CONFIG_BUSFREQ_OPP
@@ -246,6 +259,13 @@ static long fimg2d_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 			dev_unlock(info->bus_dev, info->dev);
 #endif
 #endif
+
+		if (info->fault_addr) {
+			printk(KERN_INFO "Return by G2D fault handler");
+			info->fault_addr = 0;
+			ret = -EFAULT;
+		}
+
 		break;
 
 	case FIMG2D_BITBLT_SYNC:
@@ -279,6 +299,17 @@ static long fimg2d_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 			mdelay(2);
 		}
 
+		break;
+
+	case FIMG2D_BITBLT_DBUFFER:
+		if (copy_from_user(&info->dbuffer_addr,
+				(unsigned long *)arg,
+				sizeof(unsigned long))) {
+			printk(KERN_ERR
+				"[%s] failed to FIMG2D_BITBLT_DBUFFER: copy_from_user error\n\n",
+				__func__);
+			return -EFAULT;
+		}
 		break;
 
 	default:
@@ -315,6 +346,7 @@ static int fimg2d_setup_controller(struct fimg2d_control *info)
 	atomic_set(&info->nctx, 0);
 	atomic_set(&info->active, 0);
 	info->secure = 0;
+	info->fault_addr = 0;
 
 	spin_lock_init(&info->bltlock);
 
@@ -384,12 +416,20 @@ static int fimg2d_probe(struct platform_device *pdev)
 	fimg2d_debug("device name: %s base address: 0x%lx\n",
 			pdev->name, (unsigned long)res->start);
 
+	/* Clock setup */
+	ret = fimg2d_clk_setup(info);
+	if (ret) {
+		printk(KERN_ERR "FIMG2D failed to setup clk\n");
+		ret = -ENOENT;
+		goto err_clk;
+	}
+
 	/* irq */
 	info->irq = platform_get_irq(pdev, 0);
 	if (!info->irq) {
 		printk(KERN_ERR "FIMG2D failed to get irq resource\n");
 		ret = -ENOENT;
-		goto err_map;
+		goto err_irq;
 	}
 	fimg2d_debug("irq: %d\n", info->irq);
 
@@ -398,13 +438,6 @@ static int fimg2d_probe(struct platform_device *pdev)
 		printk(KERN_ERR "FIMG2D failed to request irq\n");
 		ret = -ENOENT;
 		goto err_irq;
-	}
-
-	ret = fimg2d_clk_setup(info);
-	if (ret) {
-		printk(KERN_ERR "FIMG2D failed to setup clk\n");
-		ret = -ENOENT;
-		goto err_clk;
 	}
 
 #ifdef CONFIG_PM_RUNTIME
@@ -432,19 +465,20 @@ static int fimg2d_probe(struct platform_device *pdev)
 	return 0;
 
 err_reg:
-	fimg2d_clk_release(info);
-
-err_clk:
 	free_irq(info->irq, NULL);
 
 err_irq:
+	fimg2d_clk_release(info);
+
+err_clk:
 	iounmap(info->regs);
 
 err_map:
+	release_mem_region(res->start, resource_size(res));
 	kfree(info->mem);
 
 err_region:
-	release_resource(info->mem);
+	release_resource(res);
 
 err_res:
 	destroy_workqueue(info->work_q);

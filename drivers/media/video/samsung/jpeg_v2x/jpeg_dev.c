@@ -504,7 +504,7 @@ static void jpeg_device_enc_run(void *priv)
 	jpeg_sw_reset(dev->reg_base);
 	jpeg_set_interrupt(dev->reg_base);
 	jpeg_set_huf_table_enable(dev->reg_base, 1);
-	jpeg_set_enc_tbl(dev->reg_base);
+	jpeg_set_enc_tbl(dev->reg_base, enc_param.quality);
 	jpeg_set_encode_tbl_select(dev->reg_base, enc_param.quality);
 	jpeg_set_stream_size(dev->reg_base,
 		enc_param.in_width, enc_param.in_height);
@@ -893,12 +893,16 @@ static int jpeg_probe(struct platform_device *pdev)
 #endif
 
 #ifdef CONFIG_JPEG_V2_1
-		dev->watchdog_workqueue = create_singlethread_workqueue(JPEG_NAME);
-		INIT_WORK(&dev->watchdog_work, jpeg_watchdog_worker);
-		atomic_set(&dev->watchdog_cnt, 0);
-		init_timer(&dev->watchdog_timer);
-		dev->watchdog_timer.data = (unsigned long)dev;
-		dev->watchdog_timer.function = jpeg_watchdog;
+	dev->watchdog_workqueue = create_singlethread_workqueue(JPEG_NAME);
+	if (!dev->watchdog_workqueue) {
+		ret = -ENOMEM;
+		goto err_video_reg;
+	}
+	INIT_WORK(&dev->watchdog_work, jpeg_watchdog_worker);
+	atomic_set(&dev->watchdog_cnt, 0);
+	init_timer(&dev->watchdog_timer);
+	dev->watchdog_timer.data = (unsigned long)dev;
+	dev->watchdog_timer.function = jpeg_watchdog;
 #endif
 	/* clock disable */
 	clk_disable(dev->clk);
@@ -1043,7 +1047,8 @@ static int jpeg_runtime_suspend(struct device *dev)
 	struct jpeg_dev *jpeg_drv = platform_get_drvdata(pdev);
 #if defined(CONFIG_BUSFREQ_OPP) || defined(CONFIG_BUSFREQ_LOCK_WRAPPER)
 	/* lock bus frequency */
-	dev_unlock(jpeg_drv->bus_dev, dev);
+	if (samsung_rev() < EXYNOS4412_REV_2_0)
+		dev_unlock(jpeg_drv->bus_dev, dev);
 #endif
 	jpeg_drv->vb2->suspend(jpeg_drv->alloc_ctx);
 	/* clock disable */
@@ -1057,7 +1062,9 @@ static int jpeg_runtime_resume(struct device *dev)
 	struct jpeg_dev *jpeg_drv = platform_get_drvdata(pdev);
 #if defined(CONFIG_BUSFREQ_OPP) || defined(CONFIG_BUSFREQ_LOCK_WRAPPER)
 	/* lock bus frequency */
-	dev_lock(jpeg_drv->bus_dev, &jpeg_drv->plat_dev->dev, BUSFREQ_400MHZ);
+	if (samsung_rev() < EXYNOS4412_REV_2_0)
+		dev_lock(jpeg_drv->bus_dev,
+			&jpeg_drv->plat_dev->dev, BUSFREQ_400MHZ);
 #endif
 	clk_enable(jpeg_drv->clk);
 	jpeg_drv->vb2->resume(jpeg_drv->alloc_ctx);
@@ -1104,9 +1111,7 @@ static int __init jpeg_init(void)
 {
 	printk(KERN_CRIT "Initialize JPEG driver\n");
 
-	platform_driver_register(&jpeg_driver);
-
-	return 0;
+	return platform_driver_register(&jpeg_driver);
 }
 
 static void __exit jpeg_exit(void)

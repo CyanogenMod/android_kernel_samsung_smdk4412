@@ -132,7 +132,7 @@ static mali_physical_memory_allocation_result os_allocator_allocate(void* ctx, m
 		allocation->num_pages = ((left + _MALI_OSK_CPU_PAGE_SIZE - 1) & ~(_MALI_OSK_CPU_PAGE_SIZE - 1)) >> _MALI_OSK_CPU_PAGE_ORDER;
 		MALI_DEBUG_PRINT(6, ("Allocating page array of size %d bytes\n", allocation->num_pages * sizeof(struct page*)));
 
-		while (left > 0 && ((info->num_pages_allocated + pages_allocated) < info->num_pages_max) && _mali_osk_mem_check_allocated(os_mem_max_usage))
+		while (left > 0)
 		{
 			err = mali_allocation_engine_map_physical(engine, descriptor, *offset, MALI_MEMORY_ALLOCATION_OS_ALLOCATED_PHYSADDR_MAGIC, info->cpu_usage_adjust, _MALI_OSK_CPU_PAGE_SIZE);
 			if ( _MALI_OSK_ERR_OK != err)

@@ -1743,10 +1743,12 @@ void device_shutdown(void)
 		 */
 		list_del_init(&dev->kobj.entry);
 		spin_unlock(&devices_kset->list_lock);
-		/* Disable all device's runtime power management */
-		pm_runtime_disable(dev);
 
-#if defined(CONFIG_MACH_Q1_BD) || defined(CONFIG_MACH_PX)
+		/* Don't allow any more runtime suspends */
+		pm_runtime_get_noresume(dev);
+		pm_runtime_barrier(dev);
+
+#if defined(CONFIG_MACH_Q1_BD) || defined(CONFIG_MACH_PX) || defined(CONFIG_MACH_MIDAS)
 		/* Temporary log to analyze a problem during shutdown */
 		if (dev->bus && dev->bus->shutdown) {
 			dev_info(dev, "shutdown +: %pF\n", dev->bus->shutdown);

@@ -43,12 +43,22 @@ static struct s3c_platform_csis default_csis0_data __initdata = {
 	.clk_rate	= 166000000,
 };
 
+int fimc_clk_rate(void)
+{
+	if (samsung_rev() >= EXYNOS4412_REV_2_0)
+		return 180000000;
+	else
+		return 166750000;
+}
+
 void __init s3c_csis0_set_platdata(struct s3c_platform_csis *pd)
 {
 	struct s3c_platform_csis *npd;
 
-	if (!pd)
+	if (!pd) {
+		default_csis0_data.clk_rate = fimc_clk_rate();
 		pd = &default_csis0_data;
+	}
 
 	npd = kmemdup(pd, sizeof(struct s3c_platform_csis), GFP_KERNEL);
 	if (!npd) {
@@ -94,8 +104,10 @@ void __init s3c_csis1_set_platdata(struct s3c_platform_csis *pd)
 {
 	struct s3c_platform_csis *npd;
 
-	if (!pd)
+	if (!pd) {
+		default_csis1_data.clk_rate = fimc_clk_rate();
 		pd = &default_csis1_data;
+	}
 
 	npd = kmemdup(pd, sizeof(struct s3c_platform_csis), GFP_KERNEL);
 	if (!npd) {

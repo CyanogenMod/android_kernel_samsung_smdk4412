@@ -75,7 +75,7 @@ struct lcd_info  {
 	unsigned int			auto_brightness;
 	unsigned int			ldi_enable;
 	unsigned int			acl_enable;
-	unsigned int			cur_acl;
+	unsigned int			current_acl;
 	struct mutex			lock;
 	struct mutex			bl_lock;
 	struct lcd_device		*ld;
@@ -461,56 +461,49 @@ elvss_err:
 	return ret;
 }
 
-static int ld9040_set_acl(struct lcd_info *lcd)
+static int ld9040_set_acl(struct lcd_info *lcd, u8 force)
 {
-	int ret = 0;
+	int ret = 0, enable, level;
+	u32 candela = candela_table[lcd->bl];
 	struct ld9040_panel_data *pdata = lcd->lcd_pd->pdata;
 
-	if (lcd->acl_enable) {
-		if (lcd->cur_acl == 0) {
-			if (lcd->bl == 0 || lcd->bl == 1) {
-				ret = ld9040_panel_send_sequence(lcd, pdata->acl_table[0]);
-				dev_dbg(&lcd->ld->dev, "%s : cur_acl=%d, acl_off\n", __func__, lcd->cur_acl);
-			} else {
-				ret = ld9040_panel_send_sequence(lcd, pdata->acl_on);
-				dev_dbg(&lcd->ld->dev, "%s : cur_acl=%d, acl_on\n", __func__, lcd->cur_acl);
-			}
-		}
-		switch (lcd->bl) {
-		case GAMMA_30CD ... GAMMA_40CD: /* 30cd ~ 40cd */
-			if (lcd->cur_acl != 0) {
-				ret = ld9040_panel_send_sequence(lcd, pdata->acl_table[0]);
-				lcd->cur_acl = 0;
-				dev_dbg(&lcd->ld->dev, "%s : cur_acl=%d\n", __func__, lcd->cur_acl);
-			}
-			break;
-		case GAMMA_70CD ... GAMMA_250CD: /* 70cd ~ 250cd */
-			if (lcd->cur_acl != 40) {
-				ret = ld9040_panel_send_sequence(lcd, pdata->acl_table[1]);
-				lcd->cur_acl = 40;
-				dev_dbg(&lcd->ld->dev, "%s : cur_acl=%d\n", __func__, lcd->cur_acl);
-			}
-			break;
-		default:
-			if (lcd->cur_acl != 50) {
-				ret = ld9040_panel_send_sequence(lcd, pdata->acl_table[2]);
-				lcd->cur_acl = 50;
-				dev_dbg(&lcd->ld->dev, "%s : cur_acl=%d\n", __func__, lcd->cur_acl);
-			}
-			break;
-		}
-	} else {
-		ret = ld9040_panel_send_sequence(lcd, pdata->acl_table[0]);
-		lcd->cur_acl = 0;
-		dev_dbg(&lcd->ld->dev, "%s : cur_acl=%d\n", __func__, lcd->cur_acl);
+	switch (candela) {
+	case 0 ... 69:
+		level = ACL_STATUS_0P;
+		break;
+	case 70 ... 250:
+		level = ACL_STATUS_40P;
+		break;
+	default:
+		level = ACL_STATUS_50P;
+		break;
 	}
 
-	if (ret) {
+	if (!lcd->acl_enable)
+		level = ACL_STATUS_0P;
+
+	enable = !!level;
+
+	//if (force || lcd->acl_enable != enable) {
+		dev_dbg(&lcd->ld->dev, "acl turn %s\n", enable ? "on" : "off");
+		if (enable)
+			ret = ld9040_panel_send_sequence(lcd, pdata->acl_on);
+		else {
+			ret = ld9040_panel_send_sequence(lcd, pdata->acl_table[ACL_STATUS_0P]);
+			goto exit;
+		}
+	//}
+
+	//if (force || lcd->current_acl != level) {
+		ret = ld9040_panel_send_sequence(lcd, pdata->acl_table[level]);
+		lcd->current_acl = level;
+		dev_dbg(&lcd->ld->dev, "current_acl = %d\n", lcd->current_acl);
+	//}
+
+	if (ret)
 		ret = -EPERM;
-		goto acl_err;
-	}
 
-acl_err:
+exit:
 	return ret;
 }
 
@@ -578,7 +571,7 @@ static int update_brightness(struct lcd_info *lcd, u8 force)
 
 		ret = ld9040_gamma_ctl(lcd);
 
-		ret |= ld9040_set_acl(lcd);
+		ret |= ld9040_set_acl(lcd, force);
 
 		ret |= ld9040_set_elvss(lcd);
 
@@ -836,7 +829,7 @@ device_attribute *attr, const char *buf, size_t size)
 			mutex_lock(&lcd->bl_lock);
 			lcd->acl_enable = value;
 			if (lcd->ldi_enable)
-				ld9040_set_acl(lcd);
+				ld9040_set_acl(lcd, 0);
 			mutex_unlock(&lcd->bl_lock);
 		}
 	}
@@ -1076,7 +1069,7 @@ static int ld9040_probe(struct spi_device *spi)
 	lcd->current_gamma_mode = 0;
 
 	lcd->acl_enable = 0;
-	lcd->cur_acl = 0;
+	lcd->current_acl = 0;
 
 	lcd->auto_brightness = 1;
 
