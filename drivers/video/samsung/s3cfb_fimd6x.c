@@ -22,6 +22,11 @@
 
 #include "s3cfb.h"
 
+#ifdef CONFIG_FB_S5P_SYSMMU
+#include <asm/cacheflush.h>
+#include <plat/s5p-sysmmu.h>
+#endif
+
 void s3cfb_check_line_count(struct s3cfb_global *ctrl)
 {
 	int timeout = 30 * 5300;
@@ -110,6 +115,12 @@ int s3cfb_set_output(struct s3cfb_global *ctrl)
 		dev_err(ctrl->dev, "invalid output type: %d\n", ctrl->output);
 		return -EINVAL;
 	}
+
+#if defined(CONFIG_FB_RGBA_ORDER)
+	/* Change format to BGR order */
+	cfg &= ~(0x3F0000);
+	cfg |= 0x240000;
+#endif
 
 	writel(cfg, ctrl->regs + S3C_VIDCON2);
 
@@ -210,7 +221,7 @@ int s3cfb_set_clock(struct s3cfb_global *ctrl)
 			S3C_VIDCON0_VCLKEN_FREERUN);
 
 		src_clk = clk_get_rate(ctrl->clock);
-		printk(KERN_DEBUG "FIMD src sclk = %d\n", src_clk);
+		dev_dbg(ctrl->dev, "FIMD src sclk = %d\n", src_clk);
 	} else {
 		cfg &= ~(S3C_VIDCON0_CLKSEL_MASK |
 			S3C_VIDCON0_CLKVALUP_MASK |
@@ -223,12 +234,12 @@ int s3cfb_set_clock(struct s3cfb_global *ctrl)
 		if (strcmp(pdata->clk_name, "sclk_fimd") == 0) {
 			cfg |= S3C_VIDCON0_CLKSEL_SCLK;
 			src_clk = clk_get_rate(ctrl->clock);
-			printk(KERN_DEBUG "FIMD src sclk = %d\n", src_clk);
+			dev_dbg(ctrl->dev, "FIMD src sclk = %d\n", src_clk);
 
 		} else {
 			cfg |= S3C_VIDCON0_CLKSEL_HCLK;
 			src_clk = ctrl->clock->parent->rate;
-			printk(KERN_DEBUG "FIMD src hclk = %d\n", src_clk);
+			dev_dbg(ctrl->dev, "FIMD src hclk = %d\n", src_clk);
 		}
 	}
 
@@ -555,6 +566,23 @@ int s3cfb_win_map_off(struct s3cfb_global *ctrl, int id)
 	return 0;
 }
 
+int s3cfb_set_window_protect(struct s3cfb_global *ctrl, int id, bool protect)
+{
+	struct s3c_platform_fb *pdata = to_fb_plat(ctrl->dev);
+	u32 shw;
+
+	if ((pdata->hw_ver == 0x62) || (pdata->hw_ver == 0x70)) {
+		shw = readl(ctrl->regs + S3C_WINSHMAP);
+		if (protect)
+			shw |= S3C_WINSHMAP_PROTECT(id);
+		else
+			shw &= ~(S3C_WINSHMAP_PROTECT(id));
+		writel(shw, ctrl->regs + S3C_WINSHMAP);
+	}
+
+	return 0;
+}
+
 int s3cfb_set_window_control(struct s3cfb_global *ctrl, int id)
 {
 	struct s3c_platform_fb *pdata = to_fb_plat(ctrl->dev);
@@ -676,6 +704,38 @@ int s3cfb_get_win_cur_buf_addr(struct s3cfb_global *ctrl, int id)
 
 	return start_addr;
 }
+
+#ifdef CONFIG_FB_S5P_SYSMMU
+#define LV1_SHIFT		20
+#define LV1_PT_SIZE		SZ_1M
+#define LV2_PT_SIZE		SZ_1K
+#define LV2_BASE_MASK		0x3ff
+
+void s3cfb_clean_outer_pagetable(unsigned long vaddr, size_t size)
+{
+	unsigned long *pgd;
+	unsigned long *lv1, *lv1end;
+	unsigned long lv2pa;
+
+	if (!current->mm)
+		return;
+
+	pgd = (unsigned long *)current->mm->pgd;
+
+	lv1 = pgd + (vaddr >> LV1_SHIFT);
+	lv1end = pgd + ((vaddr + size + LV1_PT_SIZE-1) >> LV1_SHIFT);
+
+	/* clean level1 page table */
+	outer_clean_range(virt_to_phys(lv1), virt_to_phys(lv1end));
+
+	do {
+		lv2pa = *lv1 & ~LV2_BASE_MASK;	/* lv2 pt base */
+		/* clean level2 page table */
+		outer_clean_range(lv2pa, lv2pa + LV2_PT_SIZE);
+		lv1++;
+	} while (lv1 != lv1end);
+}
+#endif
 
 int s3cfb_set_buffer_address(struct s3cfb_global *ctrl, int id)
 {

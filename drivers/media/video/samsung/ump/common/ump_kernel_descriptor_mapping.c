@@ -1,9 +1,9 @@
 /*
- * Copyright (C) 2010 ARM Limited. All rights reserved.
- * 
+ * Copyright (C) 2010-2012 ARM Limited. All rights reserved.
+ *
  * This program is free software and is provided to you under the terms of the GNU General Public License version 2
  * as published by the Free Software Foundation, and any use by you of this program is subject to the terms of such GNU licence.
- * 
+ *
  * A copy of the licence is included with the program, and can also be obtained from Free Software
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
  */
@@ -65,9 +65,9 @@ void ump_descriptor_mapping_destroy(ump_descriptor_mapping * map)
 
 int ump_descriptor_mapping_allocate_mapping(ump_descriptor_mapping * map, void * target)
 {
- 	int descriptor = -1;/*-EFAULT;*/
- 	_mali_osk_lock_wait(map->lock, _MALI_OSK_LOCKMODE_RW);
- 	descriptor = _mali_osk_find_first_zero_bit(map->table->usage, map->current_nr_mappings);
+	int descriptor = -1;/*-EFAULT;*/
+	_mali_osk_lock_wait(map->lock, _MALI_OSK_LOCKMODE_RW);
+	descriptor = _mali_osk_find_first_zero_bit(map->table->usage, map->current_nr_mappings);
 	if (descriptor == map->current_nr_mappings)
 	{
 		int nr_mappings_new;
@@ -89,8 +89,8 @@ int ump_descriptor_mapping_allocate_mapping(ump_descriptor_mapping * map, void *
 			goto unlock_and_exit;
 		}
 
- 		_mali_osk_memcpy(new_table->usage, old_table->usage, (sizeof(unsigned long)*map->current_nr_mappings) / BITS_PER_LONG);
- 		_mali_osk_memcpy(new_table->mappings, old_table->mappings, map->current_nr_mappings * sizeof(void*));
+		_mali_osk_memcpy(new_table->usage, old_table->usage, (sizeof(unsigned long)*map->current_nr_mappings) / BITS_PER_LONG);
+		_mali_osk_memcpy(new_table->mappings, old_table->mappings, map->current_nr_mappings * sizeof(void*));
 		map->table = new_table;
 		map->current_nr_mappings = nr_mappings_new;
 		descriptor_table_free(old_table);
@@ -107,10 +107,10 @@ unlock_and_exit:
 
 int ump_descriptor_mapping_get(ump_descriptor_mapping * map, int descriptor, void** target)
 {
- 	int result = -1;/*-EFAULT;*/
- 	DEBUG_ASSERT(map);
- 	_mali_osk_lock_wait(map->lock, _MALI_OSK_LOCKMODE_RO);
- 	if ( (descriptor >= 0) && (descriptor < map->current_nr_mappings) && _mali_osk_test_bit(descriptor, map->table->usage) )
+	int result = -1;/*-EFAULT;*/
+	DEBUG_ASSERT(map);
+	_mali_osk_lock_wait(map->lock, _MALI_OSK_LOCKMODE_RO);
+	if ( (descriptor >= 0) && (descriptor < map->current_nr_mappings) && _mali_osk_test_bit(descriptor, map->table->usage) )
 	{
 		*target = map->table->mappings[descriptor];
 		result = 0;
@@ -122,9 +122,9 @@ int ump_descriptor_mapping_get(ump_descriptor_mapping * map, int descriptor, voi
 
 int ump_descriptor_mapping_set(ump_descriptor_mapping * map, int descriptor, void * target)
 {
- 	int result = -1;/*-EFAULT;*/
- 	_mali_osk_lock_wait(map->lock, _MALI_OSK_LOCKMODE_RO);
- 	if ( (descriptor >= 0) && (descriptor < map->current_nr_mappings) && _mali_osk_test_bit(descriptor, map->table->usage) )
+	int result = -1;/*-EFAULT;*/
+	_mali_osk_lock_wait(map->lock, _MALI_OSK_LOCKMODE_RO);
+	if ( (descriptor >= 0) && (descriptor < map->current_nr_mappings) && _mali_osk_test_bit(descriptor, map->table->usage) )
 	{
 		map->table->mappings[descriptor] = target;
 		result = 0;
@@ -135,8 +135,8 @@ int ump_descriptor_mapping_set(ump_descriptor_mapping * map, int descriptor, voi
 
 void ump_descriptor_mapping_free(ump_descriptor_mapping * map, int descriptor)
 {
- 	_mali_osk_lock_wait(map->lock, _MALI_OSK_LOCKMODE_RW);
- 	if ( (descriptor >= 0) && (descriptor < map->current_nr_mappings) && _mali_osk_test_bit(descriptor, map->table->usage) )
+	_mali_osk_lock_wait(map->lock, _MALI_OSK_LOCKMODE_RW);
+	if ( (descriptor >= 0) && (descriptor < map->current_nr_mappings) && _mali_osk_test_bit(descriptor, map->table->usage) )
 	{
 		map->table->mappings[descriptor] = NULL;
 		_mali_osk_clear_nonatomic_bit(descriptor, map->table->usage);
@@ -163,4 +163,3 @@ static void descriptor_table_free(ump_descriptor_table * table)
 {
 	_mali_osk_free(table);
 }
-

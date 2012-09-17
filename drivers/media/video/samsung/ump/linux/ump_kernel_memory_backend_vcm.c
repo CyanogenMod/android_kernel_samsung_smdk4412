@@ -1,9 +1,9 @@
 /*
- * Copyright (C) 2010 ARM Limited. All rights reserved.
- * 
+ * Copyright (C) 2010-2012 ARM Limited. All rights reserved.
+ *
  * This program is free software and is provided to you under the terms of the GNU General Public License version 2
  * as published by the Free Software Foundation, and any use by you of this program is subject to the terms of such GNU licence.
- * 
+ *
  * A copy of the licence is included with the program, and can also be obtained from Free Software
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
  */
@@ -66,9 +66,9 @@ ump_memory_backend * ump_vcm_memory_backend_create(const int max_allocation)
 	{
 		return NULL;
 	}
-	
+
 	info->num_vcm_blocks = 0;
-	
+
 
 	sema_init(&info->mutex, 1);
 
@@ -85,7 +85,7 @@ ump_memory_backend * ump_vcm_memory_backend_create(const int max_allocation)
 	backend->shutdown = vcm_memory_backend_destroy;
 	backend->pre_allocate_physical_check = NULL;
 	backend->adjust_to_mali_phys = NULL;
-	
+
 	backend->get = vcm_res_get;
 	backend->set = vcm_attr_set;
 
@@ -128,8 +128,8 @@ static int ump_vcm_allocate(void *ctx, ump_dd_mem * descriptor)
 
 	ump_vcm->dev_id = (int)descriptor->backend_info & ~UMP_REF_DRV_UK_CONSTRAINT_USE_CACHE;
 
-	if(ump_vcm->dev_id == UMP_REF_DRV_UK_CONSTRAINT_NONE) { 	/* None */
-		ump_vcm->dev_id = UMP_REF_DRV_UK_VCM_DEV_G2D; 	/* this ID is G2D */
+	if(ump_vcm->dev_id == UMP_REF_DRV_UK_CONSTRAINT_NONE) {		/* None */
+		ump_vcm->dev_id = UMP_REF_DRV_UK_VCM_DEV_G2D;	/* this ID is G2D */
 	}
 	else if(ump_vcm->dev_id == UMP_REF_DRV_UK_CONSTRAINT_PHYSICALLY_LINEAR) { /* Physical Linear */
 		return 0;
@@ -137,7 +137,7 @@ static int ump_vcm_allocate(void *ctx, ump_dd_mem * descriptor)
 	else {				/* Other VCM */
 		ump_vcm->dev_id -= 2;
 	}
-	
+
 	DBG_MSG(5, ("Device ID for VCM : %d\n", ump_vcm->dev_id));
 	ump_vcm->vcm = vcm_find_vcm(ump_vcm->dev_id);
 
@@ -146,7 +146,7 @@ static int ump_vcm_allocate(void *ctx, ump_dd_mem * descriptor)
 		return 0;
 	}
 	descriptor->backend_info = (void*)ump_vcm;
-	
+
 	if (down_interruptible(&info->mutex)) {
 		DBG_MSG(1, ("Failed to get mutex in ump_vcm_allocate\n"));
 		return 0;	/* failure */
@@ -168,7 +168,7 @@ static int vcm_mem_allocator(vcm_allocator *info, ump_dd_mem *descriptor)
 	struct ump_vcm *ump_vcm;
 
 	ump_vcm = (struct ump_vcm*)descriptor->backend_info;
-	
+
 	ump_vcm->vcm_res =
 	    vcm_make_binding(ump_vcm->vcm, descriptor->size_bytes,
 	    ump_vcm->dev_id, 0);
@@ -288,5 +288,3 @@ static void vcm_attr_set(ump_dd_mem *mem, void *args)
 
 	return;
 }
-
-

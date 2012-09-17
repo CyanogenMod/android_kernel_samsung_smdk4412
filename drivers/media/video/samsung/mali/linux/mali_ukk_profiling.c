@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2010 ARM Limited. All rights reserved.
+ * Copyright (C) 2010-2012 ARM Limited. All rights reserved.
  * 
  * This program is free software and is provided to you under the terms of the GNU General Public License version 2
  * as published by the Free Software Foundation, and any use by you of this program is subject to the terms of such GNU licence.
@@ -9,11 +9,12 @@
  */
 #include <linux/fs.h>       /* file system operations */
 #include <asm/uaccess.h>    /* user space access */
+#include <linux/slab.h>
 
 #include "mali_ukk.h"
 #include "mali_osk.h"
 #include "mali_kernel_common.h"
-#include "mali_kernel_session_manager.h"
+#include "mali_session.h"
 #include "mali_ukk_wrappers.h"
 
 int profiling_start_wrapper(struct mali_session_data *session_data, _mali_uk_profiling_start_s __user *uargs)
@@ -133,51 +134,49 @@ int profiling_clear_wrapper(struct mali_session_data *session_data, _mali_uk_pro
 	return 0;
 }
 
-int profiling_get_config_wrapper(struct mali_session_data *session_data, _mali_uk_profiling_get_config_s __user *uargs)
+int profiling_report_sw_counters_wrapper(struct mali_session_data *session_data, _mali_uk_sw_counters_report_s __user *uargs)
 {
-	_mali_uk_profiling_get_config_s kargs;
+	_mali_uk_sw_counters_report_s kargs;
 	_mali_osk_errcode_t err;
+	u32 *counter_buffer;
 
 	MALI_CHECK_NON_NULL(uargs, -EINVAL);
 
+	if (0 != copy_from_user(&kargs, uargs, sizeof(_mali_uk_sw_counters_report_s)))
+	{
+		return -EFAULT;
+	}
+
+	/* make sure that kargs.num_counters is [at least somewhat] sane */
+	if (kargs.num_counters > 10000) {
+		MALI_DEBUG_PRINT(1, ("User space attempted to allocate too many counters.\n"));
+		return -EINVAL;
+	}
+
+	counter_buffer = (u32*)kmalloc(sizeof(u32) * kargs.num_counters, GFP_KERNEL);
+	if (NULL == counter_buffer)
+	{
+		return -ENOMEM;
+	}
+
+	if (0 != copy_from_user(counter_buffer, kargs.counters, sizeof(u32) * kargs.num_counters))
+	{
+		kfree(counter_buffer);
+		return -EFAULT;
+	}
+
 	kargs.ctx = session_data;
-	err = _mali_ukk_profiling_get_config(&kargs);
+	kargs.counters = counter_buffer;
+
+	err = _mali_ukk_sw_counters_report(&kargs);
+
+	kfree(counter_buffer);
+
 	if (_MALI_OSK_ERR_OK != err)
 	{
 		return map_errcode(err);
 	}
 
-	if (0 != put_user(kargs.enable_events, &uargs->enable_events))
-	{
-		return -EFAULT;
-	}
-
 	return 0;
 }
-
-#if MALI_TRACEPOINTS_ENABLED
-int transfer_sw_counters_wrapper(struct mali_session_data *session_data, _mali_uk_sw_counters_s __user *uargs)
-{
-    _mali_uk_sw_counters_s kargs;
-    _mali_osk_errcode_t err;
-
-    MALI_CHECK_NON_NULL(uargs, -EINVAL);
-    
-    kargs.ctx = session_data;
-
-    if (0 != copy_from_user(&kargs, uargs, sizeof(_mali_uk_sw_counters_s)))
-    {
-        return -EFAULT;
-    }
-
-    err = _mali_ukk_transfer_sw_counters(&kargs);
-
-    if (_MALI_OSK_ERR_OK != err)
-    {
-        return map_errcode(err);
-    }
-
-    return 0;
-}
-#endif
 

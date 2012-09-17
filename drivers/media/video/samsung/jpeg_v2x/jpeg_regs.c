@@ -341,28 +341,99 @@ void jpeg_set_enc_out_fmt(void __iomem *base,
 	writel(reg, base + S5P_JPEG_IMG_FMT_REG);
 }
 
-void jpeg_set_enc_tbl(void __iomem *base)
+void jpeg_set_enc_tbl(void __iomem *base,
+		enum jpeg_img_quality_level level)
 {
 	int i;
 
-	for (i = 0; i < 16; i++) {
-		writel((unsigned int)ITU_Q_tbl[0][i],
-			base + S5P_JPEG_QUAN_TBL_ENTRY_REG + (i*0x04));
-	}
+	switch (level) {
+	case QUALITY_LEVEL_1:
+		for (i = 0; i < 16; i++) {
+			writel((unsigned int)ITU_Q_tbl[0][i],
+				base + S5P_JPEG_QUAN_TBL_ENTRY_REG + (i*0x04));
+		}
 
-	for (i = 0; i < 16; i++) {
-		writel((unsigned int)ITU_Q_tbl[1][i],
-			base + S5P_JPEG_QUAN_TBL_ENTRY_REG + 0x40 + (i*0x04));
-	}
+		for (i = 0; i < 16; i++) {
+			writel((unsigned int)ITU_Q_tbl[1][i],
+				base + S5P_JPEG_QUAN_TBL_ENTRY_REG + 0x40 + (i*0x04));
+		}
 
-	for (i = 0; i < 16; i++) {
-		writel((unsigned int)ITU_Q_tbl[2][i],
-			base + S5P_JPEG_QUAN_TBL_ENTRY_REG + 0x80 + (i*0x04));
-	}
+		for (i = 0; i < 16; i++) {
+			writel((unsigned int)ITU_Q_tbl[0][i],
+				base + S5P_JPEG_QUAN_TBL_ENTRY_REG + 0x80 + (i*0x04));
+		}
 
-	for (i = 0; i < 16; i++) {
-		writel((unsigned int)ITU_Q_tbl[3][i],
-			base + S5P_JPEG_QUAN_TBL_ENTRY_REG + 0xc0 + (i*0x04));
+		for (i = 0; i < 16; i++) {
+			writel((unsigned int)ITU_Q_tbl[1][i],
+				base + S5P_JPEG_QUAN_TBL_ENTRY_REG + 0xc0 + (i*0x04));
+		}
+		break;
+
+	case QUALITY_LEVEL_2:
+		for (i = 0; i < 16; i++) {
+			writel((unsigned int)ITU_Q_tbl[2][i],
+				base + S5P_JPEG_QUAN_TBL_ENTRY_REG + (i*0x04));
+		}
+
+		for (i = 0; i < 16; i++) {
+			writel((unsigned int)ITU_Q_tbl[3][i],
+				base + S5P_JPEG_QUAN_TBL_ENTRY_REG + 0x40 + (i*0x04));
+		}
+
+		for (i = 0; i < 16; i++) {
+			writel((unsigned int)ITU_Q_tbl[2][i],
+				base + S5P_JPEG_QUAN_TBL_ENTRY_REG + 0x80 + (i*0x04));
+		}
+
+		for (i = 0; i < 16; i++) {
+			writel((unsigned int)ITU_Q_tbl[3][i],
+				base + S5P_JPEG_QUAN_TBL_ENTRY_REG + 0xc0 + (i*0x04));
+		}
+		break;
+
+	case QUALITY_LEVEL_3:
+		for (i = 0; i < 16; i++) {
+			writel((unsigned int)ITU_Q_tbl[4][i],
+				base + S5P_JPEG_QUAN_TBL_ENTRY_REG + (i*0x04));
+		}
+
+		for (i = 0; i < 16; i++) {
+			writel((unsigned int)ITU_Q_tbl[5][i],
+				base + S5P_JPEG_QUAN_TBL_ENTRY_REG + 0x40 + (i*0x04));
+		}
+
+		for (i = 0; i < 16; i++) {
+			writel((unsigned int)ITU_Q_tbl[4][i],
+				base + S5P_JPEG_QUAN_TBL_ENTRY_REG + 0x80 + (i*0x04));
+		}
+
+		for (i = 0; i < 16; i++) {
+			writel((unsigned int)ITU_Q_tbl[5][i],
+				base + S5P_JPEG_QUAN_TBL_ENTRY_REG + 0xc0 + (i*0x04));
+		}
+		break;
+
+	default:
+		for (i = 0; i < 16; i++) {
+			writel((unsigned int)ITU_Q_tbl[0][i],
+				base + S5P_JPEG_QUAN_TBL_ENTRY_REG + (i*0x04));
+		}
+
+		for (i = 0; i < 16; i++) {
+			writel((unsigned int)ITU_Q_tbl[1][i],
+				base + S5P_JPEG_QUAN_TBL_ENTRY_REG + 0x40 + (i*0x04));
+		}
+
+		for (i = 0; i < 16; i++) {
+			writel((unsigned int)ITU_Q_tbl[0][i],
+				base + S5P_JPEG_QUAN_TBL_ENTRY_REG + 0x80 + (i*0x04));
+		}
+
+		for (i = 0; i < 16; i++) {
+			writel((unsigned int)ITU_Q_tbl[1][i],
+				base + S5P_JPEG_QUAN_TBL_ENTRY_REG + 0xc0 + (i*0x04));
+		}
+		break;
 	}
 
 	for (i = 0; i < 4; i++) {

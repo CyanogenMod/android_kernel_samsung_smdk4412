@@ -83,8 +83,18 @@ static DEVICE_ATTR(lcd_type, 0664, lcdtype_show, NULL);
 
 void s5c1372_ldi_enable(void)
 {
+#if defined(CONFIG_FB_S5P_S6C1372)
 	gpio_set_value(GPIO_LCD_EN, GPIO_LEVEL_HIGH);
 	msleep(40);
+#else   /* defined(CONFIG_FB_S5P_S6F1202A ) */
+	gpio_set_value(GPIO_LCD_EN, GPIO_LEVEL_HIGH);
+	gpio_set_value(GPIO_LCD_LDO_EN, GPIO_LEVEL_HIGH);
+	msleep(40);
+
+	/* Enable backlight PWM GPIO for P2 device. */
+	gpio_set_value(GPIO_LCD_BACKLIGHT_PWM, 0);
+	s3c_gpio_cfgpin(GPIO_LCD_BACKLIGHT_PWM, S3C_GPIO_SFN(3));
+#endif
 }
 
 void s5c1372_ldi_disable(void)
@@ -93,12 +103,21 @@ void s5c1372_ldi_disable(void)
 	s3c_gpio_cfgpin(GPIO_LCD_PCLK, S3C_GPIO_OUTPUT);
 	s3c_gpio_setpull(GPIO_LCD_PCLK, S3C_GPIO_PULL_NONE);
 	gpio_set_value(GPIO_LCD_PCLK, GPIO_LEVEL_LOW);
-#endif
 
 	msleep(40);
 	gpio_set_value(GPIO_LCD_EN, GPIO_LEVEL_LOW);
 
 	msleep(600);
+#else   /* defined(CONFIG_FB_S5P_S6F1202A ) */
+	/* Disable backlight PWM GPIO for P2 device. */
+	gpio_set_value(GPIO_LCD_BACKLIGHT_PWM, GPIO_LEVEL_LOW);
+	s3c_gpio_cfgpin(GPIO_LCD_BACKLIGHT_PWM, S3C_GPIO_OUTPUT);
+
+	/* Disable LVDS Panel Power, 1.2, 1.8, display 3.3V */
+	gpio_set_value(GPIO_LCD_LDO_EN, GPIO_LEVEL_LOW);
+	gpio_set_value(GPIO_LCD_EN, GPIO_LEVEL_LOW);
+	msleep(300);
+#endif
 }
 
 static int __init s6c1372_probe(struct platform_device *pdev)

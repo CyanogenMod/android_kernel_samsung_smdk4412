@@ -1,9 +1,9 @@
 /*
- * Copyright (C) 2010 ARM Limited. All rights reserved.
- * 
+ * Copyright (C) 2010-2012 ARM Limited. All rights reserved.
+ *
  * This program is free software and is provided to you under the terms of the GNU General Public License version 2
  * as published by the Free Software Foundation, and any use by you of this program is subject to the terms of such GNU licence.
- * 
+ *
  * A copy of the licence is included with the program, and can also be obtained from Free Software
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
  */
@@ -161,7 +161,7 @@ UMP_KERNEL_API_EXPORT void ump_dd_reference_add(ump_dd_handle memh)
 
 	new_ref = _ump_osk_atomic_inc_and_read(&mem->ref_count);
 
-	DBG_MSG(4, ("Memory reference incremented. ID: %u, new value: %d\n", mem->secure_id, new_ref));
+	DBG_MSG(5, ("Memory reference incremented. ID: %u, new value: %d\n", mem->secure_id, new_ref));
 }
 
 
@@ -181,7 +181,7 @@ UMP_KERNEL_API_EXPORT void ump_dd_reference_release(ump_dd_handle memh)
 
 	new_ref = _ump_osk_atomic_dec_and_read(&mem->ref_count);
 
-	DBG_MSG(4, ("Memory reference decremented. ID: %u, new value: %d\n", mem->secure_id, new_ref));
+	DBG_MSG(5, ("Memory reference decremented. ID: %u, new value: %d\n", mem->secure_id, new_ref));
 
 	if (0 == new_ref)
 	{
@@ -277,7 +277,7 @@ _mali_osk_errcode_t _ump_ukk_release( _ump_uk_release_s *release_info )
 	}
 
 	_mali_osk_lock_signal(session_data->lock, _MALI_OSK_LOCKMODE_RW);
- 	DBG_MSG_IF(1, _MALI_OSK_ERR_OK != ret, ("UMP memory with ID %u does not belong to this session.\n", secure_id));
+	DBG_MSG_IF(1, _MALI_OSK_ERR_OK != ret, ("UMP memory with ID %u does not belong to this session.\n", secure_id));
 
 	DBG_MSG(4, ("_ump_ukk_release() returning 0x%x\n", ret));
 	return ret;
@@ -313,15 +313,22 @@ _mali_osk_errcode_t _ump_ukk_size_get( _ump_uk_size_get_s *user_interaction )
 void _ump_ukk_msync( _ump_uk_msync_s *args )
 {
 	ump_dd_mem * mem = NULL;
+	void *virtual = NULL;
+	u32 size = 0;
+	u32 offset = 0;
+
 	_mali_osk_lock_wait(device.secure_id_map_lock, _MALI_OSK_LOCKMODE_RW);
 	ump_descriptor_mapping_get(device.secure_id_map, (int)args->secure_id, (void**)&mem);
-	_mali_osk_lock_signal(device.secure_id_map_lock, _MALI_OSK_LOCKMODE_RW);
 
-	if (NULL==mem)
+	if (NULL == mem)
 	{
+		_mali_osk_lock_signal(device.secure_id_map_lock, _MALI_OSK_LOCKMODE_RW);
 		DBG_MSG(1, ("Failed to look up mapping in _ump_ukk_msync(). ID: %u\n", (ump_secure_id)args->secure_id));
 		return;
 	}
+	/* Ensure the memory doesn't dissapear when we are flushing it. */
+	ump_dd_reference_add(mem);
+	_mali_osk_lock_signal(device.secure_id_map_lock, _MALI_OSK_LOCKMODE_RW);
 
 	/* Returns the cache settings back to Userspace */
 	args->is_cached=mem->is_cached;
@@ -330,17 +337,215 @@ void _ump_ukk_msync( _ump_uk_msync_s *args )
 	if ( _UMP_UK_MSYNC_READOUT_CACHE_ENABLED==args->op )
 	{
 		DBG_MSG(3, ("_ump_ukk_msync READOUT  ID: %u Enabled: %d\n", (ump_secure_id)args->secure_id, mem->is_cached));
-		return;
+		goto msync_release_and_return;
 	}
 
 	/* Nothing to do if the memory is not caches */
 	if ( 0==mem->is_cached )
 	{
 		DBG_MSG(3, ("_ump_ukk_msync IGNORING ID: %u Enabled: %d  OP: %d\n", (ump_secure_id)args->secure_id, mem->is_cached, args->op));
-		return ;
+		goto msync_release_and_return;
 	}
-	DBG_MSG(3, ("_ump_ukk_msync FLUSHING ID: %u Enabled: %d  OP: %d\n", (ump_secure_id)args->secure_id, mem->is_cached, args->op));
+	DBG_MSG(3, ("UMP[%02u] _ump_ukk_msync  Flush  OP: %d Address: 0x%08x Mapping: 0x%08x\n",
+	            (ump_secure_id)args->secure_id, args->op, args->address, args->mapping));
+
+	if ( args->address )
+	{
+		virtual = (void *)((u32)args->address);
+		offset = (u32)((args->address) - (args->mapping));
+	} else {
+		/* Flush entire mapping when no address is specified. */
+		virtual = args->mapping;
+	}
+	if ( args->size )
+	{
+		size = args->size;
+	} else {
+		/* Flush entire mapping when no size is specified. */
+		size = mem->size_bytes - offset;
+	}
+
+	if ( (offset + size) > mem->size_bytes )
+	{
+		DBG_MSG(1, ("Trying to flush more than the entire UMP allocation: offset: %u + size: %u > %u\n", offset, size, mem->size_bytes));
+		goto msync_release_and_return;
+	}
 
 	/* The actual cache flush - Implemented for each OS*/
-	_ump_osk_msync( mem , args->op, (u32)args->mapping, (u32)args->address, args->size);
+	_ump_osk_msync( mem, virtual, offset, size, args->op, NULL);
+
+msync_release_and_return:
+	ump_dd_reference_release(mem);
+	return;
+}
+
+void _ump_ukk_cache_operations_control(_ump_uk_cache_operations_control_s* args)
+{
+	ump_session_data * session_data;
+	ump_uk_cache_op_control op;
+
+	DEBUG_ASSERT_POINTER( args );
+	DEBUG_ASSERT_POINTER( args->ctx );
+
+	op = args->op;
+	session_data = (ump_session_data *)args->ctx;
+
+	_mali_osk_lock_wait(session_data->lock, _MALI_OSK_LOCKMODE_RW);
+	if ( op== _UMP_UK_CACHE_OP_START )
+	{
+		session_data->cache_operations_ongoing++;
+		DBG_MSG(4, ("Cache ops start\n" ));
+		if ( session_data->cache_operations_ongoing != 1 )
+		{
+			DBG_MSG(2, ("UMP: Number of simultanious cache control ops: %d\n", session_data->cache_operations_ongoing) );
+		}
+	}
+	else if ( op== _UMP_UK_CACHE_OP_FINISH )
+	{
+		DBG_MSG(4, ("Cache ops finish\n"));
+		session_data->cache_operations_ongoing--;
+		#if 0
+		if ( session_data->has_pending_level1_cache_flush)
+		{
+			/* This function will set has_pending_level1_cache_flush=0 */
+			_ump_osk_msync( NULL, NULL, 0, 0, _UMP_UK_MSYNC_FLUSH_L1, session_data);
+		}
+		#endif
+
+		/* to be on the safe side: always flush l1 cache when cache operations are done */
+		_ump_osk_msync( NULL, NULL, 0, 0, _UMP_UK_MSYNC_FLUSH_L1, session_data);
+		DBG_MSG(4, ("Cache ops finish end\n" ));
+	}
+	else
+	{
+		DBG_MSG(1, ("Illegal call to %s at line %d\n", __FUNCTION__, __LINE__));
+	}
+	_mali_osk_lock_signal(session_data->lock, _MALI_OSK_LOCKMODE_RW);
+
+}
+
+void _ump_ukk_switch_hw_usage(_ump_uk_switch_hw_usage_s *args )
+{
+	ump_dd_mem * mem = NULL;
+	ump_uk_user old_user;
+	ump_uk_msync_op cache_op = _UMP_UK_MSYNC_CLEAN_AND_INVALIDATE;
+	ump_session_data *session_data;
+
+	DEBUG_ASSERT_POINTER( args );
+	DEBUG_ASSERT_POINTER( args->ctx );
+
+	session_data = (ump_session_data *)args->ctx;
+
+	_mali_osk_lock_wait(device.secure_id_map_lock, _MALI_OSK_LOCKMODE_RW);
+	ump_descriptor_mapping_get(device.secure_id_map, (int)args->secure_id, (void**)&mem);
+
+	if (NULL == mem)
+	{
+		_mali_osk_lock_signal(device.secure_id_map_lock, _MALI_OSK_LOCKMODE_RW);
+		DBG_MSG(1, ("Failed to look up mapping in _ump_ukk_switch_hw_usage(). ID: %u\n", (ump_secure_id)args->secure_id));
+		return;
+	}
+
+	old_user = mem->hw_device;
+	mem->hw_device = args->new_user;
+
+	DBG_MSG(3, ("UMP[%02u] Switch usage  Start  New: %s  Prev: %s.\n", (ump_secure_id)args->secure_id, args->new_user?"MALI":"CPU",old_user?"MALI":"CPU"));
+
+	if ( ! mem->is_cached )
+	{
+		_mali_osk_lock_signal(device.secure_id_map_lock, _MALI_OSK_LOCKMODE_RW);
+		DBG_MSG(3, ("UMP[%02u] Changing owner of uncached memory. Cache flushing not needed.\n", (ump_secure_id)args->secure_id));
+		return;
+	}
+
+	if ( old_user == args->new_user)
+	{
+		_mali_osk_lock_signal(device.secure_id_map_lock, _MALI_OSK_LOCKMODE_RW);
+		DBG_MSG(4, ("UMP[%02u] Setting the new_user equal to previous for. Cache flushing not needed.\n", (ump_secure_id)args->secure_id));
+		return;
+	}
+	if (
+		 /* Previous AND new is both different from CPU */
+		 (old_user != _UMP_UK_USED_BY_CPU) && (args->new_user != _UMP_UK_USED_BY_CPU  )
+	   )
+	{
+		_mali_osk_lock_signal(device.secure_id_map_lock, _MALI_OSK_LOCKMODE_RW);
+		DBG_MSG(4, ("UMP[%02u] Previous and new user is not CPU. Cache flushing not needed.\n", (ump_secure_id)args->secure_id));
+		return;
+	}
+
+	if ( (old_user != _UMP_UK_USED_BY_CPU ) && (args->new_user==_UMP_UK_USED_BY_CPU) )
+	{
+		cache_op =_UMP_UK_MSYNC_INVALIDATE;
+		DBG_MSG(4, ("UMP[%02u] Cache invalidation needed\n", (ump_secure_id)args->secure_id));
+#ifdef UMP_SKIP_INVALIDATION
+#error
+		_mali_osk_lock_signal(device.secure_id_map_lock, _MALI_OSK_LOCKMODE_RW);
+		DBG_MSG(4, ("UMP[%02u] Performing Cache invalidation SKIPPED\n", (ump_secure_id)args->secure_id));
+		return;
+#endif
+	}
+	/* Ensure the memory doesn't dissapear when we are flushing it. */
+	ump_dd_reference_add(mem);
+	_mali_osk_lock_signal(device.secure_id_map_lock, _MALI_OSK_LOCKMODE_RW);
+
+	/* Take lock to protect: session->cache_operations_ongoing and session->has_pending_level1_cache_flush */
+	_mali_osk_lock_wait(session_data->lock, _MALI_OSK_LOCKMODE_RW);
+	/* Actual cache flush */
+	_ump_osk_msync( mem, NULL, 0, mem->size_bytes, cache_op, session_data);
+	_mali_osk_lock_signal(session_data->lock, _MALI_OSK_LOCKMODE_RW);
+
+	ump_dd_reference_release(mem);
+	DBG_MSG(4, ("UMP[%02u] Switch usage  Finish\n", (ump_secure_id)args->secure_id));
+	return;
+}
+
+void _ump_ukk_lock(_ump_uk_lock_s *args )
+{
+	ump_dd_mem * mem = NULL;
+
+	_mali_osk_lock_wait(device.secure_id_map_lock, _MALI_OSK_LOCKMODE_RW);
+	ump_descriptor_mapping_get(device.secure_id_map, (int)args->secure_id, (void**)&mem);
+
+	if (NULL == mem)
+	{
+		_mali_osk_lock_signal(device.secure_id_map_lock, _MALI_OSK_LOCKMODE_RW);
+		DBG_MSG(1, ("UMP[%02u] Failed to look up mapping in _ump_ukk_lock(). ID: %u\n", (ump_secure_id)args->secure_id));
+		return;
+	}
+	ump_dd_reference_add(mem);
+	_mali_osk_lock_signal(device.secure_id_map_lock, _MALI_OSK_LOCKMODE_RW);
+
+	DBG_MSG(1, ("UMP[%02u] Lock. New lock flag: %d. Old Lock flag:\n", (u32)args->secure_id, (u32)args->lock_usage, (u32) mem->lock_usage ));
+
+	mem->lock_usage = (ump_lock_usage) args->lock_usage;
+
+	/** TODO: TAKE LOCK HERE */
+
+	ump_dd_reference_release(mem);
+}
+
+void _ump_ukk_unlock(_ump_uk_unlock_s *args )
+{
+	ump_dd_mem * mem = NULL;
+
+	_mali_osk_lock_wait(device.secure_id_map_lock, _MALI_OSK_LOCKMODE_RW);
+	ump_descriptor_mapping_get(device.secure_id_map, (int)args->secure_id, (void**)&mem);
+
+	if (NULL == mem)
+	{
+		_mali_osk_lock_signal(device.secure_id_map_lock, _MALI_OSK_LOCKMODE_RW);
+		DBG_MSG(1, ("Failed to look up mapping in _ump_ukk_unlock(). ID: %u\n", (ump_secure_id)args->secure_id));
+		return;
+	}
+	ump_dd_reference_add(mem);
+	_mali_osk_lock_signal(device.secure_id_map_lock, _MALI_OSK_LOCKMODE_RW);
+
+	DBG_MSG(1, ("UMP[%02u] Unlocking. Old Lock flag:\n", (u32)args->secure_id, (u32) mem->lock_usage ));
+
+	mem->lock_usage = (ump_lock_usage) UMP_NOT_LOCKED;
+
+	/** TODO: RELEASE LOCK HERE */
+
+	ump_dd_reference_release(mem);
 }

@@ -36,11 +36,6 @@
 
 #define M5MO_DRIVER_NAME	"M5MO"
 
-#ifdef CONFIG_MACH_S2PLUS
-extern struct class *camera_class;
-struct device *m5mo_dev;
-#endif
-
 #define M5MO_FW_PATH		"/sdcard/RS_M5LS.bin"
 #define M5MO_FW_DUMP_PATH	"/data/RS_M5LS_dump.bin"
 
@@ -117,8 +112,9 @@ static const struct m5mo_frmsizeenum preview_frmsizes[] = {
 };
 
 static const struct m5mo_frmsizeenum capture_frmsizes[] = {
-	{ M5MO_CAPTURE_VGA,	640,	480,	0x09 },
-	{ M5MO_CAPTURE_WVGA,	800,	480,	0x0A },
+	{ M5MO_CAPTURE_VGA,	640,		480,		0x09 },
+	{ M5MO_CAPTURE_WVGA,	800,		480,		0x0A },
+	{ M5MO_CAPTURE_SXGA,	1280,	960,		0x14 },
 	{ M5MO_CAPTURE_W2MP,	2048,	1232,	0x2C },
 	{ M5MO_CAPTURE_3MP,	2048,	1536,	0x1B },
 	{ M5MO_CAPTURE_W7MP,	3264,	1968,	0x2D },
@@ -178,9 +174,7 @@ static struct m5mo_control m5mo_ctrls[] = {
 	},
 };
 
-#ifndef CONFIG_MACH_S2PLUS
 struct class *camera_class;
-#endif
 
 static inline struct m5mo_state *to_state(struct v4l2_subdev *sd)
 {
@@ -1567,9 +1561,7 @@ static int m5mo_set_af(struct v4l2_subdev *sd, int val)
 static int m5mo_set_af_mode(struct v4l2_subdev *sd, int val)
 {
 	struct m5mo_state *state = to_state(sd);
-#ifndef CONFIG_MACH_S2PLUS
 	struct regulator *movie = regulator_get(NULL, "led_movie");
-#endif
 	u32 cancel, mode, status = 0;
 	int i, err;
 
@@ -1632,12 +1624,10 @@ retry:
 		CHECK_ERR(err);
 	}
 
-#ifndef CONFIG_MACH_S2PLUS
 	if (val == FOCUS_MODE_MACRO)
 		regulator_set_current_limit(movie, 15000, 17000);
 	else if (state->focus.mode == FOCUS_MODE_MACRO)
 		regulator_set_current_limit(movie, 90000, 110000);
-#endif
 
 	state->focus.mode = val;
 
@@ -1656,7 +1646,7 @@ retry:
 
 	if ((status & 0x01) != 0x00) {
 		cam_err("failed\n");
-		return -ETIMEDOUT;
+		/*return -ETIMEDOUT;*/ /*This return value cause camera lock-up.*/
 	}
 
 	cam_trace("X\n");
@@ -2944,7 +2934,6 @@ static int __devinit m5mo_probe(struct i2c_client *client,
 #ifdef CAM_DEBUG
 	state->dbg_level = CAM_DEBUG;
 #endif
-#ifndef CONFIG_MACH_S2PLUS
 	if (state->m5mo_dev == NULL) {
 		state->m5mo_dev =
 		    device_create(camera_class, NULL, 0, NULL, "rear");
@@ -2964,7 +2953,6 @@ static int __devinit m5mo_probe(struct i2c_client *client,
 			}
 		}
 	}
-#endif
 	/* wait queue initialize */
 	init_waitqueue_head(&state->isp.wait);
 
@@ -3026,30 +3014,9 @@ static struct i2c_driver m5mo_i2c_driver = {
 
 static int __init m5mo_mod_init(void)
 {
-#ifdef CONFIG_MACH_S2PLUS
-	if (!m5mo_dev) {
-		m5mo_dev =
-		device_create(camera_class, NULL, 0, NULL, "rear");
-		if (IS_ERR(m5mo_dev)) {
-			cam_err("failed to create device m5mo_dev!\n");
-			return 0;
-		}
-		if (device_create_file
-		(m5mo_dev, &dev_attr_rear_camtype) < 0) {
-			cam_err("failed to create device file, %s\n",
-			dev_attr_rear_camtype.attr.name);
-		}
-		if (device_create_file
-		(m5mo_dev, &dev_attr_rear_camfw) < 0) {
-			cam_err("failed to create device file, %s\n",
-			dev_attr_rear_camfw.attr.name);
-		}
-	}
-#else
 	camera_class = class_create(THIS_MODULE, "camera");
 	if (IS_ERR(camera_class))
 		pr_err("Failed to create class(camera)!\n");
-#endif
 	return i2c_add_driver(&m5mo_i2c_driver);
 }
 

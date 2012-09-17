@@ -29,7 +29,8 @@
 extern void s5p_mixer_ctrl_init_fb_addr_phy(enum s5p_mixer_layer layer,
 		dma_addr_t fb_addr);
 extern void s5p_mixer_ctrl_init_grp_layer(enum s5p_mixer_layer layer);
-extern int s5p_mixer_ctrl_set_pixel_format(enum s5p_mixer_layer layer, u32 bpp, u32 trans_len);
+extern int s5p_mixer_ctrl_set_pixel_format(
+	enum s5p_mixer_layer layer, u32 bpp, u32 trans_len);
 extern int s5p_mixer_ctrl_enable_layer(enum s5p_mixer_layer layer);
 extern int s5p_mixer_ctrl_disable_layer(enum s5p_mixer_layer layer);
 extern int s5p_mixer_ctrl_set_priority(enum s5p_mixer_layer layer, u32 prio);
@@ -52,6 +53,7 @@ extern int s5p_mixer_ctrl_mux_clk(struct clk *ptr);
 extern void s5p_mixer_ctrl_set_int_enable(bool en);
 extern void s5p_mixer_ctrl_set_vsync_interrupt(bool en);
 extern bool s5p_mixer_ctrl_get_vsync_interrupt(void);
+extern void s5p_mixer_ctrl_disable_vsync_interrupt(void);
 extern void s5p_mixer_ctrl_clear_pend_all(void);
 extern void s5p_mixer_ctrl_stop(void);
 extern void s5p_mixer_ctrl_internal_start(void);

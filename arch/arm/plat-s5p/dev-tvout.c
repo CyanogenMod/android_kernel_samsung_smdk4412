@@ -93,6 +93,20 @@ struct platform_device s5p_device_hpd = {
 };
 EXPORT_SYMBOL(s5p_device_hpd);
 
+#ifdef CONFIG_HDMI_TX_STRENGTH
+void __init s5p_hdmi_tvout_set_platdata(struct s5p_platform_tvout *pd)
+{
+	struct s5p_platform_tvout *npd;
+
+	npd = kmemdup(pd, sizeof(struct s5p_platform_tvout), GFP_KERNEL);
+	if (!npd)
+		printk(KERN_ERR "%s: no memory for platform data\n", __func__);
+	else {
+		s5p_device_tvout.dev.platform_data = npd;
+	}
+}
+#endif
+
 void __init s5p_hdmi_hpd_set_platdata(struct s5p_platform_hpd *pd)
 {
 	struct s5p_platform_hpd *npd;

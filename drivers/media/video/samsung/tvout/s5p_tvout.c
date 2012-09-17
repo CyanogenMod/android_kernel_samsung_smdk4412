@@ -13,6 +13,7 @@
 #include <linux/clk.h>
 #include <linux/io.h>
 #include <linux/mm.h>
+#include <linux/delay.h>
 
 #if defined(CONFIG_S5P_SYSMMU_TV)
 #include <plat/sysmmu.h>
@@ -23,6 +24,10 @@
 #elif defined(CONFIG_S5P_MEM_BOOTMEM)
 #include <plat/media.h>
 #include <mach/media.h>
+#endif
+
+#if defined(CONFIG_HDMI_TX_STRENGTH) && !defined(CONFIG_USER_ALLOC_TVOUT)
+#include <plat/tvout.h>
 #endif
 
 #include "s5p_tvout_common_lib.h"
@@ -291,6 +296,12 @@ static int __devinit s5p_tvout_probe(struct platform_device *pdev)
 	struct device *hdmi_audio_dev;
 #endif
 
+#if defined(CONFIG_HDMI_TX_STRENGTH) && !defined(CONFIG_USER_ALLOC_TVOUT)
+	struct s5p_platform_tvout *pdata;
+	u8 tx_ch;
+	u8 *tx_val;
+#endif
+
 #ifdef CONFIG_TVOUT_DEBUG
 	struct class *sec_tvout;
 	tvout_dbg_flag = 1 << DBG_FLAG_HPD;
@@ -339,6 +350,15 @@ static int __devinit s5p_tvout_probe(struct platform_device *pdev)
 	s5p_hdmi_phy_power(true);
 	if (s5p_tvif_ctrl_start(TVOUT_720P_60, TVOUT_HDMI) < 0)
 		goto err_tvif_start;
+#ifdef CONFIG_HDMI_TX_STRENGTH
+	pdata = to_tvout_plat(&pdev->dev);
+	if (pdata && pdata->tx_tune) {
+		tx_ch = pdata->tx_tune->tx_ch;
+		tx_val = pdata->tx_tune->tx_val;
+	}
+	if (tx_ch && tx_val)
+		s5p_hdmi_phy_set_tx_strength(tx_ch, tx_val);
+#endif
 #endif
 
 	/* prepare memory */
@@ -495,14 +515,19 @@ static int s5p_tvout_remove(struct platform_device *pdev)
 static void s5p_tvout_early_suspend(struct early_suspend *h)
 {
 	tvout_dbg("\n");
+#ifdef CLOCK_GATING_ON_EARLY_SUSPEND
 	mutex_lock(&s5p_tvout_mutex);
-	s5p_mixer_ctrl_set_vsync_interrupt(false);
+	/* disable vsync interrupt during early suspend */
+	s5p_mixer_ctrl_disable_vsync_interrupt();
 	s5p_vp_ctrl_suspend();
 	s5p_mixer_ctrl_suspend();
 	s5p_tvif_ctrl_suspend();
 	suspend_status = 1;
 	tvout_dbg("suspend_status is true\n");
 	mutex_unlock(&s5p_tvout_mutex);
+#else
+	suspend_status = 1;
+#endif
 
 	return;
 }
@@ -511,6 +536,7 @@ static void s5p_tvout_late_resume(struct early_suspend *h)
 {
 	tvout_dbg("\n");
 
+#ifdef CLOCK_GATING_ON_EARLY_SUSPEND
 	mutex_lock(&s5p_tvout_mutex);
 
 #if defined(CONFIG_CPU_EXYNOS4212) || defined(CONFIG_CPU_EXYNOS4412)
@@ -521,11 +547,17 @@ static void s5p_tvout_late_resume(struct early_suspend *h)
 #endif
 	suspend_status = 0;
 	tvout_dbg("suspend_status is false\n");
+
 	s5p_tvif_ctrl_resume();
 	s5p_mixer_ctrl_resume();
 	s5p_vp_ctrl_resume();
-	s5p_mixer_ctrl_set_vsync_interrupt(s5p_mixer_ctrl_get_vsync_interrupt());
+	/* restore vsync interrupt setting */
+	s5p_mixer_ctrl_set_vsync_interrupt(
+		s5p_mixer_ctrl_get_vsync_interrupt());
 	mutex_unlock(&s5p_tvout_mutex);
+#else
+	suspend_status = 0;
+#endif
 
 	return;
 }
@@ -562,8 +594,10 @@ static int s5p_tvout_suspend(struct device *dev)
 static int s5p_tvout_resume(struct device *dev)
 {
 	tvout_dbg("\n");
+#if defined(CLOCK_GATING_ON_EARLY_SUSPEND)
 #if defined(CONFIG_CPU_EXYNOS4212) || defined(CONFIG_CPU_EXYNOS4412)
 	flag_after_resume = true;
+#endif
 #else
 	queue_work_on(0, tvout_resume_wq, &tvout_resume_work);
 #endif

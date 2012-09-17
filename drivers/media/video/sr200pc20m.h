@@ -252,18 +252,10 @@ static s32 large_file;
 #define dbg_setfile(fmt, ...)
 #endif				/* 0 */
 
-#ifdef CONFIG_MACH_S2PLUS
-#define TUNING_FILE_PATH "/mnt/sdcard/sr200pc20m_regs-s2plus.h"
-#else
 #define TUNING_FILE_PATH "/mnt/sdcard/sr200pc20m_regs.h"
-#endif				/* CONFIG_VIDEO_SR200PC20M */
 
 #endif				/* CONFIG_LOAD_FILE */
 
-#ifdef CONFIG_MACH_S2PLUS
-#include  "sr200pc20m_regs-s2plus.h"
-#else
 #include  "sr200pc20m_regs.h"
-#endif
 
 #endif				/* __SR200PC20M_H */

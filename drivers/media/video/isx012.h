@@ -9,7 +9,7 @@
  * the Free Software Foundation; either version 2 of the License, or
  * (at your option) any later version.
  *
- * - change date: 2012.04.17 12
+ * - change date: 2012.06.28
  */
 
 #ifndef __ISX012_H__
@@ -35,12 +35,11 @@
 #define CONFIG_CAM_YUV_CAPTURE
 #define CONFIG_CAM_I2C_LITTLE_ENDIAN
 /* #define CONFIG_LOAD_FILE */ /* for tuning */
-#define CONFIG_DEBUG_NO_FRAME
-#define CONFIG_NEW_STREAM_DELAY
+/* #define CONFIG_DEBUG_NO_FRAME */
 
 /** Debuging Feature **/
-#define CONFIG_CAM_DEBUG
-#define CONFIG_CAM_TRACE /* Enable it with CONFIG_CAM_DEBUG */
+/* #define CONFIG_CAM_DEBUG */
+/* #define CONFIG_CAM_TRACE */ /* Enable it with CONFIG_CAM_DEBUG */
 /* #define CONFIG_CAM_AF_DEBUG *//* Enable it with CONFIG_CAM_DEBUG */
 /* #define DEBUG_WRITE_REGS */
 /***********************************/
@@ -63,6 +62,16 @@ module_param_named(debug_mask, isx012_debug_mask, uint, S_IWUSR | S_IRUGO);
 #endif
 
 #define TAG_NAME	"["ISX012_DRIVER_NAME"]"" "
+
+/* Define debug level */
+#define CAMDBG_LEVEL_ERR		(1 << 0)
+#define CAMDBG_LEVEL_WARN		(1 << 1)
+#define CAMDBG_LEVEL_INFO		(1 << 2)
+#define CAMDBG_LEVEL_DEBUG		(1 << 3)
+#define CAMDBG_LEVEL_TRACE		(1 << 4)
+#define CAMDBG_LEVEL_DEFAULT	\
+	(CAMDBG_LEVEL_ERR | CAMDBG_LEVEL_WARN | CAMDBG_LEVEL_INFO)
+
 #define cam_err(fmt, ...)	\
 	printk(KERN_ERR TAG_NAME fmt, ##__VA_ARGS__)
 #define cam_warn(fmt, ...)	\
@@ -76,7 +85,7 @@ module_param_named(debug_mask, isx012_debug_mask, uint, S_IWUSR | S_IRUGO);
 #else
 #define cam_dbg(fmt, ...)	\
 	do { \
-		if (*to_state(sd)->dbg_level & CAMDBG_LEVEL_DEBUG) \
+		if (dbg_level & CAMDBG_LEVEL_DEBUG) \
 			printk(KERN_DEBUG TAG_NAME fmt, ##__VA_ARGS__); \
 	} while (0)
 #endif
@@ -86,7 +95,7 @@ module_param_named(debug_mask, isx012_debug_mask, uint, S_IWUSR | S_IRUGO);
 #else
 #define cam_trace(fmt, ...)	\
 	do { \
-		if (*to_state(sd)->dbg_level & CAMDBG_LEVEL_TRACE) \
+		if (dbg_level & CAMDBG_LEVEL_TRACE) \
 			printk(KERN_DEBUG TAG_NAME "%s: " fmt, \
 				__func__, ##__VA_ARGS__); \
 	} while (0)
@@ -214,6 +223,7 @@ enum isx012_preview_frame_size {
 
 enum isx012_capture_frame_size {
 	CAPTURE_SZ_VGA = 0,	/* 640x480 */
+	CAPTURE_SZ_960_720,
 	CAPTURE_SZ_W1MP,	/* 1536x864. Samsung-defined */
 	CAPTURE_SZ_2MP,		/* UXGA - 1600x1200 */
 	CAPTURE_SZ_W2MP,	/* 2048x1152. Samsung-defined */
@@ -350,18 +360,31 @@ struct isx012_gps_info {
 	s32 gps_timeStamp;
 };
 
+struct isx012_preview {
+	const struct isx012_framesize *frmsize;
+	u32 update_frmsize:1;
+	u32 fast_ae:1;
+};
+
+struct isx012_capture {
+	const struct isx012_framesize *frmsize;
+	u32 pre_req;	/* for fast capture */
+	u32 ae_manual_mode:1;
+	u32 lowlux_night:1;
+	u32 ready:1;	/* for fast capture */
+};
+
+/* Focus struct */
 struct isx012_focus {
 	enum v4l2_focusmode mode;
 	enum af_result_status status;
-	enum preflash_status preflash;
 
 	u32 pos_x;
 	u32 pos_y;
 
 	u32 start:1;	/* enum v4l2_auto_focus*/
 	u32 touch:1;
-	u32 lock:1;	/* fix me */
-	u32 ae_manual_mode:1;
+	u32 lock:1;	/* set if single AF is done */
 };
 
 /* struct for sensor specific data */
@@ -370,16 +393,30 @@ struct isx012_ae_gain_offset {
 	u32	ae_now;
 	u32	ersc_auto;
 	u32	ersc_now;
+
+	u32	ae_ofsetval;
+	u32	ae_maxdiff;
 };
 
-/* Exposure */
-struct isx012_exposure {
+/* Flash struct */
+struct isx012_flash {
 	struct isx012_ae_gain_offset ae_offset;
-	s32 val;
+	enum v4l2_flash_mode mode;
+	enum preflash_status preflash;
+	u32 awb_delay;
+	u32 ae_scl;	/* for back-up */
+	u32 on:1;	/* flash on/off */
+	u32 ignore_flash:1;
+	u32 ae_flash_lock:1;
+};
+
+/* Exposure struct */
+struct isx012_exposure {
+	s32 val;	/* exposure value */
 	u32 ae_lock:1;
 };
 
-/* White Balance */
+/* White Balance struct */
 struct isx012_whitebalance {
 	enum v4l2_wb_mode mode; /* wb mode */
 	u32 awb_lock:1;
@@ -396,8 +433,8 @@ struct isx012_exif {
 
 /* EXIF - flash filed */
 #define EXIF_FLASH_FIRED		(0x01)
-#define EXIF_FLASH_MODE_FIRING		(0x01)
-#define EXIF_FLASH_MODE_SUPPRESSION	(0x01 << 1)
+#define EXIF_FLASH_MODE_FIRING		(0x01 << 3)
+#define EXIF_FLASH_MODE_SUPPRESSION	(0x02 << 3)
 #define EXIF_FLASH_MODE_AUTO		(0x03 << 3)
 
 struct isx012_stream_time {
@@ -486,17 +523,13 @@ struct isx012_regs {
 	struct regset_table sharpness[SHARPNESS_MAX];
 	struct regset_table fps[I_FPS_MAX];
 	struct regset_table preview_return;
-	struct regset_table ae_lock_on;
-	struct regset_table ae_lock_off;
-	struct regset_table awb_lock_on;
-	struct regset_table awb_lock_off;
-#ifdef CONFIG_VIDEO_ISX012_P8
-	struct regset_table set_lowlight_cap;
-#endif
+
 	/* Flash */
 	struct regset_table flash_ae_line;
 	struct regset_table flash_on;
 	struct regset_table flash_off;
+	struct regset_table flash_fast_ae_awb;
+	struct regset_table ae_manual;
 
 	/* AF */
 	struct regset_table af_normal_mode;
@@ -534,9 +567,10 @@ struct isx012_state {
 	struct isx012_platform_data *pdata;
 	struct v4l2_subdev sd;
 	struct v4l2_pix_format req_fmt;
-	const struct isx012_framesize *preview;
-	const struct isx012_framesize *capture;
+	struct isx012_preview preview;
+	struct isx012_capture capture;
 	struct isx012_focus focus;
+	struct isx012_flash flash;
 	struct isx012_exposure exposure;
 	struct isx012_whitebalance wb;
 	struct isx012_exif exif;
@@ -556,8 +590,8 @@ struct isx012_state {
 	enum runmode runmode;
 	enum v4l2_sensor_mode sensor_mode;
 	enum v4l2_pix_format_mode format_mode;
-	enum v4l2_flash_mode flash_mode;
 	enum v4l2_scene_mode scene_mode;
+	enum v4l2_iso_mode iso;
 
 	s32 vt_mode;
 	s32 req_fps;
@@ -566,24 +600,25 @@ struct isx012_state {
 	u32 one_frame_delay_ms;
 	u32 light_level;	/* light level */
 	u32 lux_level_flash;
+	u32 shutter_level_flash;
 	u8 *dbg_level;
 #ifdef CONFIG_DEBUG_NO_FRAME
 	bool frame_check;
 #endif
 	u32 recording:1;
 	u32 hd_videomode:1;
-	u32 flash_on:1;
-	u32 ignore_flash:1;
-	u32 update_frmsize:1;
 	u32 need_wait_streamoff:1;
 	u32 initialized:1;
-	u32 lowlux_night:1;
 };
 
 static inline struct  isx012_state *to_state(struct v4l2_subdev *sd)
 {
 	return container_of(sd, struct isx012_state, sd);
 }
+
+static inline int isx012_restore_sensor_flash(struct v4l2_subdev *sd);
+static int isx012_set_capture(struct v4l2_subdev *sd);
+static int isx012_prepare_fast_capture(struct v4l2_subdev *sd);
 
 extern struct class *camera_class;
 extern int isx012_create_file(struct class *cls);
@@ -615,14 +650,15 @@ extern int isx012_create_file(struct class *cls);
 #define LUX_LEVEL_FLASH_ON		0x2B
 
 /* Count for loop */
-#define ISX012_CNT_CAPTURE_FRM		100
+#define ISX012_CNT_CAPTURE_FRM		330
 #define ISX012_CNT_CLEAR_VINT		20
 #define ISX012_CNT_AE_STABLE		100 /* for checking MODESEL_FIX */
-#define ISX012_CNT_CAPTURE_AWB		8
+#define ISX012_CNT_CAPTURE_AWB		3 /* 8 -> 3 */
 #define ISX012_CNT_OM_CHECK		30
-#define ISX012_CNT_CM_CHECK		180 /* 160 -> 180 */
+#define ISX012_CNT_CM_CHECK		280 /* 160 -> 180 */
+#define ISX012_CNT_STREAMOFF		300
 
-#define AF_SEARCH_COUNT			80
+#define AF_SEARCH_COUNT			200
 #define AE_STABLE_SEARCH_COUNT		7
 
 /* Sensor AF first,second window size.
@@ -630,6 +666,10 @@ extern int isx012_create_file(struct class *cls);
 #define DEFAULT_WINDOW_WIDTH		80
 #define DEFAULT_WINDOW_HEIGHT		80
 #define AF_PRECISION	100
+
+/* diff value fior fast AE in preview */
+#define AESCL_DIFF_FASTAE		1000
+
 
 /*
  * Register Address Definition

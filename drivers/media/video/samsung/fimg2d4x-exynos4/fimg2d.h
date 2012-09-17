@@ -41,6 +41,15 @@
 #define FIMG2D_BITBLT_SYNC	_IOW(FIMG2D_IOCTL_MAGIC, 1, int)
 #define FIMG2D_BITBLT_VERSION	_IOR(FIMG2D_IOCTL_MAGIC, 2, struct fimg2d_version)
 #define FIMG2D_BITBLT_SECURE	_IOW(FIMG2D_IOCTL_MAGIC, 3, unsigned int)
+#define FIMG2D_BITBLT_DBUFFER	_IOW(FIMG2D_IOCTL_MAGIC, 4, unsigned long)
+
+#define SEQ_NO_BLT_SKIA                0x00000001
+#define SEQ_NO_BLT_HWC_SEC             0x00000012
+#define SEQ_NO_BLT_HWC_NOSEC           0x00000002
+#define SEQ_NO_BLT_HDMI                0x00000003
+#define SEQ_NO_CMD_SECURE_ON           0x10000001
+#define SEQ_NO_CMD_SECURE_OFF          0x10000002
+#define SEQ_NO_CMD_SET_DBUFFER         0x10000003
 
 struct fimg2d_version {
 	unsigned int hw;
@@ -429,6 +438,7 @@ struct fimg2d_context {
 	atomic_t ncmd;
 	wait_queue_head_t wait_q;
 	struct fimg2d_perf perf[MAX_PERF_DESCS];
+	unsigned long *pgd_clone;
 };
 
 /**
@@ -486,6 +496,8 @@ struct fimg2d_control {
 
 	int irq;
 	unsigned int secure;
+	unsigned int dbuffer_addr;
+	unsigned long fault_addr;
 	atomic_t nctx;
 	atomic_t busy;
 	atomic_t active;

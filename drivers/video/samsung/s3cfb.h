@@ -22,6 +22,7 @@
 #endif
 #include <plat/fb-s5p.h>
 #endif
+#include <linux/kthread.h>
 #include <mach/cpufreq.h>
 
 #define S3CFB_NAME		"s3cfb"
@@ -42,9 +43,18 @@
 #define POWER_ON		1
 #define POWER_OFF		0
 
+#define VSYNC_TIMEOUT_MSEC 50
+
 #if defined(CONFIG_MACH_PX) || defined(CONFIG_MACH_Q1_BD)
 #define FEATURE_BUSFREQ_LOCK /* Now, this feature only avaliable in 4210 */
 #endif
+
+/* S3C_FB_MAX_WIN
+ * Set to the maximum number of windows that any of the supported hardware
+ * can use. Since the platform data uses this for an array size, having it
+ * set to the maximum of any version of the hardware can do is safe.
+ */
+#define S3C_FB_MAX_WIN	(5)
 
 enum s3cfb_data_path_t {
 	DATA_PATH_FIFO = 0,
@@ -145,6 +155,7 @@ struct s3cfb_lcd {
 	int	p_height;
 	int	bpp;
 	int	freq;
+	int	freq_limit;
 	int	vclk;
 	struct	s3cfb_lcd_timing timing;
 	struct	s3cfb_lcd_polarity polarity;
@@ -161,6 +172,32 @@ struct s3cfb_fimd_desc {
 	struct s3cfb_global	*fbdev[FIMD_MAX];
 };
 
+/**
+ * struct s3cfb_vsync - vsync information+
+ * @wait:              a queue for processes waiting for vsync
+ * @timestamp:         the time of the last vsync interrupt
+ * @active:            whether userspace is requesting vsync uevents
+ * @irq_refcount:      reference count for the underlying irq
+ * @irq_lock:          mutex protecting the irq refcount and register
+ * @thread:            uevent-generating thread
+ */
+struct s3cfb_vsync {
+	wait_queue_head_t       wait;
+	ktime_t                 timestamp;
+	bool                    active;
+	int                     irq_refcount;
+	struct mutex            irq_lock;
+	struct task_struct      *thread;
+};
+
+#ifdef CONFIG_FB_S5P_SYSMMU
+struct sysmmu_flag {
+	bool			enabled;
+	unsigned long		default_fb_addr;
+	unsigned long		pgd;
+};
+#endif
+
 struct s3cfb_global {
 	void __iomem		*regs;
 	void __iomem		*regs_org;
@@ -172,21 +209,29 @@ struct s3cfb_global {
 #ifdef CONFIG_BUSFREQ_OPP
 	struct device           *bus_dev;
 #endif
+	spinlock_t		vsync_slock;
 	struct clk		*clock;
 	int			irq;
 	wait_queue_head_t	wq;
 	unsigned int		wq_count;
 	struct fb_info		**fb;
-
-	ktime_t      vsync_timestamp;
-	int      vsync_state;
-	struct task_struct  *vsync_thread;
+	struct s3cfb_vsync	vsync_info;
 
 	atomic_t		enabled_win;
 	enum s3cfb_output_t	output;
 	enum s3cfb_rgb_mode_t	rgb_mode;
 	struct s3cfb_lcd	*lcd;
 	int			system_state;
+
+        /* New added */
+	struct list_head	update_regs_list;
+	struct mutex		update_regs_list_lock;
+	struct kthread_worker	update_regs_worker;
+	struct task_struct	*update_regs_thread;
+	struct kthread_work	update_regs_work;
+
+	struct sw_sync_timeline *timeline;
+	int			timeline_max;
 #ifdef CONFIG_HAS_WAKELOCK
 	struct early_suspend	early_suspend;
 	struct wake_lock	idle_lock;
@@ -194,6 +239,9 @@ struct s3cfb_global {
 #ifdef FEATURE_BUSFREQ_LOCK
 	atomic_t		busfreq_lock_cnt;	/* Bus frequency Lock count */
 	int			busfreq_flag;		/* context bus frequency flag*/
+#endif
+#ifdef CONFIG_FB_S5P_SYSMMU
+	struct sysmmu_flag	sysmmu;
 #endif
 };
 
@@ -232,6 +280,61 @@ struct s3cfb_user_chroma {
 	unsigned char	blue;
 };
 
+enum s3c_fb_pixel_format {
+	S3C_FB_PIXEL_FORMAT_RGBA_8888 = 0,
+	S3C_FB_PIXEL_FORMAT_RGB_888 = 1,
+	S3C_FB_PIXEL_FORMAT_BGRA_8888 = 2,
+	S3C_FB_PIXEL_FORMAT_RGB_565 = 3,
+	S3C_FB_PIXEL_FORMAT_RGBX_8888 = 4,
+	S3C_FB_PIXEL_FORMAT_RGBA_5551 = 5,
+	S3C_FB_PIXEL_FORMAT_RGBA_4444 = 6,
+	S3C_FB_PIXEL_FORMAT_MAX = 7,
+};
+
+struct s3c_fb_win_config {
+	enum {
+		S3C_FB_WIN_STATE_DISABLED = 0,
+		S3C_FB_WIN_STATE_COLOR,
+		S3C_FB_WIN_STATE_BUFFER,
+	} state;
+
+	union {
+		__u32 color;
+		struct {
+			int	fd;
+                        __u32	phys_addr;
+                        __u32	virt_addr;
+			__u32	offset;
+			__u32	stride;
+			enum s3c_fb_pixel_format format;
+		};
+	};
+
+	int	x;
+	int	y;
+	__u32	w;
+	__u32	h;
+};
+
+struct s3c_fb_win_config_data {
+	int	fence;
+	struct s3c_fb_win_config config[S3C_FB_MAX_WIN];
+};
+
+struct s3c_reg_data {
+	struct list_head	list;
+	u32			shadowcon;
+	u32			wincon[S3C_FB_MAX_WIN];
+	u32			winmap[S3C_FB_MAX_WIN];
+	u32			vidosd_a[S3C_FB_MAX_WIN];
+	u32			vidosd_b[S3C_FB_MAX_WIN];
+	u32			vidosd_c[S3C_FB_MAX_WIN];
+	u32			vidosd_d[S3C_FB_MAX_WIN];
+	u32			vidw_buf_start[S3C_FB_MAX_WIN];
+	u32			vidw_buf_end[S3C_FB_MAX_WIN];
+	u32			vidw_buf_size[S3C_FB_MAX_WIN];
+};
+
 #define BLENDING_NONE			0x0100
 #define BLENDING_PREMULT		0x0105
 #define BLENDING_COVERAGE		0x0405
@@ -245,6 +348,8 @@ struct s3cfb_user_chroma {
 						struct s3cfb_user_chroma)
 #define S3CFB_SET_VSYNC_INT		_IOW('F', 206, u32)
 #define S3CFB_GET_VSYNC_INT_STATUS	_IOR('F', 207, u32)
+#define S3CFB_GET_ION_USER_HANDLE       _IOWR('F', 208, struct s3c_fb_user_ion_client)
+#define S3CFB_WIN_CONFIG                _IOW('F', 209, struct s3c_fb_win_config_data)
 #define S3CFB_GET_LCD_WIDTH		_IOR('F', 302, int)
 #define S3CFB_GET_LCD_HEIGHT		_IOR('F', 303, int)
 #define S3CFB_SET_WRITEBACK		_IOW('F', 304, u32)
@@ -342,8 +447,17 @@ extern int s3cfb_set_buffer_size(struct s3cfb_global *ctrl, int id);
 extern int s3cfb_set_chroma_key(struct s3cfb_global *ctrl, int id);
 extern int s3cfb_channel_localpath_on(struct s3cfb_global *ctrl, int id);
 extern int s3cfb_channel_localpath_off(struct s3cfb_global *ctrl, int id);
+extern int s3cfb_set_vsync_int(struct fb_info *info, bool active);
 extern int s3cfb_check_vsync_status(struct s3cfb_global *ctrl);
 extern int s3cfb_set_dualrgb(struct s3cfb_global *ctrl, int mode);
+extern int s3cfb_set_window_protect(struct s3cfb_global *ctrl, int id, bool protect);
+extern void s3c_fb_update_regs(struct s3cfb_global *fbdev, struct s3c_reg_data *regs);
+#ifdef CONFIG_FB_S5P_SYSMMU
+extern void s3cfb_clean_outer_pagetable(unsigned long vaddr, size_t size);
+#endif
+#if defined(CONFIG_FB_S5P_VSYNC_THREAD)
+extern int s3cfb_wait_for_vsync(struct s3cfb_global *fbdev, u32 timeout);
+#endif
 #ifdef CONFIG_FB_S5P_MIPI_DSIM
 extern int s3cfb_vsync_status_check(void);
 #endif
