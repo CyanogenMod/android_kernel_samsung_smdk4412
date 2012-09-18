@@ -733,26 +733,10 @@ static const struct dmi_system_id intel_no_lvds[] = {
 	},
 	{
 		.callback = intel_no_lvds_dmi_callback,
-		.ident = "Asus AT5NM10T-I",
+		.ident = "MSI Wind Box DC500",
 		.matches = {
-			DMI_MATCH(DMI_BOARD_VENDOR, "ASUSTeK Computer INC."),
-			DMI_MATCH(DMI_BOARD_NAME, "AT5NM10T-I"),
-		},
-	},
-	{
-		.callback = intel_no_lvds_dmi_callback,
-		.ident = "Hewlett-Packard t5745",
-		.matches = {
-			DMI_MATCH(DMI_BOARD_VENDOR, "Hewlett-Packard"),
-			DMI_MATCH(DMI_BOARD_NAME, "hp t5745"),
-		},
-	},
-	{
-		.callback = intel_no_lvds_dmi_callback,
-		.ident = "Hewlett-Packard st5747",
-		.matches = {
-			DMI_MATCH(DMI_BOARD_VENDOR, "Hewlett-Packard"),
-			DMI_MATCH(DMI_BOARD_NAME, "hp st5747"),
+			DMI_MATCH(DMI_BOARD_VENDOR, "MICRO-STAR INTERNATIONAL CO., LTD"),
+			DMI_MATCH(DMI_BOARD_NAME, "MS-7469"),
 		},
 	},
 

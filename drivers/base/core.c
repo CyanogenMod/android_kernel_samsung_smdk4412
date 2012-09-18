@@ -1748,6 +1748,10 @@ void device_shutdown(void)
 		pm_runtime_get_noresume(dev);
 		pm_runtime_barrier(dev);
 
+		/* Don't allow any more runtime suspends */
+		pm_runtime_get_noresume(dev);
+		pm_runtime_barrier(dev);
+
 #if defined(CONFIG_MACH_Q1_BD) || defined(CONFIG_MACH_PX) || defined(CONFIG_MACH_MIDAS)
 		/* Temporary log to analyze a problem during shutdown */
 		if (dev->bus && dev->bus->shutdown) {

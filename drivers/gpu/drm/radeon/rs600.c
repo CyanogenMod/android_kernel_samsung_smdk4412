@@ -341,6 +341,16 @@ void rs600_hpd_fini(struct radeon_device *rdev)
 	}
 }
 
+void rs600_bm_disable(struct radeon_device *rdev)
+{
+	u16 tmp;
+
+	/* disable bus mastering */
+	pci_read_config_word(rdev->pdev, 0x4, &tmp);
+	pci_write_config_word(rdev->pdev, 0x4, tmp & 0xFFFB);
+	mdelay(1);
+}
+
 int rs600_asic_reset(struct radeon_device *rdev)
 {
 	struct rv515_mc_save save;
