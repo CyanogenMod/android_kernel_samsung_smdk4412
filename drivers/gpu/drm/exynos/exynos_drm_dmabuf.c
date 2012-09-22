@@ -25,6 +25,7 @@
 
 #include "drmP.h"
 #include "drm.h"
+#include "exynos_drm.h"
 #include "exynos_drm_drv.h"
 #include "exynos_drm_gem.h"
 
@@ -235,6 +236,9 @@ struct drm_gem_object *exynos_dmabuf_prime_import(struct drm_device *drm_dev,
 	if (sgt->nents == 1) {
 		buffer->dma_addr = sg_dma_address(sgt->sgl);
 		buffer->size = sg_dma_len(sgt->sgl);
+
+		/* always physically continuous memory if sgt->nents is 1. */
+		exynos_gem_obj->flags |= EXYNOS_BO_CONTIG;
 	} else {
 		unsigned int i = 0;
 
@@ -245,28 +249,24 @@ struct drm_gem_object *exynos_dmabuf_prime_import(struct drm_device *drm_dev,
 			sgl = sg_next(sgl);
 			i++;
 		}
+
+		/*
+		 * this case could be CONTIG or NONCONTIG type but now CONTIG.
+		 * we have to find a way that exporter can notify the type of
+		 * its own buffer to importer. TODO
+		 */
+		exynos_gem_obj->flags |= EXYNOS_BO_NONCONTIG;
 	}
 
 	exynos_gem_obj->buffer = buffer;
 	buffer->sgt = sgt;
 	exynos_gem_obj->base.import_attach = attach;
 
-	/* register buffer information to private buffer manager. */
-	ret = register_buf_to_priv_mgr(exynos_gem_obj,
-					&exynos_gem_obj->priv_handle,
-					&exynos_gem_obj->priv_id);
-	if (ret < 0)
-		goto err_release_gem;
-
-	DRM_DEBUG_PRIME("ump id = %d, dma_addr = 0x%x, size = 0x%lx\n",
-			exynos_gem_obj->priv_id, buffer->dma_addr, buffer->size);
+	DRM_DEBUG_PRIME("dma_addr = 0x%x, size = 0x%lx\n", buffer->dma_addr,
+				buffer->size);
 
 	return &exynos_gem_obj->base;
 
-err_release_gem:
-	drm_gem_object_release(&exynos_gem_obj->base);
-	kfree(exynos_gem_obj);
-	exynos_gem_obj = NULL;
 err_free_pages:
 	kfree(buffer->pages);
 	buffer->pages = NULL;

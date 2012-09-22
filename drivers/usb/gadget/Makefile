@@ -52,6 +52,7 @@ g_nokia-y			:= nokia.o
 g_webcam-y			:= webcam.o
 g_ncm-y				:= ncm.o
 g_android-y			:= android.o
+g_slp-y				:= slp.o
 
 obj-$(CONFIG_USB_ZERO)		+= g_zero.o
 obj-$(CONFIG_USB_AUDIO)		+= g_audio.o
@@ -71,6 +72,7 @@ obj-$(CONFIG_USB_G_NOKIA)	+= g_nokia.o
 obj-$(CONFIG_USB_G_WEBCAM)	+= g_webcam.o
 obj-$(CONFIG_USB_G_NCM)		+= g_ncm.o
 obj-$(CONFIG_USB_G_ANDROID)	+= g_android.o
+obj-$(CONFIG_USB_G_SLP)		+= g_slp.o
 obj-$(CONFIG_USB_ANDROID)	+= gadget_gbhc/android.o
 obj-$(CONFIG_USB_ANDROID_ACM)	+= gadget_gbhc/f_acm.o gadget_gbhc/u_serial.o
 obj-$(CONFIG_USB_ANDROID_ADB)	+= gadget_gbhc/f_adb.o

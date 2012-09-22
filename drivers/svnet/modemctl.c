@@ -515,6 +515,15 @@ static void mc_work(struct work_struct *work_arg)
 	dev_dbg(mc->dev, "PHONE ACTIVE: %d CP_DUMP_INT: %d\n",
 		error, cpdump_int);
 
+	if ((!error) && cpdump_int) {
+		dev_err(mc->dev, "CP abnormal dead\n");
+		dev_err(mc->dev, "(%d) send uevent to RIL [cpdump_int:%d]\n",
+			__LINE__, cpdump_int);
+		envs[0] = "MAILBOX=cp_reset";
+		kobject_uevent_env(&mc->dev->kobj, KOBJ_OFFLINE, envs);
+		sprd_boot_complete = 0;
+		return;
+	}
 	envs[0] = cpdump_int ? "MAILBOX=cp_exit" : "MAILBOX=cp_reset";
 
 	if (error && gpio_get_value(global_mc->gpio_phone_on)) {

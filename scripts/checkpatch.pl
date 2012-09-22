@@ -16,6 +16,7 @@ use Getopt::Long qw(:config no_auto_abbrev);
 
 my $quiet = 0;
 my $tree = 1;
+my $chk_subject = 1;
 my $chk_signoff = 1;
 my $chk_patch = 1;
 my $tst_only;
@@ -98,6 +99,7 @@ if (-f $conf) {
 GetOptions(
 	'q|quiet+'	=> \$quiet,
 	'tree!'		=> \$tree,
+	'subject!'	=> \$chk_subject,
 	'signoff!'	=> \$chk_signoff,
 	'patch!'	=> \$chk_patch,
 	'emacs!'	=> \$emacs,
@@ -340,6 +342,7 @@ sub deparenthesize {
 	return $string;
 }
 
+$chk_subject = 0 if ($file);
 $chk_signoff = 0 if ($file);
 
 my @dep_includes = ();
@@ -1532,6 +1535,26 @@ sub process {
 				      "do not set execute permissions for source files\n" . $permhere);
 			}
 		}
+
+# Check for subject:
+		if ($chk_subject && $line =~ /^Subject: \[PATCH\] (\s*)(\[.*\])?/i) {
+		    my $space_before = $1;
+		    my $brace_usage = $2;
+		    if (defined $space_before && $space_before ne "") {
+			WARN("BAD_SUBJECT",
+			     "Remove leading whitespace on subject\n" . $herecurr);
+		    }
+		    if (defined $brace_usage && $brace_usage ne "") {
+			WARN("BAD_SUBJECT",
+			     "Avoid using '[xxx]' on subject. Use 'xxx:' instead\n" . $herecurr);
+		    }
+		    if ($lines[$linenr] !~ /^$/) {
+			ERROR("MISSING_BLANK_LINE_AFTER_SUBJECT",
+			      "Missing blank line after Subject: line\n" . $herecurr);
+		    }
+		}
+
+		#($line =~ /^Subject:/i) &&  ? 1 : 0;
 
 # Check the patch for a signoff:
 		if ($line =~ /^\s*signed-off-by:/i) {

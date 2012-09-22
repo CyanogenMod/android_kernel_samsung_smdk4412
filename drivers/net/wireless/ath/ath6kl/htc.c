@@ -1451,6 +1451,8 @@ static int ath6kl_htc_rx_alloc(struct htc_target *target,
 	struct htc_packet *packet, *tmp_pkt;
 	struct htc_frame_hdr *htc_hdr;
 	int i, n_msg;
+	struct ath6kl_vif *vif;
+	vif = ath6kl_vif_first(target->dev->ar);
 
 	spin_lock_bh(&target->rx_lock);
 
@@ -2128,6 +2130,8 @@ int ath6kl_htc_rxmsg_pending_handler(struct htc_target *target,
 	int num_look_ahead = 1;
 	enum htc_endpoint_id id;
 	int n_fetched = 0;
+	struct ath6kl_vif *vif;
+	vif = ath6kl_vif_first(target->dev->ar);
 
 	INIT_LIST_HEAD(&comp_pktq);
 	*num_pkts = 0;

@@ -982,6 +982,7 @@ static struct vpll_div_data vpll_div_4212[] = {
 	{333000000, 2, 111, 2, 0, 0, 0, 0},
 	{350000000, 3, 175, 2, 0, 0, 0, 0},
 	{440000000, 3, 110, 1, 0, 0, 0, 0},
+	{533000000, 3, 133, 1, 16384, 0, 0, 0},
 };
 
 static unsigned long exynos4212_vpll_get_rate(struct clk *clk)

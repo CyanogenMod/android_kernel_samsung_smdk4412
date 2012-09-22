@@ -71,4 +71,8 @@ TCBB_FUNC s32 tcbd_init_dsp(
 	struct tcbd_device *_device, u8 *_boot_code, s32 _size);
 
 TCBB_FUNC s32 tcbd_check_dsp_status(struct tcbd_device *_device);
+
+#define FILTER_ENABLE          (1<<2)
+#define FILTER_SYNCERR         (1<<3)
+TCBB_FUNC s32 tcbd_set_pid_filter(struct tcbd_device *_device, u32 _filter);
 #endif /*__TCBD_DRV_IP_H__*/

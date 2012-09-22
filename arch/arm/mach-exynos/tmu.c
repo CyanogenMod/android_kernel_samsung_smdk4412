@@ -67,11 +67,12 @@ static struct workqueue_struct  *tmu_monitor_wq;
 static DEFINE_MUTEX(tmu_lock);
 
 
-#if (defined(CONFIG_CPU_EXYNOS4212) || defined(CONFIG_CPU_EXYNOS4412)) \
-	&& defined(CONFIG_VIDEO_MALI400MP)
+#if (defined(CONFIG_CPU_EXYNOS4212) || defined(CONFIG_CPU_EXYNOS4412))
+#if defined(CONFIG_VIDEO_MALI400MP)
 extern int mali_voltage_lock_init(void);
 extern int mali_voltage_lock_push(int lock_vol);
 extern int mali_voltage_lock_pop(void);
+#endif
 #define CONFIG_TC_VOLTAGE /* Temperature compensated voltage */
 #endif
 
@@ -468,6 +469,7 @@ static void exynos_interrupt_enable(struct s5p_tmu_info *info, int enable)
 		__raw_writel(0x0, info->tmu_base + EXYNOS4_TMU_INTEN);
 }
 
+#if defined(CONFIG_TC_VOLTAGE)
 /**
  * exynos_tc_volt - locks or frees vdd_arm, vdd_mif/int and vdd_g3d for
  * temperature compensation.
@@ -481,7 +483,7 @@ static int exynos_tc_volt(struct s5p_tmu_info *info, int enable)
 	static int usage;
 	int ret = 0;
 
-	if (!info)
+	if (!info || !(info->dev))
 		return -EPERM;
 
 	data = info->dev->platform_data;
@@ -501,12 +503,14 @@ static int exynos_tc_volt(struct s5p_tmu_info *info, int enable)
 		if (ret)
 			goto err_lock;
 #endif
+#if defined(CONFIG_VIDEO_MALI400MP)
 		ret = mali_voltage_lock_push(data->temp_compensate.g3d_volt);
 		if (ret < 0) {
 			pr_err("TMU: g3d_push error: %u uV\n",
 				data->temp_compensate.g3d_volt);
 			goto err_lock;
 		}
+#endif
 	} else {
 		exynos_cpufreq_lock_free(DVFS_LOCK_ID_TMU);
 #ifdef CONFIG_BUSFREQ_OPP
@@ -514,11 +518,13 @@ static int exynos_tc_volt(struct s5p_tmu_info *info, int enable)
 		if (ret)
 			goto err_unlock;
 #endif
+#if defined(CONFIG_VIDEO_MALI400MP)
 		ret = mali_voltage_lock_pop();
 		if (ret < 0) {
 			pr_err("TMU: g3d_pop error\n");
 			goto err_unlock;
 		}
+#endif
 	}
 	usage = enable;
 	pr_info("TMU: %s is ok!\n", enable ? "lock" : "unlock");
@@ -529,6 +535,7 @@ err_unlock:
 	pr_err("TMU: %s is fail.\n", enable ? "lock" : "unlock");
 	return ret;
 }
+#endif
 
 static void exynos4_handler_tmu_state(struct work_struct *work)
 {
@@ -1104,7 +1111,7 @@ static int __devinit s5p_tmu_probe(struct platform_device *pdev)
 		&info->cpulevel_tc) < 0) {
 		dev_err(&pdev->dev, "cpufreq_get_level error\n");
 		ret = -EINVAL;
-		goto err_nomem;
+		goto err_nores;
 	}
 #ifdef CONFIG_BUSFREQ_OPP
 	/* To lock bus frequency in OPP mode */
@@ -1112,13 +1119,13 @@ static int __devinit s5p_tmu_probe(struct platform_device *pdev)
 	if (info->bus_dev < 0) {
 		dev_err(&pdev->dev, "Failed to get_dev\n");
 		ret = -EINVAL;
-		goto err_nomem;
+		goto err_nores;
 	}
 	if (exynos4x12_find_busfreq_by_volt(pdata->temp_compensate.bus_volt,
 		&info->busfreq_tc)) {
 		dev_err(&pdev->dev, "get_busfreq_value error\n");
 		ret = -EINVAL;
-		goto err_nomem;
+		goto err_nores;
 	}
 #endif
 	pr_info("%s: cpufreq_level[%u], busfreq_value[%u]\n",
@@ -1243,8 +1250,10 @@ static int __devinit s5p_tmu_probe(struct platform_device *pdev)
 		if (exynos_tc_volt(info, 1) < 0)
 			pr_err("TMU: lock error!\n");
 	}
+#if defined(CONFIG_VIDEO_MALI400MP)
 	if (mali_voltage_lock_init())
 		pr_err("Failed to initialize mail voltage lock.\n");
+#endif
 #endif
 
 	/* initialize tmu_state */
@@ -1355,7 +1364,7 @@ static int s5p_tmu_resume(struct platform_device *pdev)
 	struct s5p_tmu_info *info = platform_get_drvdata(pdev);
 	struct s5p_platform_tmu *data;
 
-	if (!info)
+	if (!info || !(info->dev))
 		return -EAGAIN;
 
 	data = info->dev->platform_data;

@@ -70,25 +70,36 @@
 #define MXT_STATE_PRESS			1
 #define MXT_STATE_MOVE			2
 
-/* Debug cmds  */
-#define MXT_PAGE_UP			0x01
-#define MXT_PAGE_DOWN			0x02
-#define MXT_DELTA_MODE		0x10
-#define MXT_REFERENCE_MODE	0x11
-#define MXT_CTE_MODE			0x31
+/* Diagnostic cmds  */
+#define MXT_DIAG_PAGE_UP		0x01
+#define MXT_DIAG_PAGE_DOWN		0x02
+#define MXT_DIAG_DELTA_MODE		0x10
+#define MXT_DIAG_REFERENCE_MODE		0x11
+#define MXT_DIAG_CTE_MODE		0x31
+#define MXT_DIAG_IDENTIFICATION_MODE	0x80
+#define MXT_DIAG_TOCH_THRESHOLD_MODE	0xF4
+
+#define MXT_DIAG_MODE_MASK	0xFC
+#define MXT_DIAGNOSTIC_MODE	0
+#define MXT_DIAGNOSTIC_PAGE	1
 
 /* Firmware name */
-#define MXT_FW_NAME			"tsp_atmel/mXT1664S.fw"
+#define MXT_FW_NAME		"mXT1664S.fw"
+#define MXT_MAX_FW_PATH		255
 
 /* Firmware version */
-#define MXT_FIRM_VERSION	0x9
+#define MXT_FIRM_VERSION	0x10
 #define MXT_FIRM_BUILD		0xAA
 
 /* Feature */
 #define TSP_FIRMUP_ON_PROBE	1
-#define TSP_BOOSTER		0
-#define TSP_DEBUG_INFO	1
-#define TSP_SEC_SYSFS	1
+#define TSP_BOOSTER			1
+#define TSP_DEBUG_INFO			0
+#define TSP_SEC_SYSFS			1
+#define TSP_USE_SHAPETOUCH	1
+#define CHECK_ANTITOUCH		1
+#define TSP_INFORM_CHARGER	1
+
 /* TSP_ITDEV feature just for atmel tunning app
 * so it should be disabled after finishing tunning
 * because it use other write permission. it will be cause
@@ -96,16 +107,31 @@
 */
 #define TSP_ITDEV		1
 
+#define MXT_T7_IDLE_ACQ_INT	0
+#define MXT_T7_ACT_ACQ_INT	1
+
+#if CHECK_ANTITOUCH
+#define MXT_T61_TIMER_ONESHOT	0
+#define MXT_T61_TIMER_REPEAT	1
+#define MXT_T61_TIMER_CMD_START		1
+#define MXT_T61_TIMER_CMD_STOP		2
+#endif
+
 #if TSP_SEC_SYSFS
-#define TSP_BUF_SIZE 1024
+#define TSP_BUF_SIZE	 1024
 
-#define TX_NUM		26
-#define RX_NUM		14
-#define NODE_NUM	(TX_NUM*RX_NUM)
+#define NODE_NUM	1664
 
-#define TSP_CMD_STR_LEN 32
-#define TSP_CMD_RESULT_STR_LEN 512
-#define TSP_CMD_PARAM_NUM 8
+#define NODE_PER_PAGE	64
+#define DATA_PER_NODE	2
+
+#define REF_OFFSET_VALUE	16384
+#define REF_MIN_VALUE		(19744 - REF_OFFSET_VALUE)
+#define REF_MAX_VALUE		(28884 - REF_OFFSET_VALUE)
+
+#define TSP_CMD_STR_LEN		32
+#define TSP_CMD_RESULT_STR_LEN	512
+#define TSP_CMD_PARAM_NUM	8
 
 enum CMD_STATUS {
 	CMD_STATUS_WAITING = 0,
@@ -114,12 +140,21 @@ enum CMD_STATUS {
 	CMD_STATUS_FAIL,
 	CMD_STATUS_NOT_APPLICABLE,
 };
+
+enum {
+	MXT_FW_FROM_BUILT_IN = 0,
+	MXT_FW_FROM_UMS,
+	MXT_FW_FROM_REQ_FW,
+};
 #endif
 
 #if TSP_BOOSTER
-/* touch booster */
-#define TOUCH_BOOSTER_TIME		3000
-#define TOUCH_BOOSTER_LIMIT_CLK	500000
+#include <mach/cpufreq.h>
+#include <mach/dev.h>
+#define SEC_DVFS_LOCK_TIMEOUT	200
+#define SEC_DVFS_LOCK_FREQ		800000
+#define SEC_BUS_LOCK_FREQ		267160
+#define SEC_BUS_LOCK_FREQ2	400200
 #endif
 
 struct mxt_object {
@@ -146,6 +181,9 @@ struct mxt_finger_info {
 	s16 z;
 	u16 w;
 	s8 state;
+#if TSP_USE_SHAPETOUCH
+	int16_t component;
+#endif
 	u16 mcount;
 };
 
@@ -159,6 +197,8 @@ struct touch_booster {
 	bool touch_cpu_lock_status;
 	int cpu_lv;
 	struct delayed_work dvfs_dwork;
+	struct device *bus_dev;
+	struct device *dev;
 };
 #endif
 
@@ -172,8 +212,13 @@ struct mxt_data_sysfs {
 	struct mutex			cmd_lock;
 	bool			cmd_is_running;
 
-	unsigned int reference[NODE_NUM];
-	unsigned int delta[NODE_NUM];
+	u16 reference[NODE_NUM];
+	s16 delta[NODE_NUM];
+
+	u32 ref_max_data;
+	u32 ref_min_data;
+	s16 delta_max_data;
+	u16 delta_max_node;
 };
 #endif
 
@@ -185,17 +230,39 @@ struct mxt_data {
 	struct mxt_info_block info;
 	struct mxt_object *objects;
 	struct mxt_report_id_map *rid_map;
+	struct mxt_callbacks callbacks;
+	struct delayed_work resume_dwork;
 #ifdef CONFIG_HAS_EARLYSUSPEND
 	struct early_suspend early_suspend;
 #endif
 #if TSP_SEC_SYSFS
 	struct mxt_data_sysfs *sysfs_data;
 #endif
+#if TSP_BOOSTER
+	struct touch_booster booster;
+#endif
+#if TSP_INFORM_CHARGER
+	struct delayed_work noti_dwork;
+	struct delayed_work acq_int_dwork;
+	bool charging_mode;
+	u8 charger_inform_buf_size;
+	u8 *charger_inform_buf;
+#endif
 #ifdef TSP_ITDEV
 	int driver_paused;
 	int debug_enabled;
 	u16 last_read_addr;
 #endif
+#if CHECK_ANTITOUCH
+	u8 check_antitouch;
+	u8 check_timer;
+	u8 check_autocal;
+	u8 check_calgood;
+#endif
+	const char *config_version;
+	u8 tsp_ctl;
+	u8 x_num;
+	u8 y_num;
 	u8 max_report_id;
 	u8 finger_report_id;
 	u16 msg_proc;
@@ -206,6 +273,10 @@ struct mxt_data {
 	u32 finger_mask;
 	int num_fingers;
 	bool mxt_enabled;
+	bool debug_log;
+#if TSP_USE_SHAPETOUCH
+	int16_t sumsize;
+#endif
 	struct mutex lock;
 	struct mxt_finger_info fingers[];
 };
@@ -225,5 +296,15 @@ extern int mxt_read_object(struct mxt_data *data,
 				u8 type, u8 offset, u8 *val);
 extern int mxt_write_object(struct mxt_data *data,
 				 u8 type, u8 offset, u8 val);
+
+#if TSP_SEC_SYSFS
+extern int mxt_flash_fw_from_sysfs(struct mxt_data *data,
+		const u8 *fw_data, size_t fw_size);
+#endif
+
+#if TSP_BOOSTER
+extern void mxt_set_dvfs_on(struct mxt_data *data, bool en);
+extern int mxt_init_dvfs(struct mxt_data *data);
+#endif	/* TSP_BOOSTER */
 
 #endif /* __MXT_1664S_DEV_H */

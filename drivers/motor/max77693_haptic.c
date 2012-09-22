@@ -107,6 +107,9 @@ static void haptic_enable(struct timed_output_dev *tout_dev, int value)
 			HRTIMER_MODE_REL);
 	}
 	spin_unlock_irqrestore(&hap_data->lock, flags);
+#ifdef SEC_DEBUG_VIB
+	printk(KERN_DEBUG "[VIB] haptic_enable is called\n");
+#endif
 }
 
 static enum hrtimer_restart haptic_timer_func(struct hrtimer *timer)
@@ -163,8 +166,8 @@ static void haptic_work(struct work_struct *work)
 
 		if (hap_data->pdata->motor_en)
 			hap_data->pdata->motor_en(true);
-		else
-			regulator_enable(hap_data->regulator);
+
+		regulator_enable(hap_data->regulator);
 
 		hap_data->running = true;
 	} else {
@@ -173,15 +176,20 @@ static void haptic_work(struct work_struct *work)
 
 		if (hap_data->pdata->motor_en)
 			hap_data->pdata->motor_en(false);
-		else
-			regulator_force_disable(hap_data->regulator);
-
+#ifdef CONFIG_MACH_GC1
+		regulator_disable(hap_data->regulator);
+#else
+		regulator_force_disable(hap_data->regulator);
+#endif
 		pwm_disable(hap_data->pwm);
 
 		max77693_haptic_i2c(hap_data, false);
 
 		hap_data->running = false;
 	}
+#ifdef SEC_DEBUG_VIB
+	printk(KERN_DEBUG "[VIB] haptic_work is called\n");
+#endif
 	return;
 }
 
@@ -221,6 +229,9 @@ void vibtonz_en(bool en)
 
 		g_hap_data->running = false;
 	}
+#ifdef SEC_DEBUG_VIB
+	printk(KERN_DEBUG "[VIB] vibtonz_en is called\n");
+#endif
 }
 EXPORT_SYMBOL(vibtonz_en);
 
@@ -242,6 +253,9 @@ void vibtonz_pwm(int nForce)
         pr_debug("[VIB] %s: setting pwm_duty=%d", __func__, pwm_duty);
 		pwm_config(g_hap_data->pwm, pwm_duty, pwm_period);
 	}
+#ifdef SEC_DEBUG_VIB
+	printk(KERN_DEBUG "[VIB] vibtonz_pwm is called(%d)\n", nForce);
+#endif
 }
 EXPORT_SYMBOL(vibtonz_pwm);
 #endif
@@ -348,9 +362,9 @@ static int max77693_haptic_probe(struct platform_device *pdev)
 
 	if (pdata->init_hw)
 		pdata->init_hw();
-	else
-		hap_data->regulator
-			= regulator_get(NULL, pdata->regulator_name);
+
+	hap_data->regulator
+		= regulator_get(NULL, pdata->regulator_name);
 
 	if (IS_ERR(hap_data->regulator)) {
 		pr_err("[VIB] Failed to get vmoter regulator.\n");
@@ -377,7 +391,7 @@ static int max77693_haptic_probe(struct platform_device *pdev)
 		goto err_timed_output_register;
 	}
 #endif
-
+	pr_err("[VIB] timed_output device is registrated\n");
 	pr_debug("[VIB] -- %s\n", __func__);
 
 	return error;

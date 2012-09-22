@@ -78,13 +78,15 @@ static int ath6kl_fetch_nvmac_info(struct ath6kl *ar)
 	char *softmac_old_filename = "/data/.mac.info";
 
 	do {
+		/*
 		isnvmac_imei = android_readwrite_file(nvfilepath_imei,
 								NULL, NULL, 0);
 		isnvmac_wifi = android_readwrite_file(nvfilepath_wifi,
-								NULL, NULL, 0);
+								NULL, NULL, 0); */
 		ismac_file = android_readwrite_file(softmac_filename,
 								NULL, NULL, 0);
 
+		/*
 		if (isnvmac_imei >= 16 && isnvmac_wifi >= 16) {
 			strcpy(nvfilepath, nvfilepath_wifi);
 			isnvmac_file = isnvmac_wifi;
@@ -94,10 +96,11 @@ static int ath6kl_fetch_nvmac_info(struct ath6kl *ar)
 		} else if (isnvmac_imei >= 16) {
 			strcpy(nvfilepath, nvfilepath_imei);
 			isnvmac_file = isnvmac_imei;
-		}
+		} */
 
 		/* copy .nvmac.info file to .mac.info
 		   wifi driver will use .mac.info finally */
+		/*
 		if (isnvmac_file >= 16) {
 			ret = android_readwrite_file(nvfilepath,
 				(char *)softmac_temp, NULL, isnvmac_file);
@@ -111,9 +114,10 @@ static int ath6kl_fetch_nvmac_info(struct ath6kl *ar)
 				__func__, ret);
 			ret = android_readwrite_file(softmac_old_filename,
 				NULL, (char *)softmac_temp, ret);
-		}
+		} */
 
-		if (isnvmac_file < 16 && ismac_file < 16) {
+		//if (isnvmac_file < 16 && ismac_file < 16) {
+		if (ismac_file < 16) {
 			snprintf(softmac_temp, sizeof(softmac_temp),
 				"00:12:34:%02x:%02x:%02x",
 				random32() & 0xff,

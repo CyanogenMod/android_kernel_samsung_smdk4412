@@ -17,12 +17,16 @@
 #include <linux/init.h>
 #include <linux/platform_device.h>
 #include <linux/irq.h>
+#include <linux/interrupt.h>
 #include <linux/gpio.h>
 #include <mach/gpio-exynos4.h>
 #include <plat/gpio-cfg.h>
 #include <linux/clk.h>
 #include <linux/err.h>
 #include <linux/delay.h>
+#include <linux/usb.h>
+#include <linux/usb/hcd.h>
+#include <linux/usb/ehci_def.h>
 
 #include <linux/platform_data/modem.h>
 #include <mach/sec_modem.h>
@@ -131,6 +135,81 @@ static int umts_link_ldo_enble(bool enable)
 	return 0;
 }
 
+#ifdef EHCI_REG_DUMP
+struct dump_ehci_regs {
+	unsigned caps_hc_capbase;
+	unsigned caps_hcs_params;
+	unsigned caps_hcc_params;
+	unsigned reserved0;
+	struct ehci_regs regs;
+	unsigned port_usb;  /*0x54*/
+	unsigned port_hsic0;
+	unsigned port_hsic1;
+	unsigned reserved[12];
+	unsigned insnreg00;	/*0x90*/
+	unsigned insnreg01;
+	unsigned insnreg02;
+	unsigned insnreg03;
+	unsigned insnreg04;
+	unsigned insnreg05;
+	unsigned insnreg06;
+	unsigned insnreg07;
+};
+
+struct s5p_ehci_hcd_stub {
+	struct device *dev;
+	struct usb_hcd *hcd;
+	struct clk *clk;
+	int power_on;
+};
+/* for EHCI register dump */
+struct dump_ehci_regs sec_debug_ehci_regs;
+
+#define pr_hcd(s, r) printk(KERN_DEBUG "hcd reg(%s):\t 0x%08x\n", s, r)
+static void print_ehci_regs(struct dump_ehci_regs *base)
+{
+	pr_hcd("HCCPBASE", base->caps_hc_capbase);
+	pr_hcd("HCSPARAMS", base->caps_hcs_params);
+	pr_hcd("HCCPARAMS", base->caps_hcc_params);
+	pr_hcd("USBCMD", base->regs.command);
+	pr_hcd("USBSTS", base->regs.status);
+	pr_hcd("USBINTR", base->regs.intr_enable);
+	pr_hcd("FRINDEX", base->regs.frame_index);
+	pr_hcd("CTRLDSSEGMENT", base->regs.segment);
+	pr_hcd("PERIODICLISTBASE", base->regs.frame_list);
+	pr_hcd("ASYNCLISTADDR", base->regs.async_next);
+	pr_hcd("CONFIGFLAG", base->regs.configured_flag);
+	pr_hcd("PORT0 Status/Control", base->port_usb);
+	pr_hcd("PORT1 Status/Control", base->port_hsic0);
+	pr_hcd("PORT2 Status/Control", base->port_hsic1);
+	pr_hcd("INSNREG00", base->insnreg00);
+	pr_hcd("INSNREG01", base->insnreg01);
+	pr_hcd("INSNREG02", base->insnreg02);
+	pr_hcd("INSNREG03", base->insnreg03);
+	pr_hcd("INSNREG04", base->insnreg04);
+	pr_hcd("INSNREG05", base->insnreg05);
+	pr_hcd("INSNREG06", base->insnreg06);
+	pr_hcd("INSNREG07", base->insnreg07);
+}
+
+static void debug_ehci_reg_dump(struct device *hdev)
+{
+	struct s5p_ehci_hcd_stub *s5p_ehci = dev_get_drvdata(hdev);
+	struct usb_hcd *hcd = s5p_ehci->hcd;
+	char *buf = (char *)&sec_debug_ehci_regs;
+
+	if (s5p_ehci->power_on && hcd) {
+		memcpy(buf, hcd->regs, 0xB);
+		memcpy(buf + 0x10, hcd->regs + 0x10, 0x1F);
+		memcpy(buf + 0x50, hcd->regs + 0x50, 0xF);
+		memcpy(buf + 0x90, hcd->regs + 0x90, 0x1F);
+		print_ehci_regs(hcd->regs);
+	}
+}
+#else
+#define debug_ehci_reg_dump (NULL)
+#endif
+
 static int umts_link_reconnect(void);
 static struct modemlink_pm_data modem_link_pm_data = {
 	.name = "link_pm",
@@ -140,6 +219,7 @@ static struct modemlink_pm_data modem_link_pm_data = {
 	.gpio_link_hostwake = GPIO_IPC_HOST_WAKEUP,
 	.gpio_link_slavewake = GPIO_IPC_SLAVE_WAKEUP,
 	.link_reconnect = umts_link_reconnect,
+	.ehci_reg_dump = debug_ehci_reg_dump,
 };
 
 static struct modemlink_pm_link_activectl active_ctl;
@@ -147,9 +227,6 @@ static struct modemlink_pm_link_activectl active_ctl;
 static void xmm_gpio_revers_bias_clear(void);
 static void xmm_gpio_revers_bias_restore(void);
 
-#ifndef GPIO_AP_DUMP_INT
-#define GPIO_AP_DUMP_INT 0
-#endif
 static struct modem_data umts_modem_data = {
 	.name = "xmm6262",
 
@@ -159,9 +236,21 @@ static struct modem_data umts_modem_data = {
 	.gpio_pda_active = GPIO_PDA_ACTIVE,
 	.gpio_phone_active = GPIO_PHONE_ACTIVE,
 	.gpio_cp_dump_int = GPIO_CP_DUMP_INT,
+#ifdef GPIO_AP_DUMP_INT
 	.gpio_ap_dump_int = GPIO_AP_DUMP_INT,
+#endif
 	.gpio_flm_uart_sel = 0,
 	.gpio_cp_warm_reset = 0,
+
+#ifdef CONFIG_SEC_DUAL_MODEM_MODE
+	.gpio_sim_io_sel = GPIO_SIM_IO_SEL,
+	.gpio_cp_ctrl1 = GPIO_CP_CTRL1,
+	.gpio_cp_ctrl2 = GPIO_CP_CTRL2,
+#endif
+
+#ifdef GPIO_SIM_DETECT
+	.gpio_sim_detect = GPIO_SIM_DETECT,
+#endif
 
 	.modem_type = IMC_XMM6262,
 	.link_types = LINKTYPE(LINKDEV_HSIC),
@@ -266,10 +355,11 @@ static int umts_link_reconnect(void)
 	return 0;
 }
 
+
 /* if use more than one modem device, then set id num */
 static struct platform_device umts_modem = {
 	.name = "modem_if",
-	.id = -1,
+	.id = 1,
 	.num_resources = ARRAY_SIZE(umts_modem_res),
 	.resource = umts_modem_res,
 	.dev = {
@@ -289,7 +379,14 @@ static void umts_modem_cfg_gpio(void)
 	unsigned gpio_cp_dump_int = umts_modem_data.gpio_cp_dump_int;
 	unsigned gpio_ap_dump_int = umts_modem_data.gpio_ap_dump_int;
 	unsigned gpio_flm_uart_sel = umts_modem_data.gpio_flm_uart_sel;
-	/* unsigned irq_phone_active = umts_modem_res[0].start; */
+	unsigned gpio_sim_detect = umts_modem_data.gpio_sim_detect;
+	//unsigned irq_phone_active = umts_modem_res[0].start;
+
+#ifdef CONFIG_SEC_DUAL_MODEM_MODE
+	unsigned gpio_sim_io_sel = umts_modem_data.gpio_sim_io_sel;
+	unsigned gpio_cp_ctrl1 = umts_modem_data.gpio_cp_ctrl1;
+	unsigned gpio_cp_ctrl2 = umts_modem_data.gpio_cp_ctrl2;
+#endif
 
 	if (gpio_reset_req_n) {
 		err = gpio_request(gpio_reset_req_n, "RESET_REQ_N");
@@ -339,6 +436,19 @@ static void umts_modem_cfg_gpio(void)
 		pr_err(LOG_TAG "check phone active = %d\n", gpio_phone_active);
 	}
 
+	if (gpio_sim_detect) {
+		err = gpio_request(gpio_sim_detect, "SIM_DETECT");
+		if (err)
+			printk(KERN_ERR "fail to request gpio %s: %d\n",
+				"SIM_DETECT", err);
+
+		/* gpio_direction_input(gpio_sim_detect); */
+		s3c_gpio_cfgpin(gpio_sim_detect, S3C_GPIO_SFN(0xF));
+		s3c_gpio_setpull(gpio_sim_detect, S3C_GPIO_PULL_NONE);
+		irq_set_irq_type(gpio_to_irq(gpio_sim_detect),
+							IRQ_TYPE_EDGE_BOTH);
+	}
+
 	if (gpio_cp_dump_int) {
 		err = gpio_request(gpio_cp_dump_int, "CP_DUMP_INT");
 		if (err) {
@@ -348,7 +458,7 @@ static void umts_modem_cfg_gpio(void)
 		gpio_direction_input(gpio_cp_dump_int);
 	}
 
-	if (gpio_ap_dump_int /*&& system_rev >= 11*/) {    /* MO rev1.0*/
+	if (gpio_ap_dump_int) {
 		err = gpio_request(gpio_ap_dump_int, "AP_DUMP_INT");
 		if (err) {
 			pr_err(LOG_TAG "fail to request gpio %s : %d\n",
@@ -370,22 +480,6 @@ static void umts_modem_cfg_gpio(void)
 		irq_set_irq_type(gpio_to_irq(gpio_phone_active),
 							IRQ_TYPE_LEVEL_HIGH);
 	/* set low unused gpios between AP and CP */
-	err = gpio_request(GPIO_FLM_RXD, "FLM_RXD");
-	if (err)
-		pr_err(LOG_TAG "fail to request gpio %s : %d\n", "FLM_RXD",
-		err);
-	else {
-		gpio_direction_output(GPIO_FLM_RXD, 0);
-		s3c_gpio_setpull(GPIO_FLM_RXD, S3C_GPIO_PULL_NONE);
-	}
-	err = gpio_request(GPIO_FLM_TXD, "FLM_TXD");
-	if (err)
-		pr_err(LOG_TAG "fail to request gpio %s : %d\n", "FLM_TXD",
-		err);
-	else {
-		gpio_direction_output(GPIO_FLM_TXD, 0);
-		s3c_gpio_setpull(GPIO_FLM_TXD, S3C_GPIO_PULL_NONE);
-	}
 	err = gpio_request(GPIO_SUSPEND_REQUEST, "SUS_REQ");
 	if (err)
 		pr_err(LOG_TAG "fail to request gpio %s : %d\n", "SUS_REQ",
@@ -394,15 +488,6 @@ static void umts_modem_cfg_gpio(void)
 		gpio_direction_output(GPIO_SUSPEND_REQUEST, 0);
 		s3c_gpio_setpull(GPIO_SUSPEND_REQUEST, S3C_GPIO_PULL_NONE);
 	}
-	err = gpio_request(GPIO_GPS_CNTL, "GPS_CNTL");
-	if (err)
-		pr_err(LOG_TAG "fail to request gpio %s : %d\n", "GPS_CNTL",
-		err);
-	else {
-		gpio_direction_output(GPIO_GPS_CNTL, 0);
-		s3c_gpio_setpull(GPIO_GPS_CNTL, S3C_GPIO_PULL_NONE);
-	}
-
 	pr_info(LOG_TAG "umts_modem_cfg_gpio done\n");
 }
 
@@ -415,15 +500,29 @@ static void xmm_gpio_revers_bias_clear(void)
 	gpio_direction_output(modem_link_pm_data.gpio_link_hostwake, 0);
 	gpio_direction_output(modem_link_pm_data.gpio_link_slavewake, 0);
 
+	if (umts_modem_data.gpio_sim_detect)
+		gpio_direction_output(umts_modem_data.gpio_sim_detect, 0);
+
 	msleep(20);
 }
 
 static void xmm_gpio_revers_bias_restore(void)
 {
+	unsigned gpio_sim_detect = umts_modem_data.gpio_sim_detect;
+
 	s3c_gpio_cfgpin(umts_modem_data.gpio_phone_active, S3C_GPIO_SFN(0xF));
 	s3c_gpio_cfgpin(modem_link_pm_data.gpio_link_hostwake,
 		S3C_GPIO_SFN(0xF));
 	gpio_direction_input(umts_modem_data.gpio_cp_dump_int);
+
+	if (gpio_sim_detect) {
+		gpio_direction_input(gpio_sim_detect);
+		s3c_gpio_cfgpin(gpio_sim_detect, S3C_GPIO_SFN(0xF));
+		s3c_gpio_setpull(gpio_sim_detect, S3C_GPIO_PULL_NONE);
+		irq_set_irq_type(gpio_to_irq(gpio_sim_detect),
+				IRQ_TYPE_EDGE_BOTH);
+		enable_irq_wake(gpio_to_irq(gpio_sim_detect));
+	}
 }
 
 static void modem_link_pm_config_gpio(void)
@@ -481,6 +580,20 @@ static void modem_link_pm_config_gpio(void)
 	pr_info(LOG_TAG "modem_link_pm_config_gpio done\n");
 }
 
+static void board_set_simdetect_polarity(void)
+{
+	if (umts_modem_data.gpio_sim_detect) {
+#if defined(CONFIG_MACH_GC1)
+		if (system_rev >= 6) /* GD1 3G real B'd*/
+			umts_modem_data.sim_polarity = 1;
+		else
+			umts_modem_data.sim_polarity = 0;
+#else
+		umts_modem_data.sim_polarity = 0;
+#endif
+	}
+}
+
 static int __init init_modem(void)
 {
 	int ret;
@@ -489,9 +602,10 @@ static int __init init_modem(void)
 	/* umts gpios configuration */
 	umts_modem_cfg_gpio();
 	modem_link_pm_config_gpio();
+	board_set_simdetect_polarity();
 	ret = platform_device_register(&umts_modem);
 	if (ret < 0)
-		return ret;
+		pr_err("(%s) register fail\n", umts_modem.name);
 
 	return ret;
 }

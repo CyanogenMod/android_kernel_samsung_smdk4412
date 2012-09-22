@@ -424,7 +424,7 @@ struct exynos_ss_udc {
 	struct wake_lock	usbd_wake_lock;
 };
 
-#if defined(CONFIG_BATTERY_SAMSUNG) || defined(CONFIG_BATTERY_SAMSUNG_S2PLUS)
+#if defined(CONFIG_BATTERY_SAMSUNG)
 extern void samsung_cable_check_status(int flag);
 #endif
 

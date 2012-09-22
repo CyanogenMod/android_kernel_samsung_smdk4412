@@ -118,6 +118,9 @@ static int ath6kl_hif_proc_dbg_intr(struct ath6kl_device *dev)
 {
 	u32 dummy;
 	int ret;
+	struct ath6kl_vif *vif;
+
+	vif = ath6kl_vif_first(dev->ar);
 
 	ath6kl_warn("firmware crashed\n");
 
@@ -132,6 +135,8 @@ static int ath6kl_hif_proc_dbg_intr(struct ath6kl_device *dev)
 
 	ath6kl_hif_dump_fw_crash(dev->ar);
 	ath6kl_read_fwlogs(dev->ar);
+
+	cfg80211_priv_event(vif->ndev, "HANG", GFP_ATOMIC);
 
 	return ret;
 }
@@ -393,7 +398,8 @@ static int proc_pending_irqs(struct ath6kl_device *dev, bool *done)
 	u8 host_int_status = 0;
 	u32 lk_ahd = 0;
 	u8 htc_mbox = 1 << HTC_MAILBOX;
-
+	struct ath6kl_vif *vif;
+	vif = ath6kl_vif_first(dev->ar);
 	ath6kl_dbg(ATH6KL_DBG_IRQ, "proc_pending_irqs: (dev: 0x%p)\n", dev);
 
 	/*
@@ -402,7 +408,12 @@ static int proc_pending_irqs(struct ath6kl_device *dev, bool *done)
 	 * sleep or call any API that can block or switch thread/task
 	 * contexts. This is a fully schedulable context.
 	 */
-
+#ifdef CONFIG_MACH_PX
+	if (vif->sdio_remove == true) {
+		*done = true;
+		goto out;
+	}
+#endif
 	/*
 	 * Process pending intr only when int_status_en is clear, it may
 	 * result in unnecessary bus transaction otherwise. Target may be
@@ -450,8 +461,19 @@ static int proc_pending_irqs(struct ath6kl_device *dev, bool *done)
 			    htc_mbox) {
 				rg = &dev->irq_proc_reg;
 				lk_ahd = le32_to_cpu(rg->rx_lkahd[HTC_MAILBOX]);
-				if (!lk_ahd)
-					ath6kl_err("lookAhead is zero!\n");
+
+				if (vif->force_reload == true) {
+					lk_ahd = 0;
+				}
+				if (!lk_ahd) {
+					ath6kl_err("lookAhead is zero! force_reload = %d\n", vif->force_reload);
+#ifdef CONFIG_MACH_PX
+					cfg80211_priv_event(vif->ndev, "HANG", GFP_ATOMIC);
+					ath6kl_hif_rx_control(dev, false);
+					ssleep(3);
+					status = -ENOMEM;
+#endif
+				}
 			}
 		}
 	}
@@ -476,9 +498,17 @@ static int proc_pending_irqs(struct ath6kl_device *dev, bool *done)
 		 */
 		status = ath6kl_htc_rxmsg_pending_handler(dev->htc_cnxt,
 							  lk_ahd, &fetched);
+#ifdef CONFIG_MACH_PX
+		if (status && status != -ECANCELED) {
+			cfg80211_priv_event(vif->ndev, "HANG", GFP_ATOMIC);
+			ath6kl_hif_rx_control(dev, false);
+			ssleep(3);
+			goto out;
+		}
+#else
 		if (status)
 			goto out;
-
+#endif
 		if (!fetched)
 			/*
 			 * HTC could not pull any messages out due to lack
@@ -539,10 +569,22 @@ out:
 /* interrupt handler, kicks off all interrupt processing */
 int ath6kl_hif_intr_bh_handler(struct ath6kl *ar)
 {
+#ifdef CONFIG_MACH_PX
+	struct ath6kl_device *dev;
+	unsigned long timeout;
+	int status = 0;
+	bool done = false;
+
+	if ((ar != NULL) && (ar->htc_target != NULL) && (ar->htc_target->dev != NULL))
+		dev = ar->htc_target->dev;
+	else
+		return status;
+#else
 	struct ath6kl_device *dev = ar->htc_target->dev;
 	unsigned long timeout;
 	int status = 0;
 	bool done = false;
+#endif
 
 	/*
 	 * Reset counter used to flag a re-scan of IRQ status registers on
@@ -555,7 +597,12 @@ int ath6kl_hif_intr_bh_handler(struct ath6kl *ar)
 	 * re-read.
 	 */
 	timeout = jiffies + msecs_to_jiffies(ATH6KL_HIF_COMMUNICATION_TIMEOUT);
-	while (time_before(jiffies, timeout) && !done) {
+#ifdef CONFIG_MACH_PX
+	while (time_before(jiffies, timeout) && !done && (dev != NULL))
+#else
+	while (time_before(jiffies, timeout) && !done)
+#endif
+	{
 		status = proc_pending_irqs(dev, &done);
 		if (status)
 			break;

@@ -222,10 +222,18 @@ static int dma_hw_free(struct snd_pcm_substream *substream)
 	/* TODO - do we need to ensure DMA flushed */
 	snd_pcm_set_runtime_buffer(substream, NULL);
 
+#ifdef CONFIG_SLP_WIP
+	spin_lock(&prtd->lock);
+#endif
+
 	if (prtd->params) {
 		s3c2410_dma_free(prtd->params->channel, prtd->params->client);
 		prtd->params = NULL;
 	}
+
+#ifdef CONFIG_SLP_WIP
+	spin_unlock(&prtd->lock);
+#endif
 
 	return 0;
 }

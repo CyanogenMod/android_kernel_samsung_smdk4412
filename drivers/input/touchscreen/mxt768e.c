@@ -566,14 +566,7 @@ static void treat_error_status(void)
 
 	if (ta_status) {
 		get_object_info(data,
-			GEN_POWERCONFIG_T7, &size, &obj_address);
-		/* 1:ACTVACQINT */
-		error = change_config(data, obj_address, 1, 255);
-
-		get_object_info(data,
 			GEN_ACQUISITIONCONFIG_T8, &size, &obj_address);
-		/* 0:CHRGTIME */
-		error |= change_config(data, obj_address, 0, 64);
 #if !(USE_ADJUST_FRCCALRATIO)
 		/* 8:ATCHFRCCALTHR*/
 		error |= change_config(data, obj_address, 8, 50);
@@ -595,36 +588,18 @@ static void treat_error_status(void)
 
 		get_object_info(data,
 			PROCG_NOISESUPPRESSION_T48, &size, &obj_address);
-		/* 2:CALCFG */
-		error |= change_config(data, obj_address, 2, 114);
-		/* 3:BASEFREQ */
-		error |= change_config(data, obj_address, 3, 15);
-		/* 8:MFFREQ[0] */
-		error |= change_config(data, obj_address, 8, 3);
-		/* 9:MFFREQ[1] */
-		error |= change_config(data, obj_address, 9, 5);
-		/* 10:NLGAIN*/
-		error |= change_config(data, obj_address, 10, 96);
-		/* 11:NLTHR*/
-		error |= change_config(data, obj_address, 11, 30);
 		/* 17:GCMAXADCSPERX */
 		error |= change_config(data, obj_address, 17, 100);
-		/* 34:BLEN[0] */
-		error |= change_config(data, obj_address, 34, 80);
+		/* 22:MFINVLDDIFFTHR */
+		error |= change_config(data, obj_address, 22, 30);
 		/* 35:TCHTHR[0] */
-		error |= change_config(data, obj_address, 35, 40);
-		/* 36:TCHDI[0] */
-		error |= change_config(data, obj_address, 36, 2);
+		error |= change_config(data, obj_address, 35, 50);
 		/* 39:MOVFILTER[0] */
 		error |= change_config(data, obj_address, 39, 65);
 		/* 41:MRGHYST[0] */
 		error |= change_config(data, obj_address, 41, 40);
 		/* 42:MRGTHR[0] */
 		error |= change_config(data, obj_address, 42, 50);
-		/* 43:XLOCLIP[0] */
-		error |= change_config(data, obj_address, 43, 5);
-		/* 44:XHICLIP[0] */
-		error |= change_config(data, obj_address, 44, 5);
 		/* 51:JUMPLIMIT[0] */
 		error |= change_config(data, obj_address, 51, 25);
 		/* 52:TCHHYST[0] */
@@ -634,14 +609,7 @@ static void treat_error_status(void)
 			pr_err("failed to write error status\n");
 	} else {
 		get_object_info(data,
-			GEN_POWERCONFIG_T7, &size, &obj_address);
-		/* 1:ACTVACQINT */
-		error = change_config(data, obj_address, 1, 255);
-
-		get_object_info(data,
 			GEN_ACQUISITIONCONFIG_T8, &size, &obj_address);
-		/* 0:CHRGTIME */
-		error |= change_config(data, obj_address, 0, 64);
 #if !(USE_ADJUST_FRCCALRATIO)
 		/* 8:ATCHFRCCALTHR*/
 		error |= change_config(data, obj_address, 8, 50);
@@ -661,30 +629,18 @@ static void treat_error_status(void)
 		get_object_info(data,
 			SPT_CTECONFIG_T46, &size, &obj_address);
 		/* 2:IDLESYNCSPERX */
-		error |= change_config(data, obj_address, 2, 48);
+		error |= change_config(data, obj_address, 2, 32);
 		/* 3:ACTVSYNCSPERX */
-		error |= change_config(data, obj_address, 3, 48);
+		error |= change_config(data, obj_address, 3, 32);
 
 		get_object_info(data,
 			PROCG_NOISESUPPRESSION_T48, &size, &obj_address);
-		/* 2:CALCFG */
-		error |= change_config(data, obj_address, 2, 242);
-		/* 3:BASEFREQ */
-		error |= change_config(data, obj_address, 3, 15);
-		/* 8:MFFREQ[0] */
-		error |= change_config(data, obj_address, 8, 3);
-		/* 9:MFFREQ[1] */
-		error |= change_config(data, obj_address, 9, 5);
-		/* 10:NLGAIN*/
-		error |= change_config(data, obj_address, 10, 112);
-		/* 11:NLTHR*/
-		error |= change_config(data, obj_address, 11, 25);
 		/* 17:GCMAXADCSPERX */
-		error |= change_config(data, obj_address, 17, 100);
-		/* 34:BLEN[0] */
-		error |= change_config(data, obj_address, 34, 112);
+		error |= change_config(data, obj_address, 17, 64);
+		/* 22:MFINVLDDIFFTHR */
+		error |= change_config(data, obj_address, 22, 100);
 		/* 35:TCHTHR[0] */
-		error |= change_config(data, obj_address, 35, 40);
+		error |= change_config(data, obj_address, 35, 45);
 		/* 41:MRGHYST[0] */
 		error |= change_config(data, obj_address, 41, 40);
 		/* 42:MRGTHR[0] */
@@ -692,7 +648,7 @@ static void treat_error_status(void)
 		/* 51:JUMPLIMIT[0] */
 		error |= change_config(data, obj_address, 51, 25);
 		/* 52:TCHHYST[0] */
-		error |= change_config(data, obj_address, 52, 15);
+		error |= change_config(data, obj_address, 52, 12);
 
 		if (error < 0)
 			pr_err("failed to write error status\n");
@@ -779,7 +735,7 @@ static void mxt_check_medianfilter_error(struct work_struct *work)
 
 	if (tchcount_aft_median_error
 		>= CNTLMTTCH_AFT_MEDIAN_ERROR) {
-		calibrate_chip_e();
+		/*calibrate_chip_e();*/
 	}
 	tchcount_aft_median_error = 0;
 }

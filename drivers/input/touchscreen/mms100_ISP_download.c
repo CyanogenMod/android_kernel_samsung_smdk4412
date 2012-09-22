@@ -73,7 +73,7 @@ static void mcsdl_read_32bits(UINT8 * pData);
 static void mcsdl_write_bits(UINT32 wordData, int nBits);
 static void mcsdl_scl_toggle_twice(void);
 
-#if defined(CONFIG_MACH_C1CTC) || defined(CONFIG_MACH_M0_CHNOPEN) ||\
+#if defined(CONFIG_MACH_M0_CHNOPEN) ||					\
 	defined(CONFIG_MACH_M0_CMCC) || defined(CONFIG_MACH_M0_CTC)
 extern unsigned int lcdtype;
 #endif
@@ -146,8 +146,7 @@ int mms100_ISP_download_binary_data(int dl_mode,
 	for (retry_cnt = 0; retry_cnt < 5; retry_cnt++) {
 		if (dl_mode == 0x01) {	/*MELFAS_ISP_DOWNLOAD */
 
-#if defined(CONFIG_MACH_C1CTC) || defined(CONFIG_MACH_M0_CHNOPEN) || \
-	defined(CONFIG_MACH_M0_CTC)
+#if defined(CONFIG_MACH_M0_CHNOPEN) || defined(CONFIG_MACH_M0_CTC)
 			if (lcdtype == 0x20) {
 				nRet =
 				mcsdl_download((const UINT8*)MELFAS_binary_4_65,

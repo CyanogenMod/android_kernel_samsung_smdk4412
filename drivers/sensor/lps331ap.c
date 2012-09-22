@@ -208,7 +208,11 @@
 #define DELAY_DEFAULT			200
 #define DELAY_MINIMUM			40
 /* calibration file path */
+#ifdef CONFIG_SLP
+#define CALIBRATION_FILE_PATH		"/csa/sensor/baro_cal_data"
+#else
 #define CALIBRATION_FILE_PATH		"/efs/FactoryApp/baro_delta"
+#endif
 
 static const struct {
 	unsigned int cutoff_ms;
@@ -277,7 +281,7 @@ static int lps331ap_prs_i2c_read(struct lps331ap_prs_data *prs,
 
 	err = i2c_transfer(prs->client->adapter, msgs, 2);
 	if (err != 2) {
-		dev_err(&prs->client->dev, "read transfer error\n");
+		dev_err(&prs->client->dev, "read transfer error = %d\n", err);
 		err = -EIO;
 	}
 	return 0;
@@ -1041,15 +1045,25 @@ static ssize_t lps331ap_reg_get(struct device *dev,\
 {
 	ssize_t ret;
 	struct lps331ap_prs_data *prs = dev_get_drvdata(dev);
-	int rc;
+	int rc, i;
 	u8 data;
+	u8 data_all[64] = {0,};
 
 	mutex_lock(&prs->lock);
 	data = prs->reg_addr;
 	mutex_unlock(&prs->lock);
 	rc = lps331ap_prs_i2c_read(prs, &data, 1);
 	if (rc < 0)
-			return rc;
+		return rc;
+
+	data_all[0] = (I2C_AUTO_INCREMENT | 0x00);
+	rc = lps331ap_prs_i2c_read(prs, data_all, 64);
+	if (rc < 0)
+		return rc;
+	for (i = 0; i < 64; i++)
+		pr_info("%s, Register[0x%02x] = 0x%02x\n", __func__,
+			i, data_all[i]);
+
 	ret = sprintf(buf, "0x%02x\n", data);
 	return ret;
 }

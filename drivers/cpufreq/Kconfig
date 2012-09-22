@@ -266,6 +266,17 @@ config CPU_FREQ_GOV_ADAPTIVE
 config CPU_FREQ_GOV_PEGASUSQ
 	tristate "'pegasusq' cpufreq policy governor"
 
+config CPU_FREQ_GOV_SLP
+	tristate "'slp' cpufreq policy governor"
+
+config SLP_CHECK_CPU_LOAD
+        bool "check load and frequency of cpu"
+	depends on CPU_FREQ_GOV_SLP
+
+config SLP_GOV_DYNAMIC_PARAMS
+        bool "check SLP GOV. Dynamic Params feature"
+	depends on CPU_FREQ_GOV_SLP
+
 config CPU_FREQ_DVFS_MONITOR
 	bool "dvfs monitor"
 	depends on CPU_FREQ

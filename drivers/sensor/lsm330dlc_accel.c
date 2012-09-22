@@ -71,7 +71,11 @@ enum {
 
 #define ACC_DEV_NAME "accelerometer"
 
+#ifdef CONFIG_SLP
+#define CALIBRATION_FILE_PATH	"/csa/sensor/accel_cal_data"
+#else
 #define CALIBRATION_FILE_PATH	"/efs/calibration_data"
+#endif
 #define CAL_DATA_AMOUNT	20
 
 static const struct odr_delay {
@@ -88,7 +92,6 @@ static const struct odr_delay {
 	{    ODR1, 1000000000LL }, /*    1Hz */
 };
 
-/* It will be used, when google fusion is enabled. */
 static const int position_map[][3][3] = {
 	{{-1,  0,  0}, { 0, -1,  0}, { 0,  0,  1} }, /* 0 top/upper-left */
 	{{ 0, -1,  0}, { 1,  0,  0}, { 0,  0,  1} }, /* 1 top/upper-right */
@@ -149,6 +152,10 @@ static int lsm330dlc_accel_read_raw_xyz(struct lsm330dlc_accel_data *data,
 	acc->x = acc->x >> 4;
 	acc->y = acc->y >> 4;
 	acc->z = acc->z >> 4;
+
+#if defined(CONFIG_MACH_M3_JPN_DCM)
+	acc->y = -acc->y;
+#endif
 
 	return 0;
 }
@@ -558,15 +565,9 @@ static ssize_t lsm330dlc_accel_fs_read(struct device *dev,
 				accel_adjusted[i]
 				+= position_map[data->position][i][j] * raw[j];
 		}
-#ifdef CONFIG_SLP
-		return sprintf(buf, "raw:%d,%d,%d adjust:%d,%d,%d\n",
-			raw[0], raw[1], raw[2], accel_adjusted[0],
-			accel_adjusted[1], accel_adjusted[2]);
-#else
 		return sprintf(buf, "%d,%d,%d\n",
 			accel_adjusted[0], accel_adjusted[1],
 			accel_adjusted[2]);
-#endif
 	} else
 		return sprintf(buf, "%d,%d,%d\n",
 			data->acc_xyz.x, data->acc_xyz.y, data->acc_xyz.z);
@@ -1340,7 +1341,6 @@ static int lsm330dlc_accel_remove(struct i2c_client *client)
 	device_remove_file(data->dev, &dev_attr_odr);
 #endif
 #ifdef USES_MOVEMENT_RECOGNITION
-	wake_lock_destroy(&data->reactive_wake_lock);
 	device_remove_file(data->dev, &dev_attr_reactive_alert);
 #endif
 	device_remove_file(data->dev, &dev_attr_calibration);
@@ -1350,6 +1350,7 @@ static int lsm330dlc_accel_remove(struct i2c_client *client)
 #ifdef USES_MOVEMENT_RECOGNITION
 	device_init_wakeup(&data->client->dev, 0);
 	free_irq(data->client->irq, data);
+	wake_lock_destroy(&data->reactive_wake_lock);
 #endif
 #ifdef USES_INPUT_DEV
 	destroy_workqueue(data->work_queue);

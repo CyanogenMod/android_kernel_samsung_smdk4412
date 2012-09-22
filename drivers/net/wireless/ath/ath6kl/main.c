@@ -343,6 +343,7 @@ out:
 #ifdef CONFIG_MACH_PX
 void ath6kl_print_ar6k_registers(struct ath6kl *ar)
 {
+#if 0
 	u32 reg_addr;
 	u32 epc_addr1, epc_addr2, epc_addr3, epc_addr4;
 	u32 epc1, epc2, epc3, epc4;
@@ -417,7 +418,7 @@ void ath6kl_print_ar6k_registers(struct ath6kl *ar)
 	else
 		ath6kl_dbg(ATH6KL_DBG_TRC,
 			"ath6kl:reg_dump system sleep: %x\n", ssleep);
-
+#endif
 }
 #endif
 
@@ -1267,20 +1268,26 @@ static void ath6kl_set_multicast_list(struct net_device *ndev)
 				goto out;
 			}
 
-			memcpy(mc_filter->hw_addr, ha->addr,
-			       ATH6KL_MCAST_FILTER_MAC_ADDR_SIZE);
-			/* Set the multicast filter */
-			ath6kl_dbg(ATH6KL_DBG_TRC,
-				   "Adding %s to multicast filter list\n",
-				   sec_conv_mac(mc_filter->hw_addr));
-			ret = ath6kl_wmi_add_del_mcast_filter_cmd(vif->ar->wmi,
-					vif->fw_vif_idx, mc_filter->hw_addr,
-					true);
-			if (ret) {
-				ath6kl_warn("Failed to add multicast filter :%s\n",
-					     sec_conv_mac(mc_filter->hw_addr));
+			if (memcmp(ha->addr, "\x33\x33\x00\x00\x00\x01", ETH_ALEN) == 0) {
+				ath6kl_warn("Skipped : %s\n", sec_conv_mac(ha->addr));
 				kfree(mc_filter);
-				goto out;
+				continue;
+			} else {
+				memcpy(mc_filter->hw_addr, ha->addr,
+				       ATH6KL_MCAST_FILTER_MAC_ADDR_SIZE);
+				/* Set the multicast filter */
+				ath6kl_dbg(ATH6KL_DBG_TRC,
+					   "Adding %s to multicast filter list\n",
+					   sec_conv_mac(mc_filter->hw_addr));
+				ret = ath6kl_wmi_add_del_mcast_filter_cmd(vif->ar->wmi,
+						vif->fw_vif_idx, mc_filter->hw_addr,
+						true);
+				if (ret) {
+					ath6kl_warn("Failed to add multicast filter :%s\n",
+						     sec_conv_mac(mc_filter->hw_addr));
+					kfree(mc_filter);
+					goto out;
+				}
 			}
 
 			list_add_tail(&mc_filter->list, &mc_filter_new);

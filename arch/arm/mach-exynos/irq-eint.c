@@ -99,6 +99,10 @@ static int exynos_irq_eint_set_type(struct irq_data *data, unsigned int type)
 		newvalue = S5P_IRQ_TYPE_LEVEL_HIGH;
 		break;
 
+	case IRQ_TYPE_NONE:
+		printk(KERN_DEBUG "None irq type\n");
+		break;
+
 	default:
 		printk(KERN_ERR "No such irq type %d", type);
 		return -EINVAL;

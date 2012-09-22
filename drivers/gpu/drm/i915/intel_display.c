@@ -8591,7 +8591,7 @@ static void ivybridge_init_clock_gating(struct drm_device *dev)
 			I915_READ(GEN7_SQ_CHICKEN_MBCUNIT_CONFIG) |
 			GEN7_SQ_CHICKEN_MBCUNIT_SQINTMOB);
 
-	for_each_pipe(pipe) {
+	for_each_pipe(pipe)
 		I915_WRITE(DSPCNTR(pipe),
 			   I915_READ(DSPCNTR(pipe)) |
 			   DISPPLANE_TRICKLE_FEED_DISABLE);

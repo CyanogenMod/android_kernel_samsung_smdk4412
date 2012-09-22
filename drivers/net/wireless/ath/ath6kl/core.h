@@ -609,6 +609,8 @@ struct ath6kl_vif {
 	struct wmi_scan_params_cmd scparams;
 	unsigned int pspoll_num;
 	u16 mcastrate;
+	bool force_reload;
+	bool sdio_remove;
 };
 
 #define WOW_LIST_ID		0

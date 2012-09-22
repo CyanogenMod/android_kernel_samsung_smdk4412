@@ -86,7 +86,7 @@ void __init s5p_cma_region_reserve(struct cma_region *regions_normal,
 			reg->start = paddr;
 			reg->reserved = 1;
 
-			pr_debug("S5P/CMA: Reserved 0x%08x/0x%08x for '%s'\n",
+			pr_info("S5P/CMA: Reserved 0x%08x/0x%08x for '%s'\n",
 						reg->start, reg->size, reg->name);
 		} else {
 			pr_err("S5P/CMA: No free space in memory for '%s'\n",
@@ -141,7 +141,7 @@ void __init s5p_cma_region_reserve(struct cma_region *regions_normal,
 		} else
 			size_secure = ALIGN(size_secure, align_secure);
 
-		pr_debug("S5P/CMA: "
+		pr_info("S5P/CMA: "
 			"Reserving %#x for secure region aligned by %#x.\n",
 						size_secure, align_secure);
 

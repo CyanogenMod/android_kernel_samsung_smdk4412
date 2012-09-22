@@ -1182,6 +1182,11 @@ static int __check_block_validity(struct inode *inode, const char *func,
 {
 	if (!ext4_data_block_valid(EXT4_SB(inode->i_sb), map->m_pblk,
 				   map->m_len)) {
+		/* for debugging, sangwoo2.lee */
+		printk(KERN_ERR "printing inode..\n");
+		print_block_data(inode->i_sb, 0, (unsigned char *)inode, 0, EXT4_INODE_SIZE(inode->i_sb));
+		/* for debugging */
+
 		ext4_error_inode(inode, func, line, map->m_pblk,
 				 "lblock %lu mapped to illegal pblock "
 				 "(length %d)", (unsigned long) map->m_lblk,
@@ -4941,6 +4946,12 @@ struct inode *ext4_iget(struct super_block *sb, unsigned long ino)
 		if (inode->i_mode == 0 ||
 		    !(EXT4_SB(inode->i_sb)->s_mount_state & EXT4_ORPHAN_FS)) {
 			/* this inode is deleted */
+			/* for debugging, sangwoo2.lee */
+			printk(KERN_ERR "iloc info, offset : %lu, group# : %u\n", iloc.offset, iloc.block_group);
+			printk(KERN_ERR "sb info, inodes per group : %lu, inode size : %d\n", EXT4_SB(sb)->s_inodes_per_group, EXT4_SB(sb)->s_inode_size);
+			print_bh(sb, iloc.bh, 0, EXT4_BLOCK_SIZE(sb));
+			/* for debugging */
+
 			ret = -ESTALE;
 			goto bad_inode;
 		}

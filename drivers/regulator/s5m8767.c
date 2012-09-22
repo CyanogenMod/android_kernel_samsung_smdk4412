@@ -21,6 +21,7 @@
 #include <linux/regulator/machine.h>
 #include <linux/mfd/s5m87xx/s5m-core.h>
 #include <linux/mfd/s5m87xx/s5m-pmic.h>
+#include <linux/sched.h>
 
 struct s5m8767_info {
 	struct device *dev;
@@ -28,7 +29,9 @@ struct s5m8767_info {
 	int num_regulators;
 	struct regulator_dev **rdev;
 	struct s5m_opmode_data *opmode_data;
+	struct delayed_work set_buchg;
 
+	u8 device_id;
 	int ramp_delay;
 	bool buck2_ramp;
 	bool buck3_ramp;
@@ -190,9 +193,9 @@ unsigned int s5m8767_opmode_reg[][3] = {
 	{0x3, 0x1, 0x1},
 	{0x3, 0x1, 0x1}, /* BUCK9 */
 	/* 32KHZ */
-	{0x1, 0x1, 0x1},
-	{0x2, 0x2, 0x2},
-	{0x4, 0x4, 0x4},
+	{0x1, 0x0, 0x0},
+	{0x1, 0x0, 0x0},
+	{0x1, 0x0, 0x0},
 };
 
 static int s5m8767_get_register(struct regulator_dev *rdev, int *reg, int *pmic_en)
@@ -222,7 +225,8 @@ static int s5m8767_get_register(struct regulator_dev *rdev, int *reg, int *pmic_
 		break;
 	case S5M8767_AP_EN32KHZ ... S5M8767_BT_EN32KHZ:
 		*reg = S5M8767_REG_CTRL1;
-		break;
+		*pmic_en = 0x01 << (reg_id - S5M8767_AP_EN32KHZ);
+		return 0;
 	default:
 		return -EINVAL;
 	}
@@ -392,15 +396,15 @@ static int s5m8767_get_voltage_sel(struct regulator_dev *rdev)
 		mask = 0x3f;
 		break;
 	case S5M8767_BUCK2:
-		if(s5m8767->buck2_gpiodvs)
+		if (s5m8767->buck2_gpiodvs)
 			reg += s5m8767->buck_gpioindex;
 		break;
 	case S5M8767_BUCK3:
-		if(s5m8767->buck3_gpiodvs)
+		if (s5m8767->buck3_gpiodvs)
 			reg += s5m8767->buck_gpioindex;
 		break;
 	case S5M8767_BUCK4:
-		if(s5m8767->buck4_gpiodvs)
+		if (s5m8767->buck4_gpiodvs)
 			reg += s5m8767->buck_gpioindex;
 		break;
 	}
@@ -475,7 +479,12 @@ static int s5m8767_set_voltage(struct regulator_dev *rdev,
 	s5m_reg_read(i2c, reg, &val);
 	val = val & mask;
 
-	ret = s5m_reg_update(i2c, reg, i, mask);
+	if (s5m8767->device_id == 4 && reg == S5M8767_REG_BUCK1CTRL2)
+		ret = s5m_reg_update(i2c, reg, (i >= 0x40) ? \
+				(0x3F) : (i), mask);
+	else
+		ret = s5m_reg_update(i2c, reg, i, mask);
+
 	*selector = i;
 
 	if (val < i) {
@@ -536,8 +545,7 @@ static int s5m8767_set_voltage_buck(struct regulator_dev *rdev,
 		if (s5m8767->buck2_gpiodvs) {
 			while (s5m8767->buck2_vol[i] != new_val)
 				i++;
-		}
-		else
+		} else
 			return s5m8767_set_voltage(rdev, min_uV, max_uV, selector);
 		break;
 	case S5M8767_BUCK3:
@@ -682,6 +690,20 @@ static struct regulator_desc regulators[] = {
 	},
 };
 
+static void s5m_set_buchg(struct work_struct *work)
+{
+	struct s5m8767_info *s5m8767;
+	u8 val;
+	val = 0x4f; /* set for BUCHG 100uA */
+
+	s5m8767 = container_of(work, struct s5m8767_info, set_buchg.work);
+
+	s5m_reg_write(s5m8767->iodev->i2c, S5M8767_REG_BUCHG, val);
+
+	s5m_reg_read(s5m8767->iodev->i2c, S5M8767_REG_BUCHG, &val);
+	pr_info("%s set S5M8767_REG_BUCHG = 0x%02x\n", __func__, val);
+}
+
 static __devinit int s5m8767_pmic_probe(struct platform_device *pdev)
 {
 	struct s5m87xx_dev *iodev = dev_get_drvdata(pdev->dev.parent);
@@ -730,6 +752,17 @@ static __devinit int s5m8767_pmic_probe(struct platform_device *pdev)
 	s5m8767->buck3_ramp = pdata->buck3_ramp_enable;
 	s5m8767->buck4_ramp = pdata->buck4_ramp_enable;
 	s5m8767->opmode_data = pdata->opmode_data;
+
+	s5m_reg_read(i2c, S5M8767_REG_ID, &s5m8767->device_id);
+	printk(KERN_DEBUG "%s: PMIC DEVICE ID=> 0x%x\n",
+			__func__, s5m8767->device_id);
+
+	buck_init = s5m8767_convert_voltage(&buck_voltage_val1,
+						pdata->buck1_init,
+						pdata->buck1_init +
+						buck_voltage_val1.step);
+
+	s5m_reg_write(i2c, S5M8767_REG_BUCK1DVS2, buck_init);
 
 	buck_init = s5m8767_convert_voltage(&buck_voltage_val2,
 						pdata->buck2_init,
@@ -855,6 +888,8 @@ static __devinit int s5m8767_pmic_probe(struct platform_device *pdev)
 	gpio_direction_output(pdata->buck_ds[1], 0x0);
 	/* DS4 GPIO */
 	gpio_direction_output(pdata->buck_ds[2], 0x0);
+	/* BUCK1 DVS2 Enable */
+	s5m_reg_update(i2c, S5M8767_REG_BUCK1CTRL1, 0x02, 0x02);
 
 	if (pdata->buck2_gpiodvs) {
 		if (pdata->buck3_gpiodvs || pdata->buck4_gpiodvs) {
@@ -967,6 +1002,9 @@ static __devinit int s5m8767_pmic_probe(struct platform_device *pdev)
 			goto err;
 		}
 	}
+
+	INIT_DELAYED_WORK_DEFERRABLE(&s5m8767->set_buchg,  s5m_set_buchg);
+	schedule_delayed_work(&s5m8767->set_buchg, msecs_to_jiffies(40000));
 
 	return 0;
 err:

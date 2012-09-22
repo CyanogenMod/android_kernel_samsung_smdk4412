@@ -96,7 +96,7 @@ void exynos4_setup_sdhci2_cfg_gpio(struct platform_device *dev, int width)
 	/* Set all the necessary GPK2[0:1] pins to special-function 2 */
 	for (gpio = EXYNOS4_GPK2(0); gpio < EXYNOS4_GPK2(2); gpio++) {
 		s3c_gpio_cfgpin(gpio, S3C_GPIO_SFN(2));
-#ifdef CONFIG_MACH_U1
+#if defined(CONFIG_MACH_U1) || defined(CONFIG_MACH_TRATS)
 		s3c_gpio_setpull(gpio, S3C_GPIO_PULL_NONE);
 		s5p_gpio_set_drvstr(gpio, S5P_GPIO_DRVSTR_LV3);
 #elif defined(CONFIG_MACH_MIDAS)
@@ -113,7 +113,7 @@ void exynos4_setup_sdhci2_cfg_gpio(struct platform_device *dev, int width)
 		for (gpio = EXYNOS4_GPK3(3); gpio <= EXYNOS4_GPK3(6); gpio++) {
 			/* Data pin GPK3[3:6] to special-function 3 */
 			s3c_gpio_cfgpin(gpio, S3C_GPIO_SFN(3));
-#ifdef CONFIG_MACH_U1
+#if defined(CONFIG_MACH_U1) || defined(CONFIG_MACH_TRATS)
 			s3c_gpio_setpull(gpio, S3C_GPIO_PULL_NONE);
 			s5p_gpio_set_drvstr(gpio, S5P_GPIO_DRVSTR_LV3);
 #elif defined(CONFIG_MACH_MIDAS)
@@ -128,7 +128,7 @@ void exynos4_setup_sdhci2_cfg_gpio(struct platform_device *dev, int width)
 		for (gpio = EXYNOS4_GPK2(3); gpio <= EXYNOS4_GPK2(6); gpio++) {
 			/* Data pin GPK2[3:6] to special-function 2 */
 			s3c_gpio_cfgpin(gpio, S3C_GPIO_SFN(2));
-#ifdef CONFIG_MACH_U1
+#if defined(CONFIG_MACH_U1) || defined(CONFIG_MACH_TRATS)
 			s3c_gpio_setpull(gpio, S3C_GPIO_PULL_NONE);
 			s5p_gpio_set_drvstr(gpio, S5P_GPIO_DRVSTR_LV3);
 #elif defined(CONFIG_MACH_MIDAS)
@@ -158,12 +158,16 @@ void exynos4_setup_sdhci3_cfg_gpio(struct platform_device *dev, int width)
 	/* Set all the necessary GPK3[0:1] pins to special-function 2 */
 	for (gpio = EXYNOS4_GPK3(0); gpio < EXYNOS4_GPK3(2); gpio++) {
 		s3c_gpio_cfgpin(gpio, S3C_GPIO_SFN(2));
-#ifdef CONFIG_MACH_U1
+#if defined(CONFIG_MACH_U1) || defined(CONFIG_MACH_TRATS)
+		s3c_gpio_setpull(gpio, S3C_GPIO_PULL_NONE);
+		s5p_gpio_set_drvstr(gpio, S5P_GPIO_DRVSTR_LV2);
+#elif defined(CONFIG_MACH_M0) || defined(CONFIG_MACH_C1_USA_ATT) || \
+	defined(CONFIG_MACH_T0) || defined(CONFIG_MACH_M3)
 		s3c_gpio_setpull(gpio, S3C_GPIO_PULL_NONE);
 		s5p_gpio_set_drvstr(gpio, S5P_GPIO_DRVSTR_LV2);
 #elif defined(CONFIG_MACH_MIDAS)
 		s3c_gpio_setpull(gpio, S3C_GPIO_PULL_NONE);
-		s5p_gpio_set_drvstr(gpio, S5P_GPIO_DRVSTR_LV2);
+		s5p_gpio_set_drvstr(gpio, S5P_GPIO_DRVSTR_LV4);
 #elif defined(CONFIG_MACH_PX)
 		s3c_gpio_setpull(gpio, S3C_GPIO_PULL_NONE);
 		s5p_gpio_set_drvstr(gpio, S5P_GPIO_DRVSTR_LV4);
@@ -180,12 +184,16 @@ void exynos4_setup_sdhci3_cfg_gpio(struct platform_device *dev, int width)
 	for (gpio = EXYNOS4_GPK3(3); gpio <= EXYNOS4_GPK3(6); gpio++) {
 		/* Data pin GPK3[3:6] to special-function 2 */
 		s3c_gpio_cfgpin(gpio, S3C_GPIO_SFN(2));
-#ifdef CONFIG_MACH_U1
+#if defined(CONFIG_MACH_U1) || defined(CONFIG_MACH_TRATS)
+		s3c_gpio_setpull(gpio, S3C_GPIO_PULL_NONE);
+		s5p_gpio_set_drvstr(gpio, S5P_GPIO_DRVSTR_LV2);
+#elif defined(CONFIG_MACH_M0) || defined(CONFIG_MACH_C1_USA_ATT) || \
+	defined(CONFIG_MACH_T0) || defined(CONFIG_MACH_M3)
 		s3c_gpio_setpull(gpio, S3C_GPIO_PULL_NONE);
 		s5p_gpio_set_drvstr(gpio, S5P_GPIO_DRVSTR_LV2);
 #elif defined(CONFIG_MACH_MIDAS)
 		s3c_gpio_setpull(gpio, S3C_GPIO_PULL_NONE);
-		s5p_gpio_set_drvstr(gpio, S5P_GPIO_DRVSTR_LV2);
+		s5p_gpio_set_drvstr(gpio, S5P_GPIO_DRVSTR_LV4);
 #elif defined(CONFIG_MACH_PX)
 		s3c_gpio_setpull(gpio, S3C_GPIO_PULL_UP);
 		s5p_gpio_set_drvstr(gpio, S5P_GPIO_DRVSTR_LV4);

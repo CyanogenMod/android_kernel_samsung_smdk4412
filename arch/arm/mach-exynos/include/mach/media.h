@@ -26,7 +26,7 @@
 #define S5P_MDEV_TVOUT          9
 
 
-#ifdef CONFIG_MACH_U1
+#if defined(CONFIG_MACH_U1) || defined(CONFIG_MACH_TRATS)
 #define S5P_MDEV_PMEM		10
 #endif
 

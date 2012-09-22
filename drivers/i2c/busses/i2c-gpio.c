@@ -211,7 +211,11 @@ static int __init i2c_gpio_init(void)
 
 	return ret;
 }
+#ifdef CONFIG_FAST_RESUME
+beforeresume_initcall(i2c_gpio_init);
+#else
 subsys_initcall(i2c_gpio_init);
+#endif
 
 static void __exit i2c_gpio_exit(void)
 {

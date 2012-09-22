@@ -57,9 +57,6 @@ struct adb_dev {
 	int rx_done;
 };
 
-static void adb_ready_callback(void);
-static void adb_closed_callback(void);
-
 static struct usb_interface_descriptor adb_interface_desc = {
 	.bLength                = USB_DT_INTERFACE_SIZE,
 	.bDescriptorType        = USB_DT_INTERFACE,
@@ -148,6 +145,8 @@ static struct usb_descriptor_header *ss_adb_descs[] = {
 	NULL,
 };
 
+static void adb_ready_callback(void);
+static void adb_closed_callback(void);
 
 /* temporary variable used between adb_open() and adb_gadget_bind() */
 static struct adb_dev *_adb_dev;
@@ -456,7 +455,7 @@ static int adb_open(struct inode *ip, struct file *fp)
 	/* clear the error latch */
 	_adb_dev->error = 0;
 
-    adb_ready_callback();
+	adb_ready_callback();
 
 	return 0;
 }
@@ -464,7 +463,9 @@ static int adb_open(struct inode *ip, struct file *fp)
 static int adb_release(struct inode *ip, struct file *fp)
 {
 	pr_info("adb_release\n");
-    adb_closed_callback();
+
+	adb_closed_callback();
+
 	adb_unlock(&_adb_dev->open_excl);
 	return 0;
 }
@@ -483,6 +484,9 @@ static struct miscdevice adb_device = {
 	.name = adb_shortname,
 	.fops = &adb_fops,
 };
+
+
+
 
 static int
 adb_function_bind(struct usb_configuration *c, struct usb_function *f)

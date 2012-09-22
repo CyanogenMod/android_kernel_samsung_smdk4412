@@ -66,21 +66,27 @@ extern int s3c_gpio_slp_setpull_updown(unsigned int pin, unsigned int config);
 
 /* Sensors */
 #define GPIO_ACC_INT		EXYNOS4_GPX0(0)
+#define GPIO_GYRO_INT		EXYNOS4_GPF0(3)
+#define GPIO_GYRO_DE		EXYNOS4_GPL2(0)
+
 #define GPIO_GSENSE_SDA_18V	EXYNOS4_GPD1(2)
 #define GPIO_GSENSE_SCL_18V	EXYNOS4_GPD1(3)
 
 #define GPIO_MSENSOR_INT	EXYNOS4212_GPJ0(7)
 #define GPIO_MSENSOR_SDA_18V	EXYNOS4_GPY2(4)
 #define GPIO_MSENSOR_SCL_18V	EXYNOS4_GPY2(5)
+#define GPIO_MSENSE_RST_N	EXYNOS4212_GPJ0(5)
 /* Sensors */
 
 #define GPIO_TF_EN		EXYNOS4_GPY2(0)
 
 #define GPIO_DET_35		EXYNOS4_GPX0(1)
+#define GPIO_EAR_SEND_END	EXYNOS4_GPX3(6)
 
 #define GPIO_MIC_BIAS_EN	EXYNOS4_GPF1(7)
 #define GPIO_SUB_MIC_BIAS_EN	EXYNOS4_GPF2(0)
 #define GPIO_THIRD_MIC_BIAS_EN	EXYNOS4212_GPJ0(2)
+#define GPIO_EAR_MIC_BIAS_EN	EXYNOS4212_GPJ0(3)
 
 #define GPIO_PMU_RST		EXYNOS4_GPX3(2)
 
@@ -258,6 +264,8 @@ extern int s3c_gpio_slp_setpull_updown(unsigned int pin, unsigned int config);
 #define GPIO_PHONE_ACTIVE	EXYNOS4_GPX1(6)
 #define GPIO_CP_RST		EXYNOS4_GPX3(2)
 
+#define GPIO_SIM_DETECT		EXYNOS4_GPX3(5)
+
 #define GPIO_FM_RST EXYNOS4_GPC1(1)
 #else
 
@@ -299,8 +307,10 @@ extern int s3c_gpio_slp_setpull_updown(unsigned int pin, unsigned int config);
 #define GPIO_PLAY_KEY		EXYNOS4_GPX1(4)
 #define GPIO_S1_KEY			EXYNOS4_GPX2(0)
 #define GPIO_S2_KEY			EXYNOS4_GPX2(1)
-#define GPIO_WIDE_KEY		EXYNOS4_GPX2(2)
-#define GPIO_TELE_KEY		EXYNOS4_GPX3(3)
+#define GPIO_TELE_KEY		EXYNOS4_GPX2(2)
+#define GPIO_WIDE_KEY		EXYNOS4_GPX3(3)
+#define GPIO_FAST_TELE_KEY	EXYNOS4_GPX1(4)
+#define GPIO_FAST_WIDE_KEY	EXYNOS4_GPX0(4)
 
 #define GPIO_FM_INT_REV15	EXYNOS4_GPX1(4)
 #define GPIO_FM_INT_REV07	EXYNOS4_GPX1(3)

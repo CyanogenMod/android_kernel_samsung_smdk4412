@@ -255,6 +255,8 @@ typedef enum cy_as_funct_c_b_type {
 	CY_FUNCT_CB_STOR_GETTRANSFERAMOUNT,
 	/* Data from a CyAsStorageErase call. */
 	CY_FUNCT_CB_STOR_ERASE,
+	 /* Data from a CyAsStorageStorChangeSDFrequency call. */
+	 CY_FUNCT_CB_STOR_CHANGE_SD_FREQ,
 	/* Data from a CyAsStorageCancelAsync call. */
 	CY_FUNCT_CB_ABORT_P2S_XFER,
 	/* Data from a CyAsUsbStart call. */
@@ -516,7 +518,7 @@ typedef struct cy_as_get_firmware_version_data {
 EXTERN cy_as_return_status_t
 cy_as_misc_create_device(
 	/* Return value for handle to created device */
-	cy_as_device_handle *handle_p,
+	cy_as_device_handle * handle_p,
 	/* The HAL specific tag for this device */
 	cy_as_hal_device_tag		tag
 	);
@@ -575,7 +577,7 @@ cy_as_misc_configure_device(
 	/* Handle to the device to configure */
 	cy_as_device_handle		handle,
 	/* Configuration information */
-	cy_as_device_config		*config_p
+	cy_as_device_config		* config_p
 	);
 
 /* Summary
@@ -678,7 +680,7 @@ cy_as_misc_get_firmware_version(
 	/* Handle to the device to configure */
 	cy_as_device_handle	handle,
 	/* Return values indicating the firmware version. */
-	cy_as_get_firmware_version_data	*data,
+	cy_as_get_firmware_version_data	* data,
 	/* Callback to call when the operation is complete. */
 	cy_as_function_callback	cb,
 	/* Client data to be passed to the callback. */
@@ -857,7 +859,7 @@ cy_as_misc_acquire_resource(
 	/* Handle to the device to configure */
 	cy_as_device_handle	handle,
 	/* The resource to acquire */
-	cy_as_resource_type	*resource,
+	cy_as_resource_type	* resource,
 	/* If true, force West Bridge to release the resource */
 	cy_bool				force,
 	/* Callback to call when the operation is complete. */

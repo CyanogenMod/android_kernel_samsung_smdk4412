@@ -347,6 +347,59 @@ int alarm_set_alarm_boot(char *alarm_data)
 }
 #endif
 
+#if defined(CONFIG_RTC_POWER_OFF)
+#define PWROFFALM_BIT_EN	0
+#define PWROFFALM_BIT_YEAR	1
+#define PWROFFALM_BIT_MONTH	5
+#define PWROFFALM_BIT_DAY	7
+#define PWROFFALM_BIT_HOUR	9
+#define PWROFFALM_BIT_MIN	11
+#define PWROFFALM_BIT_TOTAL	13
+
+int alarm_set_alarm_poweroff(char *alarm_data)
+{
+	struct rtc_wkalrm alm;
+	int ret;
+	char buf_ptr[PWROFFALM_BIT_TOTAL + 1];
+
+	if (!alarm_rtc_dev) {
+		pr_alarm(ERROR, "alarm_set_alarm_poweroff: "
+			"no RTC, time will be lost on reboot\n");
+		return -1;
+	}
+
+	strlcpy(buf_ptr, alarm_data, PWROFFALM_BIT_TOTAL + 1);
+
+	alm.time.tm_sec = 0;
+
+	alm.time.tm_min = (buf_ptr[PWROFFALM_BIT_MIN] - '0') * 10
+	    + (buf_ptr[PWROFFALM_BIT_MIN + 1] - '0');
+	alm.time.tm_hour = (buf_ptr[PWROFFALM_BIT_HOUR] - '0') * 10
+	    + (buf_ptr[PWROFFALM_BIT_HOUR + 1] - '0');
+	alm.time.tm_mday = (buf_ptr[PWROFFALM_BIT_DAY] - '0') * 10
+	    + (buf_ptr[PWROFFALM_BIT_DAY + 1] - '0');
+	alm.time.tm_mon = (buf_ptr[PWROFFALM_BIT_MONTH] - '0') * 10
+	    + (buf_ptr[PWROFFALM_BIT_MONTH + 1] - '0');
+	alm.time.tm_year = (buf_ptr[PWROFFALM_BIT_YEAR] - '0') * 1000
+	    + (buf_ptr[PWROFFALM_BIT_YEAR + 1] - '0') * 100
+	    + (buf_ptr[PWROFFALM_BIT_YEAR + 2] - '0') * 10
+	    + (buf_ptr[PWROFFALM_BIT_YEAR + 3] - '0');
+	alm.enabled = (*buf_ptr == '1');
+
+	alm.time.tm_mon -= 1;
+	alm.time.tm_year -= 1900;
+
+	printk(KERN_INFO "%s: %d/%d/%d %d:%d:%d(%d)\n", __func__,
+		1900 + alm.time.tm_year, 1 + alm.time.tm_mon,
+		alm.time.tm_mday, alm.time.tm_hour, alm.time.tm_min,
+		alm.time.tm_sec, alm.time.tm_wday);
+
+	ret = rtc_set_alarm_poweroff(alarm_rtc_dev, &alm);
+
+	return ret;
+}
+#endif
+
 /**
  * alarm_get_elapsed_realtime - get the elapsed real time in ktime_t format
  *

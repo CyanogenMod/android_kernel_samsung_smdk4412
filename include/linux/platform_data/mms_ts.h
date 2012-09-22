@@ -27,7 +27,7 @@ struct melfas_tsi_platform_data {
 	int gpio_sda;
 	int gpio_scl;
 	int (*mux_fw_flash) (bool to_gpios);
-	int (*power) (int on);
+	int (*power) (bool on);
 	int (*is_vdd_on) (void);
 	const char *fw_name;
 	bool use_touchkey;

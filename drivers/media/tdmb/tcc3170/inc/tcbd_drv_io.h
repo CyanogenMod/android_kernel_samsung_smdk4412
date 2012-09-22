@@ -81,13 +81,15 @@ TCBB_FUNC s32 tcbd_rf_reg_write(
 TCBB_FUNC s32 tcbd_rf_reg_read(
 	struct tcbd_device *_handle, u32 _addr,	u32 *_data);
 
-TCBB_FUNC s32 tcbd_send_mail(
-	struct tcbd_device *_device, struct tcbd_mail_data *_mail);
-TCBB_FUNC s32 tcbd_recv_mail(
-	struct tcbd_device *_device, struct tcbd_mail_data *_mail);
-TCBB_FUNC s32 tcbd_read_mail_box(
-	struct tcbd_device *_device, u16 cmd, s32 len, u32 *data);
-
+TCBB_FUNC s32 tcbd_send_mail(struct tcbd_device *_device,
+				struct tcbd_mail_data *_mail);
+TCBB_FUNC s32 tcbd_recv_mail(struct tcbd_device *_device,
+				struct tcbd_mail_data *_mail);
+TCBB_FUNC s32 tcbd_read_mail_box(struct tcbd_device *_device, u16 cmd,
+						s32 len, u32 *data);
+TCBB_FUNC s32 tcbd_write_mail_box(struct tcbd_device *_device, u16 _cmd,
+						s32 _cnt, u32 *_data);
+TCBB_FUNC s32 tcbd_read_file(struct tcbd_device *_device, char *_path,
+						u8 *_buff, s32 _size);
 extern struct spi_device *spi_dmb; /* sukjoon_temp */
-
 #endif /*__TCBD_DRV_COMMON_H__*/

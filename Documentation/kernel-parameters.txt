@@ -482,12 +482,21 @@ bytes respectively. Such letter suffixes can also be entirely omitted.
 			Also note the kernel might malfunction if you disable
 			some critical bits.
 
+	cma=nn[MG]  [ARM,KNL]
+			Sets the size of kernel global memory area for contiguous
+			memory allocations. For more information, see
+			include/linux/dma-contiguous.h
+
 	cmo_free_hint=	[PPC] Format: { yes | no }
 			Specify whether pages are marked as being inactive
 			when they are freed.  This is used in CMO environments
 			to determine OS memory pressure for page stealing by
 			a hypervisor.
 			Default: yes
+
+	coherent_pool=nn[KMG]   [ARM,KNL]
+			Sets the size of memory pool for coherent, atomic dma
+			allocations if Contiguous Memory Allocator (CMA) is used.
 
 	code_bytes	[X86] How many bytes of object code to print
 			in an oops report.
@@ -2213,12 +2222,18 @@ bytes respectively. Such letter suffixes can also be entirely omitted.
 
 	resume=		[SWSUSP]
 			Specify the partition device for software suspend
+			Format:
+			{/dev/<dev> | PARTUUID=<uuid> | <int>:<int> | <hex>}
 
 	resume_offset=	[SWSUSP]
 			Specify the offset from the beginning of the partition
 			given by "resume=" at which the swap header is located,
 			in <PAGE_SIZE> units (needed only for swap files).
 			See  Documentation/power/swsusp-and-swap-files.txt
+
+	resumewait	[HIBERNATION] Wait (indefinitely) for resume device to show up.
+			Useful for devices that are detected asynchronously
+			(e.g. USB and MMC devices).
 
 	hibernate=	[HIBERNATION]
 		noresume	Don't check if there's a hibernation image

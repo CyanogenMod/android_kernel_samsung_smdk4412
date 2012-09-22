@@ -72,8 +72,16 @@ extern short *tableY_48[MAX_HAND][MAX_ROTATION];
 extern short tilt_offsetX[MAX_HAND][MAX_ROTATION];
 extern short tilt_offsetY[MAX_HAND][MAX_ROTATION];
 
+#if defined(CONFIG_MACH_T0)
+extern short tilt_offsetX_B713[MAX_HAND][MAX_ROTATION];
+extern short tilt_offsetY_B713[MAX_HAND][MAX_ROTATION];
+#endif
+
 extern short tilt_offsetX_48[MAX_HAND][MAX_ROTATION];
 extern short tilt_offsetY_48[MAX_HAND][MAX_ROTATION];
 
 extern short origin_offset[2];
 extern short origin_offset_48[2];
+
+extern char* tuning_version;
+extern char* tuning_version_B713;

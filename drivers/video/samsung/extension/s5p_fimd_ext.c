@@ -26,6 +26,7 @@ struct s5p_fimd_ext {
 	struct device			*dev;
 };
 
+static struct class_compat *s5p_fimd_ext_cls;
 static LIST_HEAD(fimd_ext_list);
 static DEFINE_MUTEX(fimd_ext_lock);
 
@@ -135,14 +136,25 @@ int s5p_fimd_ext_device_register(struct s5p_fimd_ext_device *fx_dev)
 	}
 
 	ret = device_add(&fx_dev->dev);
-	if (ret == 0) {
-		mutex_lock(&fimd_ext_lock);
-		list_add_tail(&fimd_ext->list, &fimd_ext_list);
-		mutex_unlock(&fimd_ext_lock);
+	if (ret)
+		goto err_clear;
 
-		return ret;
+	mutex_lock(&fimd_ext_lock);
+	list_add_tail(&fimd_ext->list, &fimd_ext_list);
+	mutex_unlock(&fimd_ext_lock);
+
+	ret = class_compat_create_link(s5p_fimd_ext_cls, &fx_dev->dev,
+			fx_dev->dev.parent);
+	if (ret) {
+		dev_err(&fx_dev->dev, "failed to create compatibility link");
+		goto err_del;
 	}
 
+	return 0;
+
+err_del:
+	list_del(&fimd_ext->list);
+err_clear:
 	kfree(fimd_ext);
 
 	return ret;
@@ -194,14 +206,33 @@ struct s5p_fimd_ext_device *s5p_fimd_ext_find_device(const char *name)
 
 static int __init s5p_fimd_ext_init(void)
 {
-	return bus_register(&s5p_fimd_ext_bus_type);
+	int ret;
+
+	ret = bus_register(&s5p_fimd_ext_bus_type);
+	if (ret)
+		return ret;
+
+	s5p_fimd_ext_cls = class_compat_register("extension");
+	if (!s5p_fimd_ext_cls) {
+		ret = -ENOMEM;
+		goto err_unreg;
+	}
+
+	return 0;
+
+err_unreg:
+	bus_unregister(&s5p_fimd_ext_bus_type);
+
+	return ret;
 }
 
 static void __exit s5p_fimd_ext_exit(void)
 {
+	class_compat_unregister(s5p_fimd_ext_cls);
+	bus_unregister(&s5p_fimd_ext_bus_type);
 }
 
-early_initcall(s5p_fimd_ext_init);
+postcore_initcall(s5p_fimd_ext_init);
 module_exit(s5p_fimd_ext_exit);
 
 MODULE_AUTHOR("InKi Dae <inki.dae@samsung.com>");

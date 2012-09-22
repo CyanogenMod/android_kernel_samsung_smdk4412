@@ -35,6 +35,9 @@
 /* for debugging */
 #undef DEBUG
 
+#define	VENDOR		"SHARP"
+#define	CHIP_ID		"GP2AP"
+
 /*********** for debug ***************************/
 #if 1
 #define gprintk(fmt, x...) printk(KERN_INFO "%s(%d): " fmt\
@@ -191,9 +194,39 @@ light_enable_store(struct device *dev, struct device_attribute *attr,
 	return count;
 }
 
+
+/* sysfs for vendor & name */
+static ssize_t lightsensor_vendor_show(struct device *dev,
+	struct device_attribute *attr, char *buf)
+{
+	return sprintf(buf, "%s\n", VENDOR);
+}
+
+static ssize_t lightsensor_name_show(struct device *dev,
+	struct device_attribute *attr, char *buf)
+{
+	return is_gp2a030a() ? sprintf(buf, "%s030\n", CHIP_ID)
+		: sprintf(buf, "%s020\n", CHIP_ID);
+}
+
+static ssize_t lightsensor_raw_data_show(struct device *dev,
+					   struct device_attribute *attr,
+					   char *buf)
+{
+	int adc = 0;
+
+	adc = lightsensor_get_adcvalue();
+
+	return sprintf(buf, "%d\n", adc);
+}
+
 static DEVICE_ATTR(poll_delay, 0664, light_delay_show, light_delay_store);
 static DEVICE_ATTR(enable, 0664, light_enable_show, light_enable_store);
 static DEVICE_ATTR(lux, 0664, lightsensor_file_state_show, NULL);
+static DEVICE_ATTR(vendor, 0664, lightsensor_vendor_show, NULL);
+static DEVICE_ATTR(name, 0664, lightsensor_name_show, NULL);
+static DEVICE_ATTR(raw_data, 0664, lightsensor_raw_data_show, NULL);
+
 
 static struct attribute *lightsensor_attributes[] = {
 	&dev_attr_poll_delay.attr,
@@ -264,19 +297,35 @@ int lightsensor_get_adc(void)
 	D0_raw_data = (get_data[1] << 8) | get_data[0];	/* clear */
 	D1_raw_data = (get_data[3] << 8) | get_data[2];	/* IR */
 	if (is_gp2a030a()) {
-		if (100 * D1_raw_data <= 41 * D0_raw_data) {
-			light_alpha = 736;
-			light_beta = 0;
-		} else if (100 * D1_raw_data <= 62 * D0_raw_data) {
-			light_alpha = 1855;
-			light_beta = 2693;
-		} else if (100 * D1_raw_data <= d0_boundary * D0_raw_data) {
-			light_alpha = 544;
-			light_beta = 595;
-		} else {
-			light_alpha = 0;
-			light_beta = 0;
-		}
+		#if defined(CONFIG_MACH_GRANDE)
+			if (100 * D1_raw_data <= 41 * D0_raw_data) {
+				light_alpha = 1186;
+				light_beta = 0;
+			} else if (100 * D1_raw_data <= 62 * D0_raw_data) {
+				light_alpha = 2930;
+				light_beta = 4252;
+			} else if (100 * D1_raw_data <= d0_boundary * D0_raw_data) {
+				light_alpha = 924;
+				light_beta = 1015;
+			} else {
+				light_alpha = 0;
+				light_beta = 0;
+			}
+		#else
+			if (100 * D1_raw_data <= 41 * D0_raw_data) {
+				light_alpha = 736;
+				light_beta = 0;
+			} else if (100 * D1_raw_data <= 62 * D0_raw_data) {
+				light_alpha = 1855;
+				light_beta = 2693;
+			} else if (100 * D1_raw_data <= d0_boundary * D0_raw_data) {
+				light_alpha = 544;
+				light_beta = 595;
+			} else {
+				light_alpha = 0;
+				light_beta = 0;
+			}
+		#endif
 	} else {
 		if (lightsensor_mode) {	/* HIGH_MODE */
 			if (100 * D1_raw_data <= 32 * D0_raw_data) {
@@ -614,6 +663,25 @@ static int lightsensor_probe(struct platform_device *pdev)
 		       dev_attr_lux.attr.name);
 		goto err_light_device_create_file;
 	}
+
+	if (device_create_file(data->light_dev, &dev_attr_vendor) < 0) {
+		pr_err("%s: could not create device file(%s)!\n", __func__,
+		       dev_attr_vendor.attr.name);
+		goto err_light_device_create_file1;
+	}
+
+	if (device_create_file(data->light_dev, &dev_attr_name) < 0) {
+		pr_err("%s: could not create device file(%s)!\n", __func__,
+		       dev_attr_name.attr.name);
+		goto err_light_device_create_file2;
+	}
+
+	if (device_create_file(data->light_dev, &dev_attr_raw_data) < 0) {
+		pr_err("%s: could not create device file(%s)!\n", __func__,
+		       dev_attr_raw_data.attr.name);
+		goto err_light_device_create_file3;
+	}
+
 	dev_set_drvdata(data->light_dev, data);
 
 	data->wq = create_singlethread_workqueue("gp2a_wq");
@@ -634,6 +702,12 @@ static int lightsensor_probe(struct platform_device *pdev)
 	goto done;
 
 /* error, unwind it all */
+err_light_device_create_file3:
+	device_remove_file(data->light_dev, &dev_attr_raw_data);
+err_light_device_create_file2:
+	device_remove_file(data->light_dev, &dev_attr_name);
+err_light_device_create_file1:
+	device_remove_file(data->light_dev, &dev_attr_vendor);
 err_create_workqueue:
 	device_remove_file(data->light_dev, &dev_attr_lux);
 err_light_device_create_file:
@@ -662,6 +736,9 @@ static int lightsensor_remove(struct platform_device *pdev)
 				   &lightsensor_attribute_group);
 
 		device_remove_file(data->light_dev, &dev_attr_lux);
+		device_remove_file(data->light_dev, &dev_attr_vendor);
+		device_remove_file(data->light_dev, &dev_attr_name);
+		device_remove_file(data->light_dev, &dev_attr_raw_data);
 		sensors_classdev_unregister(data->light_dev);
 
 		cancel_delayed_work_sync(&data->work);

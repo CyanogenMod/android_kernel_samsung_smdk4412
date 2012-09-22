@@ -41,6 +41,10 @@
 #define DEBUG_STREAM_READ   0x00008000
 #define DEBUG_STREAM_STACK  0x00010000
 #define DEBUG_STATUS        0x00020000
+#define DEBUG_PARSE_HEADER  0x00040000
+
+#define MAX_SIZE_DSP_ROM (1024*10)
+#define MAX_PATH 128
 
 s32 printk(const char *fmt, ...);
 
@@ -57,6 +61,14 @@ do {\
 				__func__, __LINE__, ##__VA_ARGS__);\
 	} \
 } while (0)
+
+s32 tcbd_debug_spur_dbg(void);
+s32 tcbd_debug_rom_from_fs(void);
+s32 *tcbd_debug_spur_clk_cfg(void);
+char *tcbd_debug_rom_path(void);
+
+void tcbd_debug_mbox_rx(u16 *_cmd, s32 *_len, u32 **_data);
+void tcbd_debug_mbox_tx(u16 *_cmd, s32 *_len, u32 **_data);
 
 extern u32 tcbd_debug_class;
 

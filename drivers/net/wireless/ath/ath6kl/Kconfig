@@ -30,3 +30,12 @@ config ATH6KL_DEBUG
 	depends on ATH6KL
 	---help---
 	  Enables debug support
+
+config ATH6KL_LOCALE_USA
+	bool "Atheros regulatory domain as USA"
+	depends on ATH6KL
+
+config 5GH_WLAN_COUNTRY_CODE
+	bool "Atheros WiFi Driver for 5GH channel setting"
+	default y
+

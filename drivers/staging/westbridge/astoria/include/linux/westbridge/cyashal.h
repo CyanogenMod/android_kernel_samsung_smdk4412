@@ -91,13 +91,27 @@
 #endif
 /*****************************/
 
+#ifdef CONFIG_MACH_C110_WESTBRIDGE_AST_PNAND_HAL
+
+ #ifdef CY_HAL_DEFINED
+  #error only one HAL layer can be defined
+ #endif
+
+ #define CY_HAL_DEFINED
+/* moved to staging location, eventual implementation
+ * considered is here
+ * #include mach/westbridge/westbridge-omap3-pnand-hal/cyashalomap_kernel.h>
+*/
+ #include "../../../arch/arm/plat-c110/include/mach/westbridge/westbridge-c110-pnand-hal/cyashalc110_pnand.h"
+
+#endif
+
 
 /******/
 #ifdef __CY_ASTORIA_CUSTOMER_HAL__
 #ifdef CY_HAL_DEFINED
 #error only one HAL layer can be defined
 #endif
-br
 #define CY_HAL_DEFINED
 #include "cyashal_customer.h"
 

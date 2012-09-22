@@ -104,6 +104,6 @@ static int __init exynos4_asv_init(void)
 out2:
 	kfree(exynos_asv);
 out1:
-	return -EINVAL;
+	return ret;
 }
 device_initcall_sync(exynos4_asv_init);

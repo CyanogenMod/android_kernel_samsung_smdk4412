@@ -45,3 +45,13 @@ config ADXRS450
 
 	  This driver can also be built as a module.  If so, the module
 	  will be called adxrs450.
+
+config K3G
+	tristate "ST K3G gyroscope sensor"
+	depends on I2C
+	depends on IIO_RING_BUFFER
+	help
+	  Say yes here to build support for ST K3G gyroscope sensor. These devices use a hardware ring buffer.
+
+	  To compile this driver as a module, choose M here: the
+	  module will be called k3g.

@@ -88,6 +88,10 @@ enum { RESERVED_T0 = 0,
 	RESERVED_T255 = 255,
 };
 
+struct mxt_callbacks {
+	void (*inform_charger)(struct mxt_callbacks *, bool);
+};
+
 struct mxt_platform_data {
 	int max_finger_touches;
 	int gpio_read_done;
@@ -102,7 +106,10 @@ struct mxt_platform_data {
 	int max_w;
 	int (*power_on) (void);
 	int (*power_off) (void);
+	int (*power_reset) (void);
+	u8 *(*register_cb)(struct mxt_callbacks *);
 	u8 boot_address;
+	const char *config_version;
 };
 
 #endif				/*  */

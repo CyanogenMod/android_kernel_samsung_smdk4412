@@ -70,7 +70,7 @@
 
 enum s5p_cpu_type {
 	TYPE_S5PV210,
-	TYPE_EXYNOS4,
+	TYPE_EXYNOS,
 };
 
 enum {
@@ -330,7 +330,7 @@ static int s5p_ace_aes_set_cipher(struct s5p_ace_aes_ctx *sctx,
 	new_status |= ACE_AES_SWAPCNT_ON;
 	new_status |= ACE_AES_SWAPIV_ON;
 
-	if (s5p_ace_dev.cputype == TYPE_EXYNOS4) {
+	if (s5p_ace_dev.cputype == TYPE_EXYNOS) {
 		new_status |= ACE_AES_SWAPDO_ON;
 		new_status |= ACE_AES_SWAPDI_ON;
 		new_status |= ACE_AES_COUNTERSIZE_128;
@@ -1537,7 +1537,7 @@ static int s5p_ace_sha_engine(struct s5p_ace_hash_ctx *sctx,
 	s5p_ace_write_sfr(ACE_FC_HRDMAC, reg);
 
 	/* Set byte swap of data in */
-	if (s5p_ace_dev.cputype == TYPE_EXYNOS4)
+	if (s5p_ace_dev.cputype == TYPE_EXYNOS)
 		s5p_ace_write_sfr(ACE_HASH_BYTESWAP, ACE_HASH_SWAPDI_ON |
 				ACE_HASH_SWAPDO_ON | ACE_HASH_SWAPIV_ON);
 	else
@@ -2611,8 +2611,8 @@ static struct platform_device_id s5p_ace_driver_ids[] = {
 		.name		= "s5pv210-ace",
 		.driver_data	= TYPE_S5PV210,
 	}, {
-		.name		= "exynos4-ace",
-		.driver_data	= TYPE_EXYNOS4,
+		.name		= "exynos-ace",
+		.driver_data	= TYPE_EXYNOS,
 	},
 	{}
 };

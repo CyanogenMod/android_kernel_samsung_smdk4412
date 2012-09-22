@@ -108,6 +108,15 @@ config REGULATOR_MAX8952
 	  via I2C bus. Maxim 8952 has one voltage output and supports 4 DVS
 	  modes ranging from 0.77V to 1.40V by 0.01V steps.
 
+config REGULATOR_MAX8952_GRANDE
+	tristate "Maxim MAX8952 Power Management IC"
+	depends on I2C
+	help
+	  This driver controls a Maxim 8952 voltage output regulator
+	  via I2C bus. Maxim 8952 has one voltage output and supports 4 DVS
+	  modes ranging from 0.77V to 1.40V by 0.01V steps.
+	  This driver uses MODE3 for Grande Project
+
 config REGULATOR_MAX8997
 	tristate "Maxim 8997/8966 regulator"
 	depends on MFD_MAX8997
@@ -217,6 +226,15 @@ config REGULATOR_LP3972
 	help
 	 Say Y here to support the voltage regulators and convertors
 	 on National Semiconductors LP3972 PMIC
+
+config REGULATOR_LP8720
+	tristate "National Semiconductors LP8720 PMIC regulator driver"
+	depends on I2C
+	help
+	 This driver controls a National Semiconductors LP8720 voltage
+	 output regulator(the BUCKs and LDOs) via I2C bus. Say Y here
+	 to support the voltage regulators and convertors on National
+	 Semiconductors LP8720 PMIC
 
 config REGULATOR_PCAP
 	tristate "PCAP2 regulator driver"

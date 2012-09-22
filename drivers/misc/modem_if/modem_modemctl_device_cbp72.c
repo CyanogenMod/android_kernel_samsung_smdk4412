@@ -43,8 +43,10 @@ static irqreturn_t phone_active_handler(int irq, void *arg)
 		phone_state, phone_reset, phone_active);
 
 	if (phone_reset && phone_active) {
-		phone_state = STATE_ONLINE;
-		mc->bootd->modem_state_changed(mc->bootd, phone_state);
+		if (mc->phone_state == STATE_BOOTING) {
+			phone_state = STATE_ONLINE;
+			mc->bootd->modem_state_changed(mc->bootd, phone_state);
+		}
 	} else if (phone_reset && !phone_active) {
 		if (mc->phone_state == STATE_ONLINE) {
 			phone_state = STATE_CRASH_EXIT;
@@ -69,6 +71,10 @@ static irqreturn_t phone_active_handler(int irq, void *arg)
 static int cbp72_on(struct modem_ctl *mc)
 {
 	mif_info("start!!!\n");
+
+	/* prevent sleep during bootloader downloading */
+	if (!wake_lock_active(&mc->mc_wake_lock))
+		wake_lock(&mc->mc_wake_lock);
 
 	gpio_set_value(mc->gpio_cp_on, 0);
 	if (mc->gpio_cp_off)
@@ -178,6 +184,9 @@ static int cbp72_boot_off(struct modem_ctl *mc)
 		return -ENXIO;
 	}
 	mc->bootd->modem_state_changed(mc->bootd, STATE_ONLINE);
+
+	wake_unlock(&mc->mc_wake_lock);
+
 	return 0;
 }
 
@@ -252,6 +261,8 @@ int cbp72_init_modemctl_device(struct modem_ctl *mc, struct modem_data *pdata)
 		mif_err("request_irq fail (%d)\n", ret);
 		return ret;
 	}
+
+	wake_lock_init(&mc->mc_wake_lock, WAKE_LOCK_SUSPEND, "cbp72_wake_lock");
 
 	ret = enable_irq_wake(irq);
 	if (ret)

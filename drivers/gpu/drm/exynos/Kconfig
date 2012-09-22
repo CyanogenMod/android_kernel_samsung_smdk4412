@@ -15,6 +15,12 @@ config DRM_EXYNOS_MEMSIZE
 	depends on DRM_EXYNOS
 	default "32768"
 
+config DRM_EXYNOS_IOMMU
+	bool "GEM IOMMU Support"
+	depends on DRM_EXYNOS
+	help
+	  Choose this option if you want to use GEM IOMMU feature for DRM.
+
 config DRM_EXYNOS_DMABUF
 	bool "GEM DMABUF Support"
 	depends on DRM_EXYNOS
@@ -54,8 +60,29 @@ config DRM_EXYNOS_G2D
 	help
 	  Choose this option if you want to use Samsung G2D for DRM.
 
-config DRM_EXYNOS_ROTATOR
-	bool "Samsung DRM Rotator"
+config DRM_EXYNOS_IPP
+	bool "Samsung DRM IPP"
 	depends on DRM_EXYNOS
 	help
+	  This option enables IPP drivers for FIMC, GSC, Rotator.
+	  It can support user space ioctl for each devices.
+	  ipp operations support rotating and scaling, writeback, flip, output
+	  when enable this options.
+
+config DRM_EXYNOS_ROTATOR
+	bool "Samsung DRM Rotator"
+	depends on DRM_EXYNOS_IPP
+	help
 	  Choose this option if you want to use Samsung Rotator for DRM.
+
+config DRM_EXYNOS_FIMC
+	bool "Samsung DRM FIMC"
+	depends on DRM_EXYNOS_IPP
+	help
+	  Choose this option if you want to use Samsung FIMC for DRM.
+
+config DRM_EXYNOS_GSC
+	bool "Samsung DRM GSC"
+	depends on DRM_EXYNOS_IPP && ARCH_EXYNOS5
+	help
+	  Choose this option if you want to use Samsung GSC for DRM.

@@ -215,6 +215,7 @@ int mfc_set_inst_cfg(struct mfc_inst_ctx *ctx, int type, void *arg)
 		case MFC_ENC_SETCONF_HIER_P:
 		case MFC_ENC_SETCONF_SEI_GEN:
 		case MFC_ENC_SETCONF_FRAME_PACKING:
+		case MFC_ENC_SETCONF_SPS_PPS_GEN:
 			if (ctx->c_ops->set_codec_cfg) {
 				if ((ctx->c_ops->set_codec_cfg(ctx, type, arg)) < 0)
 					return MFC_SET_CONF_FAIL;

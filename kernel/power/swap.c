@@ -372,6 +372,15 @@ static int swap_writer_finish(struct swap_map_handle *handle,
 			             LZO_HEADER, PAGE_SIZE)
 #define LZO_CMP_SIZE	(LZO_CMP_PAGES * PAGE_SIZE)
 
+/*
+ * lzo experimental compression ratio.
+ * When compression is used for hibernation, swap size is not required for worst
+ * case. So we use an experimental compression ratio. If the swap size is not
+ * enough, then alloc_swapdev_block() return fails and hibernation codes handle
+ * the error well.
+ */
+#define LZO_RATIO(x)	((x) / 2)
+
 /**
  *	save_image - save the suspend image data
  */
@@ -437,7 +446,7 @@ static int save_image_lzo(struct swap_map_handle *handle,
 	struct bio *bio;
 	struct timeval start;
 	struct timeval stop;
-	size_t off, unc_len, cmp_len;
+	size_t off, unc_len, cmp_len, total;
 	unsigned char *unc, *cmp, *wrk, *page;
 
 	page = (void *)__get_free_page(__GFP_WAIT | __GFP_HIGH);
@@ -477,6 +486,7 @@ static int save_image_lzo(struct swap_map_handle *handle,
 	if (!m)
 		m = 1;
 	nr_pages = 0;
+	total = 0;
 	bio = NULL;
 	do_gettimeofday(&start);
 	for (;;) {
@@ -529,6 +539,7 @@ static int save_image_lzo(struct swap_map_handle *handle,
 			if (ret)
 				goto out_finish;
 		}
+		total += DIV_ROUND_UP(LZO_HEADER + cmp_len, PAGE_SIZE);
 	}
 
 out_finish:
@@ -541,6 +552,11 @@ out_finish:
 	else
 		printk(KERN_CONT "\n");
 	swsusp_show_speed(&start, &stop, nr_to_write, "Wrote");
+	pr_info("PM: %lu->%lu kbytes, %d%% compressed\n",
+			nr_to_write * PAGE_SIZE / 1024,
+			total * PAGE_SIZE / 1024,
+			100 - ((total * 100) / nr_to_write));
+	image_size = total * PAGE_SIZE;
 
 	vfree(cmp);
 	vfree(unc);
@@ -564,8 +580,8 @@ static int enough_swap(unsigned int nr_pages, unsigned int flags)
 
 	pr_debug("PM: Free swap pages: %u\n", free_swap);
 
-	required = PAGES_FOR_IO + ((flags & SF_NOCOMPRESS_MODE) ?
-		nr_pages : (nr_pages * LZO_CMP_PAGES) / LZO_UNC_PAGES + 1);
+	required = PAGES_FOR_IO + ((flags & SF_NOCOMPRESS_MODE) ? nr_pages :
+		LZO_RATIO((nr_pages * LZO_CMP_PAGES) / LZO_UNC_PAGES + 1));
 	return free_swap > required;
 }
 
@@ -943,8 +959,11 @@ int swsusp_check(void)
 		if (!memcmp(HIBERNATE_SIG, swsusp_header->sig, 10)) {
 			memcpy(swsusp_header->sig, swsusp_header->orig_sig, 10);
 			/* Reset swap signature now */
-			error = hib_bio_write_page(swsusp_resume_block,
-						swsusp_header, NULL);
+#if defined(CONFIG_FAST_RESUME) && defined(CONFIG_SLP)
+			if (noresume)
+#endif
+				error = hib_bio_write_page(swsusp_resume_block,
+							swsusp_header, NULL);
 		} else {
 			error = -EINVAL;
 		}

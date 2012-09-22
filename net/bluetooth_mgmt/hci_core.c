@@ -45,7 +45,6 @@
 #include <linux/timer.h>
 #include <linux/crypto.h>
 #include <net/sock.h>
-#include <linux/gpio.h>
 
 #include <asm/system.h>
 #include <linux/uaccess.h>
@@ -219,6 +218,7 @@ static void hci_init_req(struct hci_dev *hdev, unsigned long opt)
 	if (!test_bit(HCI_QUIRK_NO_RESET, &hdev->quirks)) {
 			set_bit(HCI_RESET, &hdev->flags);
 			hci_send_cmd(hdev, HCI_OP_RESET, 0, NULL);
+			memset(hdev->eir, 0, sizeof(hdev->eir));
 	}
 
 	/* Read Local Supported Features */
@@ -773,6 +773,7 @@ static int hci_dev_do_close(struct hci_dev *hdev)
 		set_bit(HCI_INIT, &hdev->flags);
 		__hci_request(hdev, hci_reset_req, 0,
 					msecs_to_jiffies(250));
+		memset(hdev->eir, 0, sizeof(hdev->eir));
 		clear_bit(HCI_INIT, &hdev->flags);
 	}
 
@@ -1417,18 +1418,7 @@ int hci_remove_ltk(struct hci_dev *hdev, bdaddr_t *bdaddr)
 static void hci_cmd_timer(unsigned long arg)
 {
 	struct hci_dev *hdev = (void *) arg;
-#ifdef CONFIG_MACH_M0
-	int rx_pin = gpio_get_value(GPIO_BT_RXD);
-	int tx_pin = gpio_get_value(GPIO_BT_TXD);
-	int cts_pin = gpio_get_value(GPIO_BT_CTS);
-	int rts_pin = gpio_get_value(GPIO_BT_RTS);
 
-	int bt_host_wake_pin = gpio_get_value(GPIO_BT_HOST_WAKE);
-	int bt_wake_pin = gpio_get_value(GPIO_BT_WAKE);
-	int bt_en = gpio_get_value(GPIO_BT_EN);
-	BT_ERR("rx: %d, tx: %d, cts: %d, rts: %d", rx_pin, tx_pin, cts_pin, rts_pin);
-	BT_ERR("host_wake: %d, bt_wake: %d, en: %d", bt_host_wake_pin, bt_wake_pin, bt_en);
-#endif
 	BT_ERR("%s command tx timeout", hdev->name);
 	atomic_set(&hdev->cmd_cnt, 1);
 	tasklet_schedule(&hdev->cmd_task);
@@ -2297,6 +2287,21 @@ int hci_send_cmd(struct hci_dev *hdev, __u16 opcode, __u32 plen, void *param)
 void *hci_sent_cmd_data(struct hci_dev *hdev, __u16 opcode)
 {
 	struct hci_command_hdr *hdr;
+
+	/* SS_BLUETOOTH(is80.hwang) 2012.05.16 */
+	/*Check null pointer and opcode */
+	#if defined(CONFIG_BT_CSR8811)
+	if (hdev == NULL) {
+		BT_ERR("hci_sent_cmd_opcode:: hdev=NULL, opcode=0x%x", opcode);
+		return NULL;
+	}
+
+	if (hdev->sent_cmd->data == NULL) {
+		BT_ERR("hci_sent_cmd_opcode:: hdev->sent_cmd->data=NULL opcode=0x%x", opcode);
+		return NULL;
+	}
+	#endif
+	/* SS_BLUEZ_BT(is80.hwang) End */
 
 	if (!hdev->sent_cmd)
 		return NULL;

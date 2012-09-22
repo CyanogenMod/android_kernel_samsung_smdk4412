@@ -72,6 +72,8 @@ struct android_usb_platform_data {
 	 * (anywhere from 1 to FSG_MAX_LUNS which is 8).
 	 */
 	unsigned int            nluns;
+	/* cdfs supprot : verizon require */
+	unsigned int		cdfs_support;
 };
 
 /* Platform data for "usb_mass_storage" driver. */
@@ -96,5 +98,13 @@ struct usb_ether_platform_data {
 struct acm_platform_data {
 	u8	num_inst;
 };
+
+#ifdef CONFIG_USB_ANDROID_SAMSUNG_COMPOSITE
+int register_usb_composite_notifier(struct notifier_block *notifier);
+int unregister_usb_composite_notifier(struct notifier_block *notifier);
+#else
+#define register_usb_composite_notifier		NULL
+#define unregister_usb_composite_notifier	NULL
+#endif
 
 #endif	/* __LINUX_USB_ANDROID_H */

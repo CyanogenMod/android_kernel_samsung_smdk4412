@@ -50,6 +50,12 @@ enum s3cfb_extdsp_mem_owner_t {
 	DMA_MEM_OTHER	= 2,
 };
 
+enum s3cfb_extdsp_buf_status_t {
+	BUF_FREE	= 0,
+	BUF_ACTIVE	= 1,
+	BUF_LOCKED	= 2,
+};
+
 struct s3cfb_extdsp_lcd_polarity {
 	int rise_vclk;
 	int inv_hsync;
@@ -73,6 +79,12 @@ struct s3cfb_extdsp_time_stamp {
 	struct timeval		time_marker;
 };
 
+struct s3cfb_extdsp_buf_list {
+	unsigned int		phys_addr;
+	struct timeval		time_marker;
+	int			buf_status;
+};
+
 struct s3cfb_extdsp_global {
 	struct mutex		lock;
 	struct device		*dev;
@@ -90,8 +102,9 @@ struct s3cfb_extdsp_global {
 	struct early_suspend	early_suspend;
 	struct wake_lock	idle_lock;
 #endif
-	struct s3cfb_extdsp_time_stamp	time_stamp[CONFIG_FB_S5P_EXTDSP_NR_BUFFERS];
+	struct s3cfb_extdsp_buf_list	buf_list[CONFIG_FB_S5P_EXTDSP_NR_BUFFERS];
 	unsigned int			enabled_tz;
+	unsigned int			lock_cnt;
 };
 
 struct s3cfb_extdsp_window {
@@ -105,6 +118,7 @@ struct s3cfb_extdsp_window {
 	int			lock_status;
 	int			lock_buf_idx;
 	unsigned int		lock_buf_offset;
+	unsigned int		free_buf_offset;
 };
 
 struct s3cfb_extdsp_user_window {
@@ -131,6 +145,10 @@ struct s3cfb_extdsp_user_window {
 						struct s3cfb_extdsp_time_stamp)
 #define S3CFB_EXTDSP_GET_TZ_MODE		_IOW ('F', 325, unsigned int)
 #define S3CFB_EXTDSP_SET_TZ_MODE		_IOW ('F', 326, unsigned int)
+#define S3CFB_EXTDSP_GET_LOCKED_NUMBER		_IOW ('F', 327, unsigned int)
+#define S3CFB_EXTDSP_LOCK_AND_GET_BUF		_IOW ('F', 328, \
+						struct s3cfb_extdsp_buf_list)
+#define S3CFB_EXTDSP_GET_FREE_BUFFER		_IOW('F', 329, unsigned int)
 
 extern struct fb_ops			s3cfb_extdsp_ops;
 extern inline struct s3cfb_extdsp_global	*get_extdsp_global(int id);

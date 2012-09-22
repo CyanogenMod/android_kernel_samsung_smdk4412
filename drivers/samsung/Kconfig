@@ -1,17 +1,8 @@
 #
 #
 #
-
-menuconfig SAMSUNG_MODULES
-	tristate "Samsung Kernel Modules"
-	default n
-	help
-	  Say Y to enable Samsung kernel modules. j4fs and param
-	  modules are included.
-
 menuconfig FM_RADIO
 	tristate "FM Radio Driver"
-	depends on SAMSUNG_MODULES
 	default n
 	help
 	  Say Y to enable FM Radio Driver

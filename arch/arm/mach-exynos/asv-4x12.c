@@ -61,6 +61,41 @@ struct asv_judge_table exynos4x12_limit[] = {
 	{999, 999},		/* Reserved Group */
 };
 
+struct asv_judge_table exynos4x12_limit_rev2[] = {
+#if 0
+	/* 0705 dvfs table */
+	/* HPM, IDS */
+	{  0,   0},		/* Reserved Group */
+	{ 15,   8},		/* ASV1 Group */
+	{ 16,  11},
+	{ 18,  14},
+	{ 19,  18},
+	{ 20,  22},
+	{ 21,  26},
+	{ 22,  29},
+	{ 23,  36},
+	{ 24,  44},
+	{ 25,  56},
+	{999, 999},		/* ASV11 Group */
+#else
+	/* 0725 dvfs table */
+	/* HPM, IDS */
+	{  0,   0},		/* Reserved Group */
+	{ 15,   8},		/* ASV1 Group */
+	{ 16,  11},
+	{ 18,  14},
+	{ 19,  18},
+	{ 20,  22},
+	{ 21,  26},
+	{ 22,  29},
+	{ 23,  36},
+	{ 24,  40},
+	{ 25,  45},
+	{ 26,  50},
+	{999, 999},		/* ASV11 Group */
+#endif
+};
+
 struct asv_judge_table exynos4212_limit[] = {
 	/* HPM, IDS */
 	{  0,   0},		/* Reserved Group */
@@ -93,17 +128,63 @@ static int exynos4x12_get_ids(struct samsung_asv *asv_info)
 
 static void exynos4x12_pre_set_abb(void)
 {
-	switch (exynos_result_of_asv) {
-	case 0:
-	case 1:
-	case 2:
-	case 3:
-		exynos4x12_set_abb(ABB_MODE_100V);
-		break;
-
-	default:
-		exynos4x12_set_abb(ABB_MODE_130V);
-		break;
+	if (samsung_rev() >= EXYNOS4412_REV_2_0) {
+		switch (exynos_result_of_asv) {
+		case 0:
+		case 1:
+			exynos4x12_set_abb_member(ABB_ARM, ABB_MODE_075V);
+			exynos4x12_set_abb_member(ABB_INT, ABB_MODE_100V);
+			exynos4x12_set_abb_member(ABB_MIF, ABB_MODE_100V);
+			exynos4x12_set_abb_member(ABB_G3D, ABB_MODE_100V);
+			break;
+		case 2:
+			exynos4x12_set_abb_member(ABB_ARM, ABB_MODE_100V);
+			exynos4x12_set_abb_member(ABB_INT, ABB_MODE_100V);
+			exynos4x12_set_abb_member(ABB_MIF, ABB_MODE_140V);
+			exynos4x12_set_abb_member(ABB_G3D, ABB_MODE_100V);
+			break;
+		case 3:
+		case 4:
+		case 5:
+		case 6:
+		case 7:
+			exynos4x12_set_abb_member(ABB_ARM, ABB_MODE_130V);
+			exynos4x12_set_abb_member(ABB_INT, ABB_MODE_130V);
+			exynos4x12_set_abb_member(ABB_MIF, ABB_MODE_140V);
+			exynos4x12_set_abb_member(ABB_G3D, ABB_MODE_100V);
+			break;
+		case 8:
+		case 9:
+		case 10:
+		case 11:
+		case 12:
+			exynos4x12_set_abb_member(ABB_ARM, ABB_MODE_130V);
+			exynos4x12_set_abb_member(ABB_INT, ABB_MODE_130V);
+			exynos4x12_set_abb_member(ABB_MIF, ABB_MODE_140V);
+			exynos4x12_set_abb_member(ABB_G3D, ABB_MODE_130V);
+			break;
+		default:
+			exynos4x12_set_abb(ABB_MODE_130V);
+			break;
+		}
+	} else {
+		switch (exynos_result_of_asv) {
+		case 0:
+		case 1:
+		case 2:
+		case 3:
+			exynos4x12_set_abb(ABB_MODE_100V);
+			break;
+		case 4:
+		case 5:
+		case 6:
+		case 7:
+			exynos4x12_set_abb(ABB_MODE_130V);
+			break;
+		default:
+			exynos4x12_set_abb(ABB_MODE_130V);
+			break;
+		}
 	}
 }
 
@@ -112,11 +193,21 @@ static int exynos4x12_asv_store_result(struct samsung_asv *asv_info)
 	unsigned int i;
 
 	if (soc_is_exynos4412()) {
-		for (i = 0; i < ARRAY_SIZE(exynos4x12_limit); i++) {
-			if ((asv_info->ids_result <= exynos4x12_limit[i].ids_limit) ||
-			    (asv_info->hpm_result <= exynos4x12_limit[i].hpm_limit)) {
-				exynos_result_of_asv = i;
-				break;
+		if (samsung_rev() >= EXYNOS4412_REV_2_0) {
+			for (i = 0; i < ARRAY_SIZE(exynos4x12_limit_rev2); i++) {
+				if ((asv_info->ids_result <= exynos4x12_limit_rev2[i].ids_limit) ||
+				    (asv_info->hpm_result <= exynos4x12_limit_rev2[i].hpm_limit)) {
+						exynos_result_of_asv = i;
+					break;
+				}
+			}
+		} else {
+			for (i = 0; i < ARRAY_SIZE(exynos4x12_limit); i++) {
+				if ((asv_info->ids_result <= exynos4x12_limit[i].ids_limit) ||
+				    (asv_info->hpm_result <= exynos4x12_limit[i].hpm_limit)) {
+						exynos_result_of_asv = i;
+					break;
+				}
 			}
 		}
 	} else {
@@ -137,8 +228,10 @@ static int exynos4x12_asv_store_result(struct samsung_asv *asv_info)
 	if (exynos_result_of_asv < DEFAULT_ASV_GROUP)
 		exynos_result_of_asv = DEFAULT_ASV_GROUP;
 
+#ifndef CONFIG_SAMSUNG_PRODUCT_SHIP
 	pr_info("EXYNOS4X12(NO SG): IDS : %d HPM : %d RESULT : %d\n",
 		asv_info->ids_result, asv_info->hpm_result, exynos_result_of_asv);
+#endif
 
 	exynos4x12_pre_set_abb();
 
@@ -153,6 +246,8 @@ int exynos4x12_asv_init(struct samsung_asv *asv_info)
 	int exynos_cal_asv;
 
 	exynos_result_of_asv = 0;
+	exynos_special_flag = 0;
+	exynos_dynamic_ema = false;
 
 	pr_info("EXYNOS4X12: Adaptive Support Voltage init\n");
 
@@ -160,6 +255,31 @@ int exynos4x12_asv_init(struct samsung_asv *asv_info)
 
 	/* Store PKG_ID */
 	asv_info->pkg_id = tmp;
+
+#ifdef CONFIG_EXYNOS4X12_1000MHZ_SUPPORT
+	exynos_armclk_max = 1000000;
+#else
+	/* If maximum armclock is fused, set its value */
+	if (samsung_rev() < EXYNOS4412_REV_2_0) {
+		switch (tmp & MOD_SG_MASK) {
+		case 0:
+		case 3:
+			exynos_armclk_max = 1400000;
+			break;
+		case 2:
+			exynos_armclk_max = 1000000;
+			break;
+		default:
+			exynos_armclk_max = 1400000;
+			break;
+		}
+	}
+#endif
+
+	if ((tmp >> EMA_OFFSET) & EMA_MASK)
+		exynos_dynamic_ema = true;
+	else
+		exynos_dynamic_ema = false;
 
 	/* If Speed group is fused, get speed group from */
 	if ((tmp >> FUSED_SG_OFFSET) & 0x1) {
@@ -185,10 +305,16 @@ int exynos4x12_asv_init(struct samsung_asv *asv_info)
 		pr_info("EXYNOS4X12(SG):  ORIG : %d MOD : %d RESULT : %d\n",
 			exynos_orig_sp, exynos_mod_sp, exynos_result_of_asv);
 
+		/* set Special flag into exynos_special_flag */
+		exynos_special_flag = (tmp >> LOCKING_OFFSET) & LOCKING_MASK;
+
 		exynos4x12_pre_set_abb();
 
 		return -EEXIST;
 	}
+
+	/* set Special flag into exynos_special_flag */
+	exynos_special_flag = (tmp >> LOCKING_OFFSET) & LOCKING_MASK;
 
 	asv_info->get_ids = exynos4x12_get_ids;
 	asv_info->get_hpm = exynos4x12_get_hpm;

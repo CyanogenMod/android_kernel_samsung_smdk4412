@@ -28,11 +28,7 @@
 #include <linux/firmware.h>
 #include <linux/i2c/es305.h>
 
-#ifdef CONFIG_MACH_C1VZW
-#define ES305_FIRMWARE_NAME	"audience/es305_fw_c1vzw.bin"
-#else
 #define ES305_FIRMWARE_NAME	"audience/es305_fw.bin"
-#endif
 
 static struct i2c_client *this_client;
 static struct es305_platform_data *pdata;
@@ -55,11 +51,7 @@ unsigned char es305_sleep_cmd[] = {
 };
 
 unsigned char es305_bypass_data[] = {
-#ifdef CONFIG_MACH_C1VZW
-	0x80, 0x52, 0x00, 0x48,
-#else
 	0x80, 0x52, 0x00, 0x4C,
-#endif
 	0x80, 0x10, 0x00, 0x01,
 };
 

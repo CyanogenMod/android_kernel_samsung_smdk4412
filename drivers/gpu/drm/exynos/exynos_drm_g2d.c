@@ -22,6 +22,7 @@
 #include "drmP.h"
 #include "exynos_drm.h"
 #include "exynos_drm_drv.h"
+#include "exynos_drm_gem.h"
 #include "exynos_drm_iommu.h"
 
 #define G2D_HW_MAJOR_VER		4
@@ -93,7 +94,7 @@
 #define G2D_CMDLIST_POOL_SIZE		(G2D_CMDLIST_SIZE * G2D_CMDLIST_NUM)
 #define G2D_CMDLIST_DATA_NUM		(G2D_CMDLIST_SIZE / sizeof(u32) - 2)
 
-#define MAX_BUF_ADDR_NR			6
+#define MAX_BUF_ADDR_NR		6
 
 /* cmdlist data structure */
 struct g2d_cmdlist {
@@ -111,7 +112,7 @@ struct g2d_cmdlist_node {
 	struct list_head	list;
 	struct g2d_cmdlist	*cmdlist;
 	unsigned int		map_nr;
-	void			*gem_obj[MAX_BUF_ADDR_NR];
+	void			*gem_objs[MAX_BUF_ADDR_NR];
 	dma_addr_t		dma_addr;
 
 	struct drm_exynos_pending_g2d_event	*event;
@@ -152,7 +153,8 @@ struct g2d_data {
 	struct kmem_cache		*runqueue_slab;
 };
 
-static int g2d_init_cmdlist(struct g2d_data *g2d)
+static int g2d_init_cmdlist(struct g2d_data *g2d,
+									struct exynos_drm_private *drm_priv)
 {
 	struct device *dev = g2d->dev;
 	struct g2d_cmdlist_node *node = g2d->cmdlist_node;
@@ -171,8 +173,9 @@ static int g2d_init_cmdlist(struct g2d_data *g2d)
 	 * pages contained in sg list to iommu table. Command list pool also is
 	 * accessed by dma through device address with using iommu.
 	 */
-	g2d->cmdlist_pool_map = exynos_drm_iommu_map(dev, g2d->cmdlist_pool,
-						     G2D_CMDLIST_POOL_SIZE);
+	g2d->cmdlist_pool_map = exynos_drm_iommu_map(drm_priv->vmm,
+							g2d->cmdlist_pool,
+							G2D_CMDLIST_POOL_SIZE);
 	if (!g2d->cmdlist_pool_map) {
 		dev_err(dev, "failed map to iommu\n");
 		ret = -EFAULT;
@@ -199,7 +202,7 @@ static int g2d_init_cmdlist(struct g2d_data *g2d)
 	return 0;
 
 err_iommu_unmap:
-	exynos_drm_iommu_unmap(dev, g2d->cmdlist_pool_map);
+	exynos_drm_iommu_unmap(drm_priv->vmm, g2d->cmdlist_pool_map);
 err:
 	dma_free_coherent(dev, G2D_CMDLIST_POOL_SIZE, g2d->cmdlist_pool_virt,
 			g2d->cmdlist_pool);
@@ -208,13 +211,18 @@ err:
 
 static void g2d_fini_cmdlist(struct g2d_data *g2d)
 {
-	struct device *dev = g2d->dev;
+	struct exynos_drm_private *drm_priv;
+	struct exynos_drm_subdrv *subdrv = &g2d->subdrv;
 
-	exynos_drm_iommu_unmap(dev, g2d->cmdlist_pool_map);
+	drm_priv = subdrv->drm_dev->dev_private;
+
+	if (drm_priv->vmm)
+		exynos_drm_iommu_unmap(drm_priv->vmm, g2d->cmdlist_pool_map);
 
 	kfree(g2d->cmdlist_node);
-	dma_free_coherent(dev, G2D_CMDLIST_POOL_SIZE, g2d->cmdlist_pool_virt,
-			g2d->cmdlist_pool);
+	dma_free_coherent(g2d->dev, G2D_CMDLIST_POOL_SIZE,
+				g2d->cmdlist_pool_virt,
+				g2d->cmdlist_pool);
 }
 
 static struct g2d_cmdlist_node *g2d_get_cmdlist(struct g2d_data *g2d)
@@ -269,70 +277,48 @@ static int g2d_map_cmdlist_gem(struct g2d_data *g2d,
 				struct drm_device *drm_dev,
 				struct drm_file *file)
 {
-	struct drm_exynos_file_private *file_priv = file->driver_priv;
-	struct exynos_drm_g2d_private *g2d_priv = file_priv->g2d_priv;
 	struct g2d_cmdlist *cmdlist = node->cmdlist;
-	struct iommu_gem_map_params params;
-	unsigned int gem_handle;
-	dma_addr_t addr;
 	int offset;
 	int i;
 
-	params.dev = g2d->dev;
-	params.drm_dev = drm_dev;
-	params.file = file;
-
 	for (i = 0; i < node->map_nr; i++) {
+		unsigned int gem_handle, gem_obj;
+		dma_addr_t *addr;
+
 		offset = cmdlist->last - (i * 2 + 1);
 		gem_handle = cmdlist->data[offset];
 
-		addr = exynos_drm_iommu_map_gem(&params,
-						&g2d_priv->iommu_map_list,
-						gem_handle,
-						IOMMU_G2D);
-		if (!addr) {
+		addr = exynos_drm_gem_get_dma_addr(drm_dev, gem_handle,
+						file,
+						&gem_obj);
+		if (IS_ERR(addr)) {
 			node->map_nr = i;
 			return -EFAULT;
 		}
 
-		cmdlist->data[offset] = addr;
-		node->gem_obj[i] = params.gem_obj;
+		cmdlist->data[offset] = *addr;
+		node->gem_objs[i] = (void *)gem_obj;
 	}
 
 	return 0;
 }
 
-static void g2d_unmap_cmdlist_gem(struct drm_device *drm_dev,
-				  struct g2d_cmdlist_node *node,
-				  struct drm_file *file, int dec)
+static void g2d_unmap_cmdlist_gem(struct g2d_data *g2d,
+				  struct g2d_cmdlist_node *node)
 {
-	struct drm_exynos_file_private *file_priv = file->driver_priv;
-	struct exynos_drm_g2d_private *g2d_priv = file_priv->g2d_priv;
-	struct device *dev = g2d_priv->dev;
-	struct g2d_cmdlist *cmdlist = node->cmdlist;
-	struct iommu_gem_map_params params;
-	struct g2d_data *g2d;
-	dma_addr_t addr;
-	int offset;
+	struct exynos_drm_subdrv *subdrv = &g2d->subdrv;
 	int i;
 
-	g2d = dev_get_drvdata(dev);
-	if (!g2d)
-		return;
-
-	params.dev = dev;
-	params.drm_dev = drm_dev;
-	params.file = file;
-
 	for (i = 0; i < node->map_nr; i++) {
-		offset = cmdlist->last - (i * 2 + 1) - dec;
-		addr = cmdlist->data[offset];
+		void *gem_obj = node->gem_objs[i];
 
-		params.gem_obj = node->gem_obj[i];
+		if (gem_obj)
+			exynos_drm_gem_put_dma_addr(subdrv->drm_dev, gem_obj);
 
-		exynos_drm_iommu_unmap_gem(&params, addr,
-						IOMMU_G2D);
+		node->gem_objs[i] = NULL;
 	}
+
+	node->map_nr = 0;
 }
 
 static void g2d_dma_start(struct g2d_data *g2d,
@@ -344,7 +330,7 @@ static void g2d_dma_start(struct g2d_data *g2d,
 
 	pm_runtime_get_sync(g2d->dev);
 	clk_enable(g2d->gate_clk);
-	pm_qos_update_request(&g2d->pm_qos, 400000);
+	pm_qos_update_request(&g2d->pm_qos, 400200);
 
 	/* interrupt enable */
 	writel_relaxed(G2D_INTEN_ACF | G2D_INTEN_UCF | G2D_INTEN_GCF,
@@ -370,10 +356,18 @@ static struct g2d_runqueue_node *g2d_get_runqueue_node(struct g2d_data *g2d)
 static void g2d_free_runqueue_node(struct g2d_data *g2d,
 				   struct g2d_runqueue_node *runqueue_node)
 {
+	struct g2d_cmdlist_node *node;
+
 	if (!runqueue_node)
 		return;
 
 	mutex_lock(&g2d->cmdlist_mutex);
+	/*
+	 * commands in run_cmdlist have been completed so unmap all gem
+	 * objects in each command node so that they are unreferenced.
+	 */
+	list_for_each_entry(node, &runqueue_node->run_cmdlist, list)
+		g2d_unmap_cmdlist_gem(g2d, node);
 	list_splice_tail_init(&runqueue_node->run_cmdlist, &g2d->free_cmdlist);
 	mutex_unlock(&g2d->cmdlist_mutex);
 
@@ -398,7 +392,15 @@ static void g2d_runqueue_worker(struct work_struct *work)
 	clk_disable(g2d->gate_clk);
 	pm_runtime_put_sync(g2d->dev);
 
-	complete(&g2d->runqueue_node->complete);
+	/* if async mode, do not call complete. */
+	if (!g2d->runqueue_node->async)
+		complete(&g2d->runqueue_node->complete);
+
+	/*
+	 * if async mode, run_cmdlist of runqueue_node is not freed
+	 * at exynos_g2d_exec_ioctl once complete because wait_for_completion
+	 * wasn't called there so free it here.
+	 */
 	if (g2d->runqueue_node->async)
 		g2d_free_runqueue_node(g2d, g2d->runqueue_node);
 
@@ -444,12 +446,14 @@ static irqreturn_t g2d_irq_handler(int irq, void *dev_id)
 		writel_relaxed(pending, g2d->regs + G2D_INTC_PEND);
 
 	if (pending & G2D_INTP_GCMD_FIN) {
-		u32 cmdlist_no = readl_relaxed(g2d->regs + G2D_DMA_STATUS);
+		u32 value, list_done_count;
 
-		cmdlist_no = (cmdlist_no & G2D_DMA_LIST_DONE_COUNT) >>
+		value = readl_relaxed(g2d->regs + G2D_DMA_STATUS);
+
+		list_done_count = (value & G2D_DMA_LIST_DONE_COUNT) >>
 						G2D_DMA_LIST_DONE_COUNT_OFFSET;
 
-		g2d_finish_event(g2d, cmdlist_no);
+		g2d_finish_event(g2d, list_done_count);
 
 		writel_relaxed(0, g2d->regs + G2D_DMA_HOLD_CMD);
 		if (!(pending & G2D_INTP_ACMD_FIN)) {
@@ -460,6 +464,8 @@ static irqreturn_t g2d_irq_handler(int irq, void *dev_id)
 
 	if (pending & G2D_INTP_ACMD_FIN)
 		queue_work(g2d->g2d_workq, &g2d->runqueue_work);
+
+		writel_relaxed(pending, g2d->regs + G2D_INTC_PEND);
 
 	return IRQ_HANDLED;
 }
@@ -653,7 +659,7 @@ int exynos_g2d_set_cmdlist_ioctl(struct drm_device *drm_dev, void *data,
 	return 0;
 
 err_unmap:
-	g2d_unmap_cmdlist_gem(drm_dev, node, file, 0);
+	g2d_unmap_cmdlist_gem(g2d, node);
 err_free_event:
 	if (node->event) {
 		spin_lock_irqsave(&drm_dev->event_lock, flags);
@@ -724,11 +730,57 @@ out:
 }
 EXPORT_SYMBOL_GPL(exynos_g2d_exec_ioctl);
 
-static int g2d_open(struct drm_device *drm_dev, struct device *dev,
+static int g2d_subdrv_probe(struct drm_device *drm_dev, struct device *dev)
+{
+	struct exynos_drm_private *drm_priv;
+	struct g2d_data *g2d;
+	int ret;
+
+	drm_priv = drm_dev->dev_private;
+
+	g2d = dev_get_drvdata(dev);
+	if (!g2d)
+		return -EFAULT;
+
+	/* allocate dma-aware cmdlist buffer and map it with iommu table. */
+	ret = g2d_init_cmdlist(g2d, drm_priv);
+	if (ret < 0)
+		return ret;
+
+	/* enable iommu to g2d hardware */
+	ret = exynos_drm_iommu_activate(drm_priv->vmm, dev);
+	if (ret < 0) {
+		dev_err(dev, "failed to activate iommu\n");
+		goto err_fini_cmdlist;
+	}
+
+	return ret;
+
+err_fini_cmdlist:
+	g2d_fini_cmdlist(g2d);
+	return ret;
+}
+
+static void g2d_subdrv_remove(struct drm_device *drm_dev, struct device *dev)
+{
+	struct exynos_drm_private *drm_priv;
+
+	drm_priv = drm_dev->dev_private;
+
+	if (drm_priv->vmm)
+		exynos_drm_iommu_deactivate(drm_priv->vmm, dev);
+}
+
+static int g2d_subdrv_open(struct drm_device *drm_dev, struct device *dev,
 			struct drm_file *file)
 {
 	struct drm_exynos_file_private *file_priv = file->driver_priv;
 	struct exynos_drm_g2d_private *g2d_priv;
+	struct g2d_data *g2d;
+
+	g2d = dev_get_drvdata(dev);
+	if (!g2d)
+		return -EFAULT;
 
 	g2d_priv = kzalloc(sizeof(*g2d_priv), GFP_KERNEL);
 	if (!g2d_priv) {
@@ -741,20 +793,17 @@ static int g2d_open(struct drm_device *drm_dev, struct device *dev,
 
 	INIT_LIST_HEAD(&g2d_priv->inuse_cmdlist);
 	INIT_LIST_HEAD(&g2d_priv->event_list);
-	INIT_LIST_HEAD(&g2d_priv->iommu_map_list);
 
 	return 0;
 }
 
-static void g2d_close(struct drm_device *drm_dev, struct device *dev,
+static void g2d_subdrv_close(struct drm_device *drm_dev, struct device *dev,
 			struct drm_file *file)
 {
 	struct drm_exynos_file_private *file_priv = file->driver_priv;
 	struct exynos_drm_g2d_private *g2d_priv = file_priv->g2d_priv;
 	struct g2d_data *g2d;
 	struct g2d_cmdlist_node *node, *n;
-	struct iommu_info_node *im, *t_im;
-	struct iommu_gem_map_params params;
 
 	if (!dev)
 		return;
@@ -764,27 +813,18 @@ static void g2d_close(struct drm_device *drm_dev, struct device *dev,
 		return;
 
 	mutex_lock(&g2d->cmdlist_mutex);
-	list_for_each_entry_safe(node, n, &g2d_priv->inuse_cmdlist, list)
+	list_for_each_entry_safe(node, n, &g2d_priv->inuse_cmdlist, list) {
+		/*
+		 * unmap all gem objects not completed.
+		 *
+		 * P.S. if current process was terminated forcely then
+		 * there may be some commands in inuse_cmdlist so unmap
+		 * them.
+		 */
+		g2d_unmap_cmdlist_gem(g2d, node);
 		list_move_tail(&node->list, &g2d->free_cmdlist);
-	mutex_unlock(&g2d->cmdlist_mutex);
-
-	params.dev = dev;
-	params.drm_dev = drm_dev;
-	params.file = file;
-
-	/*
-	 * unmap all device address spaces from iommu table and
-	 * release all lists.
-	 */
-	list_for_each_entry_safe(im, t_im, &g2d_priv->iommu_map_list, list) {
-		params.gem_obj = im->gem_obj;
-
-		exynos_drm_iommu_unmap_gem(&params, im->dma_addr,
-						IOMMU_G2D);
-		list_del(&im->list);
-		kfree(im);
-		im = NULL;
 	}
+	mutex_unlock(&g2d->cmdlist_mutex);
 
 	kfree(file_priv->g2d_priv);
 }
@@ -826,29 +866,11 @@ static int __devinit g2d_probe(struct platform_device *pdev)
 	mutex_init(&g2d->cmdlist_mutex);
 	mutex_init(&g2d->runqueue_mutex);
 
-	/* setup device address space for g2d iommu */
-	ret = exynos_drm_iommu_setup(dev);
-	if (ret < 0) {
-		dev_err(dev, "failed to setup iommu\n");
-		goto err_destroy_workqueue;
-	}
-
-	/* enable iommu to g2d hardware */
-	ret = exynos_drm_iommu_activate(dev);
-	if (ret < 0) {
-		dev_err(dev, "failed to activate iommu\n");
-		goto err_iommu_cleanup;
-	}
-
-	ret = g2d_init_cmdlist(g2d);
-	if (ret < 0)
-		goto err_iommu_deactivate;
-
 	g2d->gate_clk = clk_get(dev, "fimg2d");
 	if (IS_ERR(g2d->gate_clk)) {
 		dev_err(dev, "failed to get gate clock\n");
 		ret = PTR_ERR(g2d->gate_clk);
-		goto err_fini_cmdlist;
+		goto err_destory_workqueue;
 	}
 
 	pm_runtime_enable(dev);
@@ -892,8 +914,10 @@ static int __devinit g2d_probe(struct platform_device *pdev)
 
 	subdrv = &g2d->subdrv;
 	subdrv->dev = dev;
-	subdrv->open = g2d_open;
-	subdrv->close = g2d_close;
+	subdrv->probe = g2d_subdrv_probe;
+	subdrv->remove = g2d_subdrv_remove;
+	subdrv->open = g2d_subdrv_open;
+	subdrv->close = g2d_subdrv_close;
 
 	ret = exynos_drm_subdrv_register(subdrv);
 	if (ret < 0) {
@@ -918,13 +942,7 @@ err_release_res:
 err_put_clk:
 	pm_runtime_disable(dev);
 	clk_put(g2d->gate_clk);
-err_fini_cmdlist:
-	g2d_fini_cmdlist(g2d);
-err_iommu_deactivate:
-	exynos_drm_iommu_deactivate(dev);
-err_iommu_cleanup:
-	exynos_drm_iommu_cleanup(dev);
-err_destroy_workqueue:
+err_destory_workqueue:
 	destroy_workqueue(g2d->g2d_workq);
 err_destroy_slab:
 	kmem_cache_destroy(g2d->runqueue_slab);
@@ -955,8 +973,6 @@ static int __devexit g2d_remove(struct platform_device *pdev)
 	clk_put(g2d->gate_clk);
 
 	g2d_fini_cmdlist(g2d);
-	exynos_drm_iommu_deactivate(&pdev->dev);
-	exynos_drm_iommu_cleanup(&pdev->dev);
 	destroy_workqueue(g2d->g2d_workq);
 	kmem_cache_destroy(g2d->runqueue_slab);
 	kfree(g2d);
@@ -968,6 +984,8 @@ static int __devexit g2d_remove(struct platform_device *pdev)
 static int g2d_suspend(struct device *dev)
 {
 	struct g2d_data *g2d = dev_get_drvdata(dev);
+	struct drm_device *drm_dev = g2d->subdrv.drm_dev;
+	struct exynos_drm_private *drm_priv = drm_dev->dev_private;
 
 	mutex_lock(&g2d->runqueue_mutex);
 	g2d->suspended = true;
@@ -979,12 +997,25 @@ static int g2d_suspend(struct device *dev)
 
 	flush_work_sync(&g2d->runqueue_work);
 
+	/* disable iommu to g2d device. */
+	exynos_drm_iommu_deactivate(drm_priv->vmm, dev);
+
 	return 0;
 }
 
 static int g2d_resume(struct device *dev)
 {
 	struct g2d_data *g2d = dev_get_drvdata(dev);
+	struct drm_device *drm_dev = g2d->subdrv.drm_dev;
+	struct exynos_drm_private *drm_priv = drm_dev->dev_private;
+	int ret;
+
+	/* enable iommu to g2d hardware */
+	ret = exynos_drm_iommu_activate(drm_priv->vmm, dev);
+	if (ret < 0) {
+		dev_err(dev, "failed to activate iommu\n");
+		return ret;
+	}
 
 	g2d->suspended = false;
 	g2d_exec_runqueue(g2d);

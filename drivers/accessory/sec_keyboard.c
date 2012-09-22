@@ -152,8 +152,18 @@ static int check_keyboard_dock(struct sec_keyboard_callbacks *cb, bool val)
 	int try_cnt = 0;
 	int max_cnt = 14;
 
-	if (NULL == data->serio)
-		return 0;
+	if (NULL == data->serio) {
+		for (try_cnt = 0; try_cnt < max_cnt; try_cnt++) {
+			msleep(50);
+			if (data->tx_ready)
+				break;
+
+			if (gpio_get_value(data->acc_int_gpio)) {
+				printk(KERN_DEBUG "[Keyboard] acc is disconnected.\n");
+				return 0;
+			}
+		}
+	}
 
 	if (!val)
 		data->dockconnected = false;
@@ -164,7 +174,6 @@ static int check_keyboard_dock(struct sec_keyboard_callbacks *cb, bool val)
 			if (UNKOWN_KEYLAYOUT != data->pre_kl) {
 				data->kl = data->pre_kl;
 				data->acc_power(1, true);
-				forced_wakeup(data);
 				printk(KERN_DEBUG "[Keyboard] kl : %d\n",
 					data->pre_kl);
 				return 1;
@@ -198,7 +207,6 @@ static int check_keyboard_dock(struct sec_keyboard_callbacks *cb, bool val)
 	}
 
 	if (data->dockconnected) {
-		forced_wakeup(data);
 		return 1;
 	} else {
 		if (data->pre_connected) {
@@ -223,6 +231,9 @@ static int sec_keyboard_event(struct input_dev *dev,
 			sec_keyboard_tx(data, 0xca);
 		else
 			sec_keyboard_tx(data, 0xcb);
+
+	printk(KERN_DEBUG "[Keyboard] %s, capslock on led value=%d\n",\
+		 __func__, value);
 		return 0;
 	}
 	return -1;
@@ -292,6 +303,7 @@ static void keyboard_early_suspend(struct early_suspend *early_sus)
 		sec_keyboard_tx(0xcb);
 		msleep(20);
 		*/
+		release_all_keys(data);
 		sec_keyboard_tx(data, 0x10);	/* the idle mode */
 	}
 }

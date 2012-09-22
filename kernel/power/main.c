@@ -190,6 +190,12 @@ static ssize_t state_show(struct kobject *kobj, struct kobj_attribute *attr,
 #endif
 	return (s - buf);
 }
+#ifdef CONFIG_FAST_BOOT
+bool fake_shut_down = false;
+EXPORT_SYMBOL(fake_shut_down);
+
+extern void wakelock_force_suspend(void);
+#endif
 
 static ssize_t state_store(struct kobject *kobj, struct kobj_attribute *attr,
 			   const char *buf, size_t n)
@@ -220,15 +226,29 @@ static ssize_t state_store(struct kobject *kobj, struct kobj_attribute *attr,
 		if (*s && len == strlen(*s) && !strncmp(buf, *s, len))
 			break;
 	}
-	if (state < PM_SUSPEND_MAX && *s)
+
+#ifdef CONFIG_FAST_BOOT
+	if (len == 4 && !strncmp(buf, "dmem", len)) {
+		pr_info("%s: fake shut down!!!\n", __func__);
+		fake_shut_down = true;
+		state = PM_SUSPEND_MEM;
+	}
+#endif
+
+	if (state < PM_SUSPEND_MAX && *s) {
 #ifdef CONFIG_EARLYSUSPEND
 		if (state == PM_SUSPEND_ON || valid_state(state)) {
 			error = 0;
 			request_suspend_state(state);
 		}
+#ifdef CONFIG_FAST_BOOT
+		if (fake_shut_down)
+			wakelock_force_suspend();
+#endif
 #else
 		error = enter_state(state);
 #endif
+	}
 #endif
 
  Exit:
@@ -683,7 +703,7 @@ static ssize_t mali_lock_store(struct kobject *kobj,
 		mali_lock_cnt = mali_dvfs_bottom_lock_pop();
 		if (mali_lock_cnt == 0)
 			mali_lock_val = 0;
-	} else if (val > 0 && val < 4) { /* lock with level */
+	} else if (val > 0 && val < 5) { /* lock with level */
 		mali_lock_cnt = mali_dvfs_bottom_lock_push(val);
 		if (mali_lock_val < val)
 			mali_lock_val = val;

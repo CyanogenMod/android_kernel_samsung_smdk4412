@@ -21,12 +21,8 @@
 #define IOCTL_LTE_MODEM_XMIT_BOOT		_IOW('o', 0x23, unsigned int)
 #define IOCTL_LTE_MODEM_LTE2AP_STATUS	_IOR('o', 0x24, unsigned int)
 
-#define AIRPLAIN_MODE_TEST
-
-#ifdef AIRPLAIN_MODE_TEST
-#define IOCTL_LTE_MODEM_AIRPLAIN_ON		_IOWR('o', 0x25, unsigned int)
-#define IOCTL_LTE_MODEM_AIRPLAIN_OFF	_IOWR('o', 0x26, unsigned int)
-#endif
+#define IOCTL_LTE_MODEM_FACTORY_MODE_ON		_IOWR('o', 0x25, unsigned int)
+#define IOCTL_LTE_MODEM_FACTORY_MODE_OFF	_IOWR('o', 0x26, unsigned int)
 
 struct lte_modem_bootloader_param {
 	char __user *buf;

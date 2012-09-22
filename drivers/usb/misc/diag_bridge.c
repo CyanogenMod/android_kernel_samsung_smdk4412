@@ -23,8 +23,15 @@
 #include <linux/debugfs.h>
 #include <mach/diag_bridge.h>
 
+#ifdef CONFIG_MDM_HSIC_PM
+#include <linux/mdm_hsic_pm.h>
+static const char rmnet_pm_dev[] = "mdm_hsic_pm0";
+#endif
+
 #define DRIVER_DESC	"USB host diag bridge driver"
 #define DRIVER_VERSION	"1.0"
+/* zero_pky.patch */
+#define IN_BUF_SIZE	16384
 
 struct diag_bridge {
 	struct usb_device	*udev;
@@ -36,6 +43,9 @@ struct diag_bridge {
 	struct kref		kref;
 	struct diag_bridge_ops	*ops;
 	struct platform_device	*pdev;
+	/* zero_pky.patch */
+	unsigned char		*buf_in;
+
 
 	/* debugging counters */
 	unsigned long		bytes_to_host;
@@ -56,10 +66,71 @@ int diag_bridge_open(struct diag_bridge_ops *ops)
 
 	dev->ops = ops;
 	dev->err = 0;
+	usb_kill_anchored_urbs(&dev->submitted);
 
 	return 0;
 }
 EXPORT_SYMBOL(diag_bridge_open);
+
+/* zero_pky.patch */
+/* Even when no driver is using the diag bridge
+   we are setting default read on this endpoint.
+   This will consume any packet sent by CP
+   and its dropped  */
+static void read_hsic_cb(struct urb* urb);
+static void read_hsic(void)
+{
+	struct diag_bridge	*dev = __dev;
+	struct urb              *urb = NULL;
+	unsigned int            pipe;
+	int                     ret;
+
+	dev_info(&dev->udev->dev, "%s:\n", __func__);
+	if (!dev->ifc) {
+                dev_err(&dev->udev->dev, "device is disconnected\n");
+                return;
+	}
+
+        /* if there was a previous unrecoverable error, just quit */
+        if (dev->err)
+                return;
+
+        urb = usb_alloc_urb(0, GFP_KERNEL);
+        if (!urb) {
+                dev_err(&dev->udev->dev, "unable to allocate urb\n");
+                return;
+	}
+
+        pipe = usb_rcvbulkpipe(dev->udev, dev->in_epAddr);
+        usb_fill_bulk_urb(urb, dev->udev, pipe, dev->buf_in,IN_BUF_SIZE,
+		read_hsic_cb, dev);
+        usb_anchor_urb(urb, &dev->submitted);
+        ret = usb_submit_urb(urb, GFP_KERNEL);
+        if (ret) {
+		dev_err(&dev->udev->dev, "submitting urb failed err:%d\n", ret);
+		dev->pending_reads--;
+                usb_unanchor_urb(urb);
+                usb_free_urb(urb);
+		return;
+        }
+
+        usb_free_urb(urb);
+}
+
+static void read_hsic_cb(struct urb *urb)
+{
+	struct diag_bridge	*dev = urb->context;
+	struct diag_bridge_ops	*cbs = dev->ops;
+
+	pr_info("%s: status:%d actual:%d\n", __func__,
+					urb->status, urb->actual_length);
+
+	/* Drop the packet */
+	if (urb->status == -EPROTO) {
+		pr_err("%s: drop packet from protocol error\n", __func__);
+		return;
+	}
+}
 
 void diag_bridge_close(void)
 {
@@ -78,9 +149,6 @@ static void diag_bridge_read_cb(struct urb *urb)
 	struct diag_bridge	*dev = urb->context;
 	struct diag_bridge_ops	*cbs = dev->ops;
 
-	dev_dbg(&dev->udev->dev, "%s: status:%d actual:%d\n", __func__,
-			urb->status, urb->actual_length);
-
 	if (urb->status == -EPROTO) {
 		dev_err(&dev->udev->dev, "%s: proto error\n", __func__);
 		/* save error so that subsequent read/write returns ESHUTDOWN */
@@ -88,7 +156,8 @@ static void diag_bridge_read_cb(struct urb *urb)
 		return;
 	}
 
-	cbs->read_complete_cb(cbs->ctxt,
+	if (cbs && cbs->read_complete_cb)
+		cbs->read_complete_cb(cbs->ctxt,
 			urb->transfer_buffer,
 			urb->transfer_buffer_length,
 			urb->status < 0 ? urb->status : urb->actual_length);
@@ -103,8 +172,10 @@ int diag_bridge_read(char *data, int size)
 	unsigned int		pipe;
 	struct diag_bridge	*dev = __dev;
 	int			ret;
+	int			spin = 50;
 
-	dev_dbg(&dev->udev->dev, "%s:\n", __func__);
+	if (!dev || !dev->udev)
+		return -ENODEV;
 
 	if (!size) {
 		dev_err(&dev->udev->dev, "invalid size:%d\n", size);
@@ -119,6 +190,16 @@ int diag_bridge_read(char *data, int size)
 	/* if there was a previous unrecoverable error, just quit */
 	if (dev->err)
 		return -ESHUTDOWN;
+
+	while (check_request_blocked(rmnet_pm_dev) && spin--) {
+		pr_debug("%s: wake up wait loop\n", __func__);
+		msleep(20);
+	}
+
+	if (check_request_blocked(rmnet_pm_dev)) {
+		pr_err("%s: in lpa wakeup, return EAGAIN\n", __func__);
+		return -EAGAIN;
+	}
 
 	urb = usb_alloc_urb(0, GFP_KERNEL);
 	if (!urb) {
@@ -161,24 +242,25 @@ static void diag_bridge_write_cb(struct urb *urb)
 	struct diag_bridge	*dev = urb->context;
 	struct diag_bridge_ops	*cbs = dev->ops;
 
-	dev_dbg(&dev->udev->dev, "%s:\n", __func__);
-
 	usb_autopm_put_interface_async(dev->ifc);
 
 	if (urb->status == -EPROTO) {
 		dev_err(&dev->udev->dev, "%s: proto error\n", __func__);
 		/* save error so that subsequent read/write returns ESHUTDOWN */
 		dev->err = urb->status;
+		usb_free_urb(urb);
 		return;
 	}
 
-	cbs->write_complete_cb(cbs->ctxt,
+	if (cbs && cbs->write_complete_cb)
+		cbs->write_complete_cb(cbs->ctxt,
 			urb->transfer_buffer,
 			urb->transfer_buffer_length,
 			urb->status < 0 ? urb->status : urb->actual_length);
 
 	dev->bytes_to_mdm += urb->actual_length;
 	dev->pending_writes--;
+	usb_free_urb(urb);
 }
 
 int diag_bridge_write(char *data, int size)
@@ -187,8 +269,10 @@ int diag_bridge_write(char *data, int size)
 	unsigned int		pipe;
 	struct diag_bridge	*dev = __dev;
 	int			ret;
+	int			spin;
 
-	dev_dbg(&dev->udev->dev, "%s:\n", __func__);
+	if (!dev || !dev->udev)
+		return -ENODEV;
 
 	if (!size) {
 		dev_err(&dev->udev->dev, "invalid size:%d\n", size);
@@ -204,16 +288,45 @@ int diag_bridge_write(char *data, int size)
 	if (dev->err)
 		return -ESHUTDOWN;
 
+	spin = 50;
+	while (check_request_blocked(rmnet_pm_dev) && spin--) {
+		pr_info("%s: wake up wait loop\n", __func__);
+		msleep(20);
+	}
+
+	if (check_request_blocked(rmnet_pm_dev)) {
+		pr_err("%s: in lpa wakeup, return EAGAIN\n", __func__);
+		return -EAGAIN;
+	}
+
 	urb = usb_alloc_urb(0, GFP_KERNEL);
 	if (!urb) {
 		err("unable to allocate urb");
 		return -ENOMEM;
 	}
 
-	ret = usb_autopm_get_interface(dev->ifc);
+	ret = usb_autopm_get_interface_async(dev->ifc);
 	if (ret < 0) {
 		dev_err(&dev->udev->dev, "autopm_get failed:%d\n", ret);
 		usb_free_urb(urb);
+		return ret;
+	}
+
+	for (spin = 0; spin < 10; spin++) {
+		/* check rpm active */
+		if (dev->udev->dev.power.runtime_status == RPM_ACTIVE) {
+			ret = 0;
+			break;
+		} else {
+			dev_err(&dev->udev->dev, "waiting rpm active\n");
+			ret = -EAGAIN;
+		}
+		msleep(20);
+	}
+	if (ret < 0) {
+		dev_err(&dev->udev->dev, "rpm active failed:%d\n", ret);
+		usb_free_urb(urb);
+		usb_autopm_put_interface(dev->ifc);
 		return ret;
 	}
 
@@ -232,9 +345,9 @@ int diag_bridge_write(char *data, int size)
 		usb_autopm_put_interface(dev->ifc);
 		return ret;
 	}
-
+#if 0
 	usb_free_urb(urb);
-
+#endif
 	return 0;
 }
 EXPORT_SYMBOL(diag_bridge_write);
@@ -351,6 +464,12 @@ diag_bridge_probe(struct usb_interface *ifc, const struct usb_device_id *id)
 		kfree(dev);
 		return -ENOMEM;
 	}
+	/* zero_pky.patch */
+	dev->buf_in = kzalloc(IN_BUF_SIZE, GFP_KERNEL);
+	if (!dev->buf_in) {
+		pr_err("%s: unable to allocate dev->buf_in\n", __func__);
+		return -ENOMEM;
+	}
 	__dev = dev;
 
 	dev->udev = usb_get_dev(interface_to_usbdev(ifc));
@@ -397,6 +516,8 @@ static void diag_bridge_disconnect(struct usb_interface *ifc)
 	dev_dbg(&dev->udev->dev, "%s:\n", __func__);
 
 	platform_device_del(dev->pdev);
+	/* zero_pky.patch */
+	kfree(dev->buf_in);
 	diag_bridge_debugfs_cleanup();
 	kref_put(&dev->kref, diag_bridge_delete);
 	usb_set_intfdata(ifc, NULL);
@@ -415,9 +536,10 @@ static int diag_bridge_suspend(struct usb_interface *ifc, pm_message_t message)
 				"%s: diag veto'd suspend\n", __func__);
 			return ret;
 		}
-
-		usb_kill_anchored_urbs(&dev->submitted);
 	}
+
+	/* zero_pky.patch */
+	usb_kill_anchored_urbs(&dev->submitted);
 
 	return ret;
 }
@@ -430,6 +552,9 @@ static int diag_bridge_resume(struct usb_interface *ifc)
 
 	if (cbs && cbs->resume)
 		cbs->resume(cbs->ctxt);
+	/* set the default read */ /* zero_pky.patch */
+	else
+		read_hsic();
 
 	return 0;
 }
@@ -455,6 +580,7 @@ static struct usb_driver diag_bridge_driver = {
 	.disconnect =	diag_bridge_disconnect,
 	.suspend =	diag_bridge_suspend,
 	.resume =	diag_bridge_resume,
+	.reset_resume =	diag_bridge_resume,
 	.id_table =	diag_bridge_ids,
 	.supports_autosuspend = 1,
 };

@@ -56,8 +56,8 @@ static s32 tcpal_i2c_probe(
 	struct i2c_client *i2c, const struct i2c_device_id *id)
 {
 	s32 ret = 0;
-
 	tcpal_i2c_client = i2c;
+	tcbd_debug(DEBUG_TCPAL_I2C, "tcpal_i2c_client : %p\n", i2c);
 	return ret;
 }
 
@@ -107,7 +107,7 @@ static s32 tcpal_i2c_add_device(void)
 	i2c_put_adapter(adapter);
 	if (!client) {
 		tcbd_debug(DEBUG_TCPAL_I2C,
-			"can't add i2c device at %p\n", info.addr);
+			"can't add i2c device at 0x%X\n", info.addr);
 		goto err_driver;
 	}
 
@@ -122,8 +122,6 @@ static s32 tcpal_i2c_close(void)
 {
 	i2c_unregister_device(tcpal_i2c_client);
 	i2c_del_driver(&tcpal_i2c_driver);
-
-	tcbd_debug(DEBUG_TCPAL_I2C, "\n");
 	return 0;
 }
 

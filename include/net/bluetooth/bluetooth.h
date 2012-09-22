@@ -23,6 +23,8 @@
 */
 #ifdef CONFIG_BT_MGMT
 #include "bluetooth_mgmt.h"
+#elif defined(CONFIG_BT_TIZEN)
+#include "tizen/bluetooth.h"
 #else
 #ifndef __BLUETOOTH_H
 #define __BLUETOOTH_H

@@ -64,7 +64,8 @@ static const unsigned short tune_color_tone_3[] = {
 	END_SEQ, 0x0000,
 };
 
-static const unsigned short tune_negative_amoled[] = {
+#if !defined(CONFIG_FB_MDNIE_PWM)
+static const unsigned short tune_negative[] = {
 	0x0000, 0x0000,	/*BANK 0*/
 	0x0008, 0x0020,	/*SCR*/
 	0x00e1, 0x00ff,	/*SCR RrCr*/
@@ -82,8 +83,8 @@ static const unsigned short tune_negative_amoled[] = {
 	0x00ff, 0x0000,	/*Mask Release*/
 	END_SEQ, 0x0000,
 };
-
-static const unsigned short tune_negative_cabcoff[] = {
+#else
+static const unsigned short tune_negative[] = {
 	0x0000, 0x0000, /*BANK 0*/
 	0x0008, 0x0020, /*Dither8 UC4 ABC2 CP1 | CC8 MCM4 SCR2 SCC1 | CS8 DE4 DNR2 HDR1*/
 	0x0030, 0x0000, /*FA cs1 de8 hdr2 fa1*/
@@ -102,8 +103,9 @@ static const unsigned short tune_negative_cabcoff[] = {
 	0x00ff, 0x0000, /*Mask Release*/
 	END_SEQ, 0x0000,
 };
+#endif
 
-static const unsigned short tune_negative_cabcOn[] = {
+static const unsigned short tune_negative_cabc[] = {
 	0x0000, 0x0000, /*BANK 0*/
 	0x0008, 0x0220, /*Dither8 UC4 ABC2 CP1 | CC8 MCM4 SCR2 SCC1 | CS8 DE4 DNR2 HDR1*/
 	0x0030, 0x0000, /*FA cs1 de8 hdr2 fa1*/
@@ -129,20 +131,19 @@ static const unsigned short tune_negative_cabcOn[] = {
 	END_SEQ, 0x0000,
 };
 
-struct mdnie_tunning_info tune_negative[CABC_MAX] = {
+struct mdnie_tunning_info negative_table[CABC_MAX] = {
 #if defined(CONFIG_FB_MDNIE_PWM)
-	{"NEGATIVE_CABC_OFF",	tune_negative_cabcoff},
-	{"NEGATIVE_CABC_ON",	tune_negative_cabcOn},
+	{"NEGATIVE",		tune_negative},
+	{"NEGATIVE_CABC",	tune_negative_cabc},
 #else
-	{"NEGATIVE_ON",		tune_negative_amoled},
+	{"NEGATIVE",		tune_negative},
 #endif
 };
 
-struct mdnie_tunning_info tune_color_tone[COLOR_TONE_MAX - COLOR_TONE_1] = {
+struct mdnie_tunning_info color_tone_table[COLOR_TONE_MAX - COLOR_TONE_1] = {
 	{"COLOR_TONE_1",	tune_color_tone_1},
 	{"COLOR_TONE_2",	tune_color_tone_2},
 	{"COLOR_TONE_3",	tune_color_tone_3},
 };
-
 
 #endif /* __MDNIE_COLOR_TONE_H__ */

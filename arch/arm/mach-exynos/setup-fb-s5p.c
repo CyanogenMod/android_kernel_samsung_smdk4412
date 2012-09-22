@@ -31,7 +31,11 @@
 #include <plat/gpio-cfg.h>
 #include <plat/cpu.h>
 #include <plat/clock-clksrc.h>
+#if defined(CONFIG_S5P_DSIM_SWITCHABLE_DUAL_LCD)
+#include <../../../drivers/video/samsung_duallcd/s3cfb.h>
+#else
 #include <../../../drivers/video/samsung/s3cfb.h>	/* should be fixed */
+#endif
 
 struct platform_device; /* don't need the contents */
 
@@ -668,9 +672,9 @@ int s3cfb_mdnie_pwm_clk_on(void)
 	clk_set_rate(sclk, rate);
 	printk(KERN_INFO "set mdnie_pwm sclk rate to %d\n", rate);
 	clk_set_parent(sclk_pre, mout_mpll);
-	rate = clk_round_rate(sclk_pre, 24000000);
+	rate = clk_round_rate(sclk_pre, 22000000);
 	if (!rate)
-		rate = 24000000;
+		rate = 22000000;
 	clk_set_rate(sclk_pre, rate);
 #elif defined(CONFIG_FB_S5P_S6F1202A)
 	if (soc_is_exynos4210())
@@ -745,24 +749,29 @@ unsigned int get_clk_rate(struct platform_device *pdev, struct clk *sclk)
 
 	div = DIV_ROUND_CLOSEST(src_clk, vclk);
 
-	vclk_limit = (40 *
-		(timing->h_bp + timing->h_fp + timing->h_sw + lcd->width) *
-		(timing->v_bp + timing->v_fp + timing->v_sw + lcd->height));
+	if (lcd->freq_limit) {
+		vclk_limit = (lcd->freq_limit *
+			(timing->h_bp + timing->h_fp + timing->h_sw + lcd->width) *
+			(timing->v_bp + timing->v_fp + timing->v_sw + lcd->height));
 
-	div_limit = DIV_ROUND_CLOSEST(src_clk, vclk_limit);
+		div_limit = DIV_ROUND_CLOSEST(src_clk, vclk_limit);
 
-	fimd_div = gcd(div, div_limit);
+		fimd_div = gcd(div, div_limit);
 
-#if defined(CONFIG_MACH_MIDAS) && defined(CONFIG_FB_S5P_S6E8AA0) && !defined(CONFIG_S6E8AA0_AMS529HA01)
-	div /= fimd_div;
-#endif
+		div /= fimd_div;
+	}
 
 	if (!div) {
 		dev_err(&pdev->dev, "div(%d) should be non-zero\n", div);
 		div = 1;
 	} else if (div > 16) {
 		dev_err(&pdev->dev, "div(%d) max should be 16\n", div);
-		div = 16;
+		for (fimd_div = 2; fimd_div < div; div++) {
+			if (div%fimd_div == 0)
+				break;
+		}
+		div /= fimd_div;
+		div = (div > 16) ? 16 : div;
 	}
 
 	rate = src_clk / div;

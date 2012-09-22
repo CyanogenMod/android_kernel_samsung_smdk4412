@@ -31,6 +31,7 @@
 #define SEND_RESET_ACK		8
 #define SET_ZLP_DATA		9
 #define GET_HIGH_FULL_SPEED	10
+#define SEND_FILE_WITH_HEADER 11
 #define SIG_SETUP		44
 
 /*PIMA15740-2000 spec*/
@@ -52,5 +53,21 @@ void mtp_function_enable(int enable);
 struct usb_mtp_ctrlrequest {
 	struct usb_ctrlrequest	setup;
 };
+
+
+struct usb_container_header {
+	uint32_t  Length;/* the valid size, in BYTES, of the container  */
+	uint16_t   Type;/* Container type */
+	uint16_t   Code;/* Operation code, response code, or Event code */
+	uint32_t  TransactionID;/* host generated number */
+};
+
+struct read_send_info {
+	int	Fd;/* Media File fd */
+	uint64_t Length;/* the valid size, in BYTES, of the container  */
+	uint16_t Code;/* Operation code, response code, or Event code */
+	uint32_t TransactionID;/* host generated number */
+};
+
 
 #endif /* __F_MTP_H */

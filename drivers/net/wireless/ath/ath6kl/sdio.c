@@ -926,7 +926,9 @@ cut_pwr:
 static int ath6kl_sdio_resume(struct ath6kl *ar)
 {
 
+#if !defined(CONFIG_MACH_P8LTE)
 	ath6kl_sdio_setup_irq_mode(ar);
+#endif
 
 	switch (ar->state) {
 	case ATH6KL_STATE_OFF:
@@ -1288,7 +1290,7 @@ static int ath6kl_sdio_pm_suspend(struct device *device)
 	struct sdio_func *func;
 	struct ath6kl_sdio *ar_sdio;
 	int ret;
-	ath6kl_dbg(ATH6KL_DBG_SUSPEND, "sdio pm resume\n");
+	ath6kl_dbg(ATH6KL_DBG_SUSPEND, "sdio pm suspend\n");
 
 	func = dev_to_sdio_func(device);
 	ar_sdio = sdio_get_drvdata(func);
@@ -1433,12 +1435,24 @@ err_hif:
 static void ath6kl_sdio_remove(struct sdio_func *func)
 {
 	struct ath6kl_sdio *ar_sdio;
+	struct ath6kl_vif *vif;
+	long timeleft;
 
 	ath6kl_dbg(ATH6KL_DBG_BOOT,
 		   "sdio removed func %d vendor 0x%x device 0x%x\n",
 		   func->num, func->vendor, func->device);
 
 	ar_sdio = sdio_get_drvdata(func);
+#ifdef CONFIG_MACH_PX
+	vif = ath6kl_vif_first(ar_sdio->ar);
+	/* Wait for Wmi event to be ready */
+	timeleft = wait_event_interruptible_timeout(ar_sdio->ar->event_wq,
+			ar_sdio->ar->state == ATH6KL_STATE_ON,
+			WMI_TIMEOUT);
+
+	ath6kl_hif_rx_control(ar_sdio->ar->htc_target->dev, false);
+	vif->sdio_remove = true;
+#endif
 
 	ath6kl_stop_txrx(ar_sdio->ar);
 	cancel_work_sync(&ar_sdio->wr_async_work);

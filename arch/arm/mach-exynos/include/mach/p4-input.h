@@ -18,4 +18,8 @@ void p4_key_init(void);
 extern void synaptics_ts_charger_infom(bool en);
 #endif
 
+#if defined(CONFIG_TOUCHSCREEN_ATMEL_MXT1664S)
+extern void ts_charger_infom(bool en);
+#endif
+
 #endif /* __P4_INPUT_H */

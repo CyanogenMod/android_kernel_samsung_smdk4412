@@ -511,8 +511,8 @@ extern struct sk_buff *skb_clone(struct sk_buff *skb,
 				 gfp_t priority);
 extern struct sk_buff *skb_copy(const struct sk_buff *skb,
 				gfp_t priority);
-extern struct sk_buff *pskb_copy(struct sk_buff *skb,
-				 gfp_t gfp_mask);
+extern struct sk_buff *__pskb_copy(struct sk_buff *skb,
+				 int headroom, gfp_t gfp_mask);
 extern int	       pskb_expand_head(struct sk_buff *skb,
 					int nhead, int ntail,
 					gfp_t gfp_mask);
@@ -1612,6 +1612,12 @@ static inline struct page *netdev_alloc_page(struct net_device *dev)
 static inline void netdev_free_page(struct net_device *dev, struct page *page)
 {
 	__free_page(page);
+}
+
+static inline struct sk_buff *pskb_copy(struct sk_buff *skb,
+					gfp_t gfp_mask)
+{
+	return __pskb_copy(skb, skb_headroom(skb), gfp_mask);
 }
 
 /**

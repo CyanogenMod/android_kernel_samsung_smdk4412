@@ -258,3 +258,13 @@ void set_string_mode(u16 w_length)
 		stringMode = OTHER_REQUEST;
 	}
 }
+
+/* Description  : Get Host OS type
+ * Return value : type - u16
+ *		- 0 : MAC PC
+ *		- 1 : Windows and Linux PC
+ */
+u16 get_host_os_type(void)
+{
+	return stringMode;
+}

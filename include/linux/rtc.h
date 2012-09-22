@@ -150,6 +150,8 @@ struct rtc_class_ops {
 	int (*set_alarm)(struct device *, struct rtc_wkalrm *);
 #if defined(CONFIG_RTC_ALARM_BOOT)
 	int (*set_alarm_boot)(struct device *, struct rtc_wkalrm *);
+#elif defined(CONFIG_RTC_POWER_OFF)
+	int (*set_alarm_poweroff)(struct device *, struct rtc_wkalrm *);
 #endif
 	int (*proc)(struct device *, struct seq_file *);
 	int (*set_mmss)(struct device *, unsigned long secs);
@@ -236,10 +238,13 @@ extern int rtc_set_alarm(struct rtc_device *rtc,
 				struct rtc_wkalrm *alrm);
 #if defined(CONFIG_RTC_ALARM_BOOT)
 extern int rtc_set_alarm_boot(struct rtc_device *rtc,
-			      struct rtc_wkalrm *alarm);
+				struct rtc_wkalrm *alarm);
+#elif defined(CONFIG_RTC_POWER_OFF)
+extern int rtc_set_alarm_poweroff(struct rtc_device *rtc,
+					struct rtc_wkalrm *alarm);
 #endif
 extern int rtc_initialize_alarm(struct rtc_device *rtc,
-				struct rtc_wkalrm *alrm);
+					struct rtc_wkalrm *alrm);
 extern void rtc_update_irq(struct rtc_device *rtc,
 			unsigned long num, unsigned long events);
 

@@ -40,7 +40,7 @@ struct secmem_crypto_driver_ftn {
 
 struct secmem_region {
 	char		*virt_addr;
-	unsigned long	phys_addr;
+	dma_addr_t	phys_addr;
 	unsigned long	len;
 };
 

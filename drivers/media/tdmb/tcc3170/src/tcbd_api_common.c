@@ -31,12 +31,25 @@
 
 #include "tcc317x_boot_tdmb.h"
 
-s32 tcbd_device_start(
-	struct tcbd_device *_device, enum tcbd_clock_type _clock_type)
+s32 tcbd_device_start(struct tcbd_device *_device,
+			enum tcbd_clock_type _clock_type)
 {
 	s32 ret = 0, ver;
 	u8 *dsp_rom = TCC317X_BOOT_DATA_TDMB;
 	s32 size = TCC317X_BOOT_SIZE_TDMB;
+#if defined(__DEBUG_DSP_ROM__)
+	static u8 dsp_rom_buff[MAX_SIZE_DSP_ROM];
+	if (tcbd_debug_rom_from_fs() == 1) {
+		ret = tcbd_read_file(_device, tcbd_debug_rom_path(),
+					dsp_rom_buff, MAX_SIZE_DSP_ROM);
+		if (ret > 0) {
+			dsp_rom = dsp_rom_buff;
+			size = ret;
+			tcbd_debug(DEBUG_ERROR, "rom:%s, size:%d\n",
+						tcbd_debug_rom_path(), size);
+		}
+	}
+#endif /*__DEBUG_DSP_ROM__*/
 
 	/* Initialize PLL */
 	tcbd_init_pll(_device, _clock_type);
@@ -46,13 +59,13 @@ s32 tcbd_device_start(
 	tcbd_enable_peri(_device);
 	ret = tcbd_init_dsp(_device, dsp_rom, size);
 	if (ret < 0) {
-		tcbd_debug(DEBUG_ERROR,
-			"failed to initialize dsp!! error:%d\n", ret);
+		tcbd_debug(DEBUG_ERROR, "failed to initialize dsp!! "
+						"error:%d\n", ret);
 		return -TCERR_FATAL_ERROR;
 	} else {
 		tcbd_get_rom_version(_device, &ver);
-		tcbd_debug(DEBUG_API_COMMON,
-			"device start success!! version:0x%X\n", ver);
+		tcbd_debug(DEBUG_API_COMMON, "device start success!! "
+						"version:0x%X\n", ver);
 	}
 	return 0;
 }
@@ -164,9 +177,9 @@ s32 tcbd_init_stream_data_config(
 	return ret;
 }
 
+#if defined(__CSPI_ONLY__)
 #if defined(__READ_FIXED_LENGTH__)
-s32 tcbd_read_stream(
-	struct tcbd_device *_device, u8 *_buff,	s32 *_size)
+s32 tcbd_read_stream(struct tcbd_device *_device, u8 *_buff, s32 *_size)
 {
 	u32 bytes_read = _device->intr_threshold;
 
@@ -186,9 +199,8 @@ s32 tcbd_read_stream(
 	return tcbd_reg_read_burst_fix(
 		_device, TCBD_STREAM_CFG4, _buff, bytes_read);
 }
-#else /* __READ_VARIABLE_LENGTH__ */
-s32 tcbd_read_stream(
-	struct tcbd_device *_device, u8 *_buff,	s32 *_size)
+#elif defined(__READ_VARIABLE_LENGTH__)
+s32 tcbd_read_stream(struct tcbd_device *_device, u8 *_buff, s32 *_size)
 {
 	u32 bytes_remain = 0;
 	u32 bytes_read = _device->intr_threshold;
@@ -217,7 +229,10 @@ s32 tcbd_read_stream(
 	return tcbd_reg_read_burst_fix(
 		_device, TCBD_STREAM_CFG4, _buff, bytes_read);
 }
-#endif
+#else
+#error "you must define __READ_VARIABLE_LENGTH__ or __READ_FIXED_LENGTH__"
+#endif /*!__READ_FIXED_LENGTH__ && !__READ_VARIABLE_LENGTH__*/
+#endif /*__CSPI_ONLY__*/
 
 s32 tcbd_tune_frequency(
 	struct tcbd_device *_device, u32 _freq_khz, s32 _bw_khz)
@@ -233,32 +248,35 @@ s32 tcbd_tune_frequency(
 		_device->curr_band = BAND_TYPE_BAND3;
 	else
 		_device->curr_band = BAND_TYPE_LBAND;
-	ret |= tcbd_reset_ip(
-			_device, TCBD_SYS_COMP_ALL, TCBD_SYS_COMP_ALL);
+	ret |= tcbd_reset_ip(_device, TCBD_SYS_COMP_ALL, TCBD_SYS_COMP_ALL);
 
 	ret |= tcbd_rf_tune_frequency(_device, _freq_khz, _bw_khz);
 	if (ret < 0) {
-		tcbd_debug(DEBUG_ERROR,
-			"failed to tune frequency to RF!! ret:%d\n", ret);
+		tcbd_debug(DEBUG_ERROR, "failed to tune frequency to RF!! "
+					"ret:%d\n", ret);
 		return ret;
 	}
 
-	if (_device->peri_type == PERI_TYPE_SPI_ONLY) {
-		/* enable fic buffer only*/
-		ret |= tcbd_init_stream_data_config(
-				_device,
-				ENABLE_CMD_FIFO,
-				STREAM_DATA_ENABLE |
-					STREAM_HEADER_ON |
-					STREAM_MASK_BUFFERA,
-				TCBD_THRESHOLD_FIC);
+	switch (_device->peri_type) {
+	case PERI_TYPE_SPI_ONLY:
+		ret |= tcbd_init_stream_data_config(_device, ENABLE_CMD_FIFO,
+				STREAM_DATA_ENABLE | STREAM_HEADER_ON |
+				STREAM_MASK_BUFFERA, TCBD_THRESHOLD_FIC);
+		break;
+	case PERI_TYPE_STS:
+		ret |= tcbd_init_stream_data_config(_device, DISABLE_CMD_FIFO,
+									0, 0);
+		break;
+	default:
+		tcbd_debug(DEBUG_ERROR, "%d not implemented!!\n",
+						_device->peri_type);
+		return -TCERR_FATAL_ERROR;
 	}
 	tcbd_init_status_manager();
 
 	ret |= tcbd_demod_tune_frequency(_device, _freq_khz, _bw_khz);
 	if (ret < 0) {
-		tcbd_debug(DEBUG_ERROR,
-			"failed to tune frequency "
+		tcbd_debug(DEBUG_ERROR, "failed to tune frequency "
 			"to demodulator!! ret:%d\n", ret);
 		return ret;
 	}
@@ -268,8 +286,8 @@ s32 tcbd_tune_frequency(
 #if defined(__READ_VARIABLE_LENGTH__)
 	_device->size_more_read = 0;
 #endif /*__READ_VARIABLE_LENGTH__*/
-	tcbd_debug(DEBUG_API_COMMON,
-		" # Frequency set time :%lld\n", tcpal_diff_time(tick));
+	tcbd_debug(DEBUG_API_COMMON, " # Frequency set time :%lld\n",
+						tcpal_diff_time(tick));
 
 	return ret;
 }
@@ -318,8 +336,8 @@ s32 tcbd_wait_tune(struct tcbd_device *_device, u8 *_status)
 	} while (tcpal_diff_time(time_tick) < time_tune_wait);
 
 	if (cto && cfo)
-		tcbd_debug(DEBUG_API_COMMON,
-			"lock status : 0x%02X\n", *_status);
+		tcbd_debug(DEBUG_API_COMMON, "lock status : 0x%02X\n",
+								*_status);
 	else
 		ret = -TCERR_TUNE_FAILED;
 
@@ -345,12 +363,11 @@ static inline s32 tcbd_calc_threshold(struct tcbd_service *_service)
 	if (TCBD_MAX_THRESHOLD < threshold)
 		threshold  = TCBD_MAX_THRESHOLD;
 
-	tcbd_debug(DEBUG_API_COMMON,
-		"ptype:%s, bitrate :%d, interrupt threshold:%d\n",
-			(_service->ptype) ? "EEP" : "UEP",
+	tcbd_debug(DEBUG_API_COMMON, "ptype:%s, bitrate :%d, interrupt "
+			"threshold:%d\n", (_service->ptype) ? "EEP" : "UEP",
 			 _service->bitrate, threshold);
 
-	return threshold;
+	return threshold>>1;
 }
 
 static inline s32 tcbd_find_empty_slot(
@@ -381,37 +398,37 @@ static inline s32 tcbd_find_used_slot(
 	return -1;
 }
 
-static inline s32 tcbd_set_service(
-	struct tcbd_device *_device, struct tcbd_service *_service)
+#define FLAG_SHORT_PARAM 0
+#define FLAG_LONG_PARAM 1
+static inline s32 tcbd_set_service(struct tcbd_device *_device,
+				struct tcbd_service *_service, s32 _flag)
 {
 	s32 ret = 0;
-	u32 threshold, sel_buff = 0, sel_stream = 0;
+	u32 threshold = 0, sel_buff = 0, sel_stream = 0;
 	u8 en_cmd_fifo = 0;
 
+	sel_buff = STREAM_DATA_ENABLE | STREAM_HEADER_ON |
+				STREAM_MASK_BUFFERA;
 	switch (_device->peri_type) {
 	case PERI_TYPE_SPI_ONLY:
-#if defined(__CALC_INTRRUPT_THRESHOLD__)
-		threshold = tcbd_calc_threshold(_service);
-		sel_stream = STREAM_SET_GARBAGE(threshold) |
+		if (_flag == FLAG_LONG_PARAM) {
+			threshold = tcbd_calc_threshold(_service);
+			sel_stream = STREAM_SET_GARBAGE(threshold) |
 				STREAM_TYPE_ALL;
-#else /* __CALC_INTRRUPT_THRESHOLD__ */
+		} else {
 		threshold = TCBD_MAX_THRESHOLD;
 		sel_stream = STREAM_SET_GARBAGE(TCBD_MAX_THRESHOLD) |
 				STREAM_TYPE_ALL;
-#endif /* __CALC_INTRRUPT_THRESHOLD__ */
+		}
 		tcbd_debug(DEBUG_API_COMMON, "threshold : %d\n", threshold);
 		en_cmd_fifo = ENABLE_CMD_FIFO;
-		sel_buff = STREAM_DATA_ENABLE |
-			STREAM_HEADER_ON |
-			STREAM_MASK_BUFFERA |
-			STREAM_MASK_BUFFERB;
 		break;
 	case PERI_TYPE_STS:
 		en_cmd_fifo = DISABLE_CMD_FIFO;
 		sel_stream = STREAM_TYPE_ALL;
-		sel_buff = STREAM_DATA_ENABLE |
-			STREAM_MASK_BUFFERA |
-			STREAM_MASK_BUFFERB;
+#if !defined(__ALWAYS_FIC_ON__)
+		sel_buff &= ~(STREAM_HEADER_ON);
+#endif /*__ALWAYS_FIC_ON__*/
 		break;
 	default:
 		tcbd_debug(DEBUG_ERROR, "not implemented!\n");
@@ -429,18 +446,20 @@ static inline s32 tcbd_set_service(
 #if defined(__READ_VARIABLE_LENGTH__)
 	_device->size_more_read = 0;
 #endif /*__READ_VARIABLE_LENGTH__*/
+	ret |= tcbd_disable_irq(_device, 0);
 
 	ret |= tcbd_change_stream_type(_device, sel_stream);
 	ret |= tcbd_init_stream_data_config(
 		_device, en_cmd_fifo, sel_buff, threshold);
 
 	ret |= tcbd_send_service_info(_device);
-	ret |= tcbd_enable_irq(_device, _device->enabled_irq);
+	if (_device->peri_type == PERI_TYPE_SPI_ONLY)
+		ret |= tcbd_enable_irq(_device, _device->enabled_irq);
 	return ret;
 }
 
-s32 tcbd_register_service(
-	struct tcbd_device *_device, u8 _subch_id, u8 _data_mode)
+s32 tcbd_register_service(struct tcbd_device *_device, u8 _subch_id,
+							u8 _data_mode)
 {
 	s32 empty_slot, empty_slot2x;
 	struct tcbd_service service = {0, };
@@ -448,8 +467,7 @@ s32 tcbd_register_service(
 	u32 *service_info = mult_service->service_info;
 
 	if (tcbd_find_used_slot(mult_service, _subch_id) >= 0) {
-		tcbd_debug(DEBUG_ERROR,
-			"aready registerd service! "
+		tcbd_debug(DEBUG_ERROR, "aready registerd service! "
 			"subch_id:%d\n", _subch_id);
 		return -TCERR_AREADY_REGISTERED;
 	}
@@ -473,11 +491,11 @@ s32 tcbd_register_service(
 		(empty_slot << 20) |
 		(_data_mode << 16);
 
-	return tcbd_set_service(_device, &service);
+	return tcbd_set_service(_device, &service, FLAG_SHORT_PARAM);
 }
 
-s32 tcbd_register_service_long(
-	struct tcbd_device *_device, struct tcbd_service *_service)
+s32 tcbd_register_service_long(struct tcbd_device *_device,
+				struct tcbd_service *_service)
 {
 	s32 empty_slot, empty_slot2x;
 	u32 data_mode = 0;
@@ -485,8 +503,7 @@ s32 tcbd_register_service_long(
 	u32 *service_info = mult_service->service_info;
 
 	if (tcbd_find_used_slot(mult_service, _service->subch_id) >= 0) {
-		tcbd_debug(DEBUG_ERROR,
-					"aready registerd service! "
+		tcbd_debug(DEBUG_ERROR, "aready registerd service! "
 					"subch_id:%d\n", _service->subch_id);
 		return -TCERR_AREADY_REGISTERED;
 	}
@@ -525,11 +542,10 @@ s32 tcbd_register_service_long(
 		(_service->plevel << 8) |
 		_service->bitrate;
 
-	return tcbd_set_service(_device, _service);
+	return tcbd_set_service(_device, _service, FLAG_LONG_PARAM);
 }
 
-s32 tcbd_unregister_service(
-	struct tcbd_device *_device, u8 _subch_id)
+s32 tcbd_unregister_service(struct tcbd_device *_device, u8 _subch_id)
 {
 	s32 ret = 0;
 	s32 service_idx;
@@ -553,34 +569,55 @@ s32 tcbd_unregister_service(
 	return ret;
 }
 
-s32 tcbd_read_fic_data(
-	struct tcbd_device *_device, u8 *_buff,	s32 _size)
+s32 tcbd_read_fic_data(struct tcbd_device *_device, u8 *_buff,	s32 _size)
 {
 	s32 ret = 0;
 	u32 addr_fic_buff;
 	u8 status, err_status;
-	u64 tick;
 
+	tcbd_read_irq_status(_device, &status, &err_status);
 	if (_size != TCBD_FIC_SIZE) {
 		tcbd_debug(DEBUG_ERROR, "wrong fic size! %d\n", _size);
-		return -TCERR_INVALID_ARG;
+		ret = -TCERR_INVALID_ARG;
+		goto exit_read_fic;
 	}
-
-	ret = tcbd_read_irq_status(_device, &status, &err_status);
 	if (status & TCBD_IRQ_STAT_FIFOAINIT) {
 		addr_fic_buff = PHY_MEM_ADDR_A_START;
-		tick = tcpal_get_time();
-		tcbd_debug(0, "status:0x%02X, err:0x%02X, %lld elapsed\n",
-				status, err_status, tcpal_diff_time(tick));
+		tcbd_debug(DEBUG_INTRRUPT, "status:0x%02X, err:0x%02X\n",
+						status, err_status);
 
 		ret = tcbd_mem_read(_device, addr_fic_buff, _buff, _size);
-		ret |= tcbd_clear_irq(_device, status);
-	} else {
-		ret |= -TCERR_NO_FIC_DATA;
+	} else
+		ret = -TCERR_NO_FIC_DATA;
+exit_read_fic:
+	tcbd_clear_irq(_device, status);
+	return ret;
 	}
 
-	ret |= tcbd_clear_irq(_device, status);
+static s32 tcbd_disp_dsp_debug(struct tcbd_device *_device)
+{
+	s32 pos_buf = 0, ret, i;
+	u32 len = 0, *data = NULL;
+	u16 cmd;
+	s8 debug_buff[256];
+
+	tcbd_debug_mbox_rx(&cmd, &len, &data);
+	if (data == NULL)
+		return 0;
+
+	ret = tcbd_read_mail_box(_device, cmd, len, data);
+	if (ret < 0) {
+		tcbd_debug(DEBUG_ERROR, "failed to read mail box, "
+					"err:%d\n", ret);
 	return ret;
+}
+
+	for (i = 0; i < 6; i++)
+		pos_buf += sprintf(debug_buff + pos_buf, "[%d:%08X]",
+							i, data[i]);
+	tcbd_debug(DEBUG_INFO, "%s\n", debug_buff);
+
+	return 0;
 }
 
 s32 tcbd_read_signal_info(
@@ -594,6 +631,9 @@ s32 tcbd_read_signal_info(
 
 	if (!_status_data)
 		return -TCERR_INVALID_ARG;
+
+	if (tcbd_debug_spur_dbg() == 1)
+		tcbd_disp_dsp_debug(_device);
 
 #if defined(__STATUS_IN_REGISTER__)
 	ret = tcbd_reg_write(_device, TCBD_OP_STATUS0, 0x1);

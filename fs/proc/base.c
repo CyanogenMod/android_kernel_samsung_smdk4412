@@ -841,8 +841,8 @@ static ssize_t mem_rw(struct file *file, char __user *buf,
 		count -= this_len;
 	}
 	*ppos = addr;
-	mmput(mm);
 
+	mmput(mm);
 free:
 	free_page((unsigned long) page);
 	return copied;
@@ -854,11 +854,16 @@ static ssize_t mem_read(struct file *file, char __user *buf,
 	return mem_rw(file, buf, count, ppos, 0);
 }
 
+#define mem_write NULL
+
+#ifndef mem_write
+/* This is a security hazard */
 static ssize_t mem_write(struct file *file, const char __user *buf,
 			 size_t count, loff_t *ppos)
 {
 	return mem_rw(file, (char __user*)buf, count, ppos, 1);
 }
+#endif
 
 loff_t mem_lseek(struct file *file, loff_t offset, int orig)
 {
@@ -881,7 +886,6 @@ static int mem_release(struct inode *inode, struct file *file)
 	struct mm_struct *mm = file->private_data;
 	if (mm)
 		mmdrop(mm);
-
 	return 0;
 }
 
@@ -1208,6 +1212,32 @@ static const struct file_operations proc_oom_score_adj_operations = {
 	.write		= oom_score_adj_write,
 	.llseek		= default_llseek,
 };
+
+#ifdef CONFIG_ANDROID
+static ssize_t oom_killed_read(struct file *file, char __user *buf,
+			       size_t count, loff_t *ppos)
+{
+	struct task_struct *task = get_proc_task(file->f_path.dentry->d_inode);
+	char buffer[PROC_NUMBUF];
+	int oom_killed = 0;
+	unsigned long flags;
+	size_t len;
+
+	if (!task)
+		return -ESRCH;
+	if (lock_task_sighand(task, &flags)) {
+		oom_killed = sigismember(&task->pending.signal, SIGKILL);
+		unlock_task_sighand(task, &flags);
+	}
+	put_task_struct(task);
+	len = snprintf(buffer, sizeof(buffer), "%d\n", oom_killed);
+	return simple_read_from_buffer(buf, count, ppos, buffer, len);
+}
+
+static const struct file_operations proc_oom_killed_operations = {
+	.read		= oom_killed_read,
+};
+#endif
 
 #ifdef CONFIG_AUDITSYSCALL
 #define TMPBUFLEN 21
@@ -2809,6 +2839,9 @@ static const struct pid_entry tgid_base_stuff[] = {
 	INF("oom_score",  S_IRUGO, proc_oom_score),
 	ANDROID("oom_adj",S_IRUGO|S_IWUSR, oom_adjust),
 	REG("oom_score_adj", S_IRUGO|S_IWUSR, proc_oom_score_adj_operations),
+#ifdef CONFIG_ANDROID
+	REG("oom_killed", S_IRUGO, proc_oom_killed_operations),
+#endif
 #ifdef CONFIG_AUDITSYSCALL
 	REG("loginuid",   S_IWUSR|S_IRUGO, proc_loginuid_operations),
 	REG("sessionid",  S_IRUGO, proc_sessionid_operations),
@@ -3154,6 +3187,9 @@ static const struct pid_entry tid_base_stuff[] = {
 	INF("oom_score", S_IRUGO, proc_oom_score),
 	REG("oom_adj",   S_IRUGO|S_IWUSR, proc_oom_adjust_operations),
 	REG("oom_score_adj", S_IRUGO|S_IWUSR, proc_oom_score_adj_operations),
+#ifdef CONFIG_ANDROID
+	REG("oom_killed", S_IRUGO, proc_oom_killed_operations),
+#endif
 #ifdef CONFIG_AUDITSYSCALL
 	REG("loginuid",  S_IWUSR|S_IRUGO, proc_loginuid_operations),
 	REG("sessionid",  S_IRUGO, proc_sessionid_operations),

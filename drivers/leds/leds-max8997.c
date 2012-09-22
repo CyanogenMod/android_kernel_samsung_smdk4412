@@ -39,7 +39,7 @@ static inline int led_regulator_get_max_brightness(struct regulator *supply)
 	int voltage = regulator_list_voltage(supply, 0);
 
 	/*TODO*/
-#if defined(CONFIG_MACH_Q1_BD)
+#if defined(CONFIG_MACH_Q1_BD)  || defined(CONFIG_MACH_U1_NA_USCC)
 	return LED_BRIGHTNESS_MAX_LEVEL;
 #else
 	return 1;
@@ -126,7 +126,7 @@ static void regulator_led_set_value(struct regulator_led *led)
 /* Q1 has torch light widget, and it changes */
 /* its brightness level without disabling rerulator */
 /* So, remove the below code for Q1 */
-#if !defined(CONFIG_MACH_Q1_BD)
+#if !defined(CONFIG_MACH_Q1_BD) && !defined(CONFIG_MACH_U1_NA_USCC)
 	if (regulator_is_enabled(movie) > 0) {
 		pr_info("%s: led_movie is enabled.\n", __func__);
 		goto end;
@@ -146,7 +146,7 @@ static void regulator_led_set_value(struct regulator_led *led)
 	}
 #endif
 
-#if defined(CONFIG_MACH_Q1_BD)
+#if defined(CONFIG_MACH_Q1_BD)  || defined(CONFIG_MACH_U1_NA_USCC)
 	switch (led->value) {
 	case LED_BRIGHTNESS_LEVEL1:
 		regulator_set_current_limit(led->vcc, 10000, 20000);

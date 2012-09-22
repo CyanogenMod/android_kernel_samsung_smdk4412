@@ -19,4 +19,7 @@
 int cpufreq_pegasusq_cpu_lock(int num_core);
 int cpufreq_pegasusq_cpu_unlock(int num_core);
 
+void cpufreq_pegasusq_min_cpu_lock(unsigned int num_core);
+void cpufreq_pegasusq_min_cpu_unlock(void);
+
 #endif

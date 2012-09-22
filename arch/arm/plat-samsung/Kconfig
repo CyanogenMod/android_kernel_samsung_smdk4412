@@ -275,6 +275,15 @@ config S3C_DEV_I2C16_EMUL
 	help
 	  Compile in platform device definitions for I2C channel 16
 
+config S3C_DEV_I2C17_EMUL
+	bool "I2C17 Information GPIO bitbanging emulation"
+	depends on CPU_EXYNOS4210
+	help
+	  Compile in platform device definitions for I2C channel 17.
+	  This is used for usb hub 3803. Select this if USBHUB_USB3803
+	  is selected.
+	  If unsure, say N.
+
 config S3C_DEV_FB
 	bool
 	help

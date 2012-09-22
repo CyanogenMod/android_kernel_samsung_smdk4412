@@ -12,7 +12,7 @@
 int *aat1290a_ctrl;
 struct aat1290a_led_platform_data *led_pdata;
 
-struct class *flash_class;
+extern struct class *camera_class; /*sys/class/camera*/
 struct device *aat1290a_dev;
 
 static int aat1290a_setPower(int onoff, int level)
@@ -165,8 +165,15 @@ ssize_t aat1290a_power(struct device *dev,
 	return count;
 }
 
-static DEVICE_ATTR(flash_power, S_IWUSR|S_IWGRP|S_IROTH,
-	NULL, aat1290a_power);
+ssize_t aat1290a_get_max_brightness(struct device *dev,
+		struct device_attribute *attr, char *buf)
+{
+	return snprintf(buf,
+		sizeof(led_pdata->brightness), "%d", TORCH_BRIGHTNESS_100);
+}
+
+static DEVICE_ATTR(rear_flash, S_IRUSR|S_IWUSR|S_IRGRP|S_IWGRP|S_IROTH,
+	aat1290a_get_max_brightness, aat1290a_power);
 
 static const struct file_operations aat1290a_fops = {
 	.owner = THIS_MODULE,
@@ -192,18 +199,17 @@ static int aat1290a_led_probe(struct platform_device *pdev)
 		return -ENODEV;
 	}
 
-	flash_class = class_create(THIS_MODULE, "flash");
-	if (IS_ERR(flash_class))
-		LED_ERROR("Failed to create class(flash)!\n");
-	aat1290a_dev = device_create(flash_class, NULL, 0, NULL, "flash");
+	aat1290a_dev = device_create(camera_class, NULL, 0, NULL, "flash");
 	if (IS_ERR(aat1290a_dev))
 		LED_ERROR("Failed to create device(flash)!\n");
 
-	if (device_create_file(aat1290a_dev, &dev_attr_flash_power) < 0) {
+	if (device_create_file(aat1290a_dev, &dev_attr_rear_flash) < 0) {
 		LED_ERROR("failed to create device file, %s\n",
-				dev_attr_flash_power.attr.name);
+				dev_attr_rear_flash.attr.name);
 	}
-	led_pdata->initGpio();
+
+	if (led_pdata)
+		led_pdata->initGpio();
 	aat1290a_setGpio();
 	return 0;
 }
@@ -213,9 +219,9 @@ static int __devexit aat1290a_led_remove(struct platform_device *pdev)
 	led_pdata->freeGpio();
 	misc_deregister(&aat1290a_miscdev);
 
-	device_remove_file(aat1290a_dev, &dev_attr_flash_power);
-	device_destroy(flash_class, 0);
-	class_destroy(flash_class);
+	device_remove_file(aat1290a_dev, &dev_attr_rear_flash);
+	device_destroy(camera_class, 0);
+	class_destroy(camera_class);
 
 	return 0;
 }

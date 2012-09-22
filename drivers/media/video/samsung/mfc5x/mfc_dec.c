@@ -1882,15 +1882,6 @@ int mfc_init_decoding(struct mfc_inst_ctx *ctx, union mfc_args *args)
 		dec_ctx->numtotaldpb);
 
 #if defined(CONFIG_BUSFREQ)
-#if defined(CONFIG_CPU_EXYNOS4210)
-	/* Fix MFC & Bus Frequency for better performance */
-	if (atomic_read(&ctx->dev->busfreq_lock_cnt) == 0) {
-		exynos4_busfreq_lock(DVFS_LOCK_ID_MFC, BUS_L1);
-		mfc_dbg("Bus FREQ locked to L1\n");
-	}
-	atomic_inc(&ctx->dev->busfreq_lock_cnt);
-	ctx->busfreq_flag = true;
-#else
 	/* Lock MFC & Bus FREQ for high resolution */
 	if (ctx->width >= MAX_HOR_RES || ctx->height >= MAX_VER_RES) {
 		if (atomic_read(&ctx->dev->busfreq_lock_cnt) == 0) {
@@ -1900,8 +1891,17 @@ int mfc_init_decoding(struct mfc_inst_ctx *ctx, union mfc_args *args)
 
 		atomic_inc(&ctx->dev->busfreq_lock_cnt);
 		ctx->busfreq_flag = true;
-	}
+	} else {
+#if defined(CONFIG_CPU_EXYNOS4210)
+		/* Fix MFC & Bus Frequency for better performance */
+		if (atomic_read(&ctx->dev->busfreq_lock_cnt) == 0) {
+			exynos4_busfreq_lock(DVFS_LOCK_ID_MFC, BUS_L1);
+			mfc_dbg("Bus FREQ locked to L1\n");
+		}
+		atomic_inc(&ctx->dev->busfreq_lock_cnt);
+		ctx->busfreq_flag = true;
 #endif
+	}
 #endif
 
 #if defined(CONFIG_CPU_EXYNOS4210) && defined(CONFIG_EXYNOS4_CPUFREQ)
@@ -1926,8 +1926,12 @@ int mfc_init_decoding(struct mfc_inst_ctx *ctx, union mfc_args *args)
 				dmc_max_threshold =
 					EXYNOS4212_DMC_MAX_THRESHOLD + 5;
 			} else if (soc_is_exynos4412()) {
-				dmc_max_threshold =
-					EXYNOS4412_DMC_MAX_THRESHOLD + 5;
+				if (samsung_rev() >= EXYNOS4412_REV_2_0)
+					dmc_max_threshold =
+						PRIME_DMC_MAX_THRESHOLD + 5;
+				else
+					dmc_max_threshold =
+						EXYNOS4412_DMC_MAX_THRESHOLD + 5;
 			} else {
 				pr_err("Unsupported model.\n");
 				return -EINVAL;
@@ -2093,6 +2097,25 @@ int mfc_change_resolution(struct mfc_inst_ctx *ctx, struct mfc_dec_exe_arg *exe_
 	}
 
 	ret = mfc_cmd_init_buffers(ctx);
+
+#ifdef CONFIG_SLP
+	if (ctx->codecid == H264_DEC) {
+		exe_arg->out_crop_right_offset =
+			(read_shm(ctx, CROP_INFO1) >> 16) & 0xFFFF;
+		exe_arg->out_crop_left_offset =
+			read_shm(ctx, CROP_INFO1) & 0xFFFF;
+		exe_arg->out_crop_bottom_offset =
+			(read_shm(ctx, CROP_INFO2) >> 16) & 0xFFFF;
+		exe_arg->out_crop_top_offset =
+			read_shm(ctx, CROP_INFO2)  & 0xFFFF;
+
+		mfc_dbg("mfc_change_resolution: crop info t: %d, r: %d, b: %d, l: %d\n",
+			exe_arg->out_crop_top_offset,
+			exe_arg->out_crop_right_offset,
+			exe_arg->out_crop_bottom_offset,
+			exe_arg->out_crop_left_offset);
+	}
+#endif
 	if (ret < 0)
 		return ret;
 
@@ -2126,7 +2149,7 @@ static int mfc_decoding_frame(struct mfc_inst_ctx *ctx, struct mfc_dec_exe_arg *
 	unsigned char *stream_vir;
 	int ret;
 	struct mfc_dec_ctx *dec_ctx = (struct mfc_dec_ctx *)ctx->c_priv;
-	unsigned long mem_ofs;
+	long mem_ofs;
 #ifdef CONFIG_VIDEO_MFC_VCM_UMP
 	void *ump_handle;
 #endif
@@ -2265,9 +2288,29 @@ static int mfc_decoding_frame(struct mfc_inst_ctx *ctx, struct mfc_dec_exe_arg *
 
 	exe_arg->out_display_status = dec_ctx->dispstatus;
 
-	exe_arg->out_display_Y_addr = (display_luma_addr << 11);
-	exe_arg->out_display_C_addr = (display_chroma_addr << 11);
-
+#ifdef CONFIG_SLP_DMABUF
+	if (exe_arg->memory_type == MEMORY_DMABUF) {
+		exe_arg->out_display_Y_addr =
+			mfc_get_buf_dmabuf(display_luma_addr << 11);
+		if (exe_arg->out_display_Y_addr < 0) {
+			mfc_err("mfc_get_buf_dmabuf : Get Y fd error %d\n",
+				exe_arg->out_display_Y_addr);
+			return MFC_DEC_EXE_ERR;
+		}
+		exe_arg->out_display_C_addr =
+			mfc_get_buf_dmabuf(display_chroma_addr << 11);
+		if (exe_arg->out_display_C_addr < 0) {
+			mfc_err("mfc_get_buf_dmabuf : Get C fd error %d\n",
+				exe_arg->out_display_C_addr);
+			return MFC_DEC_EXE_ERR;
+		}
+	} else {
+#endif
+		exe_arg->out_display_Y_addr = (display_luma_addr << 11);
+		exe_arg->out_display_C_addr = (display_chroma_addr << 11);
+#ifdef CONFIG_SLP_DMABUF
+	}
+#endif
 	exe_arg->out_disp_pic_frame_type = display_frame_type;
 
 	exe_arg->out_y_offset = mfc_mem_data_ofs(display_luma_addr << 11, 1);
@@ -2361,6 +2404,7 @@ int mfc_exec_decoding(struct mfc_inst_ctx *ctx, union mfc_args *args)
 		mfc_check_resolution_change(ctx, exe_arg);
 		if (ctx->resolution_status == RES_SET_CHANGE) {
 			ret = mfc_decoding_frame(ctx, exe_arg, &consumed);
+#ifndef CONFIG_SLP
 		} else if ((ctx->resolution_status == RES_WAIT_FRAME_DONE) &&
 			(exe_arg->out_display_status == DISP_S_FINISH)) {
 			exe_arg->out_display_status = DISP_S_RES_CHANGE;
@@ -2368,6 +2412,20 @@ int mfc_exec_decoding(struct mfc_inst_ctx *ctx, union mfc_args *args)
 			if (ret != MFC_OK)
 				return ret;
 			ctx->resolution_status = RES_NO_CHANGE;
+#else
+		} else if (ctx->resolution_status == RES_WAIT_FRAME_DONE) {
+			if (exe_arg->out_display_status == DISP_S_FINISH) {
+				exe_arg->out_display_status =
+							DISP_S_RES_CHANGE_DONE;
+
+				ret = mfc_change_resolution(ctx, exe_arg);
+				if (ret != MFC_OK)
+					return ret;
+				ctx->resolution_status = RES_NO_CHANGE;
+			} else
+				exe_arg->out_display_status =
+							DISP_S_RES_CHANGING;
+#endif
 		}
 
 		if ((dec_ctx->ispackedpb) &&

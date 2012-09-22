@@ -471,8 +471,8 @@ s32 tcc_fic_run_decoder(u8 *buff, s32 size)
 	s32 num_broken_fib = 0;
 	u16 fib_crc;
 
-	if (size != MAX_FIC_SIZE) {
-		tcbd_debug(DEBUG_ERROR, "invalid fic size!\n");
+	if ((size%TCC_FIB_SIZE) != 0) {
+		tcbd_debug(DEBUG_ERROR, "invalid fic size:%d!\n", size);
 		return -1;
 	}
 	while (size > cnt * TCC_FIB_SIZE) {

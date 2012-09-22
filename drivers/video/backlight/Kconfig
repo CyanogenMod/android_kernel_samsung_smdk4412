@@ -174,11 +174,32 @@ config LCD_LTE480WV
 config LCD_S6E8AA0
 	tristate "S6E8AA0 MIPI AMOLED LCD Driver"
 	depends on S5P_MIPI_DSI2 && BACKLIGHT_CLASS_DEVICE && \
-			(MACH_SLP_MIDAS || MACH_SLP_PQ_LTE || MACH_SLP_PQ)
+			(MACH_SLP_MIDAS || MACH_SLP_PQ_LTE || MACH_SLP_PQ || MACH_TRATS)
 	default n
 	help
 	  If you have an S6E8AA0 MIPI AMOLED LCD Panel, say Y to enable its
 	  LCD control driver.
+
+config LCD_EA8061
+	tristate "EA8061 MIPI AMOLED LCD Driver"
+	depends on S5P_MIPI_DSI2 && BACKLIGHT_CLASS_DEVICE && \
+			(MACH_SLP_T0_LTE)
+	default n
+	help
+	  If you have an S6E8AA0 MIPI AMOLED LCD Panel, say Y to enable its
+	  LCD control driver. this driver supported S-Strip Portrait.
+	  It support MIPI interface for transmitting video data to LCD.
+	  please find quality about display.
+
+config LCD_S6D6AA1
+	tristate "S6D6AA1 MIPI TFT-LCD Driver"
+	depends on S5P_MIPI_DSI2 && BACKLIGHT_CLASS_DEVICE && \
+			(MACH_REDWOOD)
+	help
+	  If you have an S6D6AA1 MIPI TFT-LCD Panel, say Y to enable its
+	  LCD control driver. this driver supported white maic sony ip.
+	  improve power consumtion and outdoor mode using white pixel.
+	  please find advantage about this driver.
 
 config LCD_S6E39A0X02
 	tristate "S6E39A0X02 MIPI AMOLED LCD Driver"
@@ -399,7 +420,7 @@ config BACKLIGHT_PCF50633
 
 config BACKLIGHT_SMART_DIMMING
 	bool "SLP Backlight driver feature for smart dimming"
-	depends on (MACH_SLP_MIDAS || MACH_SLP_PQ_LTE || MACH_SLP_PQ)
+	depends on (MACH_SLP_MIDAS || MACH_SLP_T0_LTE || MACH_SLP_PQ_LTE || MACH_SLP_PQ || MACH_TRATS)
 	help
 	  Say Y to enable the Smart Dimming Feature.
 

@@ -617,7 +617,7 @@ void midas_power_init(void)
 	if (system_rev == 0 || system_rev == 3)
 #elif defined(CONFIG_MACH_C1)
 		if (system_rev <= 1 || system_rev == 3)
-#elif defined(CONFIG_MACH_C1VZW)
+#elif defined(CONFIG_MACH_M3)
 			if (system_rev == 0)
 #endif
 				ldo8_init_data.constraints.always_on = 1;

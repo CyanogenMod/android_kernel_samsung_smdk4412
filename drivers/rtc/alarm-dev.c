@@ -68,8 +68,9 @@ static long alarm_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 	uint32_t alarm_type_mask = 1U << alarm_type;
 #if defined(CONFIG_RTC_ALARM_BOOT)
 	char bootalarm_data[14];
+#elif defined(CONFIG_RTC_POWER_OFF)
+	char pwroffalarm_data[14];
 #endif
-
 	if (alarm_type >= ANDROID_ALARM_TYPE_COUNT)
 		return -EINVAL;
 
@@ -170,6 +171,14 @@ from_old_alarm_set:
 			goto err1;
 		}
 		rv = alarm_set_alarm_boot(bootalarm_data);
+		break;
+#elif defined(CONFIG_RTC_POWER_OFF)
+	case ANDROID_ALARM_SET_ALARM_POWEROFF:
+		if (copy_from_user(pwroffalarm_data, (void __user *)arg, 14)) {
+			rv = -EFAULT;
+			goto err1;
+		}
+		rv = alarm_set_alarm_poweroff(pwroffalarm_data);
 		break;
 #endif
 	case ANDROID_ALARM_GET_TIME(0):

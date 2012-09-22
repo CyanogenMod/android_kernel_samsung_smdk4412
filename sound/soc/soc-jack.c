@@ -23,13 +23,17 @@
 #include <linux/jack.h>
 #endif
 
+#ifdef CONFIG_SWITCH
 #include <linux/switch.h>
+#endif
 #include <linux/sec_jack.h>
 
+#ifdef CONFIG_SWITCH
 /* Android jack detection */
 static struct switch_dev android_switch = {
 	.name = "h2w",
 };
+#endif
 
 
 /**
@@ -53,7 +57,9 @@ int snd_soc_jack_new(struct snd_soc_codec *codec, const char *id, int type,
 	INIT_LIST_HEAD(&jack->jack_zones);
 	BLOCKING_INIT_NOTIFIER_HEAD(&jack->notifier);
 
+#ifdef CONFIG_SWITCH
 	switch_dev_register(&android_switch);
+#endif
 
 	return snd_jack_new(codec->card->snd_card, id, type, &jack->jack);
 }
@@ -81,6 +87,7 @@ void snd_soc_jack_report(struct snd_soc_jack *jack, int status, int mask)
 	int enable;
 	int oldstatus;
 
+#ifdef CONFIG_SWITCH
 	if (mask & SND_JACK_HEADSET) {
 		if (status & SND_JACK_MICROPHONE)
 			switch_set_state(&android_switch, SEC_HEADSET_4POLE);
@@ -89,6 +96,7 @@ void snd_soc_jack_report(struct snd_soc_jack *jack, int status, int mask)
 		else
 			switch_set_state(&android_switch, SEC_JACK_NO_DEVICE);
 	}
+#endif
 
 #ifdef CONFIG_JACK_MON
 	if (mask & SND_JACK_HEADSET) {

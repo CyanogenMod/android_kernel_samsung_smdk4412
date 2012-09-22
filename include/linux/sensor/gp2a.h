@@ -64,5 +64,6 @@ int is_gp2a030a(void);
 struct gp2a_platform_data {
 	int (*gp2a_led_on) (bool);
 	int p_out; /* proximity-sensor-output gpio */
+	unsigned long (*gp2a_get_threshold)(void);
 };
 #endif

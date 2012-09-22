@@ -223,14 +223,13 @@ static long secmem_ioctl(struct file *filp, unsigned int cmd, unsigned long arg)
 			return -EFAULT;
 		}
 
-		region.virt_addr = kmalloc(region.len, GFP_KERNEL | GFP_DMA);
-		if (!region.virt_addr) {
-			printk(KERN_ERR "%s: Get memory address failed. [size : %ld]\n", __func__, region.len);
-			return -EFAULT;
-		}
-		region.phys_addr = virt_to_phys(region.virt_addr);
+		pr_info("SECMEM_IOC_GET_ADDR: size:%lu\n", region.len);
 
-		dma_map_single(secmem.this_device, region.virt_addr, region.len, DMA_TO_DEVICE);
+		region.virt_addr = dma_alloc_coherent(NULL, region.len,
+						&region.phys_addr, GFP_KERNEL);
+		if (!region.virt_addr)
+			panic("SECMEM_IOC_GET_ADDR: dma_alloc_coherent failed! "
+			      "size=%lu\n", region.len);
 
 		if (copy_to_user((void __user *)arg, &region,
 					sizeof(struct secmem_region)))
@@ -245,12 +244,14 @@ static long secmem_ioctl(struct file *filp, unsigned int cmd, unsigned long arg)
 					sizeof(struct secmem_region)))
 			return -EFAULT;
 
-		if (!region.virt_addr) {
-			printk(KERN_ERR "Get secmem address error. [address : %x]\n", (uint32_t)region.virt_addr);
-			return -EFAULT;
-		}
+		if (!region.virt_addr)
+			panic("SECMEM_IOC_RELEASE_ADDR: Get secmem address error"
+			      " [address : %x]\n", (uint32_t)region.virt_addr);
 
-		kfree(region.virt_addr);
+		pr_info("SECMEM_IOC_RELEASE_ADDR: size:%lu\n", region.len);
+
+		dma_free_coherent(NULL, region.len, region.virt_addr,
+					region.phys_addr);
 		break;
 	}
 

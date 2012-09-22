@@ -15,4 +15,8 @@ static int __init midas_class_create(void)
 	return 0;
 }
 
+#ifdef CONFIG_FAST_RESUME
+beforeresume_initcall(midas_class_create);
+#else
 subsys_initcall(midas_class_create);
+#endif

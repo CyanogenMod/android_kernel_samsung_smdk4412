@@ -1,0 +1,7 @@
+comment "Enable MMC support to see CMC7xx driver"
+	depends on MMC = n
+
+config WIMAX_CMC7XX_DEBUG
+	bool "Samsung WiMax CMC7xx debug log"
+	depends on WIMAX_CMC
+	default n

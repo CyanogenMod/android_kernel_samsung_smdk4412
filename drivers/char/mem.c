@@ -36,11 +36,9 @@
 
 #ifdef CONFIG_S3C_MEM
 # include "s3c_mem.h"
-#ifdef CONFIG_S3C_MEM_CMA_ALLOC
+#ifdef CONFIG_VIDEO_SAMSUNG_USE_DMA_MEM
 #include <linux/cma.h>
 #include <linux/platform_device.h>
-#define S3CMEM_NAME "s3c-mem"
-
 #endif
 #endif
 
@@ -836,13 +834,18 @@ extern int s3c_mem_mmap(struct file* filp, struct vm_area_struct *vma);
 extern long s3c_mem_ioctl(struct file *file, unsigned int cmd, unsigned long arg);
 
 static const struct file_operations s3c_mem_fops = {
-#ifdef CONFIG_S3C_MEM_CMA_ALLOC
+#ifdef CONFIG_VIDEO_SAMSUNG_USE_DMA_MEM
 	.open = s3c_mem_open,
 	.release = s3c_mem_release,
 #endif
 	.unlocked_ioctl	= s3c_mem_ioctl,
 	.mmap   = s3c_mem_mmap,
 };
+
+#ifdef CONFIG_VIDEO_SAMSUNG_USE_DMA_MEM
+static struct backing_dev_info s3c_mem_cma_dev_bdi;
+#endif
+
 #endif
 
 #ifdef CONFIG_EXYNOS_MEM
@@ -922,8 +925,13 @@ static const struct memdev {
 	[12] = { "oldmem", 0, &oldmem_fops, NULL },
 #endif
 #ifdef CONFIG_S3C_MEM
-	[13] = {"s3c-mem", S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP | S_IROTH
-			| S_IWOTH, &s3c_mem_fops},
+	    [13] = {
+		"s3c-mem", S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP | S_IROTH
+			| S_IWOTH, &s3c_mem_fops
+#ifdef CONFIG_VIDEO_SAMSUNG_USE_DMA_MEM
+		 , &s3c_mem_cma_dev_bdi
+#endif
+		},
 #endif
 #ifdef CONFIG_EXYNOS_MEM
 	[14] = {"exynos-mem", S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP | S_IROTH
@@ -976,7 +984,7 @@ static int __init chr_dev_init(void)
 {
 	int minor;
 	int err;
-#ifdef CONFIG_S3C_MEM_CMA_ALLOC
+#if defined(CONFIG_S3C_MEM) && defined(CONFIG_VIDEO_SAMSUNG_USE_DMA_MEM)
 	struct device *dev;
 #endif
 	err = bdi_init(&zero_bdi);
@@ -994,52 +1002,17 @@ static int __init chr_dev_init(void)
 	for (minor = 1; minor < ARRAY_SIZE(devlist); minor++) {
 		if (!devlist[minor].name)
 			continue;
-#ifndef CONFIG_S3C_MEM_CMA_ALLOC
-		device_create(mem_class, NULL, MKDEV(MEM_MAJOR, minor),
-			      NULL, devlist[minor].name);
-#else
+#if defined(CONFIG_S3C_MEM) && defined(CONFIG_VIDEO_SAMSUNG_USE_DMA_MEM)
 		dev = device_create(mem_class, NULL, MKDEV(MEM_MAJOR, minor),
-				    NULL, devlist[minor].name);
-		if (strncmp(devlist[minor].name, S3CMEM_NAME, 7) == 0) {
-#ifdef CONFIG_VIDEO_SAMSUNG_USE_DMA_MEM
+			      NULL, devlist[minor].name);
 
-			s3c_mem_cma_dev =
-			    kzalloc(sizeof(struct device), GFP_KERNEL);
-			memcpy(s3c_mem_cma_dev, dev, sizeof(struct device));
+		if (devlist[minor].dev_info == &s3c_mem_cma_dev_bdi)
+			devlist[minor].dev_info->dev = IS_ERR(dev) ? NULL : dev;
+
 #else
-			struct cma_info s_cma_mem_info;
-			dma_addr_t base_addr = 0;
-			int err, i = 0;
-			err = cma_info(&s_cma_mem_info, dev, 0);
-			if (err) {
-				printk(KERN_INFO "%s: get cma info failed\n",
-				       __func__);
-			} else {
-				base_addr =
-				    (dma_addr_t) cma_alloc(dev, S3CMEM_NAME,
-							   (size_t)
-							   s_cma_mem_info.
-							   total_size, 0);
-			}
+		device_create(mem_class, NULL, MKDEV(MEM_MAJOR, minor),
+				    NULL, devlist[minor].name);
 
-			printk(KERN_INFO "base_addr = 0x%x\n", base_addr);
-			s3c_cma_block_size = SLOT_SIZE * SZ_1K;
-			s3c_cma_max_block_num =
-			    (s_cma_mem_info.total_size / s3c_cma_block_size);
-			s3c_slot_info =
-			    kzalloc(sizeof(struct s3c_slot_info) *
-				    s3c_cma_max_block_num, GFP_KERNEL);
-			for (i = 0; i < s3c_cma_max_block_num; i++) {
-				s3c_slot_info[i].s_start_addr =
-				    base_addr + (i * s3c_cma_block_size);
-				s3c_slot_info[i].s_end_addr =
-				    s3c_slot_info[i].s_start_addr +
-				    s3c_cma_block_size;
-				s3c_slot_info[i].s_size = s3c_cma_block_size;
-				s3c_slot_info[i].s_mapped = false;
-			}
-#endif
-		}
 #endif
 
 	}
@@ -1047,7 +1020,7 @@ static int __init chr_dev_init(void)
 	return tty_init();
 }
 
-#ifdef CONFIG_S3C_MEM_CMA_ALLOC
+#if defined(CONFIG_S3C_MEM) && defined(CONFIG_VIDEO_SAMSUNG_USE_DMA_MEM)
 late_initcall(chr_dev_init);
 #else
 fs_initcall(chr_dev_init);

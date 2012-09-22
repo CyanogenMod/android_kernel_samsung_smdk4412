@@ -321,6 +321,8 @@ static void tdmb_InitOFDM(void)
 
 	RTV_REG_SET(0x16, 0x6C);
 
+	RTV_REG_SET(0x1a, 0xb4);
+
 	RTV_REG_SET(0x38, 0x01);
 
 	RTV_REG_SET(0x20, 0x5B);
@@ -1201,6 +1203,11 @@ INT rtvTDMB_OpenSubChannel(
 		RTV_GUARD_LOCK;
 		/* Max sub channel is 1. So, we close the previous sub ch. */
 		tdmb_CloseSubChannel(0);
+#if defined(RTV_IF_SPI) || defined(RTV_IF_EBI2)
+		RTV_REG_MAP_SEL(OFDM_PAGE);
+		RTV_REG_SET(0x10, 0x48);
+		RTV_REG_SET(0x10, 0xC9);
+#endif
 		tdmb_OpenSubChannel(nSubChID, eServiceType, nThresholdSize);
 		RTV_GUARD_FREE;
 #else

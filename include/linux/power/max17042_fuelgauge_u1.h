@@ -14,7 +14,7 @@
 #define __MAX17042_BATTERY_H_
 
 /*#define NO_READ_I2C_FOR_MAXIM */
-#if !defined(CONFIG_MACH_Q1_BD)
+#if !defined(CONFIG_MACH_Q1_BD) && !defined(CONFIG_MACH_TRATS)
 #define RECAL_SOC_FOR_MAXIM
 #endif
 /*#define LOG_REG_FOR_MAXIM */

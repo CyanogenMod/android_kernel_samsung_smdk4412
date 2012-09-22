@@ -32,6 +32,11 @@
 #include <plat/pm.h>
 #include <plat/cpu.h>
 
+#if defined(CONFIG_MACH_PX) || defined(CONFIG_MACH_Q1_BD) ||\
+	defined(CONFIG_MACH_P4NOTE) || defined(CONFIG_MACH_GC1)
+#include <mach/sec_debug.h>
+#endif
+
 struct exynos_dvfs_info *exynos_info;
 
 static struct regulator *arm_regulator;
@@ -316,6 +321,7 @@ int exynos_cpufreq_lock(unsigned int nId,
 	mutex_lock(&set_freq_lock);
 	freq_old = policy->cur;
 	freq_new = freq_table[cpufreq_level].frequency;
+
 	if (freq_old < freq_new) {
 		/* Find out current level index */
 		for (i = 0; freq_table[i].frequency != CPUFREQ_TABLE_END; i++) {
@@ -348,6 +354,7 @@ int exynos_cpufreq_lock(unsigned int nId,
 
 		cpufreq_notify_transition(&freqs, CPUFREQ_POSTCHANGE);
 	}
+
 	mutex_unlock(&set_freq_lock);
 
 	return ret;
@@ -470,6 +477,7 @@ int exynos_cpufreq_upper_limit(unsigned int nId,
 	/* If cur frequency is higher than limit freq, it needs to update */
 	freq_old = policy->cur;
 	freq_new = freq_table[cpufreq_level].frequency;
+
 	if (freq_old > freq_new) {
 		/* Find out current level index */
 		for (i = 0; i <= exynos_info->min_support_idx; i++) {

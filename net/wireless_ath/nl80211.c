@@ -214,6 +214,7 @@ static const struct nla_policy nl80211_policy[NL80211_ATTR_MAX+1] = {
 	[NL80211_ATTR_BTCOEX_DATA] = { .type = NLA_BINARY,
 				      .len = IEEE80211_MAX_DATA_LEN },
 	[NL80211_ATTR_PRIV_CMD] = { .type = NLA_NUL_STRING, .len = 128 },
+	[NL80211_ATTR_PRIV_EVENT] = { .type = NLA_NUL_STRING, .len = 128 },
 
 };
 
@@ -6515,7 +6516,10 @@ static struct genl_ops nl80211_ops[] = {
 		.doit = nl80211_testmode_do,
 		.dumpit = nl80211_testmode_dump,
 		.policy = nl80211_policy,
+#ifdef CONFIG_MACH_PX
+#else
 		.flags = GENL_ADMIN_PERM,
+#endif
 		.internal_flags = NL80211_FLAG_NEED_WIPHY |
 				  NL80211_FLAG_NEED_RTNL,
 	},
@@ -7968,6 +7972,46 @@ void cfg80211_report_obss_beacon(struct wiphy *wiphy,
 	nlmsg_free(msg);
 }
 EXPORT_SYMBOL(cfg80211_report_obss_beacon);
+
+void cfg80211_priv_event(struct net_device *dev,
+				 const char *priv_event, gfp_t gfp)
+{
+	struct wireless_dev *wdev = dev->ieee80211_ptr;
+	struct cfg80211_registered_device *rdev = wiphy_to_dev(wdev->wiphy);
+	struct sk_buff *msg;
+	void *hdr;
+	int err;
+
+	msg = nlmsg_new(NLMSG_GOODSIZE, gfp);
+	if (!msg)
+		return;
+
+	hdr = nl80211hdr_put(msg, 0, 0, 0, NL80211_CMD_PRIV_EVENT);
+	if (!hdr) {
+		nlmsg_free(msg);
+		return;
+	}
+
+	NLA_PUT_U32(msg, NL80211_ATTR_IFINDEX, dev->ifindex);
+	NLA_PUT_STRING(msg, NL80211_ATTR_PRIV_EVENT, priv_event);
+
+	err = genlmsg_end(msg, hdr);
+	if (err < 0) {
+		nlmsg_free(msg);
+		return;
+	}
+
+	genlmsg_multicast_netns(wiphy_net(&rdev->wiphy), msg, 0,
+				nl80211_mlme_mcgrp.id, gfp);
+	return;
+
+ nla_put_failure:
+	genlmsg_cancel(msg, hdr);
+	nlmsg_free(msg);
+
+}
+EXPORT_SYMBOL(cfg80211_priv_event);
+
 
 static int nl80211_netlink_notify(struct notifier_block * nb,
 				  unsigned long state,

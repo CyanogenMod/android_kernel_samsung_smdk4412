@@ -9,7 +9,16 @@
 #include <plat/gpio-cfg.h>
 #include <mach/regs-gpio.h>
 #include <mach/gpio.h>
+#include <linux/mfd/max77693.h>
+#include <linux/mfd/max77693-private.h>
+#include <linux/power_supply.h>
 #include "midas.h"
+#include <plat/udc-hs.h>
+
+/*Event of receiving*/
+#define PSY_BAT_NAME "battery"
+/*Event of sending*/
+#define PSY_CHG_NAME "max77693-charger"
 
 #ifdef CONFIG_SAMSUNG_MHL
 static void sii9234_cfg_gpio(void)
@@ -44,7 +53,8 @@ static void sii9234_cfg_gpio(void)
 	gpio_set_value(GPIO_MHL_RST, GPIO_LEVEL_LOW);
 
 #if !defined(CONFIG_MACH_C1_KOR_LGT) && !defined(CONFIG_SAMSUNG_MHL_9290)
-#if !defined(CONFIG_MACH_P4NOTE)
+#if !defined(CONFIG_MACH_P4NOTE) && !defined(CONFIG_MACH_T0) && \
+	!defined(CONFIG_MACH_M3) && !defined(CONFIG_MACH_SLP_T0_LTE)
 	s3c_gpio_cfgpin(GPIO_MHL_SEL, S3C_GPIO_OUTPUT);
 	s3c_gpio_setpull(GPIO_MHL_SEL, S3C_GPIO_PULL_NONE);
 	gpio_set_value(GPIO_MHL_SEL, GPIO_LEVEL_LOW);
@@ -81,6 +91,82 @@ static void sii9234_power_onoff(bool on)
 	}
 }
 
+#ifdef __MHL_NEW_CBUS_MSC_CMD__
+#if defined(CONFIG_MFD_MAX77693)
+static int sii9234_usb_op(bool on, int value)
+{
+	pr_info("func:%s bool on(%d) int value(%d)\n", __func__, on, value);
+	if (on) {
+		if (value == 1)
+			max77693_muic_usb_cb(USB_CABLE_ATTACHED);
+		else if (value == 2)
+			max77693_muic_usb_cb(USB_POWERED_HOST_ATTACHED);
+		else
+			return 0;
+	} else {
+		if (value == 1)
+			max77693_muic_usb_cb(USB_CABLE_DETACHED);
+		else if (value == 2)
+			max77693_muic_usb_cb(USB_POWERED_HOST_DETACHED);
+		else
+			return 0;
+	}
+	return 1;
+}
+#endif
+static void sii9234_vbus_present(bool on, int value)
+{
+	struct power_supply *psy = power_supply_get_by_name(PSY_CHG_NAME);
+	union power_supply_propval power_value;
+	u8 intval;
+	pr_info("%s: on(%d), vbus type(%d)\n", __func__, on, value);
+
+	if (!psy) {
+		pr_err("%s: fail to get %s psy\n", __func__, PSY_CHG_NAME);
+		return;
+	}
+
+	power_value.intval = ((POWER_SUPPLY_TYPE_MISC << 4) |
+			(on << 2) | (value << 0));
+
+	pr_info("%s: value.intval(0x%x)\n", __func__, power_value.intval);
+	psy->set_property(psy, POWER_SUPPLY_PROP_ONLINE, &power_value);
+
+	return;
+}
+#endif
+
+#ifdef CONFIG_SAMSUNG_MHL_UNPOWERED
+static int sii9234_get_vbus_status(void)
+{
+	struct power_supply *psy = power_supply_get_by_name(PSY_BAT_NAME);
+	union power_supply_propval value;
+	u8 intval;
+
+	if (!psy) {
+		pr_err("%s: fail to get %s psy\n", __func__, PSY_BAT_NAME);
+		return -1;
+	}
+
+	psy->get_property(psy, POWER_SUPPLY_PROP_ONLINE, &value);
+	pr_info("%s: value.intval(0x%x)\n", __func__, value.intval);
+
+	return (int)value.intval;
+}
+
+static void sii9234_otg_control(bool onoff)
+{
+	otg_control(onoff);
+
+	gpio_request(GPIO_OTG_EN, "USB_OTG_EN");
+	gpio_direction_output(GPIO_OTG_EN, onoff);
+	gpio_free(GPIO_OTG_EN);
+
+	printk(KERN_INFO "[MHL] %s: onoff =%d\n", __func__, onoff);
+
+	return;
+}
+#endif
 static void sii9234_reset(void)
 {
 	printk(KERN_INFO "%s()\n", __func__);
@@ -126,12 +212,11 @@ static struct sii9234_platform_data sii9234_pdata = {
 	.hw_onoff = sii9234_power_onoff,
 	.hw_reset = sii9234_reset,
 	.enable_vbus = NULL,
-#if defined(__MHL_NEW_CBUS_MSC_CMD__)
 	.vbus_present = NULL,
-#else
-	.vbus_present = NULL,
+#ifdef CONFIG_SAMSUNG_MHL_UNPOWERED
+	.get_vbus_status = sii9234_get_vbus_status,
+	.sii9234_otg_control = sii9234_otg_control,
 #endif
-
 #ifdef CONFIG_EXTCON
 	.extcon_name = "max77693-muic",
 #endif
@@ -171,7 +256,9 @@ static int __init midas_mhl_init(void)
 		printk(KERN_ERR "[MHL] adding i2c fail - nodevice\n");
 		return -ENODEV;
 	}
-#if defined(CONFIG_MACH_S2PLUS) || defined(CONFIG_MACH_P4NOTE)
+#if defined(CONFIG_MACH_T0_EUR_OPEN) || defined(CONFIG_MACH_T0_CHN_OPEN)
+	sii9234_pdata.ddc_i2c_num = 6;
+#elif defined(CONFIG_MACH_P4NOTE) || defined(CONFIG_MACH_T0)
 	sii9234_pdata.ddc_i2c_num = 5;
 #else
 	sii9234_pdata.ddc_i2c_num = (system_rev == 3 ? 16 : 5);

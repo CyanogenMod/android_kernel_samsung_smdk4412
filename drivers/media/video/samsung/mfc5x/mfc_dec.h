@@ -44,7 +44,12 @@ enum disp_status {
 	DISP_S_DD		= 1,
 	DISP_S_DISPLAY		= 2,
 	DISP_S_FINISH		= 3,
+#ifndef CONFIG_SLP
 	DISP_S_RES_CHANGE	= 4,	/* not H/W bit */
+#else
+	DISP_S_RES_CHANGING	= 4,	/* not H/W bit */
+	DISP_S_RES_CHANGE_DONE	= 5,	/* not H/W bit */
+#endif
 };
 
 /* decoding status */

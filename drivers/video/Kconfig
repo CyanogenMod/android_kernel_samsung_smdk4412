@@ -263,6 +263,7 @@ comment "Frame buffer hardware drivers"
 
 source "drivers/video/samsung/Kconfig"
 source "drivers/video/samsung_extdisp/Kconfig"
+source "drivers/video/samsung_duallcd/Kconfig"
 
 config FB_CIRRUS
 	tristate "Cirrus Logic support"

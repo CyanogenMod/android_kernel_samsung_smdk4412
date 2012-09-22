@@ -448,7 +448,11 @@ void put_page(struct page *page);
 void put_pages_list(struct list_head *pages);
 
 void split_page(struct page *page, unsigned int order);
+#ifndef CONFIG_DMA_CMA
 int split_free_page(struct page *page);
+#else
+int split_free_page(struct page *page, bool for_cma);
+#endif
 
 /*
  * Compound pages have a destructor function.  Provide a
@@ -1603,6 +1607,9 @@ int in_gate_area_no_mm(unsigned long addr);
 #define in_gate_area(mm, addr) ({(void)mm; in_gate_area_no_mm(addr);})
 #endif	/* __HAVE_ARCH_GATE_AREA */
 
+#ifdef CONFIG_DMA_CMA
+void perform_drop_caches(unsigned int mode);
+#endif
 int drop_caches_sysctl_handler(struct ctl_table *, int,
 					void __user *, size_t *, loff_t *);
 unsigned long shrink_slab(struct shrink_control *shrink,

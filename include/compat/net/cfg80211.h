@@ -3358,6 +3358,16 @@ void cfg80211_report_obss_beacon(struct wiphy *wiphy,
 				 const u8 *frame, size_t len,
 				 int freq, gfp_t gfp);
 
+/**
+ * cfg80211_priv_event - notify userspace about priv event
+ * @dev: the device the priv event was sent on
+ * @priv_event: event string
+ * @gfp: allocation flags
+ */
+void cfg80211_priv_event(struct net_device *dev, const char *priv_event,
+			   gfp_t gfp);
+
+
 /* Logging, debugging and troubleshooting/diagnostic helpers. */
 
 /* wiphy_printk helpers, similar to dev_printk */

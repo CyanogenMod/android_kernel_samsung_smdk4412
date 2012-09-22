@@ -24,6 +24,8 @@
 
 #ifdef CONFIG_BT_MGMT
 #include "sco_mgmt.h"
+#elif defined(CONFIG_BT_TIZEN)
+#include "tizen/sco.h"
 #else
 #ifndef __SCO_H
 #define __SCO_H

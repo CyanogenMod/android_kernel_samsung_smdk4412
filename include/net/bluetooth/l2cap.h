@@ -25,6 +25,8 @@
 */
 #ifdef CONFIG_BT_MGMT
 #include "l2cap_mgmt.h"
+#elif defined(CONFIG_BT_TIZEN)
+#include "tizen/l2cap.h"
 #else
 #ifndef __L2CAP_H
 #define __L2CAP_H

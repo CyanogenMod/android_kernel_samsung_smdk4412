@@ -310,12 +310,14 @@ extern void midas_config_sleep_gpio_table(void);
 #define GPIO_USB_HUB_SDA	EXYNOS4_GPL1(1)
 #define GPIO_USB_HUB_INT	EXYNOS4_GPX2(1)
 
+/* Definitions for PDA_ACTIVE for CMC221 & CBP7.2 */
+#define GPIO_PDA_ACTIVE		EXYNOS4_GPF1(6)
+
 #if defined(CONFIG_MACH_C1_KOR_LGT)
 /* Definitions for CBP7.2 */
 #define GPIO_CBP_PMIC_PWRON	EXYNOS4212_GPM0(6)
 #define GPIO_CBP_PS_HOLD_OFF	EXYNOS4212_GPM1(0)
 #define GPIO_CBP_CP_RST		EXYNOS4_GPF2(4)
-#define GPIO_PDA_ACTIVE		EXYNOS4_GPF1(6)
 
 #define GPIO_CBP_PHONE_ACTIVE	EXYNOS4_GPX1(3)
 #define CBP_PHONE_ACTIVE_IRQ	IRQ_EINT(11)

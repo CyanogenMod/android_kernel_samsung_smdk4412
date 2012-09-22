@@ -46,7 +46,13 @@ static unsigned int ar6k_clock = 26000000;
 #else
 static unsigned int ar6k_clock = 19200000;
 #endif
+
+#ifdef CONFIG_ATH6KL_LOCALE_USA
+static unsigned short reg_domain = 0x8348;
+#else
 static unsigned short reg_domain = 0xffff;
+#endif
+
 static unsigned short lrssi = 10;
 
 static unsigned short en_ani = 1;
@@ -481,7 +487,7 @@ static int ath6kl_target_config_wlan_params(struct ath6kl *ar, int idx)
 {
 	int status = 0;
 	int ret;
-#if CONFIG_MACH_PX
+#ifdef CONFIG_MACH_PX
 	struct ath6kl_vif *vif = ath6kl_get_vif_by_index(ar, idx);
 #endif
 	/*
@@ -496,7 +502,7 @@ static int ath6kl_target_config_wlan_params(struct ath6kl *ar, int idx)
 	}
 
 
-#if CONFIG_MACH_PX
+#ifdef CONFIG_MACH_PX
 	if (ar->conf_flags & ATH6KL_CONF_IGNORE_PS_FAIL_EVT_IN_SCAN) {
 		if ((ath6kl_wmi_pmparams_cmd(ar->wmi, idx,
 			0, vif->pspoll_num, 0, 0, 1,
@@ -1528,6 +1534,157 @@ static int ath6kl_upload_testscript(struct ath6kl *ar)
 	return 0;
 }
 
+#ifdef GLOBALCONFIG_WLAN_COUNTRY_CODE
+#define COUNTRY_MAX 76
+struct channels {
+	char country[30];
+	char ccode[6];
+	unsigned short reg_dmn_code;
+}
+pArray[COUNTRY_MAX] = {
+	{"Afghanistan",		"AF 0",	0x406a},
+	{"Albania",			"AL 0",	0x8008},
+	{"Algeria",			"DZ 0",	0x800c},
+	{"Angola",			"AD 0",	0x406a},
+	{"Austria",			"AT 0",	0x8028},
+	{"Australia",		"AU 0",	0x8024},
+	{"Bangladesh",		"BD 0",	0x8032},
+	{"Belgium",			"BE 0",	0x8038},
+	{"Bosnia",			"BA 0",	0x8046},
+	{"Bulgaria",		"BG 0",	0x8064},
+	{"Croatia",			"HR 0",	0x80bf},
+	{"Greece",			"GR 0",	0x812c},
+	{"Czech Republic",	"CZ 0",	0x80cb},
+	{"Egypt",			"EG 0",	0x8332},
+	{"Nordic",			"FI 0",	0x80f6},
+	{"Finland",			"FI 0",	0x80f6},
+	{"France",			"FR 0",	0x80FA},
+	{"Gabon",			"GA 0",	0x406a},
+	{"Germany",			"DE 0",	0x8114},
+	{"Ghana",			"GH 0",	0x406a},
+	{"Greece",			"GR 0",	0x812c},
+	{"Hungary",			"HU 0",	0x815c},
+	{"Iceland",			"IS 0",	0x8160},
+	{"India",			"IN 0",	0x8164},
+	{"Indonesia",		"ID 0",	0x8168},
+	{"Iraq",			"IQ 0",	0x406a},
+	{"IE",				"IE 0",	0x8174},
+	{"Ireland",			"IE 0",	0x8174},
+	{"Israel",			"IL 0",	0x8178},
+	{"Italy",			"IT 0",	0x817c},
+	{"Jamaica",			"JM 0",	0x8184},
+	{"Jordan",			"JO 0",	0x8190},
+	{"Central Asia",	"KZ 0",	0x818e},
+	{"Kazakhstan",		"KZ 0",	0x818e},
+	{"Kenya",			"KE 0",	0x8198},
+	{"BALTIC",			"LV 0",	0x81ac},
+	{"Libya",			"LY 0",	0x406a},
+	{"Lithuania",		"LT 0",	0x81b8},
+	{"Luxemburg",		"LU 0",	0x81ba},
+	{"Macedonia",		"MK 0",	0x8327},
+	{"Malaysia",		"MY 0",	0x81ca},
+	{"Mongolia",		"MN 0",	0x406a},
+	{"Montenegro",		"ME 0",	0x837b},
+	{"Morocco",			"MA 0",	0x81f8},
+	{"Nepal",			"NP 0",	0x820c},
+	{"Netherlands",		"NL 0",	0x8210},
+	{"The Netherlands",	"NL 0",	0x8210},
+	{"New Zealand",		"NZ 0",	0x822a},
+	{"Nigeria",			"NG 0",	0x406a},
+	{"Norway",			"NO 0",	0x8242},
+	{"Pakistan",		"PK 0",	0x824a},
+	{"Philippines",		"PH 0",	0x8260},
+	{"Poland",			"PL 0",	0x8268},
+	{"Portugal",		"PT 0",	0x826c},
+	{"Romania",			"RO 0",	0x8282},
+	{"Russia",			"RU 0",	0x8283},
+	{"KSA",				"SA 0",	0x82aa},
+	{"Senegal",			"SN 0",	0x406a},
+	{"Serbia",			"RS 0",	0x8114},
+	{"Singapore",		"SG 0",	0x82be},
+	{"Slovakia",		"SK 0",	0x82bf},
+	{"Slovenia",		"SI 0",	0x82c1},
+	{"South Africa",	"ZA 0",	0x82c6},
+	{"Spain",			"ES 0",	0x82D4},
+	{"Sri Lanka",		"LK 0",	0x8090},
+	{"Sweden",			"SE 0",	0x82f0},
+	{"Switzerland",		"CH 0",	0x82f4},
+	{"Thailand",		"TH 0",	0x82fc},
+	{"Tunisia",			"TN 0",	0x8314},
+	{"Turkey",			"TR 0",	0x8318},
+	{"Ukraine",			"UA 0",	0x8324},
+	{"UK",				"GB 0",	0x833A},
+	{"UK &IRE",			"GB 0",	0x833A},
+	{"United Kingdom",	"GB 0",	0x833A},
+	{"Uzbekistan",		"UZ 0",	0x835c},
+	{"Vietnam",			"VN 0",	0x82c0}
+};
+
+static unsigned short ath6kl_get_reg_dmn_code(u8 *ccode)
+{
+	int i = 0;
+
+	for (i = 0; i < COUNTRY_MAX; i++) {
+		if (strncmp(ccode, pArray[i].ccode, 2) == 0) {
+			ath6kl_dbg(ATH6KL_DBG_BOOT, "%s: %s %s 0x%x",
+				__func__, pArray[i].country, pArray[i].ccode,
+				pArray[i].reg_dmn_code);
+			return pArray[i].reg_dmn_code;
+		}
+	}
+
+	ath6kl_err("%s() Failed to find reg_domain code for %s\n",
+		__func__, ccode);
+
+	return 0xffff;
+}
+
+static void ath6kl_update_ccodeinfo(struct ath6kl *ar)
+{
+	char ccode_filename[32];
+
+	do {
+		int ret = 0;
+		size_t length;
+		u8 *pdata = NULL;
+
+		snprintf(ccode_filename, sizeof(ccode_filename),
+			"/data/.ccode.info");
+
+		ret = android_readwrite_file(ccode_filename, NULL, NULL, 0);
+
+		if (ret < 0)
+			break;
+		else
+			length = ret;
+
+		pdata = vmalloc(length + 1);
+
+		if (!pdata) {
+			ath6kl_dbg(ATH6KL_DBG_BOOT,
+				"%s: Cannot allocate buffer for ccode_info (%d)\n",
+				__func__, length);
+			break;
+		}
+
+		if (android_readwrite_file(ccode_filename,
+				(char *)pdata, NULL, length) != length) {
+			ath6kl_dbg(ATH6KL_DBG_BOOT,
+				"%s: file read error, length %d\n",
+				__func__, length);
+			vfree(pdata);
+			break;
+		}
+		pdata[length] = '\0';
+
+		if (reg_domain == 0xffff)
+			reg_domain = ath6kl_get_reg_dmn_code(pdata);
+
+
+		vfree(pdata);
+	} while (0);
+}
+#endif
 
 static void ath6kl_update_psminfo(struct ath6kl *ar)
 {
@@ -1859,6 +2016,9 @@ int ath6kl_init_hw_start(struct ath6kl *ar)
 	}
 
 	ar->state = ATH6KL_STATE_ON;
+#ifdef CONFIG_MACH_PX
+	wake_up(&ar->event_wq);
+#endif
 
 	return 0;
 
@@ -1941,6 +2101,9 @@ int ath6kl_core_init(struct ath6kl *ar)
 
 	ath6kl_mangle_mac_address(ar);
 	ath6kl_update_psminfo(ar);
+#ifdef GLOBALCONFIG_WLAN_COUNTRY_CODE
+	ath6kl_update_ccodeinfo(ar);
+#endif
 
 	/* FIXME: we should free all firmwares in the error cases below */
 

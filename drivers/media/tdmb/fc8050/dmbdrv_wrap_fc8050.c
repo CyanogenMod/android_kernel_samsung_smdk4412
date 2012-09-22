@@ -217,14 +217,13 @@ unsigned char dmb_drv_scan_ch(unsigned long frequency)
 	if (!dmb_initialize)
 		return TDMB_FAIL;
 
-	fic_decoder_subchannel_info_clean();
-
-	bbm_com_word_write(NULL, BBM_BUF_INT, 0x01ff);
-
 	if (bbm_com_tuner_set_freq(NULL, frequency)) {
 		bbm_com_word_write(NULL, BBM_BUF_INT, 0x00ff);
 		return TDMB_FAIL;
 	}
+
+	fic_decoder_subchannel_info_clean();
+	bbm_com_word_write(NULL, BBM_BUF_INT, 0x01ff);
 
 	if (bbm_com_scan_status(NULL)) {
 		bbm_com_word_write(NULL, BBM_BUF_INT, 0x00ff);

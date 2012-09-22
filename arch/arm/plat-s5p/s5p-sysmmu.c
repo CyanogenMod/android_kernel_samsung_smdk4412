@@ -55,21 +55,9 @@ static char *sysmmu_fault_name[SYSMMU_FAULTS_NUM] = {
 	"UNKNOWN FAULT"
 };
 
-struct sysmmu_drvdata {
-	struct list_head node;
-	struct device *dev;
-	struct device *owner;
-	void __iomem *sfrbase;
-	struct clk *clk;
-	int activations;
-	rwlock_t lock;
-	s5p_sysmmu_fault_handler_t fault_handler;
-	unsigned long version;
-};
-
 static LIST_HEAD(sysmmu_list);
 
-static struct sysmmu_drvdata *get_sysmmu_data(struct device *owner,
+struct sysmmu_drvdata *get_sysmmu_data(struct device *owner,
 						struct sysmmu_drvdata *start)
 {
 	if (start) {

@@ -24,7 +24,6 @@
 #define __TCBD_STREAM_PARSER_H__
 
 #undef __MERGE_EACH_TYPEOF_STREAM__
-#define __FIND_HEADER_MORE__
 
 #define SIZE_BUFF_HEADER 4 /*[TYPE(1)][SUBCH(1)][SIZE(2)]*/
 
@@ -36,10 +35,11 @@ enum DATA_TYPE {
 	DATA_TYPE_MAX
 };
 
-typedef s32 (*tcbd_stream_callback)(
-	u8 *_stream, s32 _size,	u8 _subch_id, u8 _type);
+typedef s32 (*tcbd_stream_callback)(s32 _dev_idx, u8 *_stream, s32 _size,
+					u8 _subch_id, u8 _type);
 
-TCBB_FUNC void tcbd_init_parser(tcbd_stream_callback _streamCallback);
-TCBB_FUNC s32 tcbd_split_stream(u8 *_stream, s32 _size);
+TCBB_FUNC void tcbd_init_parser(s32 _dev_idx,
+					tcbd_stream_callback _streamCallback);
+TCBB_FUNC s32 tcbd_split_stream(s32 _dev_idx, u8 *_stream, s32 _size);
 
 #endif /*__TCBD_STREAM_PARSER_H__*/

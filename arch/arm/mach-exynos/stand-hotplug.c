@@ -48,7 +48,8 @@
 
 #endif
 
-#if defined(CONFIG_MACH_U1) || defined(CONFIG_MACH_PX)
+#if defined(CONFIG_MACH_U1) || defined(CONFIG_MACH_PX) || \
+	defined(CONFIG_MACH_TRATS)
 #define TRANS_LOAD_H0 30
 #define TRANS_LOAD_L1 20
 #define TRANS_LOAD_H1 100
@@ -58,23 +59,24 @@
 #define CHECK_DELAY_OFF	(.5*HZ)
 #endif
 
-#if defined(CONFIG_MACH_MIDAS) || defined(CONFIG_MACH_SMDK4X12)
-#ifdef CONFIG_MACH_S2PLUS
-#define TRANS_LOAD_H0 30
-#define TRANS_LOAD_L1 20
-#define TRANS_LOAD_H1 100
-#else
+#if defined(CONFIG_MACH_MIDAS) || defined(CONFIG_MACH_SMDK4X12) \
+	|| defined(CONFIG_MACH_SLP_PQ)
 #define TRANS_LOAD_H0 20
 #define TRANS_LOAD_L1 10
 #define TRANS_LOAD_H1 35
-#endif
 #define TRANS_LOAD_L2 15
 #define TRANS_LOAD_H2 45
 #define TRANS_LOAD_L3 20
 
 #define BOOT_DELAY	60
+
+#if defined(CONFIG_MACH_SLP_PQ)
+#define CHECK_DELAY_ON	(.3*HZ * 4)
+#define CHECK_DELAY_OFF	(.3*HZ)
+#else
 #define CHECK_DELAY_ON	(.5*HZ * 4)
 #define CHECK_DELAY_OFF	(.5*HZ)
+#endif
 #endif
 
 #define TRANS_RQ 2

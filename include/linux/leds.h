@@ -24,7 +24,7 @@ struct device;
 
 enum led_brightness {
 	LED_OFF		= 0,
-#if defined(CONFIG_MACH_Q1_BD)
+#if defined(CONFIG_MACH_Q1_BD)   || defined(CONFIG_MACH_U1_NA_USCC)
 	LED_BRIGHTNESS_LEVEL1	= 1,
 	LED_BRIGHTNESS_LEVEL2	= 2,
 	LED_BRIGHTNESS_LEVEL3	= 3,

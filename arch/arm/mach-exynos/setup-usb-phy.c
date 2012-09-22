@@ -347,16 +347,6 @@ static int exynos4_usb_phy1_resume(struct platform_device *pdev)
 	u32 phypwr;
 	int err;
 
-#if defined(CONFIG_LINK_DEVICE_HSIC) || defined(CONFIG_LINK_DEVICE_USB)
-	/* HSIC LPA: reset-resume, let cp know pda active from LPA */
-	/* slave wake at lpa wake ??? */
-	/* 12.04.27 Move start of phy1_resume, If usb cable power on the
-	 * host phy, EHCI resume miss the PDA_ACTVIE, then CP can't send Host
-	 * wakeup Irq */
-	if (!strcmp(pdev->name, "s5p-ehci"))
-		set_hsic_lpa_states(STATE_HSIC_LPA_WAKE);
-#endif
-
 	if (exynos4_usb_host_phy_is_on()) {
 		/* set to resume HSIC 0 and 1 and standard of PHY1 */
 		phypwr = readl(EXYNOS4_PHYPWR);
@@ -372,10 +362,16 @@ static int exynos4_usb_phy1_resume(struct platform_device *pdev)
 		}
 		writel(phypwr, EXYNOS4_PHYPWR);
 		if (usb_phy_control.lpa_entered) {
+#if defined(CONFIG_LINK_DEVICE_HSIC) || defined(CONFIG_LINK_DEVICE_USB) \
+		|| defined(CONFIG_MDM_HSIC_PM)
+			if (!strcmp(pdev->name, "s5p-ehci"))
+				set_hsic_lpa_states(STATE_HSIC_LPA_WAKE);
+#endif
 			usb_phy_control.lpa_entered = 0;
 			err = 1;
-		} else
+		} else {
 			err = 0;
+		}
 	} else {
 		phypwr = readl(EXYNOS4_PHYPWR);
 		/* set to normal HSIC 0 and 1 of PHY1 */
@@ -431,6 +427,11 @@ static int exynos4_usb_phy1_resume(struct platform_device *pdev)
 				| EXYNOS4212_PHY1_SWRST_MASK);
 			writel(rstcon, EXYNOS4_RSTCON);
 		}
+#if defined(CONFIG_LINK_DEVICE_HSIC) || defined(CONFIG_LINK_DEVICE_USB) \
+		|| defined(CONFIG_MDM_HSIC_PM)
+		if (!strcmp(pdev->name, "s5p-ehci"))
+			set_hsic_lpa_states(STATE_HSIC_LPA_WAKE);
+#endif
 		usb_phy_control.lpa_entered = 0;
 		err = 1;
 	}
@@ -1008,6 +1009,11 @@ int exynos4_check_usb_op(void)
 	unsigned long flags;
 	int ret;
 
+#if defined(CONFIG_MDM_HSIC_PM)
+	/* if it is normal boot, block lpa till modem boot */
+	if (set_hsic_lpa_states(STATE_HSIC_LPA_CHECK))
+		return 1;
+#endif
 	ret = clk_enable(phy_clk);
 	if (ret)
 		return 0;
@@ -1045,7 +1051,8 @@ int exynos4_check_usb_op(void)
 		if (phypwr & (PHY1_STD_FORCE_SUSPEND
 			| EXYNOS4212_HSIC0_FORCE_SUSPEND
 			| EXYNOS4212_HSIC1_FORCE_SUSPEND)) {
-#if defined(CONFIG_LINK_DEVICE_HSIC) || defined(CONFIG_LINK_DEVICE_USB)
+#if defined(CONFIG_LINK_DEVICE_HSIC) || defined(CONFIG_LINK_DEVICE_USB) \
+		|| defined(CONFIG_MDM_HSIC_PM)
 			/* HSIC LPA: LPA USB phy retention reume call the usb
 			* reset resume, so we should let CP to HSIC L3 mode. */
 			set_hsic_lpa_states(STATE_HSIC_LPA_ENTER);
@@ -1211,7 +1218,6 @@ int s5p_usb_phy_resume(struct platform_device *pdev, int type)
 		if (soc_is_exynos4210() ||
 			soc_is_exynos4212() ||
 			soc_is_exynos4412()) {
-			dev_info(&pdev->dev, "host_phy_resume\n");
 #ifdef CONFIG_USB_OHCI_S5P
 			phyclk = readl(EXYNOS4_PHYCLK);
 			phyclk |= PHY1_COMMON_ON_N;
@@ -1326,7 +1332,8 @@ int s5p_usb_phy_init(struct platform_device *pdev, int type)
 		else if (!strcmp(pdev->name, "s5p-ohci"))
 			set_bit(HOST_PHY_OHCI, &usb_phy_control.flags);
 
-#if defined(CONFIG_LINK_DEVICE_HSIC) || defined(CONFIG_LINK_DEVICE_USB)
+#if defined(CONFIG_LINK_DEVICE_HSIC) || defined(CONFIG_LINK_DEVICE_USB) \
+		|| defined(CONFIG_MDM_HSIC_PM)
 		/* HSIC LPA: Let CP know the slave wakeup from LPA wakeup */
 		if (!strcmp(pdev->name, "s5p-ehci"))
 			set_hsic_lpa_states(STATE_HSIC_LPA_PHY_INIT);

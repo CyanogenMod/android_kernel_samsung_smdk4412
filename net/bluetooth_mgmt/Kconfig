@@ -3,7 +3,7 @@
 #
 
 menuconfig BT
-	tristate "Bluetooth subsystem support"
+	tristate "Bluetooth subsystem support(Android)"
 	depends on NET && !S390
 	depends on RFKILL || !RFKILL
 	select CRYPTO

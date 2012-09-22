@@ -78,13 +78,18 @@
 /* Intelligent Cancelation*/
 #define CM36651_CANCELATION
 #ifdef CM36651_CANCELATION
+#ifdef CONFIG_SLP
+#define CANCELATION_FILE_PATH	"/csa/sensor/prox_cal_data"
+#else
 #define CANCELATION_FILE_PATH	"/efs/prox_cal"
+#endif
 #define CANCELATION_THRESHOLD	9
 #endif
 
 #define PROX_READ_NUM	40
  /*lightsnesor log time 6SEC 200mec X 30*/
 #define LIGHT_LOG_TIME	30
+#define LIGHT_ADD_STARTTIME 300000000
 enum {
 	LIGHT_ENABLED = BIT(0),
 	PROXIMITY_ENABLED = BIT(1),
@@ -237,13 +242,21 @@ int cm36651_i2c_write_byte(struct cm36651_data *cm36651, u8 addr, u8 command,
 static void cm36651_light_enable(struct cm36651_data *cm36651)
 {
 	/* enable setting */
+	int64_t start_add_time = 0;
+	start_add_time = ktime_to_ns(cm36651->light_poll_delay)\
+	+ LIGHT_ADD_STARTTIME;
 	cm36651_i2c_write_byte(cm36651, CM36651_ALS, CS_CONF1,
 		als_reg_setting[0][1]);
 	cm36651_i2c_write_byte(cm36651, CM36651_ALS, CS_CONF2,
 		als_reg_setting[1][1]);
-
+#if defined(CONFIG_MACH_C1_KOR_SKT) || defined(CONFIG_MACH_C1_KOR_KT)\
+|| defined(CONFIG_MACH_C1_KOR_LGT)
+	hrtimer_start(&cm36651->light_timer, ns_to_ktime(start_add_time),
+					HRTIMER_MODE_REL);
+#else
 	hrtimer_start(&cm36651->light_timer, cm36651->light_poll_delay,
-		      HRTIMER_MODE_REL);
+	      HRTIMER_MODE_REL);
+#endif
 }
 
 static void cm36651_light_disable(struct cm36651_data *cm36651)
@@ -736,6 +749,9 @@ irqreturn_t cm36651_irq_thread_fn(int irq, void *data)
 	input_report_abs(cm36651->proximity_input_dev, ABS_DISTANCE, val);
 	input_sync(cm36651->proximity_input_dev);
 	wake_lock_timeout(&cm36651->prx_wake_lock, 3 * HZ);
+#ifdef CONFIG_SLP
+	pm_wakeup_event(cm36651->proximity_dev, 0);
+#endif
 	pr_info("%s: val = %d, ps_data = %d (close:0, far:1)\n",
 		__func__, val, ps_data);
 
@@ -783,7 +799,7 @@ static int cm36651_setup_reg(struct cm36651_data *cm36651)
 
 	/* turn off */
 	cm36651_i2c_write_byte(cm36651,   CM36651_ALS, CS_CONF1, 0x01);
-	cm36651_i2c_write_byte(cm36651,   CM36651_ALS, PS_CONF1, 0x01);
+	cm36651_i2c_write_byte(cm36651,   CM36651_PS, PS_CONF1, 0x01);
 
 	pr_info("%s is success.", __func__);
 	return err;
@@ -1164,6 +1180,10 @@ static int cm36651_i2c_probe(struct i2c_client *client,
 		goto err_light_device_create_file4;
 	}
 
+#ifdef CONFIG_SLP
+	device_init_wakeup(cm36651->proximity_dev, true);
+#endif
+
 	dev_set_drvdata(cm36651->light_dev, cm36651);
 
 	pr_info("%s is success.\n", __func__);
@@ -1250,6 +1270,10 @@ static int cm36651_i2c_remove(struct i2c_client *client)
 	/* destroy workqueue */
 	destroy_workqueue(cm36651->light_wq);
 	destroy_workqueue(cm36651->prox_wq);
+
+#ifdef CONFIG_SLP
+	device_init_wakeup(cm36651->proximity_dev, false);
+#endif
 
 	/* sysfs destroy */
 	device_remove_file(cm36651->light_dev, &dev_attr_name);

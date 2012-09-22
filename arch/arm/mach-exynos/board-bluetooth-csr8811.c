@@ -213,7 +213,7 @@ static int csr_bt_lpm_init(struct platform_device *pdev)
 	bt_lpm.host_wake = 0;
 	bt_is_running = 0;
 
-	irq = IRQ_BT_HOST_WAKE;
+	irq = gpio_to_irq(GPIO_BT_HOST_WAKE);
 	ret = request_irq(irq, host_wake_isr, IRQF_TRIGGER_HIGH,
 		"bt host_wake", NULL);
 	if (ret) {

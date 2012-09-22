@@ -1,292 +1,320 @@
+/* linux/arch/arm/mach-xxxx/board-m0-td-modems.c
+ * Copyright (C) 2010 Samsung Electronics. All rights reserved.
+ *
+ * This software is licensed under the terms of the GNU General Public
+ * License version 2, as published by the Free Software Foundation, and
+ * may be copied, distributed, and modified under those terms.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ */
+
+/* Modem configuraiton for M0 CMCC (P-Q + SPRD8803)*/
+
+#include <linux/kernel.h>
+#include <linux/init.h>
+#include <linux/platform_device.h>
+#include <linux/irq.h>
 #include <linux/gpio.h>
+#include <mach/gpio-exynos4.h>
 #include <plat/gpio-cfg.h>
-#include <plat/devs.h>
-#include <mach/regs-gpio.h>
-#include <mach/gpio.h>
-#include <mach/irqs.h>
+#include <linux/clk.h>
 #include <linux/err.h>
 #include <linux/delay.h>
-#include <linux/workqueue.h>
-#include <linux/regulator/consumer.h>
-#ifdef CONFIG_HAS_WAKELOCK
-#include <linux/wakelock.h>
+
+#include <linux/platform_data/modem.h>
+#include <mach/sec_modem.h>
+
+/* tdscdma target platform data */
+static struct modem_io_t tdscdma_io_devices[] = {
+	[0] = {
+		.name = "td_ipc0",
+		.id = 0x1,
+		.format = IPC_FMT,
+		.io_type = IODEV_MISC,
+		.links = LINKTYPE(LINKDEV_SPI),
+	},
+	[1] = {
+		.name = "td_rfs0",
+		.id = 0x41,
+		.format = IPC_RFS,
+		.io_type = IODEV_MISC,
+		.links = LINKTYPE(LINKDEV_SPI),
+	},
+	[2] = {
+		.name = "td_boot0",
+		.id = 0x0,
+		.format = IPC_BOOT,
+		.io_type = IODEV_MISC,
+		.links = LINKTYPE(LINKDEV_SPI),
+	},
+	[3] = {
+		.name = "td_multipdp",
+		.id = 0x1,
+		.format = IPC_MULTI_RAW,
+		.io_type = IODEV_DUMMY,
+		.links = LINKTYPE(LINKDEV_SPI),
+	},
+	[4] = {
+#ifdef CONFIG_SLP
+		.name = "pdp0",
+#else
+		.name = "td_rmnet0",
 #endif
-#include <linux/phone_svn/modemctl.h>
+		.id = 0x2A,
+		.format = IPC_RAW,
+		.io_type = IODEV_NET,
+		.links = LINKTYPE(LINKDEV_SPI),
+	},
+	[5] = {
+#ifdef CONFIG_SLP
+		.name = "pdp1",
+#else
+		.name = "td_rmnet1",
+#endif
+		.id = 0x2B,
+		.format = IPC_RAW,
+		.io_type = IODEV_NET,
+		.links = LINKTYPE(LINKDEV_SPI),
+	},
+	[6] = {
+#ifdef CONFIG_SLP
+		.name = "pdp2",
+#else
+		.name = "td_rmnet2",
+#endif
+		.id = 0x2C,
+		.format = IPC_RAW,
+		.io_type = IODEV_NET,
+		.links = LINKTYPE(LINKDEV_SPI),
+	},
+	[7] = {
+		.name = "td_router",
+		.id = 0x39,
+		.format = IPC_RAW,
+		.io_type = IODEV_MISC,
+		.links = LINKTYPE(LINKDEV_SPI),
+	},
+	[8] = {
+		.name = "td_csd",
+		.id = 0x21,
+		.format = IPC_RAW,
+		.io_type = IODEV_MISC,
+		.links = LINKTYPE(LINKDEV_SPI),
+	},
+	[9] = {
+		.name = "td_ramdump0",
+		.id = 0x0,
+		.format = IPC_RAMDUMP,
+		.io_type = IODEV_MISC,
+		.links = LINKTYPE(LINKDEV_SPI),
+	},
+	[10] = {
+		.name = "td_loopback0",
+		.id = 0x3f,
+		.format = IPC_RAW,
+		.io_type = IODEV_MISC,
+		.links = LINKTYPE(LINKDEV_SPI),
+	},
+};
 
-#define DEBUG
+/* To get modem state, register phone active irq using resource */
+static struct resource tdscdma_modem_res[] = {
+};
 
-static struct modemctl_platform_data mdmctl_data;
-void modemctl_cfg_gpio(void)
+static struct modem_data tdscdma_modem_data = {
+	.name = "sprd8803",
+
+	.gpio_cp_on = GPIO_TD_PHONE_ON,
+	.gpio_pda_active = GPIO_TD_PDA_ACTIVE,
+	.gpio_phone_active = GPIO_TD_PHONE_ACTIVE,
+	.gpio_cp_dump_int = GPIO_TD_DUMP_INT,
+	.gpio_ap_cp_int1 = GPIO_AP_TD_INT1,
+	.gpio_ap_cp_int2 = GPIO_AP_TD_INT2,
+	.gpio_ipc_mrdy = GPIO_IPC_MRDY,
+	.gpio_ipc_srdy = GPIO_IPC_SRDY,
+	.gpio_ipc_sub_mrdy = GPIO_IPC_SUB_MRDY,
+	.gpio_ipc_sub_srdy = GPIO_IPC_SUB_SRDY,
+#ifdef CONFIG_SEC_DUAL_MODEM_MODE
+	.gpio_sim_io_sel = GPIO_SIM_IO_SEL,
+	.gpio_cp_ctrl1 = GPIO_CP_CTRL1,
+	.gpio_cp_ctrl2 = GPIO_CP_CTRL2,
+#endif
+	.modem_type = SPRD_SC8803,
+	.link_types = LINKTYPE(LINKDEV_SPI),
+	.modem_net = TDSCDMA_NETWORK,
+
+	.num_iodevs = ARRAY_SIZE(tdscdma_io_devices),
+	.iodevs = tdscdma_io_devices,
+};
+
+/* if use more than one modem device, then set id num */
+static struct platform_device tdscdma_modem = {
+	.name = "modem_if",
+	.id = 2,
+	.num_resources = ARRAY_SIZE(tdscdma_modem_res),
+	.resource = tdscdma_modem_res,
+	.dev = {
+		.platform_data = &tdscdma_modem_data,
+	},
+};
+
+static void tdscdma_modem_cfg_gpio(void)
 {
 	int err = 0;
 
-	unsigned gpio_phone_on = mdmctl_data.gpio_phone_on;
-	unsigned gpio_phone_active = mdmctl_data.gpio_phone_active;
-	unsigned gpio_cp_rst = mdmctl_data.gpio_cp_reset;
-	unsigned gpio_pda_active = mdmctl_data.gpio_pda_active;
-	unsigned gpio_cp_req_reset = mdmctl_data.gpio_cp_req_reset;
-	unsigned gpio_ipc_slave_wakeup = mdmctl_data.gpio_ipc_slave_wakeup;
-	unsigned gpio_ipc_host_wakeup = mdmctl_data.gpio_ipc_host_wakeup;
-	unsigned gpio_suspend_request = mdmctl_data.gpio_suspend_request;
-	unsigned gpio_active_state = mdmctl_data.gpio_active_state;
-	unsigned gpio_cp_dump_int = mdmctl_data.gpio_cp_dump_int;
+	unsigned gpio_cp_on = tdscdma_modem_data.gpio_cp_on;
+	unsigned gpio_pda_active = tdscdma_modem_data.gpio_pda_active;
+	unsigned gpio_phone_active = tdscdma_modem_data.gpio_phone_active;
+	unsigned gpio_cp_dump_int = tdscdma_modem_data.gpio_cp_dump_int;
+	unsigned gpio_ipc_mrdy = tdscdma_modem_data.gpio_ipc_mrdy;
+	unsigned gpio_ipc_srdy = tdscdma_modem_data.gpio_ipc_srdy;
+	unsigned gpio_ipc_sub_mrdy = tdscdma_modem_data.gpio_ipc_sub_mrdy;
+	unsigned gpio_ipc_sub_srdy = tdscdma_modem_data.gpio_ipc_sub_srdy;
+#ifdef CONFIG_SEC_DUAL_MODEM_MODE
+	unsigned gpio_sim_io_sel = tdscdma_modem_data.gpio_sim_io_sel;
+	unsigned gpio_cp_ctrl1 = tdscdma_modem_data.gpio_cp_ctrl1;
+	unsigned gpio_cp_ctrl2 = tdscdma_modem_data.gpio_cp_ctrl2;
 
+	/* these 3 gpios need to set again before cp booting */
+	if (gpio_sim_io_sel) {
+		err = gpio_request(gpio_sim_io_sel, "SIM_IO_SEL");
+		if (err) {
+			pr_err(LOG_TAG "fail to request gpio %s : %d\n",
+				"SIM_IO_SEL", err);
+		}
+		gpio_direction_output(gpio_sim_io_sel, 0);
+	}
+
+	if (gpio_cp_ctrl1) {
+		err = gpio_request(gpio_cp_ctrl1, "CP_CTRL1");
+		if (err) {
+			pr_err(LOG_TAG "fail to request gpio %s : %d\n",
+				"CP_CTRL1", err);
+		}
+		gpio_direction_output(gpio_cp_ctrl1, 0);
+	}
+
+	if (gpio_cp_ctrl2) {
+		err = gpio_request(gpio_cp_ctrl2, "CP_CTRL2");
+		if (err) {
+			pr_err(LOG_TAG "fail to request gpio %s : %d\n",
+				"CP_CTRL2", err);
+		}
+		gpio_direction_output(gpio_cp_ctrl2, 0);
+	}
+#endif
 	/*TODO: check uart init func AP FLM BOOT RX -- */
 	s3c_gpio_setpull(EXYNOS4_GPA1(4), S3C_GPIO_PULL_UP);
 
-	err = gpio_request(gpio_phone_on, "PHONE_ON");
-	if (err) {
-		printk(KERN_ERR "fail to request gpio %s\n", "PHONE_ON");
-	} else {
-		gpio_direction_output(gpio_phone_on, 0);
-		s3c_gpio_setpull(gpio_phone_on, S3C_GPIO_PULL_NONE);
+	if (gpio_cp_on) {
+		err = gpio_request(gpio_cp_on, "CP_ON");
+		if (err) {
+			pr_err(LOG_TAG "fail to request gpio %s : %d\n",
+			       "CP_ON", err);
+		}
+		gpio_direction_output(gpio_cp_on, 0);
 	}
-	err = gpio_request(gpio_pda_active, "PDA_ACTIVE");
-	if (err) {
-		printk(KERN_ERR "fail to request gpio %s\n", "PDA_ACTIVE");
-	} else {
+
+	if (gpio_pda_active) {
+		err = gpio_request(gpio_pda_active, "PDA_ACTIVE");
+		if (err) {
+			pr_err(LOG_TAG "fail to request gpio %s : %d\n",
+			       "PDA_ACTIVE", err);
+		}
 		gpio_direction_output(gpio_pda_active, 0);
-		s3c_gpio_setpull(gpio_pda_active, S3C_GPIO_PULL_NONE);
-	}
-#if !defined(CONFIG_CHN_CMCC_SPI_SPRD)
-	err = gpio_request(gpio_cp_rst, "CP_RST");
-	if (err) {
-		printk(KERN_ERR "fail to request gpio %s\n", "CP_RST");
-	} else {
-		gpio_direction_output(gpio_cp_rst, 0);
-		s3c_gpio_setpull(gpio_cp_rst, S3C_GPIO_PULL_NONE);
-	}
-	err = gpio_request(gpio_cp_req_reset, "CP_REQ_RESET");
-	if (err) {
-		printk(KERN_ERR "fail to request gpio %s\n", "CP_REQ_RESET");
-	} else {
-		gpio_direction_output(gpio_cp_req_reset, 0);
-		s3c_gpio_setpull(gpio_cp_req_reset, S3C_GPIO_PULL_NONE);
 	}
 
-	err = gpio_request(gpio_ipc_slave_wakeup, "IPC_SLAVE_WAKEUP");
-	if (err) {
-		printk(KERN_ERR "fail to request gpio %s\n",
-			"IPC_SLAVE_WAKEUP");
-	} else {
-		gpio_direction_output(gpio_ipc_slave_wakeup, 0);
-		s3c_gpio_setpull(gpio_ipc_slave_wakeup, S3C_GPIO_PULL_NONE);
-	}
-
-	err = gpio_request(gpio_ipc_host_wakeup, "IPC_HOST_WAKEUP");
-	if (err) {
-		printk(KERN_ERR "fail to request gpio %s\n", "IPC_HOST_WAKEUP");
-	} else {
-		gpio_direction_output(gpio_ipc_host_wakeup, 0);
-		s3c_gpio_cfgpin(gpio_ipc_host_wakeup, S3C_GPIO_SFN(0xF));
-		s3c_gpio_setpull(gpio_ipc_host_wakeup, S3C_GPIO_PULL_NONE);
-	}
-
-	err = gpio_request(gpio_suspend_request, "SUSPEND_REQUEST");
-	if (err) {
-		printk(KERN_ERR "fail to request gpio %s\n", "SUSPEND_REQUEST");
-	} else {
-		gpio_direction_input(gpio_suspend_request);
-		s3c_gpio_setpull(gpio_suspend_request, S3C_GPIO_PULL_NONE);
-	}
-
-	err = gpio_request(gpio_active_state, "ACTIVE_STATE");
-	if (err) {
-		printk(KERN_ERR "fail to request gpio %s\n", "ACTIVE_STATE");
-	} else {
-		gpio_direction_output(gpio_active_state, 0);
-		s3c_gpio_setpull(gpio_active_state, S3C_GPIO_PULL_NONE);
-	}
-#endif
-	err = gpio_request(gpio_phone_active, "PHONE_ACTIVE");
-	if (err) {
-		printk(KERN_ERR "fail to request gpio %s\n", "PHONE_ACTIVE");
-	} else {
+	if (gpio_phone_active) {
+		err = gpio_request(gpio_phone_active, "PHONE_ACTIVE");
+		if (err) {
+			pr_err(LOG_TAG "fail to request gpio %s : %d\n",
+			       "PHONE_ACTIVE", err);
+		}
 		gpio_direction_input(gpio_phone_active);
-		s3c_gpio_cfgpin(gpio_phone_active, S3C_GPIO_SFN(0xF));
 		s3c_gpio_setpull(gpio_phone_active, S3C_GPIO_PULL_DOWN);
 	}
 
-	err = gpio_request(gpio_cp_dump_int, "CP_DUMP_INT");
-	if (err) {
-		printk(KERN_ERR "fail to request gpio %s\n", "CP_DUMP_INT");
-	} else {
+	if (gpio_cp_dump_int) {
+		err = gpio_request(gpio_cp_dump_int, "CP_DUMP_INT");
+		if (err) {
+			pr_err(LOG_TAG "fail to request gpio %s : %d\n",
+			       "CP_DUMP_INT", err);
+		}
 		gpio_direction_input(gpio_cp_dump_int);
-		s3c_gpio_cfgpin(gpio_cp_dump_int, S3C_GPIO_SFN(0xF));
 		s3c_gpio_setpull(gpio_cp_dump_int, S3C_GPIO_PULL_DOWN);
 	}
-}
 
-static void xmm6260_vcc_init(struct modemctl *mc)
-{
-	int err;
+	if (gpio_phone_active)
+		irq_set_irq_type(gpio_to_irq(gpio_phone_active),
+							IRQ_TYPE_EDGE_BOTH);
 
-	if (!mc->vcc) {
-		mc->vcc = regulator_get(NULL, "vhsic");
-		if (IS_ERR(mc->vcc)) {
-			err = PTR_ERR(mc->vcc);
-			dev_dbg(mc->dev, "No VHSIC_1.2V regualtor: %d\n", err);
-			mc->vcc = NULL;
+	if (gpio_ipc_mrdy) {
+		err = gpio_request(gpio_ipc_mrdy, "IPC_MRDY");
+		if (err) {
+			printk(KERN_ERR "ipc_spi_cfg_gpio - fail to request gpio %s : %d\n",
+				"IPC_MRDY", err);
+		} else {
+			gpio_direction_output(gpio_ipc_mrdy, 0);
 		}
 	}
 
-	if (mc->vcc)
-		regulator_enable(mc->vcc);
-}
+	if (gpio_ipc_srdy) {
+		err = gpio_request(gpio_ipc_srdy, "IPC_SRDY");
+		if (err) {
+			printk(KERN_ERR "ipc_spi_cfg_gpio - fail to request gpio %s : %d\n",
+				"IPC_SRDY", err);
+		} else {
+			gpio_direction_input(gpio_ipc_srdy);
+			s3c_gpio_cfgpin(gpio_ipc_srdy, S3C_GPIO_SFN(0xF));
+			s3c_gpio_setpull(gpio_ipc_srdy, S3C_GPIO_PULL_DOWN);
 
-static void xmm6260_vcc_off(struct modemctl *mc)
-{
-	if (mc->vcc)
-		regulator_disable(mc->vcc);
-}
-
-static void xmm6260_on(struct modemctl *mc)
-{
-	dev_dbg(mc->dev, "%s\n", __func__);
-	if (!mc->gpio_cp_reset || !mc->gpio_phone_on || !mc->gpio_cp_req_reset)
-		return;
-#if defined(CONFIG_CHN_CMCC_SPI_SPRD)
-	gpio_set_value(mc->gpio_cp_req_reset, 0);
-	gpio_set_value(mc->gpio_pda_active, 0);
-	gpio_set_value(mc->gpio_phone_on, 0);
-	msleep(100);
-	gpio_set_value(mc->gpio_phone_on, 1);
-	gpio_set_value(mc->gpio_pda_active, 1);
-#else
-	xmm6260_vcc_init(mc);
-
-	gpio_set_value(mc->gpio_phone_on, 0);
-	gpio_set_value(mc->gpio_cp_reset, 0);
-	udelay(160);
-
-	gpio_set_value(mc->gpio_pda_active, 0);
-	gpio_set_value(mc->gpio_active_state, 0);
-	msleep(100);
-
-	gpio_set_value(mc->gpio_cp_reset, 1);
-	udelay(160);
-	gpio_set_value(mc->gpio_cp_req_reset, 1);
-	udelay(160);
-
-	gpio_set_value(mc->gpio_phone_on, 1);
-
-	msleep(20);
-	gpio_set_value(mc->gpio_active_state, 1);
-	gpio_set_value(mc->gpio_pda_active, 1);
-#endif
-}
-
-static void xmm6260_off(struct modemctl *mc)
-{
-	dev_dbg(mc->dev, "%s\n", __func__);
-	if (!mc->gpio_cp_reset || !mc->gpio_phone_on)
-		return;
-
-	gpio_set_value(mc->gpio_phone_on, 0);
-	gpio_set_value(mc->gpio_cp_reset, 0);
-
-	xmm6260_vcc_off(mc);
-}
-
-static void xmm6260_reset(struct modemctl *mc)
-{
-	dev_dbg(mc->dev, "%s\n", __func__);
-	if (!mc->gpio_cp_reset || !mc->gpio_cp_req_reset)
-		return;
-
-#if defined(CONFIG_CHN_CMCC_SPI_SPRD)
-	gpio_set_value(mc->gpio_cp_req_reset, 0);
-	msleep(100);
-	gpio_set_value(mc->gpio_cp_req_reset, 1);
-#else
-/*	gpio_set_value(mc->gpio_pda_active, 0);
-	gpio_set_value(mc->gpio_active_state, 0);*/
-	gpio_set_value(mc->gpio_cp_reset, 0);
-	gpio_set_value(mc->gpio_cp_req_reset, 0);
-
-	msleep(100);
-
-	gpio_set_value(mc->gpio_cp_reset, 1);
-	udelay(160);
-	gpio_set_value(mc->gpio_cp_req_reset, 1);
-#endif
-}
-
-/* move the PDA_ACTIVE Pin control to sleep_gpio_table */
-static void xmm6260_suspend(struct modemctl *mc)
-{
-	xmm6260_vcc_off(mc);
-}
-
-static void xmm6260_resume(struct modemctl *mc)
-{
-	xmm6260_vcc_init(mc);
-}
-
-#if defined(CONFIG_CHN_CMCC_SPI_SPRD)
-static struct modemctl_platform_data mdmctl_data = {
-	.name = "xmm6260",
-
-	.gpio_phone_on = GPIO_PHONE_ON,
-	.gpio_phone_active = GPIO_PHONE_ACTIVE,
-	.gpio_pda_active = GPIO_PDA_ACTIVE,
-	.gpio_cp_reset = GPIO_CP_RST,
-	.gpio_cp_req_reset = GPIO_AP_CP_INT2,
-	.gpio_ipc_slave_wakeup = GPIO_IPC_SLAVE_WAKEUP,
-	.gpio_ipc_host_wakeup = GPIO_IPC_HOST_WAKEUP,
-	.gpio_suspend_request = GPIO_SUSPEND_REQUEST,
-	.gpio_active_state = GPIO_ACTIVE_STATE,
-	.gpio_cp_dump_int = GPIO_CP_DUMP_INT,
-
-	.ops = {
-		.modem_on = xmm6260_on,
-		.modem_off = xmm6260_off,
-		.modem_reset = xmm6260_reset,
-		.modem_suspend = xmm6260_suspend,
-		.modem_resume = xmm6260_resume,
-		.modem_cfg_gpio = modemctl_cfg_gpio,
+			irq_set_irq_type(gpio_to_irq(gpio_ipc_srdy),
+				IRQ_TYPE_EDGE_RISING);
+		}
 	}
-};
-#else
-static struct modemctl_platform_data mdmctl_data = {
-	.name = "xmm6260",
-	.gpio_phone_on = GPIO_PHONE_ON,
-	.gpio_phone_active = GPIO_PHONE_ACTIVE,
-	.gpio_pda_active = GPIO_PDA_ACTIVE,
-	.gpio_cp_reset = GPIO_CP_RST,
-	.gpio_cp_req_reset = GPIO_CP_REQ_RESET,
-	.gpio_ipc_slave_wakeup = GPIO_IPC_SLAVE_WAKEUP,
-	.gpio_ipc_host_wakeup = GPIO_IPC_HOST_WAKEUP,
-	.gpio_suspend_request = GPIO_SUSPEND_REQUEST,
-	.gpio_active_state = GPIO_ACTIVE_STATE,
-	.gpio_cp_dump_int = GPIO_CP_DUMP_INT,
-	.ops = {
-		.modem_on = xmm6260_on,
-		.modem_off = xmm6260_off,
-		.modem_reset = xmm6260_reset,
-		.modem_suspend = xmm6260_suspend,
-		.modem_resume = xmm6260_resume,
-		.modem_cfg_gpio = modemctl_cfg_gpio,
+
+	if (gpio_ipc_sub_mrdy) {
+		err = gpio_request(gpio_ipc_sub_mrdy, "IPC_SUB_MRDY");
+		if (err) {
+			printk(KERN_ERR "ipc_spi_cfg_gpio - fail to request gpio %s : %d\n",
+				"IPC_SUB_MRDY", err);
+		} else {
+			gpio_direction_output(gpio_ipc_sub_mrdy, 0);
+		}
 	}
-};
-#endif
 
-/* TODO: check the IRQs..... */
-static struct resource mdmctl_res[] = {
-	[0] = {
-		.start = IRQ_PHONE_ACTIVE,
-		.end = IRQ_PHONE_ACTIVE,
-		.flags = IORESOURCE_IRQ,
-	},
-};
+	if (gpio_ipc_sub_srdy) {
+		err = gpio_request(gpio_ipc_sub_srdy, "IPC_SUB_SRDY");
+		if (err) {
+			printk(KERN_ERR "ipc_spi_cfg_gpio - fail to request gpio %s : %d\n",
+				"IPC_SUB_SRDY", err);
+		} else {
+			gpio_direction_input(gpio_ipc_sub_srdy);
+			s3c_gpio_cfgpin(gpio_ipc_sub_srdy, S3C_GPIO_SFN(0xF));
+			s3c_gpio_setpull(gpio_ipc_sub_srdy, S3C_GPIO_PULL_DOWN);
 
-struct platform_device modemctl = {
-	.name = "modemctl",
-	.id = -1,
-	.num_resources = ARRAY_SIZE(mdmctl_res),
-	.resource = mdmctl_res,
+			irq_set_irq_type(gpio_to_irq(gpio_ipc_sub_srdy),
+				IRQ_TYPE_EDGE_RISING);
+		}
+	}
 
-	.dev = {
-		.platform_data = &mdmctl_data,
-	},
-};
+	pr_info(LOG_TAG "tdscdma_modem_cfg_gpio done\n");
+}
+
+static int __init init_modem(void)
+{
+	int ret;
+	pr_info(LOG_TAG "tdscdma init_modem\n");
+
+	/* tdscdma gpios configuration */
+	tdscdma_modem_cfg_gpio();
+	ret = platform_device_register(&tdscdma_modem);
+	if (ret < 0)
+		return ret;
+
+	return ret;
+}
+late_initcall(init_modem);

@@ -35,6 +35,14 @@ enum {
 	MAX77693_MUIC_ATTACHED
 };
 
+enum {
+	MAX77693_MUIC_DOCK_DETACHED = 0,
+	MAX77693_MUIC_DOCK_DESKDOCK,
+	MAX77693_MUIC_DOCK_CARDOCK,
+	MAX77693_MUIC_DOCK_AUDIODOCK = 7,
+	MAX77693_MUIC_DOCK_SMARTDOCK = 8
+};
+
 /* MAX77686 regulator IDs */
 enum max77693_regulators {
 	MAX77693_ESAFEOUT1 = 0,
@@ -63,6 +71,7 @@ struct max77693_charger_platform_data {
 #ifdef CONFIG_VIBETONZ
 #define MAX8997_MOTOR_REG_CONFIG2	0x2
 #define MOTOR_LRA			(1<<7)
+#define MOTOR_ERM			(0<<7)
 #define MOTOR_EN			(1<<6)
 #define EXT_PWM				(0<<5)
 #define DIVIDER_128			(1<<1)
@@ -117,14 +126,17 @@ struct max77693_muic_data {
 	void (*usb_cb) (u8 attached);
 	void (*uart_cb) (u8 attached);
 	int (*charger_cb) (enum cable_type_muic);
-	void (*deskdock_cb) (bool attached);
-	void (*cardock_cb) (bool attached);
+	void (*dock_cb) (int type);
 	void (*mhl_cb) (int attached);
 	void (*init_cb) (void);
 	int (*set_safeout) (int path);
 	 bool(*is_mhl_attached) (void);
 	int (*cfg_uart_gpio) (void);
 	void (*jig_uart_cb) (int path);
+#if defined(CONFIG_MUIC_DET_JACK)
+	void (*earjack_cb) (int attached);
+	void (*earjackkey_cb) (int pressed, unsigned int code);
+#endif
 	int (*host_notify_cb) (int enable);
 	int gpio_usb_sel;
 	int sw_path;
@@ -135,7 +147,11 @@ struct max77693_muic_data {
 };
 
 #if defined(CONFIG_MACH_M0_CTC)
-int max7693_muic_cp_usb_state(void);
+extern int max7693_muic_cp_usb_state(void);
 #endif
+
+#if defined(CONFIG_MUIC_MAX77693_SUPPORT_OTG_AUDIO_DOCK)
+extern void max77693_muic_attach_audio_dock(void);
+#endif /* CONFIG_MUIC_MAX77693_SUPPORT_OTG_AUDIO_DOCK */
 
 #endif				/* __LINUX_MFD_MAX77693_H */

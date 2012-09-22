@@ -10,16 +10,4 @@
 #ifndef	_EXYNOS_DRM_ROTATOR_H_
 #define	_EXYNOS_DRM_ROTATOR_H_
 
-#ifdef CONFIG_DRM_EXYNOS_ROTATOR
-extern int exynos_drm_rotator_exec_ioctl(struct drm_device *dev, void *data,
-					 struct drm_file *file_priv);
-#else
-static inline int exynos_drm_rotator_exec_ioctl(struct drm_device *dev,
-						void *data,
-						struct drm_file *file_priv)
-{
-	return -ENOTTY;
-}
-#endif
-
 #endif

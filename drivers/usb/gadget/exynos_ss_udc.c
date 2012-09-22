@@ -255,7 +255,7 @@ static int exynos_ss_udc_issue_epcmd(struct exynos_ss_udc *udc,
 	return res;
 }
 
-#if defined(CONFIG_BATTERY_SAMSUNG) || defined(CONFIG_BATTERY_SAMSUNG_S2PLUS)
+#if defined(CONFIG_BATTERY_SAMSUNG)
 void exynos_ss_udc_cable_connect(struct exynos_ss_udc *udc, bool connect)
 {
 	static int last_connect;

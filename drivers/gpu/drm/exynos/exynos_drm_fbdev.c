@@ -82,9 +82,9 @@ static int exynos_drm_fbdev_update(struct drm_fb_helper *helper,
 	offset = fbi->var.xoffset * (fb->bits_per_pixel >> 3);
 	offset += fbi->var.yoffset * fb->pitches[0];
 
-	dev->mode_config.fb_base = (resource_size_t)buffer->dma_addr;
+	dev->mode_config.fb_base = (resource_size_t)buffer->paddr;
 	fbi->screen_base = buffer->kvaddr + offset;
-	fbi->fix.smem_start = (unsigned long)(buffer->dma_addr + offset);
+	fbi->fix.smem_start = (unsigned long)(buffer->paddr + offset);
 	fbi->screen_size = size;
 	fbi->fix.smem_len = size;
 

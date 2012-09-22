@@ -64,3 +64,7 @@ ath6kl_usb-y += wmiconfig.o
 ath6kl_usb-$(CONFIG_NL80211_TESTMODE) += testmode.o
 
 ccflags-y += -D__CHECK_ENDIAN__
+# 5GHz channels setting
+ifeq ($(CONFIG_5GH_WLAN_COUNTRY_CODE),y)
+ccflags-y += -DGLOBALCONFIG_WLAN_COUNTRY_CODE
+endif

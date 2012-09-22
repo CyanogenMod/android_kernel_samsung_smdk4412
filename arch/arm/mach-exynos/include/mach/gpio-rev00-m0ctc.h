@@ -16,8 +16,8 @@ extern void midas_config_sleep_gpio_table(void);
 #define GPIO_PMIC_SDA		EXYNOS4_GPB(2)
 #define GPIO_PMIC_SCL		EXYNOS4_GPB(3)
 
-#define GPIO_ADC_SCL		EXYNOS4_GPY0(2)
-#define GPIO_ADC_SDA		EXYNOS4_GPY0(3)
+#define GPIO_FM_SCL		EXYNOS4_GPY0(2)
+#define GPIO_FM_SDA		EXYNOS4_GPY0(3)
 #define GPIO_ADC_INT		EXYNOS4_GPX2(4)
 
 #define GPIO_CAM_SPI_SCLK	EXYNOS4_GPB(4)
@@ -52,8 +52,10 @@ extern void midas_config_sleep_gpio_table(void);
 #define GPIO_ACC_INT		EXYNOS4_GPX0(0)
 
 #define GPIO_GYRO_DE		EXYNOS4_GPL2(0)
+#if !defined(CONFIG_MACH_M0_DUOSCTC)
 #define GPIO_GPS_nRST		EXYNOS4_GPL2(1)
 #define GPIO_GPS_PWR_EN		EXYNOS4_GPL2(2)
+#endif
 
 #define GPIO_GYRO_INT		EXYNOS4_GPF0(3)
 #define GPIO_GSENSE_SDA_18V	EXYNOS4_GPD1(2)
@@ -62,6 +64,9 @@ extern void midas_config_sleep_gpio_table(void);
 #define GPIO_MSENSOR_INT	EXYNOS4212_GPJ0(7)
 #define GPIO_MSENSOR_SDA_18V	EXYNOS4_GPY2(4)
 #define GPIO_MSENSOR_SCL_18V	EXYNOS4_GPY2(5)
+#if defined(CONFIG_MACH_M0_DUOSCTC)
+#define GPIO_MSENSE_RST_N	EXYNOS4212_GPM4(4)
+#endif
 
 #define GPIO_BENSE_SCL_18V	EXYNOS4_GPY2(3)
 #define GPIO_BSENSE_SDA_18V	EXYNOS4_GPY2(2)
@@ -83,7 +88,9 @@ extern void midas_config_sleep_gpio_table(void);
 #define GPIO_MIC_BIAS_EN	EXYNOS4_GPF1(7)
 #define GPIO_SUB_MIC_BIAS_EN	EXYNOS4_GPF2(0)
 #define GPIO_THIRD_MIC_BIAS_EN	EXYNOS4212_GPJ0(2)
-
+#if defined(CONFIG_MACH_M0_DUOSCTC)
+#define GPIO_AUDIO_PCM_SEL  EXYNOS4_GPF2(3)
+#endif
 #define GPIO_PMU_RST		EXYNOS4_GPX3(2)
 
 #define GPIO_PMIC_IRQ		EXYNOS4_GPX0(7)
@@ -166,7 +173,9 @@ extern void midas_config_sleep_gpio_table(void);
 #define GPIO_ISP_TXD		EXYNOS4212_GPM4(5)
 #define GPIO_ISP_RXD		EXYNOS4212_GPM4(6)
 
+#if !defined(CONFIG_MACH_M0_DUOSCTC)
 #define GPIO_TA_EN		EXYNOS4_GPL2(2)
+#endif
 
 #define GPIO_MHL_SEL		EXYNOS4_GPL0(3)
 
@@ -183,7 +192,11 @@ extern void midas_config_sleep_gpio_table(void);
 #define GPIO_FUEL_SDA		EXYNOS4_GPF1(5)
 
 #define GPIO_MLCD_RST		EXYNOS4_GPF2(1)
+#if defined(CONFIG_MACH_M0_DUOSCTC)
+#define GPIO_UART_SEL		EXYNOS4212_GPJ0(2)
+#else
 #define GPIO_UART_SEL		EXYNOS4_GPF2(3)
+#endif
 #define GPIO_S_LED_I2C_SCL	EXYNOS4_GPF2(6)
 #define GPIO_S_LED_I2C_SDA	EXYNOS4_GPF2(7)
 #define GPIO_OLED_DET		EXYNOS4_GPF3(0)
@@ -241,11 +254,17 @@ extern void midas_config_sleep_gpio_table(void);
 #define GPIO_CODEC_LDO_EN	EXYNOS4212_GPJ0(4)
 
 #define GPIO_WM8994_LDO		EXYNOS4212_GPJ0(4)
-
+#if defined(CONFIG_MACH_M0_DUOSCTC)
+#define GPIO_FM_RST	EXYNOS4_GPC1(0)
+#define GPIO_FM_INT_REV15	EXYNOS4_GPX0(4)
+#define GPIO_FM_INT_REV07	EXYNOS4_GPX0(4)
+#define GPIO_FM_INT	EXYNOS4_GPX0(4)
+#else
 #define GPIO_FM_RST	EXYNOS4_GPC1(1)
 #define GPIO_FM_INT_REV15	EXYNOS4_GPX1(3)
 #define GPIO_FM_INT_REV07	EXYNOS4_GPX1(3)
 #define GPIO_FM_INT	EXYNOS4_GPX1(3)
+#endif
 #define GPIO_FM_MIC_SW		EXYNOS4_GPL0(3)
 
 /* Definitions for DPRAM */
@@ -269,10 +288,16 @@ extern void midas_config_sleep_gpio_table(void);
 #define GPIO_USB_HUB_SCL	EXYNOS4_GPL1(0)
 #define GPIO_USB_HUB_SDA	EXYNOS4_GPL1(1)
 #define GPIO_USB_HUB_INT	EXYNOS4_GPX2(1)
+
+#if defined(CONFIG_MACH_M0_DUOSCTC)
+#define GPIO_USB_HUB_CONNECT	EXYNOS4_GPF1(0)	/* dummy */
+#define GPIO_USB_BOOT_EN		EXYNOS4_GPF2(2)
+#define GPIO_BOOT_SW_SEL		EXYNOS4_GPF1(1)
+#else
 #define GPIO_USB_HUB_CONNECT	EXYNOS4212_GPV3(5)
 #define GPIO_USB_BOOT_EN		EXYNOS4212_GPV3(7)
-
 #define GPIO_BOOT_SW_SEL		EXYNOS4212_GPV3(6)
+#endif
 
 /* for revesion 06 higher */
 #define GPIO_USB_BOOT_EN_REV06		EXYNOS4_GPF2(2)
@@ -280,6 +305,7 @@ extern void midas_config_sleep_gpio_table(void);
 
 #define GPIO_IPC_SLAVE_WAKEUP	EXYNOS4_GPX1(0)
 #define GPIO_IPC_HOST_WAKEUP	EXYNOS4_GPX1(1)
+#define GPIO_CP_DUMP_INT	EXYNOS4_GPX1(2)
 
 #define GPIO_CP_MSM_PWRON	EXYNOS4_GPL2(5)
  #define GPIO_CP_MSM_RST	EXYNOS4_GPL2(4)
@@ -287,10 +313,20 @@ extern void midas_config_sleep_gpio_table(void);
 #define GPIO_CP_MSM_DUMP	EXYNOS4_GPX1(2)
 
 #define GPIO_MSM_PHONE_ACTIVE		EXYNOS4_GPX1(6)
-#define MSM_PHONE_ACTIVE_IRQ		IRQ_EINT(14)	/* IRQ of GPX1[6] */
+#define MSM_PHONE_ACTIVE_IRQ	IRQ_EINT(14)
 
 #define GPIO_MSM_DPRAM_INT	EXYNOS4_GPX2(0)
-#define MSM_DPRAM_INT_IRQ	IRQ_EINT(16)	/* IRQ of GPX2[0] */
+#define MSM_DPRAM_INT_IRQ		IRQ_EINT(16)
 
+#if defined(CONFIG_MACH_M0_DUOSCTC)
+#define GPIO_CP2_MSM_PWRON		EXYNOS4_GPL2(2)
+#define GPIO_CP2_MSM_RST		EXYNOS4_GPL2(1)
+#define GPIO_BOOT_SW_SEL_CP2	EXYNOS4_GPF2(4)
+
+#define GPIO_ESC_PHONE_ACTIVE	EXYNOS4_GPX1(4)
+#define ESC_PHONE_ACTIVE_IRQ	IRQ_EINT(12)
+#define GPIO_ESC_DPRAM_INT		EXYNOS4_GPX3(5)
+#define ESC_DPRAM_INT_IRQ		IRQ_EINT(29)
+#endif
 
 #endif /* __MACH_GPIO_C1_H */

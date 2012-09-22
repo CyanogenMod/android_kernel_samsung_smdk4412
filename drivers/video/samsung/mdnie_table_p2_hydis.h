@@ -1,11 +1,11 @@
-#ifndef __MDNIE_TABLE_P2_hy_H__
-#define __MDNIE_TABLE_P2_hy_H__
+#ifndef __MDNIE_TABLE_P2_HYDIS_H__
+#define __MDNIE_TABLE_P2_HYDIS_H__
 
 #include "mdnie.h"
 
 
-static const unsigned short tune_dyn_gallery_cabcOff_hy[] = {
-	/*start P2 dynamic, gallery, cabcOff*/
+static const unsigned short tune_dynamic_gallery_hydis[] = {
+	/*start P2 dynamic, gallery, cabcoff*/
 	0x0001, 0x0060,	/* LABC 0060 LABC SCR*/
 	0x002c, 0x0fff,	/*DNR bypass 0x003C*/
 	0x002d, 0x1900,	/*DNR bypass 0x0a08*/
@@ -59,8 +59,8 @@ static const unsigned short tune_dyn_gallery_cabcOff_hy[] = {
 	END_SEQ, 0x0000,
 };
 
-static const unsigned short tune_dyn_ui_cabcOff_hy[] = {
-	/*start P2 dynamic, ui, cabcOff*/
+static const unsigned short tune_dynamic_ui_hydis[] = {
+	/*start P2 dynamic, ui, cabcoff*/
 	0x0001, 0x0060,	/*SCR LABC 0060*/
 	0x002c, 0x0fff,	/*DNR bypass 0x003C*/
 	0x002d, 0x1900,	/*DNR bypass 0x0a08*/
@@ -114,8 +114,8 @@ static const unsigned short tune_dyn_ui_cabcOff_hy[] = {
 	END_SEQ, 0x0000,
 };
 
-static const unsigned short tune_dyn_vid_cabcOff_hy[] = {
-	/*start P2 dynamic, video, cabcOff*/
+static const unsigned short tune_dynamic_video_hydis[] = {
+	/*start P2 dynamic, video, cabcoff*/
 	0x0001, 0x0060,	/* LABC 0060 LABC SCR*/
 	0x002c, 0x0fff,	/*DNR bypass 0x003C*/
 	0x002d, 0x1900,	/*DNR bypass 0x0a08*/
@@ -169,8 +169,8 @@ static const unsigned short tune_dyn_vid_cabcOff_hy[] = {
 	END_SEQ, 0x0000,
 };
 
-static const unsigned short tune_dyn_vtcall_cabcOff_hy[] = {
-	/*start P2 dynamic, vtcall, cabcOff*/
+static const unsigned short tune_dynamic_vt_hydis[] = {
+	/*start P2 dynamic, vt, cabcoff*/
 	0x0001, 0x0060,	/* LABC 0060 LABC SCR*/
 	0x002c, 0x0fff,	/*DNR VTcall,dir_th   0x003c*/
 	0x002d, 0x19ff,	/*DNR dir_num,decont7 0x0a08*/
@@ -224,8 +224,8 @@ static const unsigned short tune_dyn_vtcall_cabcOff_hy[] = {
 	END_SEQ, 0x0000,
 };
 
-static const unsigned short tune_mov_gallery_cabcOff_hy[] = {
-	/*start P2 movie, gallery, cabcOff*/
+static const unsigned short tune_movie_gallery_hydis[] = {
+	/*start P2 movie, gallery, cabcoff*/
 	0x0001, 0x0060,	/*SCR LABC 0060*/
 	0x002c, 0x0fff,	/*DNR bypass 0x003C*/
 	0x002d, 0x1900,	/*DNR bypass 0x0a08*/
@@ -279,8 +279,8 @@ static const unsigned short tune_mov_gallery_cabcOff_hy[] = {
 	END_SEQ, 0x0000,
 };
 
-static const unsigned short tune_mov_ui_cabcOff_hy[] = {
-	/*start P2 movie, ui, cabcOff*/
+static const unsigned short tune_movie_ui_hydis[] = {
+	/*start P2 movie, ui, cabcoff*/
 	0x0001, 0x0060,	/*SCR LABC 0060*/
 	0x002c, 0x0fff,	/*DNR bypass 0x003C*/
 	0x002d, 0x1900,	/*DNR bypass 0x0a08*/
@@ -334,8 +334,8 @@ static const unsigned short tune_mov_ui_cabcOff_hy[] = {
 	END_SEQ, 0x0000,
 };
 
-static const unsigned short tune_mov_vid_cabcOff_hy[] = {
-	/*start P2 movie, video, cabcOff*/
+static const unsigned short tune_movie_video_hydis[] = {
+	/*start P2 movie, video, cabcoff*/
 	0x0001, 0x0060,	/*SCR LABC 0060*/
 	0x002c, 0x0fff,	/*DNR bypass 0x003C*/
 	0x002d, 0x1900,	/*DNR bypass 0x0a08*/
@@ -389,8 +389,8 @@ static const unsigned short tune_mov_vid_cabcOff_hy[] = {
 	END_SEQ, 0x0000,
 };
 
-static const unsigned short tune_mov_vtcall_cabcOff_hy[] = {
-	/*start P2 movie, ui, cabcOff*/
+static const unsigned short tune_movie_vt_hydis[] = {
+	/*start P2 movie, ui, cabcoff*/
 	0x0001, 0x0060,	/*SCR LABC 0060*/
 	0x002c, 0x0fff,	/*DNR VTcall,dir_th   0x003c*/
 	0x002d, 0x19ff,	/*DNR dir_num,decont7 0x0a08*/
@@ -444,8 +444,8 @@ static const unsigned short tune_mov_vtcall_cabcOff_hy[] = {
 	END_SEQ, 0x0000,
 };
 
-static const unsigned short tune_std_gallery_cabcOff_hy[] = {
-	/*start P2 standard, gallery, cabcOff*/
+static const unsigned short tune_standard_gallery_hydis[] = {
+	/*start P2 standard, gallery, cabcoff*/
 	0x0001, 0x0060,	/* LABC 0060 LABC SCR*/
 	0x002c, 0x0fff,	/*DNR bypass 0x003C*/
 	0x002d, 0x1900,	/*DNR bypass 0x0a08*/
@@ -499,8 +499,8 @@ static const unsigned short tune_std_gallery_cabcOff_hy[] = {
 	END_SEQ, 0x0000,
 };
 
-static const unsigned short tune_std_ui_cabcOff_hy[] = {
-	/*start P2 standard, ui, cabcOff*/
+static const unsigned short tune_standard_ui_hydis[] = {
+	/*start P2 standard, ui, cabcoff*/
 	0x0001, 0x0060,	/*SCR LABC 0060*/
 	0x002c, 0x0fff,	/*DNR bypass 0x003C*/
 	0x002d, 0x1900,	/*DNR bypass 0x0a08*/
@@ -554,8 +554,8 @@ static const unsigned short tune_std_ui_cabcOff_hy[] = {
 	END_SEQ, 0x0000,
 };
 
-static const unsigned short tune_std_vid_cabcOff_hy[] = {
-	/*start P2 standard, video, cabcOff*/
+static const unsigned short tune_standard_video_hydis[] = {
+	/*start P2 standard, video, cabcoff*/
 	0x0001, 0x0060,	/* LABC 0060 LABC SCR*/
 	0x002c, 0x0fff,	/*DNR bypass 0x003C*/
 	0x002d, 0x1900,	/*DNR bypass 0x0a08*/
@@ -609,8 +609,8 @@ static const unsigned short tune_std_vid_cabcOff_hy[] = {
 	END_SEQ, 0x0000,
 };
 
-static const unsigned short tune_std_vtcall_cabcOff_hy[] = {
-	/*start P2 standard, vtcall, cabcOff*/
+static const unsigned short tune_standard_vt_hydis[] = {
+	/*start P2 standard, vt, cabcoff*/
 	0x0001, 0x0060,	/* LABC 0060 LABC SCR*/
 	0x002c, 0x0fff,	/*DNR VTcall,dir_th   0x003c*/
 	0x002d, 0x19ff,	/*DNR dir_num,decont7 0x0a08*/
@@ -664,8 +664,8 @@ static const unsigned short tune_std_vtcall_cabcOff_hy[] = {
 	END_SEQ, 0x0000,
 };
 
-static const unsigned short tune_dyn_gallery_cabcOn_hy[] = {
-	/*start P2 dynamic, gallery, cabcOn*/
+static const unsigned short tune_dynamic_gallery_cabc_hydis[] = {
+	/*start P2 dynamic, gallery, cabcon*/
 	0x0001, 0x0070,	/* LABC SCR CABC*/
 	0x002c, 0x0fff,	/*DNR bypass 0x003C*/
 	0x002d, 0x1900,	/*DNR bypass 0x0a08*/
@@ -725,8 +725,8 @@ static const unsigned short tune_dyn_gallery_cabcOn_hy[] = {
 	END_SEQ, 0x0000,
 };
 
-static const unsigned short tune_dyn_ui_cabcOn_hy[] = {
-	/*start P2 dynamic, ui, cabcOn*/
+static const unsigned short tune_dynamic_ui_cabc_hydis[] = {
+	/*start P2 dynamic, ui, cabcon*/
 	0x0001, 0x0070,	/*SCR LABC CABC*/
 	0x002c, 0x0fff,	/*DNR bypass 0x003C*/
 	0x002d, 0x1900,	/*DNR bypass 0x0a08*/
@@ -786,8 +786,8 @@ static const unsigned short tune_dyn_ui_cabcOn_hy[] = {
 	END_SEQ, 0x0000,
 };
 
-static const unsigned short tune_dyn_vid_cabcOn_hy[] = {
-	/*start P2 dynamic, video, cabcOn*/
+static const unsigned short tune_dynamic_video_cabc_hydis[] = {
+	/*start P2 dynamic, video, cabcon*/
 	0x0001, 0x0070,	/* LABC  SCR CABC*/
 	0x002c, 0x0fff,	/*DNR bypass 0x003C*/
 	0x002d, 0x1900,	/*DNR bypass 0x0a08*/
@@ -847,8 +847,8 @@ static const unsigned short tune_dyn_vid_cabcOn_hy[] = {
 	END_SEQ, 0x0000,
 };
 
-static const unsigned short tune_dyn_vtcall_cabcOn_hy[] = {
-	/*start P2 dynamic, vtcall, cabcOn*/
+static const unsigned short tune_dynamic_vt_cabc_hydis[] = {
+	/*start P2 dynamic, vt, cabcon*/
 	0x0001, 0x0070,	/* LABC SCR CABC*/
 	0x002c, 0x0fff,	/*DNR VTcall,dir_th   0x003c*/
 	0x002d, 0x19ff,	/*DNR dir_num,decont7 0x0a08*/
@@ -908,8 +908,8 @@ static const unsigned short tune_dyn_vtcall_cabcOn_hy[] = {
 	END_SEQ, 0x0000,
 };
 
-static const unsigned short tune_mov_gallery_cabcOn_hy[] = {
-	/*start P2 movie, gallery, cabcOn*/
+static const unsigned short tune_movie_gallery_cabc_hydis[] = {
+	/*start P2 movie, gallery, cabcon*/
 	0x0001, 0x0070,	/*SCR LABC CABC*/
 	0x002c, 0x0fff,	/*DNR bypass 0x003C*/
 	0x002d, 0x1900,	/*DNR bypass 0x0a08*/
@@ -969,8 +969,8 @@ static const unsigned short tune_mov_gallery_cabcOn_hy[] = {
 	END_SEQ, 0x0000,
 };
 
-static const unsigned short tune_mov_ui_cabcOn_hy[] = {
-	/*start P2 movie, ui, cabcOn*/
+static const unsigned short tune_movie_ui_cabc_hydis[] = {
+	/*start P2 movie, ui, cabcon*/
 	0x0001, 0x0070,	/*SCR LABC CABC*/
 	0x002c, 0x0fff,	/*DNR bypass 0x003C*/
 	0x002d, 0x1900,	/*DNR bypass 0x0a08*/
@@ -1030,8 +1030,8 @@ static const unsigned short tune_mov_ui_cabcOn_hy[] = {
 	END_SEQ, 0x0000,
 };
 
-static const unsigned short tune_mov_vid_cabcOn_hy[] = {
-	/*start P2 movie, video, cabcOn*/
+static const unsigned short tune_movie_video_cabc_hydis[] = {
+	/*start P2 movie, video, cabcon*/
 	0x0001, 0x0070,	/*SCR LABC CABC*/
 	0x002c, 0x0fff,	/*DNR bypass 0x003C*/
 	0x002d, 0x1900,	/*DNR bypass 0x0a08*/
@@ -1091,8 +1091,8 @@ static const unsigned short tune_mov_vid_cabcOn_hy[] = {
 	END_SEQ, 0x0000,
 };
 
-static const unsigned short tune_mov_vtcall_cabcOn_hy[] = {
-	/*start P2 movie, ui, cabcOn*/
+static const unsigned short tune_movie_vt_cabc_hydis[] = {
+	/*start P2 movie, ui, cabcon*/
 	0x0001, 0x0070,	/*SCR LABC CABC*/
 	0x002c, 0x0fff,	/*DNR VTcall,dir_th   0x003c*/
 	0x002d, 0x19ff,	/*DNR dir_num,decont7 0x0a08*/
@@ -1152,8 +1152,8 @@ static const unsigned short tune_mov_vtcall_cabcOn_hy[] = {
 	END_SEQ, 0x0000,
 };
 
-static const unsigned short tune_std_gallery_cabcOn_hy[] = {
-	/*start P2 standard, gallery, cabcOn*/
+static const unsigned short tune_standard_gallery_cabc_hydis[] = {
+	/*start P2 standard, gallery, cabcon*/
 	0x0001, 0x0070,	/* LABC SCR CABC*/
 	0x002c, 0x0fff,	/*DNR bypass 0x003C*/
 	0x002d, 0x1900,	/*DNR bypass 0x0a08*/
@@ -1213,8 +1213,8 @@ static const unsigned short tune_std_gallery_cabcOn_hy[] = {
 	END_SEQ, 0x0000,
 };
 
-static const unsigned short tune_std_ui_cabcOn_hy[] = {
-	/*start P2 standard, ui, cabcOn*/
+static const unsigned short tune_standard_ui_cabc_hydis[] = {
+	/*start P2 standard, ui, cabcon*/
 	0x0001, 0x0070,	/*SCR LABC CABC*/
 	0x002c, 0x0fff,	/*DNR bypass 0x003C*/
 	0x002d, 0x1900,	/*DNR bypass 0x0a08*/
@@ -1274,8 +1274,8 @@ static const unsigned short tune_std_ui_cabcOn_hy[] = {
 	END_SEQ, 0x0000,
 };
 
-static const unsigned short tune_std_vid_cabcOn_hy[] = {
-	/*start P2 standard, video, cabcOn*/
+static const unsigned short tune_standard_video_cabc_hydis[] = {
+	/*start P2 standard, video, cabcon*/
 	0x0001, 0x0070,	/* LABC SCR CABC*/
 	0x002c, 0x0fff,	/*DNR bypass 0x003C*/
 	0x002d, 0x1900,	/*DNR bypass 0x0a08*/
@@ -1335,8 +1335,8 @@ static const unsigned short tune_std_vid_cabcOn_hy[] = {
 	END_SEQ, 0x0000,
 };
 
-static const unsigned short tune_std_vtcall_cabcOn_hy[] = {
-	/*start P2 standard, vtcall, cabcOn*/
+static const unsigned short tune_standard_vt_cabc_hydis[] = {
+	/*start P2 standard, vt, cabcon*/
 	0x0001, 0x0070,	/* LABC SCR CABC*/
 	0x002c, 0x0fff,	/*DNR VTcall,dir_th   0x003c*/
 	0x002d, 0x19ff,	/*DNR dir_num,decont7 0x0a08*/
@@ -1396,7 +1396,7 @@ static const unsigned short tune_std_vtcall_cabcOn_hy[] = {
 	END_SEQ, 0x0000,
 };
 
-static const unsigned short tune_camera_hy[] = {
+static const unsigned short tune_camera_hydis[] = {
 	/*start P2 camera, bypass*/
 	0x0001, 0x0020,
 	0x002c, 0x0fff,	/*DNR bypass 0x003C*/
@@ -1439,7 +1439,7 @@ static const unsigned short tune_camera_hy[] = {
 	END_SEQ, 0x0000,
 };
 
-static const unsigned short tune_camera_outdoor_hy[] = {
+static const unsigned short tune_camera_outdoor_hydis[] = {
 	/*start P2 camera, ove*/
 	0x0001, 0x0022,	/*LABC OVE*/
 	0x002c, 0x0fff,	/*DNR bypass 0x003C*/
@@ -1483,8 +1483,8 @@ static const unsigned short tune_camera_outdoor_hy[] = {
 	END_SEQ, 0x0000,
 };
 
-static const unsigned short tune_cold_cabcOff_hy[] = {
-	/*start P2 cold, cabcOff*/
+static const unsigned short tune_cold_hydis[] = {
+	/*start P2 cold, cabcoff*/
 	0x0001, 0x0064,	/*SCR LABC MCM*/
 	0x005b, 0x0064,	/*MCM 10000K*/
 	0x0063, 0x8a00,	/*cb*/
@@ -1494,8 +1494,8 @@ static const unsigned short tune_cold_cabcOff_hy[] = {
 	END_SEQ, 0x0000,
 };
 
-static const unsigned short tune_cold_outdoor_cabcOff_hy[] = {
-	/*start P2 cold, ove, cabcOff*/
+static const unsigned short tune_cold_outdoor_hydis[] = {
+	/*start P2 cold, ove, cabcoff*/
 	0x0001, 0x0066,	/*SCR LABC MCM OVE*/
 	0x0054, 0x6050,	/*OVE Lightness Chroma*/
 	0x005b, 0x0064,	/*MCM 10000K*/
@@ -1506,8 +1506,8 @@ static const unsigned short tune_cold_outdoor_cabcOff_hy[] = {
 	END_SEQ, 0x0000,
 };
 
-static const unsigned short tune_outdoor_cabcOff_hy[] = {
-	/*start P2 ove, cabcOff*/
+static const unsigned short tune_normal_outdoor_hydis[] = {
+	/*start P2 ove, cabcoff*/
 	0x0001, 0x0062,	/*SCR LABC OVE*/
 	0x0054, 0x6050,	/*OVE Lightness Chroma*/
 	0x0028, 0x0000,	/*Register Mask*/
@@ -1515,8 +1515,8 @@ static const unsigned short tune_outdoor_cabcOff_hy[] = {
 	END_SEQ, 0x0000,
 };
 
-static const unsigned short tune_warm_cabcOff_hy[] = {
-	/*start P2 warm, cabcOff*/
+static const unsigned short tune_warm_hydis[] = {
+	/*start P2 warm, cabcoff*/
 	0x0001, 0x0064,	/*SCR LABC MCM*/
 	0x005b, 0x0028,	/*MCM 4000K*/
 	0x0061, 0x7600,	/*cb*/
@@ -1526,8 +1526,8 @@ static const unsigned short tune_warm_cabcOff_hy[] = {
 	END_SEQ, 0x0000,
 };
 
-static const unsigned short tune_warm_outdoor_cabcOff_hy[] = {
-	/*start P2 warm, ove, cabcOff*/
+static const unsigned short tune_warm_outdoor_hydis[] = {
+	/*start P2 warm, ove, cabcoff*/
 	0x0001, 0x0066,	/*SCR LABC MCM OVE*/
 	0x0054, 0x6050,	/*OVE Lightness Chroma*/
 	0x005b, 0x0028,	/*MCM 4000K*/
@@ -1538,8 +1538,8 @@ static const unsigned short tune_warm_outdoor_cabcOff_hy[] = {
 	END_SEQ, 0x0000,
 };
 
-static const unsigned short tune_cold_cabcOn_hy[] = {
-	/*start P2 cold, cabcOn*/
+static const unsigned short tune_cold_cabc_hydis[] = {
+	/*start P2 cold, cabcon*/
 	0x0001, 0x0074,	/*SCR LABC MCM CABC*/
 	0x005b, 0x0064,	/*MCM 10000K*/
 	0x0063, 0x8a00,	/*cb*/
@@ -1549,8 +1549,8 @@ static const unsigned short tune_cold_cabcOn_hy[] = {
 	END_SEQ, 0x0000,
 };
 
-static const unsigned short tune_cold_outdoor_cabcOn_hy[] = {
-	/*start P2 cold, ove, cabcOn*/
+static const unsigned short tune_cold_outdoor_cabc_hydis[] = {
+	/*start P2 cold, ove, cabcon*/
 	0x0001, 0x0076,	/*SCR LABC MCM OVE*/
 	0x0054, 0x6050,	/*OVE Lightness Chroma*/
 	0x005b, 0x0064,	/*MCM 10000K*/
@@ -1561,8 +1561,8 @@ static const unsigned short tune_cold_outdoor_cabcOn_hy[] = {
 	END_SEQ, 0x0000,
 };
 
-static const unsigned short tune_outdoor_cabcOn_hy[] = {
-	/*start P2 ove, cabcOn*/
+static const unsigned short tune_normal_outdoor_cabc_hydis[] = {
+	/*start P2 ove, cabcon*/
 	0x0001, 0x0072,	/*SCR LABC OVE CABC*/
 	0x0054, 0x6050,	/*OVE Lightness Chroma*/
 	0x0028, 0x0000,	/*Register Mask*/
@@ -1570,8 +1570,8 @@ static const unsigned short tune_outdoor_cabcOn_hy[] = {
 	END_SEQ, 0x0000,
 };
 
-static const unsigned short tune_warm_cabcOn_hy[] = {
-	/*start P2 warm, cabcOn*/
+static const unsigned short tune_warm_cabc_hydis[] = {
+	/*start P2 warm, cabcon*/
 	0x0001, 0x0074,	/*SCR LABC MCM CABC*/
 	0x005b, 0x0028,	/*MCM 4000K*/
 	0x0061, 0x7600,	/*cb*/
@@ -1581,8 +1581,8 @@ static const unsigned short tune_warm_cabcOn_hy[] = {
 	END_SEQ, 0x0000,
 };
 
-static const unsigned short tune_warm_outdoor_cabcOn_hy[] = {
-	/*start P2 warm, ove, cabcOn*/
+static const unsigned short tune_warm_outdoor_cabc_hydis[] = {
+	/*start P2 warm, ove, cabcon*/
 	0x0001, 0x0076,	/*SCR LABC MCM OVE CABC*/
 	0x0054, 0x6050,	/*OVE Lightness Chroma*/
 	0x005b, 0x0028,	/*MCM 4000K*/
@@ -1593,97 +1593,100 @@ static const unsigned short tune_warm_outdoor_cabcOn_hy[] = {
 	END_SEQ, 0x0000,
 };
 
-
-struct mdnie_tunning_info etc_table_hy[CABC_MAX][OUTDOOR_MAX][TONE_MAX] = {
+struct mdnie_tunning_info etc_table_hydis[CABC_MAX][OUTDOOR_MAX][TONE_MAX] = {
 	{
 		{
 			{"NORMAL",		NULL},
-			{"WARM",		tune_warm_cabcOff_hy},
-			{"COLD",		tune_cold_cabcOff_hy},
+			{"WARM",		tune_warm_hydis},
+			{"COLD",		tune_cold_hydis},
 		},
 		{
-			{"NORMAL_OUTDOOR", tune_outdoor_cabcOff_hy},
-			{"WARM_OUTDOOR", tune_warm_outdoor_cabcOff_hy},
-			{"COLD_OUTDOOR", tune_cold_outdoor_cabcOff_hy},
+			{"NORMAL_OUTDOOR",	tune_normal_outdoor_hydis},
+			{"WARM_OUTDOOR",	tune_warm_outdoor_hydis},
+			{"COLD_OUTDOOR",	tune_cold_outdoor_hydis},
 		},
 	},
 	{
 		{
 			{"NORMAL_CABC",		NULL},
-			{"WARM_CABC",		tune_warm_cabcOn_hy},
-			{"COLD_CABC",		tune_cold_cabcOn_hy},
+			{"WARM_CABC",		tune_warm_cabc_hydis},
+			{"COLD_CABC",		tune_cold_cabc_hydis},
 		},
 		{
-			{"NORMAL_OUTDOOR_CABC",	tune_outdoor_cabcOn_hy},
-			{"WARM_OUTDOOR_CABC",	tune_warm_outdoor_cabcOn_hy},
-			{"COLD_OUTDOOR_CABC",	tune_cold_outdoor_cabcOn_hy},
+			{"NORMAL_OUTDOOR_CABC",	tune_normal_outdoor_cabc_hydis},
+			{"WARM_OUTDOOR_CABC",	tune_warm_outdoor_cabc_hydis},
+			{"COLD_OUTDOOR_CABC",	tune_cold_outdoor_cabc_hydis},
 		},
 	},
 };
 
-struct mdnie_tunning_info_cabc tunning_table_hy
-					[CABC_MAX][MODE_MAX][SCENARIO_MAX] = {
+struct mdnie_tunning_info_cabc tunning_table_hydis[CABC_MAX][MODE_MAX][SCENARIO_MAX] = {
 {
 	{
-		{"DYNAMIC_UI",		tune_dyn_ui_cabcOff_hy, 0},
-		{"DYNAMIC_VIDEO_NOR", tune_dyn_vid_cabcOff_hy, LUT_VIDEO},
-		{"DYNAMIC_VIDEO_WARM",	tune_dyn_vid_cabcOff_hy, LUT_VIDEO},
-		{"DYNAMIC_VIDEO_COLD",	tune_dyn_vid_cabcOff_hy, LUT_VIDEO},
-		{"CAMERA",		tune_camera_hy,		0},
-		{"DYNAMIC_UI",		tune_dyn_ui_cabcOff_hy,	0},
-		{"DYNAMIC_GALLERY",	tune_dyn_gallery_cabcOff_hy, 0},
-		{"DYNAMIC_VT",		tune_dyn_vtcall_cabcOff_hy, 0},
+		{"DYNAMIC_UI",			tune_dynamic_ui_hydis,		0},
+		{"DYNAMIC_VIDEO",		tune_dynamic_video_hydis,		LUT_VIDEO},
+		{"DYNAMIC_VIDEO",		tune_dynamic_video_hydis,		LUT_VIDEO},
+		{"DYNAMIC_VIDEO",		tune_dynamic_video_hydis,		LUT_VIDEO},
+		{"CAMERA",			NULL,					0},
+		{"DYNAMIC_UI",			tune_dynamic_ui_hydis,		0},
+		{"DYNAMIC_GALLERY",		tune_dynamic_gallery_hydis,		0},
+		{"DYNAMIC_VT",			tune_dynamic_vt_hydis,		0},
 	}, {
-		{"STANDARD_UI",		tune_std_ui_cabcOff_hy, 0},
-		{"STANDARD_VIDEO_NOR", tune_std_vid_cabcOff_hy, LUT_VIDEO},
-		{"STANDARD_VIDEO_WARM",	tune_std_vid_cabcOff_hy, LUT_VIDEO},
-		{"STANDARD_VIDEO_COLD",	tune_std_vid_cabcOff_hy, LUT_VIDEO},
-		{"CAMERA",		tune_camera_hy,		0},
-		{"STANDARD_UI",		tune_std_ui_cabcOff_hy, 0},
-		{"STANDARD_GALLERY",	tune_std_gallery_cabcOff_hy, 0},
-		{"STANDARD_VT",		tune_std_vtcall_cabcOff_hy, 0},
+		{"STANDARD_UI",			tune_standard_ui_hydis,		0},
+		{"STANDARD_VIDEO",		tune_standard_video_hydis,		LUT_VIDEO},
+		{"STANDARD_VIDEO",		tune_standard_video_hydis,		LUT_VIDEO},
+		{"STANDARD_VIDEO",		tune_standard_video_hydis,		LUT_VIDEO},
+		{"CAMERA",			NULL,					0},
+		{"STANDARD_UI",			tune_standard_ui_hydis,		0},
+		{"STANDARD_GALLERY",		tune_standard_gallery_hydis,	0},
+		{"STANDARD_VT",			tune_standard_vt_hydis,		0},
 	}, {
-		{"MOVIE_UI",		tune_mov_ui_cabcOff_hy,	0},
-		{"MOVIE_VIDEO_NOR",	tune_mov_vid_cabcOff_hy, LUT_VIDEO},
-		{"MOVIE_VIDEO_WARM",	tune_mov_vid_cabcOff_hy, LUT_VIDEO},
-		{"MOVIE_VIDEO_COLD",	tune_mov_vid_cabcOff_hy, LUT_VIDEO},
-		{"CAMERA",		tune_camera_hy,		0},
-		{"MOVIE_UI",		tune_mov_ui_cabcOff_hy,	0},
-		{"MOVIE_GALLERY",	tune_mov_gallery_cabcOff_hy, 0},
-		{"MOVIE_VT",		tune_mov_vtcall_cabcOff_hy, 0},
+		{"MOVIE_UI",			tune_movie_ui_hydis,			0},
+		{"MOVIE_VIDEO",			tune_movie_video_hydis,		LUT_VIDEO},
+		{"MOVIE_VIDEO",			tune_movie_video_hydis,		LUT_VIDEO},
+		{"MOVIE_VIDEO",			tune_movie_video_hydis,		LUT_VIDEO},
+		{"CAMERA",			NULL,					0},
+		{"MOVIE_UI",			tune_movie_ui_hydis,			0},
+		{"MOVIE_GALLERY",		tune_movie_gallery_hydis,		0},
+		{"MOVIE_VT",			tune_movie_vt_hydis,			0},
 	},
 },
 {
 	{
-		{"DYNAMIC_UI_CABC",	tune_dyn_ui_cabcOn_hy, 0},
-		{"DYNAMIC_VIDEO_NOR_CABC", tune_dyn_vid_cabcOn_hy, LUT_VIDEO},
-		{"DYNAMIC_VIDEO_WARM_CABC", tune_dyn_vid_cabcOn_hy, LUT_VIDEO},
-		{"DYNAMIC_VIDEO_COLD",	tune_dyn_vid_cabcOn_hy, LUT_VIDEO},
-		{"CAMERA",		tune_camera_hy,		0},
-		{"DYNAMIC_UI_CABC",	tune_dyn_ui_cabcOn_hy,	0},
-		{"DYNAMIC_GALLERY_CABC", tune_dyn_gallery_cabcOn_hy, 0},
-		{"DYNAMIC_VT_CABC",	tune_dyn_vtcall_cabcOn_hy, 0},
+		{"DYNAMIC_UI_CABC",		tune_dynamic_ui_cabc_hydis,		0},
+		{"DYNAMIC_VIDEO_CABC",		tune_dynamic_video_cabc_hydis,	LUT_VIDEO},
+		{"DYNAMIC_VIDEO_CABC",		tune_dynamic_video_cabc_hydis,	LUT_VIDEO},
+		{"DYNAMIC_VIDEO_CABC",		tune_dynamic_video_cabc_hydis,	LUT_VIDEO},
+		{"CAMERA",			NULL,					0},
+		{"DYNAMIC_UI_CABC",		tune_dynamic_ui_cabc_hydis,		0},
+		{"DYNAMIC_GALLERY_CABC",	tune_dynamic_gallery_cabc_hydis,	0},
+		{"DYNAMIC_VT_CABC",		tune_dynamic_vt_cabc_hydis,		0},
 	}, {
-		{"STANDARD_UI_CABC",	tune_std_ui_cabcOn_hy, 0},
-		{"STANDARD_VIDEO_NOR_CABC", tune_std_vid_cabcOn_hy, LUT_VIDEO},
-		{"STANDARD_VIDEO_WARM_CABC", tune_std_vid_cabcOn_hy, LUT_VIDEO},
-		{"STANDARD_VIDEO_COLD_CABC", tune_std_vid_cabcOn_hy, LUT_VIDEO},
-		{"CAMERA",		tune_camera_hy,		0},
-		{"STANDARD_UI_CABC",	tune_std_ui_cabcOn_hy,	0},
-		{"STANDARD_GALLERY_CABC", tune_std_gallery_cabcOn_hy, 0},
-		{"STANDARD_VT_CABC",	tune_std_vtcall_cabcOn_hy, 0},
+		{"STANDARD_UI_CABC",		tune_standard_ui_cabc_hydis,	0},
+		{"STANDARD_VIDEO_CABC",		tune_standard_video_cabc_hydis,	LUT_VIDEO},
+		{"STANDARD_VIDEO_CABC",		tune_standard_video_cabc_hydis,	LUT_VIDEO},
+		{"STANDARD_VIDEO_CABC",		tune_standard_video_cabc_hydis,	LUT_VIDEO},
+		{"CAMERA",			NULL,					0},
+		{"STANDARD_UI_CABC",		tune_standard_ui_cabc_hydis,	0},
+		{"STANDARD_GALLERY_CABC",	tune_standard_gallery_cabc_hydis,	0},
+		{"STANDARD_VT_CABC",		tune_standard_vt_cabc_hydis,	0},
 	}, {
-		{"MOVIE_UI_CABC",	tune_mov_ui_cabcOn_hy,	0},
-		{"MOVIE_VIDEO_NOR_CABC", tune_mov_vid_cabcOn_hy, LUT_VIDEO},
-		{"MOVIE_VIDEO_WARM_CABC", tune_mov_vid_cabcOn_hy, LUT_VIDEO},
-		{"MOVIE_VIDEO_COLD_CABC", tune_mov_vid_cabcOn_hy, LUT_VIDEO},
-		{"CAMERA",		tune_camera_hy,		0},
-		{"MOVIE_UI_CABC",	tune_mov_ui_cabcOn_hy,	0},
-		{"MOVIE_GALLERY_CABC",	tune_mov_gallery_cabcOn_hy, 0},
-		{"MOVIE_VT_CABC",	tune_mov_vtcall_cabcOn_hy, 0},
+		{"MOVIE_UI_CABC",		tune_movie_ui_cabc_hydis,		0},
+		{"MOVIE_VIDEO_CABC",		tune_movie_video_cabc_hydis,	LUT_VIDEO},
+		{"MOVIE_VIDEO_CABC",		tune_movie_video_cabc_hydis,	LUT_VIDEO},
+		{"MOVIE_VIDEO_CABC",		tune_movie_video_cabc_hydis,	LUT_VIDEO},
+		{"CAMERA",			NULL,					0},
+		{"MOVIE_UI_CABC",		tune_movie_ui_cabc_hydis,		0},
+		{"MOVIE_GALLERY_CABC",		tune_movie_gallery_cabc_hydis,	0},
+		{"MOVIE_VT_CABC",		tune_movie_vt_cabc_hydis,		0},
 	},
 },
 };
 
-#endif /* __MDNIE_TABLE_P2_hy_H__ */
+struct mdnie_tunning_info camera_table_hydis[OUTDOOR_MAX] = {
+	{"CAMERA",		tune_camera_hydis},
+	{"CAMERA_OUTDOOR",	tune_camera_outdoor_hydis},
+};
+
+#endif /* __MDNIE_TABLE_P2_HYDIS_H__ */
 

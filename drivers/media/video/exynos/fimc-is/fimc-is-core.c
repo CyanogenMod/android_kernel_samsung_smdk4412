@@ -357,6 +357,10 @@ static int fimc_is_probe(struct platform_device *pdev)
 		snprintf(v4l2_dev->name, sizeof(v4l2_dev->name),
 			 "%s.isp", dev_name(&dev->pdev->dev));
 	ret = v4l2_device_register(NULL, v4l2_dev);
+	if (ret) {
+		v4l2_err(v4l2_dev, "Failed to register v4l2 device\n");
+		goto err_vd_reg;
+	}
 
 	snprintf(dev->video[FIMC_IS_VIDEO_NUM_BAYER].vd.name,
 			sizeof(dev->video[FIMC_IS_VIDEO_NUM_BAYER].vd.name),
@@ -385,10 +389,8 @@ static int fimc_is_probe(struct platform_device *pdev)
 
 	ret = video_register_device(&dev->video[FIMC_IS_VIDEO_NUM_BAYER].vd,
 							VFL_TYPE_GRABBER, 30);
-	if (ret) {
-		v4l2_err(v4l2_dev, "Failed to register video device\n");
-		goto err_vd_reg;
-	}
+	if (ret)
+		goto p_err_device_register;
 
 	printk(KERN_INFO "FIMC-IS Video node :: ISP %d minor : %d\n",
 		dev->video[FIMC_IS_VIDEO_NUM_BAYER].vd.num,
@@ -412,6 +414,7 @@ static int fimc_is_probe(struct platform_device *pdev)
 		dev->pdata->clk_get(pdev);
 	} else {
 		err("#### failed to Get Clock####\n");
+		ret = -EINVAL;
 		goto p_err_init_mem;
 	}
 	/* Init v4l2 sub device */
@@ -464,11 +467,11 @@ static int fimc_is_probe(struct platform_device *pdev)
 	return 0;
 
 p_err_init_mem:
-	free_irq(dev->irq1, dev);
 #if defined(CONFIG_VIDEO_EXYNOS_FIMC_IS_BAYER)
 err_vd_reg:
-	video_device_release(&dev->video[FIMC_IS_VIDEO_NUM_BAYER].vd);
+p_err_device_register:
 #endif
+	free_irq(dev->irq1, dev);
 p_err_req_irq:
 p_err_get_irq:
 	iounmap(dev->regs);

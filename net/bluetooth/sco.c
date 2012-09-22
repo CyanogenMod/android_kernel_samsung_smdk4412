@@ -890,6 +890,11 @@ static void sco_conn_ready(struct sco_conn *conn)
 		bacpy(&bt_sk(sk)->src, conn->src);
 		bacpy(&bt_sk(sk)->dst, conn->dst);
 
+		if (!conn->hcon) {
+				BT_ERR("conn->hcon = NULL");
+				/* to do */
+		}
+
 		hci_conn_hold(conn->hcon);
 		__sco_chan_add(conn, sk, parent);
 

@@ -133,6 +133,17 @@ config RTC_ALARM_BOOT
 	  time with checking auto power up menu, the handset must be powered
 	  on in time automatically.
 
+config RTC_POWER_OFF
+	bool "Power off alarm function"
+	depends on RTC_INTF_ALARM
+	default n
+	help
+	  This is only for S project power off alarm. When the handset going to
+	  fake power off state, all wakeup sources are blocked,
+	  except pwr-key and RTC_POWER_OFF.
+	  At the time you will set power off time, rtc wakeup the device
+	  and run the power off process.
+
 config RTC_DRV_TEST
 	tristate "Test driver/device"
 	help

@@ -299,7 +299,7 @@ static struct regulator_consumer_supply ldo8_supply[] = {
 };
 
 static struct regulator_consumer_supply ldo9_supply[] = {
-	REGULATOR_SUPPLY("cam_isp_mipi_1.2v", NULL),
+	REGULATOR_SUPPLY("vled_ic_1.9v", NULL),
 };
 
 static struct regulator_consumer_supply ldo10_supply[] = {
@@ -407,8 +407,13 @@ REGULATOR_INIT(ldo5, "VCC_1.8V_IO", 1800000, 1800000, 0,
 	       REGULATOR_CHANGE_STATUS, 1);
 REGULATOR_INIT(ldo8, "VMIPI_1.0V", 1000000, 1000000, 1,
 	       REGULATOR_CHANGE_STATUS, 0);
-REGULATOR_INIT(ldo9, "CAM_ISP_MIPI_1.2V", 1200000, 1200000, 0,
+#if defined(CONFIG_IR_REMOCON_MC96)
+REGULATOR_INIT(ldo9, "VLED_IC_1.9V", 1950000, 1950000, 1,
 	       REGULATOR_CHANGE_STATUS, 1);
+#else
+REGULATOR_INIT(ldo9, "VLED_IC_1.9V", 1950000, 1950000, 0,
+	       REGULATOR_CHANGE_STATUS, 1);
+#endif
 REGULATOR_INIT(ldo10, "VMIPI_1.8V", 1800000, 1800000, 1,
 	       REGULATOR_CHANGE_STATUS, 0);
 REGULATOR_INIT(ldo11, "VABB1_1.9V", 1950000, 1950000, 1,
@@ -1099,13 +1104,8 @@ struct s5m_platform_data exynos4_s5m8767_info = {
 
 void midas_power_init(void)
 {
-#ifdef CONFIG_MACH_S2PLUS
-	ldo8_init_data.constraints.always_on = 1;
-	ldo13_init_data.constraints.always_on = 1;
-#else
 	ldo8_init_data.constraints.always_on = 1;
 	ldo10_init_data.constraints.always_on = 1;
-#endif
 }
 
 /* End of S5M8767 */

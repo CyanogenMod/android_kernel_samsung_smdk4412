@@ -331,6 +331,14 @@ config LEDS_REGULATOR
 	help
 	  This option enables support for regulator driven LEDs.
 
+config LEDS_MAX8997
+	tristate "MAX8997 LED support"
+	default n
+	help
+	  This option
+	  enables support
+	  for LEDs
+	  of MAX8997.
 config LEDS_BD2802
 	tristate "LED driver for BD2802 RGB LED"
 	depends on LEDS_CLASS
@@ -415,11 +423,18 @@ config LEDS_ASIC3
 	  cannot be used. This driver supports hardware blinking with an on+off
 	  period from 62ms to 125s. Say Y to enable LEDs on the HP iPAQ hx4700.
 
+config LEDS_SWITCH
+	bool "LED control switch support"
+	depends on LEDS_CLASS
+	default n
+	help
+	  This option enables support for the LED SWITCH.
+
 config LEDS_MAX77693
 	bool "LED support for the MAX77693"
 	depends on LEDS_CLASS
 	depends on MFD_MAX77693
-	default y
+	default n
 	help
 	  This option enables support for the LEDs on the MAX77693.
 

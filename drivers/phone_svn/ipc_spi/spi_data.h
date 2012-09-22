@@ -106,7 +106,6 @@ extern void *ipc_spi_get_queue_buff(void);
 extern struct spi_data_queue *spi_data_queue;
 extern struct spi_data_queue_info	 *spi_queue_info;
 extern char *gspi_data_packet_buf;
-extern char *gspi_data_sync_buf;
 
 extern void spi_data_queue_init(void);
 extern void spi_data_queue_destroy(void);

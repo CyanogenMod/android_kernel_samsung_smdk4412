@@ -58,8 +58,6 @@
 #define VENDOR_NAME		"SHARP"
 #define CHIP_NAME		"GP2A0002"
 
-#define ADC_SAMPLE_NUM		5
-
 /* ADDSEL is LOW */
 #define REGS_PROX		0x0 /* Read  Only */
 #define REGS_GAIN		0x1 /* Write Only */
@@ -121,34 +119,6 @@ static u8 reg_defaults[5] = {
 /* light sensor adc channel */
 #define ALS_IOUT_ADC	9
 
-#if defined(CONFIG_MACH_P8)
-
-static const int adc_table[4] = {
-	320,
-	840,
-	1400,
-	1950,
-};
-
-#elif defined(CONFIG_MACH_P2)
-
-static const int adc_table[4] = {
-	480,
-	975,
-	1535,
-	2090,
-};
-
-#else
-
-static const int adc_table[4] = {
-	430,
-	925,
-	1485,
-	1950,
-};
-#endif
-
 struct gp2a_data;
 
 enum {
@@ -182,7 +152,6 @@ struct gp2a_data {
 	struct mutex			adc_mutex;
 	struct wake_lock		prx_wake_lock;
 	struct workqueue_struct		*wq;
-	unsigned int			adc_total;
 	struct s3c_adc_client		*padc;
 	bool				enable_wakeup;
 	int				prox_value;
@@ -386,7 +355,6 @@ static int lightsensor_get_adcvalue(struct gp2a_data *gp2a)
 {
 	int value = 0;
 	int fake_value;
-	unsigned int adc_avr_value;
 
 	/* get ADC */
 	/* value = gp2a->pdata->light_adc_value(); */
@@ -402,28 +370,16 @@ static int lightsensor_get_adcvalue(struct gp2a_data *gp2a)
 		value = 0;
 	}
 
-	gp2a->adc_total += value;
-
-	adc_avr_value = gp2a->adc_total/ADC_SAMPLE_NUM;
-
-	gp2a->adc_total -= adc_avr_value;
-
 	/* Cut off ADC Value
 	 */
-#if 1
-	if (adc_avr_value < LIGHT_FAKE_LIMIT) {
+	if (value < LIGHT_FAKE_LIMIT) {
 		fake_value =
-			(adc_avr_value < LIGHT_FAKE_THRESHOLD) ?
-			0 : 2 * (adc_avr_value) - LIGHT_FAKE_LIMIT;
-		adc_avr_value = fake_value;
+			(value < LIGHT_FAKE_THRESHOLD) ?
+			0 : 2 * (value) - LIGHT_FAKE_LIMIT;
+		value = fake_value;
 	}
-#else
-	if (adc_avr_value < 10) {
-		gp2a->adc_total = 0;
-		adc_avr_value = 0;
-	}
-#endif
-	return adc_avr_value;
+
+	return value;
 }
 
 static ssize_t lightsensor_file_state_show(struct device *dev,
@@ -521,7 +477,6 @@ static struct device_attribute *proximity_sensor_attrs[] = {
 
 static void gp2a_work_func_light(struct work_struct *work)
 {
-	int i;
 	struct gp2a_data *gp2a = container_of(work, struct gp2a_data,
 					work_light);
 	int adc = lightsensor_get_adcvalue(gp2a);
@@ -705,12 +660,7 @@ static int gp2a_i2c_probe(struct i2c_client *client,
 		pr_err("%s: missing pdata!\n", __func__);
 		return ret;
 	}
-	/*
-	if (!pdata->power || !pdata->light_adc_value) {
-		pr_err("%s: incomplete pdata!\n", __func__);
-		return ret;
-	}
-	*/
+
 	if (!i2c_check_functionality(client->adapter, I2C_FUNC_I2C)) {
 		pr_err("%s: i2c functionality check failed!\n", __func__);
 		return ret;
@@ -891,8 +841,6 @@ static int gp2a_i2c_probe(struct i2c_client *client,
 	gp2a->prox_value = 1;
 	input_report_abs(gp2a->proximity_input_dev, ABS_DISTANCE, 1);
 	input_sync(gp2a->proximity_input_dev);
-
-	gp2a->adc_total = 0;
 
 	goto done;
 

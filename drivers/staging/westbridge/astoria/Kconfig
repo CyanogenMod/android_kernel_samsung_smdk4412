@@ -7,3 +7,6 @@ source "drivers/staging/westbridge/astoria/block/Kconfig"
 
 source "drivers/staging/westbridge/astoria/gadget/Kconfig"
 
+source "drivers/staging/westbridge/astoria/switch/Kconfig"
+
+

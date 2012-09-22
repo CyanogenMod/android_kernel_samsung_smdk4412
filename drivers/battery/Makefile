@@ -2,9 +2,6 @@
 obj-$(CONFIG_BATTERY_SAMSUNG)	+= samsung_battery.o	\
 					battery-factory.o
 
-obj-$(CONFIG_BATTERY_SAMSUNG_S2PLUS)	+= samsung_battery_s2plus.o	\
-					battery-factory.o
-
 obj-$(CONFIG_MAX8997_CHARGER)	+= max8997-charger.o
 
 obj-$(CONFIG_BATTERY_MAX17043_FUELGAUGE)	+= max17043_fuelgauge.o

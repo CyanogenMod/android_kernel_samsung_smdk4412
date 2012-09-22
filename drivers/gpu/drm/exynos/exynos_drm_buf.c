@@ -47,7 +47,7 @@ static int lowlevel_buffer_allocate(struct drm_device *dev,
 		return -EINVAL;
 	}
 
-	if (buf->dma_addr) {
+	if (buf->paddr) {
 		DRM_DEBUG_KMS("already allocated.\n");
 		return 0;
 	}
@@ -78,21 +78,21 @@ static int lowlevel_buffer_allocate(struct drm_device *dev,
 	}
 
 #ifdef CONFIG_CMA
-	buf->dma_addr = cma_alloc(dev->dev, "drm", buf->size,
+	buf->paddr = cma_alloc(dev->dev, "drm", buf->size,
 					buf->page_size);
-	if (IS_ERR((void *)buf->dma_addr)) {
+	if (IS_ERR((void *)buf->paddr)) {
 		DRM_DEBUG_KMS("cma_alloc of size %ld failed\n",
 				buf->size);
 		ret = -ENOMEM;
 		goto err1;
 	}
 
-	buf->kvaddr = phys_to_virt(buf->dma_addr);
+	buf->kvaddr = phys_to_virt(buf->paddr);
 #else
 	/* align it as page size(page or section) TODO */
 
 	buf->kvaddr = dma_alloc_writecombine(dev->dev, buf->size,
-			&buf->dma_addr, GFP_KERNEL);
+			&buf->paddr, GFP_KERNEL);
 	if (!buf->kvaddr) {
 		DRM_ERROR("failed to allocate buffer.\n");
 		ret = -ENOMEM;
@@ -107,7 +107,7 @@ static int lowlevel_buffer_allocate(struct drm_device *dev,
 	}
 
 	sgl = buf->sgt->sgl;
-	start_addr = buf->dma_addr;
+	start_addr = buf->paddr;
 
 	while (i < npages) {
 		buf->pages[i] = phys_to_page(start_addr);
@@ -118,20 +118,20 @@ static int lowlevel_buffer_allocate(struct drm_device *dev,
 		i++;
 	}
 
-	DRM_INFO("vaddr(0x%lx), dma_addr(0x%lx), size(0x%lx)\n",
+	DRM_INFO("vaddr(0x%lx), paddr(0x%lx), size(0x%lx)\n",
 			(unsigned long)buf->kvaddr,
-			(unsigned long)buf->dma_addr,
+			(unsigned long)buf->paddr,
 			buf->size);
 
 	return ret;
 err2:
 #ifdef CONFIG_CMA
-	cma_free(buf->dma_addr);
+	cma_free(buf->paddr);
 #else
 	dma_free_writecombine(dev->dev, buf->size, buf->kvaddr,
-			(dma_addr_t)buf->dma_addr);
+			(dma_addr_t)buf->paddr);
 #endif
-	buf->dma_addr = (dma_addr_t)NULL;
+	buf->paddr = (dma_addr_t)NULL;
 err1:
 	sg_free_table(buf->sgt);
 	kfree(buf->sgt);
@@ -146,13 +146,6 @@ static void lowlevel_buffer_deallocate(struct drm_device *dev,
 	DRM_DEBUG_KMS("%s.\n", __FILE__);
 
 	/*
-	 * now buffer is being shared and it would be released
-	 * by original owner so ignor free action.
-	 */
-	if (buf->shared || atomic_read(&buf->shared_refcount))
-		return;
-
-	/*
 	 * release only physically continuous memory and
 	 * non-continuous memory would be released by exynos
 	 * gem framework.
@@ -162,25 +155,36 @@ static void lowlevel_buffer_deallocate(struct drm_device *dev,
 		return;
 	}
 
-	if (!buf->dma_addr) {
-		DRM_DEBUG_KMS("dma_addr is invalid.\n");
+	if (!buf->paddr) {
+		DRM_DEBUG_KMS("paddr is invalid.\n");
 		return;
 	}
 
-	sg_free_table(buf->sgt);
-
-	kfree(buf->sgt);
-	buf->sgt = NULL;
+	if (buf->sgt) {
+		sg_free_table(buf->sgt);
+		kfree(buf->sgt);
+		buf->sgt = NULL;
+	}
 
 	kfree(buf->pages);
 	buf->pages = NULL;
+
+	/*
+	 * now buffer is being shared and it would be released
+	 * by original owner so ignor free action.
+	 * this buffer was imported from physical memory to gem directly
+	 * and this feature is used temporarily so removed later.
+	 */
+	if (buf->shared)
+		return;
+
 #ifdef CONFIG_CMA
-	cma_free(buf->dma_addr);
+	cma_free(buf->paddr);
 #else
 	dma_free_writecombine(dev->dev, buf->size, buf->kvaddr,
-				(dma_addr_t)buf->dma_addr);
+				(dma_addr_t)buf->paddr);
 #endif
-	buf->dma_addr = (dma_addr_t)NULL;
+	buf->paddr = (dma_addr_t)NULL;
 }
 
 struct exynos_drm_gem_buf *exynos_drm_init_buf(struct drm_device *dev,
@@ -221,7 +225,7 @@ int exynos_drm_alloc_buf(struct drm_device *dev,
 
 	/*
 	 * allocate memory region and set the memory information
-	 * to vaddr and dma_addr of a buffer object.
+	 * to vaddr and paddr of a buffer object.
 	 */
 	if (lowlevel_buffer_allocate(dev, flags, buf) < 0)
 		return -ENOMEM;

@@ -1,0 +1,30 @@
+menuconfig SEC_MODEM
+	bool "Samsung Mobile Modem Interface"
+	default n
+	---help---
+	  Samsung Modem Interface Driver.
+
+config CDMA_MODEM_CBP71
+	bool "modem chip : VIA CBP7.1"
+	depends on SEC_MODEM
+	default n
+
+config LTE_MODEM_CMC220
+	bool "modem chip : cmc220"
+	depends on SEC_MODEM
+	default n
+
+config LINK_DEVICE_DPRAM
+	bool "modem driver link device DPRAM"
+	depends on SEC_MODEM
+	default n
+
+config LINK_DEVICE_USB
+	bool "modem driver link device USB"
+	depends on SEC_MODEM
+	default n
+
+config INTERNAL_MODEM_IF
+	bool "modem feature for INTERNAL MODEM IF"
+	depends on SEC_MODEM
+	default n

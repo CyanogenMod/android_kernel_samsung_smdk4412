@@ -9,6 +9,7 @@ extern void midas_camera_init(void);
 /* charger-manager */
 extern struct charger_global_desc midas_charger_g_desc;
 extern struct platform_device midas_charger_manager;
+extern void cm_change_fullbatt_uV(void);
 
 /* MAX77693 */
 extern struct max77693_muic_data max77693_muic;

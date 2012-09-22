@@ -515,4 +515,17 @@ config INPUT_XEN_KBDDEV_FRONTEND
 	  To compile this driver as a module, choose M here: the
 	  module will be called xen-kbdfront.
 
+config INPUT_FLIP
+        tristate "INPUT_FLIP"
+	help
+	  Say Y here if you want to support gpio based Flip...
+
+config INPUT_KR3DH
+	tristate "ST KR3DH accelerometer sensor"
+	depends on I2C
+	help
+	  Say Y here if you want to support for ST KR3DH accelerometer sensor.
+
+	  To compile this driver as a module, choose M here: the
+	  module will be called kr3dh.
 endif

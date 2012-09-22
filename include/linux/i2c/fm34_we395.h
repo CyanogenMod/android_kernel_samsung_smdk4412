@@ -22,7 +22,7 @@
 #ifndef __FEM34_WE395_PDATA_H__
 #define __FM34_WE395_PDATA_H__
 
-#if defined(CONFIG_MACH_C1_KOR_LGT) || defined(CONFIG_MACH_C1VZW)
+#if defined(CONFIG_MACH_C1_KOR_LGT)
 int fm34_set_mode(int mode);
 #endif
 

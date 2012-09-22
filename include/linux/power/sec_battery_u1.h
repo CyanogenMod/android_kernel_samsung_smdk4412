@@ -27,8 +27,8 @@
 #define HWREV_FOR_BATTERY	0x06
 #elif defined(CONFIG_MACH_Q1_BD)
 #define HWREV_FOR_BATTERY	0x02
-#elif defined(CONFIG_MACH_U1CAMERA_BD)
-#define HWREV_FOR_BATTERY	0x00
+#elif defined(CONFIG_MACH_TRATS)
+#define HWREV_FOR_BATTERY	0x02
 #else	/*U1 EUR OPEN */
 #define HWREV_FOR_BATTERY	0x08
 #endif
