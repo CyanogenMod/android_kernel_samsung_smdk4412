@@ -687,6 +687,32 @@ config SWP_EMULATE
 
 	  If unsure, say Y.
 
+config IDIV_EMULATE
+	bool "Emulate SDIV/UDIV instructions"
+	depends on !CPU_USE_DOMAINS && CPU_V7
+	select HAVE_PROC_CPU if PROC_FS
+	default y if SMP
+	help
+
+	  The Virtualization Extensions introduce the requirement for an
+	  ARMv7-A implementation to include SDIV and UDIV.  Any
+	  implementation of the Virtualization Extensions must include
+	  the SDIV and UDIV instructions in the Thumb and ARM
+	  instruction sets.
+
+	  In an ARMv7-A implementation that does not include the
+	  Virtualization Extensions, it is IMPLEMENTATION DEFINED whether:
+	  *  SDIV and UDIV are not implemented
+	  *  SDIV and UDIV are implemented only in the Thumb instruction set
+	  *  SDIV and UDIV are implemented in the Thumb and ARM
+	  instruction sets.
+
+	  This option allows to handle exeptions due to unimplemented
+	  SDIV and UDIV instructions in ARM and Thumb modes.
+
+	  If unsure, say Y.
+
+
 config CPU_BIG_ENDIAN
 	bool "Build big-endian kernel"
 	depends on ARCH_SUPPORTS_BIG_ENDIAN
