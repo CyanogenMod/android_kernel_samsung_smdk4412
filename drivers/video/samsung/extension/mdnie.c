@@ -40,6 +40,10 @@
 
 /* FIXME:!! need to change chip id dynamically */
 #define MDNIE_CHIP_ID "cmc623p"
+#ifdef CONFIG_SLP_DISP_DEBUG
+#define MDNIE_MAX_REG	128
+#define MDNIE_BASE_REG	0x11CA0000
+#endif
 
 static const char *mode_name[MODE_MAX] = {
 	"dynamic",
@@ -105,6 +109,19 @@ static void mdnie_write_tune(struct s5p_mdnie *mdnie,
 	}
 }
 
+static void mdnie_wr_tune_dat(struct s5p_mdnie *mdnie, const u8 *data)
+{
+	unsigned int val1 = 0, val2 = 0;
+	int ret;
+	char *str = NULL;
+
+	while ((str = strsep((char **)&data, "\n"))) {
+		ret = sscanf(str, "0x%x,0x%x,\n", &val1, &val2);
+		if (ret == 2)
+			writel((u16)val2, mdnie->regs+(u16)val1*4);
+	}
+}
+
 static int mdnie_request_fw(struct s5p_mdnie *mdnie, const char *name)
 {
 	const struct firmware *fw;
@@ -122,8 +139,7 @@ static int mdnie_request_fw(struct s5p_mdnie *mdnie, const char *name)
 		return ret;
 	}
 
-	mdnie_write_tune(mdnie, (const unsigned short *)fw->data,
-				fw->size / sizeof(const unsigned short));
+	mdnie_wr_tune_dat(mdnie, fw->data);
 	release_firmware(fw);
 
 	mutex_unlock(&mdnie->lock);
@@ -628,6 +644,40 @@ static ssize_t show_mdnie_tune(struct device *dev,
 	return snprintf(buf, PAGE_SIZE, "%d\n", mdnie->tune);
 }
 
+#ifdef CONFIG_SLP_DISP_DEBUG
+static int mdnie_read_reg(struct s5p_mdnie *mdnie, char *buf)
+{
+	u32 cfg;
+	int i;
+	int pos = 0;
+
+	pos += sprintf(buf+pos, "0x%.8x | ", MDNIE_BASE_REG);
+	for (i = 1; i < MDNIE_MAX_REG + 1; i++) {
+		cfg = readl(mdnie->regs + ((i-1) * sizeof(u32)));
+		pos += sprintf(buf+pos, "0x%.8x ", cfg);
+		if (i % 4 == 0)
+			pos += sprintf(buf+pos, "\n0x%.8x | ",
+				MDNIE_BASE_REG + (i * sizeof(u32)));
+	}
+
+	return pos;
+}
+
+static ssize_t show_read_reg(struct device *dev, struct device_attribute *attr,
+			char *buf)
+{
+	struct s5p_fimd_ext_device *fx_dev = to_fimd_ext_device(dev);
+	struct s5p_mdnie *mdnie = fimd_ext_get_drvdata(fx_dev);
+
+	if (!mdnie->regs) {
+		dev_err(dev, "failed to get current register.\n");
+		return -EINVAL;
+	}
+
+	return mdnie_read_reg(mdnie, buf);
+}
+#endif
+
 /* sys/devices/platform/mdnie */
 static struct device_attribute mdnie_device_attrs[] = {
 	__ATTR(mode, S_IRUGO|S_IWUSR, show_mdnie_mode,
@@ -640,6 +690,9 @@ static struct device_attribute mdnie_device_attrs[] = {
 							store_mdnie_outdoor),
 	__ATTR(tune, S_IRUGO|S_IWUSR, show_mdnie_tune,
 							store_mdnie_tune),
+#ifdef CONFIG_SLP_DISP_DEBUG
+	__ATTR(read_reg, S_IRUGO, show_read_reg, NULL),
+#endif
 };
 
 static int mdnie_probe(struct s5p_fimd_ext_device *fx_dev)

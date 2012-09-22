@@ -486,7 +486,7 @@ config HID_ROCCAT_PYRA
 
 config HID_SAMSUNG
 	tristate "Samsung InfraRed remote control or keyboards"
-	depends on USB_HID
+	depends on (USB_HID || BT_HIDP)
 	---help---
 	Support for Samsung InfraRed remote control or keyboards.
 

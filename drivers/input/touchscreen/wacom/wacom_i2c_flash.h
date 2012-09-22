@@ -37,7 +37,7 @@
 #define FLASH_ERASE       0x84
 #define FLASH_SET_INFO    0x85
 #define FLASH_END_TO_BOOT 0x87
-#define FLASH_BAIDRATE    0x88
+#define FLASH_BAUDRATE    0x88
 
 #define FLASH_QUERY    0xE0
 #define FLASH_BLVER    0xE1
@@ -67,6 +67,11 @@
 #define BLVER_514        0x50
 #endif
 #define MAX_ADDR_514     0xBFFF
+
+#define MPUVER_505             0x28
+#define MAX_BLOCK_505          59
+#define MAX_ADDR_505           0xEFFF
+#define BLVER_505              0xFF
 
 #define RETRY            1
 

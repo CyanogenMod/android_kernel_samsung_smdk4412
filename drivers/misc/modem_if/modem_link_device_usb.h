@@ -52,7 +52,6 @@ enum IPC_INIT_STATUS {
 enum hub_status {
 	HUB_STATE_OFF,		/* usb3503 0ff*/
 	HUB_STATE_RESUMMING,	/* usb3503 on, but enummerattion was not yet*/
-	HUB_STATE_PREACTIVE,
 	HUB_STATE_ACTIVE,	/* hub and CMC221 enumerate */
 };
 
@@ -128,5 +127,6 @@ do {								\
 #define has_hub(usb_ld) ((usb_ld)->link_pm_data->has_usbhub)
 
 irqreturn_t usb_resume_irq(int irq, void *data);
+bool usb_is_enumerated(struct modem_shared *msd);
 
 #endif

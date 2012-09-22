@@ -27,4 +27,8 @@ config SAMSUNG_WORKAROUND_HPD_GLANCE
 	depends on (SAMSUNG_MHL || MHL_SII9234) && (CPU_EXYNOS4210 || CPU_EXYNOS4212 || CPU_EXYNOS4412)
 	default y
 
+config SAMSUNG_MHL_UNPOWERED
+	bool "Use source vbus for mhl dongle if no external power"
+	depends on (SAMSUNG_MHL || MHL_SII9234)
+	default n
 endmenu

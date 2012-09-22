@@ -28,6 +28,9 @@
 #include <linux/workqueue.h>
 #include <linux/rtc.h>
 #include <mach/gpio.h>
+#if defined(CONFIG_TARGET_LOCALE_KOR)
+#include <linux/power_supply.h>
+#endif /* CONFIG_TARGET_LOCALE_KOR */
 #include <linux/power/sec_battery_px.h>
 #include <linux/power/max17042_fuelgauge_px.h>
 
@@ -136,11 +139,11 @@ void fg_write_and_verify_register(u8 addr, u16 w_data)
 	}
 }
 
-static void fg_test_print(void)
+static void fg_debug_print(void)
 {
 	struct i2c_client *client = fg_i2c_client;
 	u8 data[2];
-	u32 average_vcell;
+	u32 avg_v;
 	u16 w_data;
 	u32 temp;
 	u32 temp2;
@@ -154,19 +157,19 @@ static void fg_test_print(void)
 	w_data = (data[1]<<8) | data[0];
 
 	temp = (w_data & 0xFFF) * 78125;
-	average_vcell = temp / 1000000;
+	avg_v = temp / 1000000;
 
 	temp = ((w_data & 0xF000) >> 4) * 78125;
 	temp2 = temp / 1000000;
-	average_vcell += (temp2 << 4);
+	avg_v += (temp2 << 4);
 
 	fullcap = fg_read_register(FULLCAP_REG);
 	remcap = fg_read_register(REMCAP_REP_REG);
 	mixcap = fg_read_register(REMCAP_MIX_REG);
 	avcap = fg_read_register(REMCAP_AV_REG);
 
-	pr_info("avg_vcell(%d), fullcap(%d),  remcap(%d), mixcap(%d), avcap(%d)\n",
-		average_vcell, fullcap/2, remcap/2, mixcap/2, avcap/2);
+	pr_info("avg_v(%d), fullcap(%d), remcap(%d), mixcap(%d), avcap(%d)\n",
+		avg_v, (fullcap / 2), (remcap / 2), (mixcap / 2), (avcap / 2));
 	msleep(20);
 }
 
@@ -221,8 +224,8 @@ static int fg_read_vcell(void)
 	vcell += (temp2 << 4);
 
 	if (!(chip->info.pr_cnt % PRINT_COUNT))
-		pr_info("%s: VCELL(%d), data(0x%04x)\n",
-			__func__, vcell, (data[1]<<8) | data[0]);
+		pr_info("%s: vcell(%d, 0x%04x)\n", __func__,
+				vcell, (data[1]<<8) | data[0]);
 
 	return vcell;
 }
@@ -339,31 +342,10 @@ static int fg_read_temp(void)
 		temper = 20000;
 
 	if (!(chip->info.pr_cnt % PRINT_COUNT))
-		pr_info("%s: TEMPERATURE(%d), data(0x%04x)\n", __func__,
+		pr_info("%s: temper(%d, 0x%04x)\n", __func__,
 				temper, (data[1]<<8) | data[0]);
 
 	return temper;
-}
-
-static int fg_read_soc(void)
-{
-	struct i2c_client *client = fg_i2c_client;
-	struct max17042_chip *chip = i2c_get_clientdata(client);
-	u8 data[2];
-	u32 soc = 0;
-
-	if (fg_i2c_read(client, SOCREP_REG, data, 2) < 0) {
-		pr_err("%s: Failed to read SOCREP\n", __func__);
-		return -1;
-	}
-
-	soc = data[1];
-
-	if (!(chip->info.pr_cnt % PRINT_COUNT))
-		pr_info("%s: SOC(%d), data(0x%04x)\n", __func__,
-				soc, (data[1]<<8) | data[0]);
-
-	return soc;
 }
 
 static int fg_read_vfsoc(void)
@@ -377,6 +359,32 @@ static int fg_read_vfsoc(void)
 	}
 
 	return (int)data[1];
+}
+
+static int fg_read_soc(void)
+{
+	struct i2c_client *client = fg_i2c_client;
+	struct max17042_chip *chip = i2c_get_clientdata(client);
+	u8 data[2];
+	u32 soc = 0;
+	u32 soc_lsb = 0;
+	int psoc = 0;
+
+	if (fg_i2c_read(client, SOCREP_REG, data, 2) < 0) {
+		pr_err("%s: Failed to read SOCREP\n", __func__);
+		return -1;
+	}
+
+	soc_lsb = (data[0] * 100) / 256;
+	psoc = (data[1] * 100) + soc_lsb;
+	soc = psoc / 99;
+	chip->info.psoc = psoc;
+
+	if (!(chip->info.pr_cnt % PRINT_COUNT))
+		pr_info("%s: soc(%d), psoc(%d), vfsoc(%d)\n", __func__,
+			soc, psoc, fg_read_vfsoc());
+
+	return soc;
 }
 
 static int fg_read_current(void)
@@ -421,10 +429,11 @@ static int fg_read_current(void)
 		avg_current *= -1;
 
 	if (!(chip->info.pr_cnt++ % PRINT_COUNT)) {
-		fg_test_print();
-		pr_info("%s: CURRENT(%dmA), AVG_CURRENT(%dmA)\n", __func__,
+		pr_info("%s: curr(%d), avg_curr(%dmA)\n", __func__,
 				i_current, avg_current);
 		chip->info.pr_cnt = 1;
+
+		fg_debug_print();
 		/* Read max17042's all registers every 5 minute. */
 		fg_periodic_read();
 	}
@@ -590,8 +599,9 @@ void fg_low_batt_compensation(u32 level)
 
 void fg_periodic_read(void)
 {
+	u8 reg;
 	int i;
-	u16 data[0x10];
+	int data[0x10];
 	struct timespec ts;
 	struct rtc_time tm;
 
@@ -599,21 +609,21 @@ void fg_periodic_read(void)
 	rtc_time_to_tm(ts.tv_sec, &tm);
 
 	pr_info("[MAX17042] %d/%d/%d %02d:%02d,",
-		tm.tm_mday, tm.tm_mon + 1, tm.tm_year + 1900, tm.tm_hour,
-		tm.tm_min);
+		tm.tm_mday, tm.tm_mon + 1, tm.tm_year + 1900,
+		tm.tm_hour, tm.tm_min);
 
 	for (i = 0; i < 16; i++) {
-		fg_read_16register(i, data);
+		for (reg = 0; reg < 0x10; reg++)
+			data[reg] = fg_read_register(reg + i * 0x10);
 
-		pr_info("%04xh,%04xh,%04xh,%04xh,%04xh,%04xh,%04xh,%04xh,",
+		pr_info("%04xh,%04xh,%04xh,%04xh,%04xh,%04xh,%04xh,%04xh,\n"
+			"%04xh,%04xh,%04xh,%04xh,%04xh,%04xh,%04xh,%04xh,",
 			data[0x00], data[0x01], data[0x02], data[0x03],
-			data[0x04], data[0x05], data[0x06], data[0x07]);
-		pr_info("%04xh,%04xh,%04xh,%04xh,%04xh,%04xh,%04xh,%04xh,",
+			data[0x04], data[0x05], data[0x06], data[0x07],
 			data[0x08], data[0x09], data[0x0a], data[0x0b],
 			data[0x0c], data[0x0d], data[0x0e], data[0x0f]);
 		if (i == 4)
 			i = 13;
-
 		msleep(20);
 	}
 	pr_info("\n");
@@ -1048,6 +1058,8 @@ static void display_low_batt_comp_cnt(void)
 		sprintf(type_str, "SDI");
 	else if (fg_get_battery_type() == ATL_BATTERY_TYPE)
 		sprintf(type_str, "ATL");
+	else if (fg_get_battery_type() == BYD_BATTERY_TYPE)
+		sprintf(type_str, "BYD");
 	else
 		sprintf(type_str, "Unknown");
 
@@ -1109,7 +1121,7 @@ void prevent_early_late_poweroff(int vcell, int *fg_soc)
 		return;
 
 	avg_vcell = fg_read_avg_vcell();
-	pr_info("%s: soc=%d%%(0x%04x), vcell=%d avg_vcell=%d\n",
+	pr_info("%s: soc(%d%%(0x%04x)), v(%d), avg_v(%d)\n",
 			__func__, repsoc, repsoc_data, vcell, avg_vcell);
 
 	if (vcell > POWER_OFF_VOLTAGE_HIGH_MARGIN) {
@@ -1118,8 +1130,8 @@ void prevent_early_late_poweroff(int vcell, int *fg_soc)
 		fg_write_register(REMCAP_REP_REG, (u16)(read_val * 13 / 1000));
 		msleep(200);
 		*fg_soc = fg_read_soc();
-		pr_info("%s: new soc=%d, vcell=%d, avg_vcell=%d\n",
-				__func__, *fg_soc, vcell, avg_vcell);
+		pr_info("%s: 1.3%% case: new soc(%d), v(%d), avg_v(%d)\n",
+					__func__, *fg_soc, vcell, avg_vcell);
 	} else if ((vcell < POWER_OFF_VOLTAGE_NOW_LOW_MARGIN) &&
 		(avg_vcell < POWER_OFF_VOLTAGE_AVG_LOW_MARGIN)) {
 		read_val = fg_read_register(FULLCAP_REG);
@@ -1127,8 +1139,8 @@ void prevent_early_late_poweroff(int vcell, int *fg_soc)
 		fg_write_register(REMCAP_REP_REG, (u16)(read_val * 9 / 1000));
 		msleep(200);
 		*fg_soc = fg_read_soc();
-		pr_info("%s: new soc=%d, vcell=%d, avg_vcell=%d\n",
-				__func__, *fg_soc, vcell, avg_vcell);
+		pr_info("%s: 0%% case: new soc(%d), v(%d), avg_v(%d)\n",
+					__func__, *fg_soc, vcell, avg_vcell);
 	}
 }
 
@@ -1263,8 +1275,85 @@ static int get_low_batt_threshold(int range, int level, int nCurrent)
 			break;
 		}
 	}
+#if defined(CONFIG_MACH_P4NOTE)
+	else if (fg_get_battery_type() == BYD_BATTERY_TYPE) {
+		switch (range) {
+		case 5:
+			if (level == 1)
+				ret = BYD_Range5_1_Offset + \
+				      ((nCurrent * BYD_Range5_1_Slope) / 1000);
+			else if (level == 3)
+				ret = BYD_Range5_3_Offset + \
+				      ((nCurrent * BYD_Range5_3_Slope) / 1000);
+			break;
+		case 4:
+			if (level == 1)
+				ret = BYD_Range4_1_Offset + \
+				      ((nCurrent * BYD_Range4_1_Slope) / 1000);
+			else if (level == 3)
+				ret = BYD_Range4_3_Offset + \
+				      ((nCurrent * BYD_Range4_3_Slope) / 1000);
+			break;
 
+		case 3:
+			if (level == 1)
+				ret = BYD_Range3_1_Offset + \
+				      ((nCurrent * BYD_Range3_1_Slope) / 1000);
+			else if (level == 3)
+				ret = BYD_Range3_3_Offset + \
+				      ((nCurrent * BYD_Range3_3_Slope) / 1000);
+			break;
+
+		case 2:
+			if (level == 1)
+				ret = BYD_Range2_1_Offset + \
+				      ((nCurrent * BYD_Range2_1_Slope) / 1000);
+			else if (level == 3)
+				ret = BYD_Range2_3_Offset + \
+				      ((nCurrent * BYD_Range2_3_Slope) / 1000);
+			break;
+
+		case 1:
+			if (level == 1)
+				ret = BYD_Range1_1_Offset + \
+				      ((nCurrent * BYD_Range1_1_Slope) / 1000);
+			else if (level == 3)
+				ret = BYD_Range1_3_Offset + \
+				      ((nCurrent * BYD_Range1_3_Slope) / 1000);
+			break;
+
+		default:
+			break;
+		}
+	}
+#endif
 	return ret;
+}
+
+void fg_reset_fullcap_in_fullcharge(void)
+{
+	u32 fullCap = fg_read_register(FULLCAP_REG);
+	u32 remCapRep = fg_read_register(REMCAP_REP_REG);
+	if (!fullCap || !remCapRep) {
+		pr_err("%s: Possible i2c failure !!!\n", __func__);
+		return;
+	}
+
+	pr_info("%s: FullCap(%d), RemCapRep(%d)\n",
+			__func__,
+			fullCap,
+			remCapRep);
+
+	if (remCapRep < fullCap) {
+		/* Usually we need a delay of 100ms here for the
+		 * RemCapRep to adjust to the new FullCap but
+		 * here this call is being made in an interrupt where
+		 * we already follow this call with a delay
+		 * of 300ms, hence avoided.
+		 */
+		fg_write_register(FULLCAP_REG, remCapRep);
+	 }
+	return;
 }
 
 int low_batt_compensation(int fg_soc, int fg_vcell, int fg_current)
@@ -1411,6 +1500,9 @@ static void fg_set_battery_type(void)
 	else if ((data == chip->pdata->atl_vfcapacity) || \
 			(data == chip->pdata->atl_vfcapacity-1))
 		chip->info.battery_type = ATL_BATTERY_TYPE;
+	else if ((data == chip->pdata->byd_vfcapacity) || \
+			(data == chip->pdata->byd_vfcapacity-1))
+		chip->info.battery_type = BYD_BATTERY_TYPE;
 	else {
 		pr_info("%s: Unknown battery is set to SDI type.\n", __func__);
 		chip->info.battery_type = SDI_BATTERY_TYPE;
@@ -1420,6 +1512,8 @@ static void fg_set_battery_type(void)
 		sprintf(type_str, "SDI");
 	else if (chip->info.battery_type == ATL_BATTERY_TYPE)
 		sprintf(type_str, "ATL");
+	else if (chip->info.battery_type == BYD_BATTERY_TYPE)
+		sprintf(type_str, "BYD");
 	else
 		sprintf(type_str, "Unknown");
 
@@ -1431,7 +1525,10 @@ static void fg_set_battery_type(void)
 		chip->info.capacity = chip->pdata->atl_capacity;
 		chip->info.vfcapacity = chip->pdata->atl_vfcapacity;
 		break;
-
+	case BYD_BATTERY_TYPE:
+		chip->info.capacity = chip->pdata->byd_capacity;
+		chip->info.vfcapacity = chip->pdata->byd_vfcapacity;
+		break;
 	case SDI_BATTERY_TYPE:
 	default:
 		chip->info.capacity = chip->pdata->sdi_capacity;
@@ -1447,6 +1544,9 @@ static void fg_set_battery_type(void)
 		else if (chip->info.battery_type == ATL_BATTERY_TYPE)
 			chip->info.check_start_vol = \
 					chip->pdata->atl_low_bat_comp_start_vol;
+		else if (chip->info.battery_type == BYD_BATTERY_TYPE)
+			chip->info.check_start_vol = \
+					chip->pdata->byd_low_bat_comp_start_vol;
 	}
 
 }
@@ -1537,10 +1637,159 @@ static int fg_i2c_remove(struct i2c_client *client)
 	return 0;
 }
 
+#if defined(CONFIG_TARGET_LOCALE_KOR)
+static int max17042_get_property(struct power_supply *psy,
+			    enum power_supply_property psp,
+			    union power_supply_propval *val)
+{
+	switch (psp) {
+	case POWER_SUPPLY_PROP_STATUS:
+		val->intval = POWER_SUPPLY_STATUS_NOT_CHARGING;
+		break;
+	case POWER_SUPPLY_PROP_ONLINE:
+		val->intval = 1;
+		break;
+	case POWER_SUPPLY_PROP_VOLTAGE_NOW:
+		val->intval = get_fuelgauge_value(FG_VOLTAGE);
+		break;
+	case POWER_SUPPLY_PROP_CAPACITY:
+		val->intval = get_fuelgauge_value(FG_LEVEL);
+		break;
+	default:
+		return -EINVAL;
+	}
+	return 0;
+}
+
+static enum power_supply_property max17042_battery_props[] = {
+	POWER_SUPPLY_PROP_STATUS,
+	POWER_SUPPLY_PROP_ONLINE,
+	POWER_SUPPLY_PROP_VOLTAGE_NOW,
+	POWER_SUPPLY_PROP_CAPACITY,
+};
+
+static ssize_t max17042_show_property(struct device *dev,
+					struct device_attribute *attr,
+					char *buf);
+
+static ssize_t max17042_store_property(struct device *dev,
+					struct device_attribute *attr,
+					const char *buf, size_t count);
+
+#define SEC_MAX17042_ATTR(_name) \
+{ \
+	.attr = { .name = #_name, .mode = S_IRUGO | (S_IWUSR | S_IWGRP) }, \
+	.show = max17042_show_property, \
+	.store = max17042_store_property, \
+}
+
+static struct device_attribute sec_max17042_attrs[] = {
+	SEC_MAX17042_ATTR(fg_vfsoc),
+	SEC_MAX17042_ATTR(fg_vfocv),
+	SEC_MAX17042_ATTR(fg_filtercfg),
+	SEC_MAX17042_ATTR(fg_cgain),
+};
+
+enum {
+	MAX17042_VFSOC = 0,
+	MAX17042_VFOCV,
+	MAX17042_FILTERCFG,
+	MAX17042_CGAIN,
+};
+
+static ssize_t max17042_show_property(struct device *dev,
+				    struct device_attribute *attr, char *buf)
+{
+	struct power_supply *psy = dev_get_drvdata(dev);
+	struct max17042_chip *chip = container_of(psy,
+						  struct max17042_chip,
+						  battery);
+	int i = 0;
+	const ptrdiff_t off = attr - sec_max17042_attrs;
+	int val;
+
+	switch (off) {
+	case MAX17042_VFSOC:
+		val = fg_read_register(VFSOC_REG);
+		val = val >> 8; /* % */
+		if (val >= 0)
+			i += scnprintf(buf + i, PAGE_SIZE - i, "%d\n", val);
+		else
+			i = -EINVAL;
+		break;
+	case MAX17042_VFOCV:
+		val = fg_read_register(VFOCV_REG);
+		val = ((val >> 3) * 625) / 1000; /* mV */
+		if (val >= 0)
+			i += scnprintf(buf + i, PAGE_SIZE - i, "%d\n", val);
+		else
+			i = -EINVAL;
+		break;
+	case MAX17042_FILTERCFG:
+		val = fg_read_register(FILTERCFG_REG);
+		if (val >= 0)
+			i += scnprintf(buf + i, PAGE_SIZE - i, "0x%x\n", val);
+		else
+			i = -EINVAL;
+		break;
+	case MAX17042_CGAIN:
+		val = fg_read_register(CGAIN_REG);
+		if (val >= 0)
+			i += scnprintf(buf + i, PAGE_SIZE - i,
+				"0x%x, PSOC: %d\n", val, chip->info.psoc);
+		else
+			i = -EINVAL;
+		break;
+	default:
+		i = -EINVAL;
+		break;
+	}
+
+	return i;
+}
+
+static ssize_t max17042_store_property(struct device *dev,
+					struct device_attribute *attr,
+					const char *buf, size_t count)
+{
+	int ret = 0;
+	const ptrdiff_t off = attr - sec_max17042_attrs;
+
+	switch (off) {
+	default:
+		ret = -EINVAL;
+		break;
+	}
+
+	return ret;
+}
+
+static int max17042_create_attrs(struct device *dev)
+{
+	int i, rc;
+
+	for (i = 0; i < ARRAY_SIZE(sec_max17042_attrs); i++) {
+		rc = device_create_file(dev, &sec_max17042_attrs[i]);
+		if (rc)
+			goto max17042_attrs_failed;
+	}
+	goto succeed;
+
+max17042_attrs_failed:
+	while (i--)
+		device_remove_file(dev, &sec_max17042_attrs[i]);
+succeed:
+	return rc;
+}
+#endif /* CONFIG_TARGET_LOCALE_KOR */
+
 static int
 fg_i2c_probe(struct i2c_client *client,  const struct i2c_device_id *id)
 {
 	struct max17042_chip *chip;
+#if defined(CONFIG_TARGET_LOCALE_KOR)
+	int ret = 0;
+#endif /* CONFIG_TARGET_LOCALE_KOR */
 
 	if (!client->dev.platform_data) {
 		pr_err("%s: No platform data\n", __func__);
@@ -1585,6 +1834,23 @@ fg_i2c_probe(struct i2c_client *client,  const struct i2c_device_id *id)
 	fg_alert_init();
 	fg_read_model_data();
 	fg_periodic_read();
+
+#if defined(CONFIG_TARGET_LOCALE_KOR)
+	chip->battery.name = "fuelgauge";
+	chip->battery.type = POWER_SUPPLY_TYPE_BATTERY;
+	chip->battery.get_property = max17042_get_property;
+	chip->battery.properties = max17042_battery_props;
+	chip->battery.num_properties = ARRAY_SIZE(max17042_battery_props);
+	ret = power_supply_register(&client->dev, &chip->battery);
+	if (ret) {
+		pr_err("%s : failed to regist fuel_gauge(ret = %d)\n",
+			__func__, ret);
+		kfree(chip);
+		return ret;
+	}
+
+	max17042_create_attrs(chip->battery.dev);
+#endif /* CONFIG_TARGET_LOCALE_KOR */
 	return 0;
 }
 

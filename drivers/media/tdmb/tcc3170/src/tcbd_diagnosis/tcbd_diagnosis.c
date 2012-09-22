@@ -188,6 +188,9 @@ static inline void tcbd_calc_pcber(struct tcbd_status_data *_status_data)
 	else if (_status_data->pcber > MAX_PCBER * ERROR_LIMIT)
 		_status_data->pcber = MAX_PCBER * ERROR_LIMIT;
 
+	if (_status_data->pcber <= 20)
+		_status_data->pcber = 0;
+
 	_status_data->pcber_moving_avg =
 		tcbd_get_moving_avg(
 			&moving_average[0],

@@ -147,10 +147,12 @@ static struct clk init_clocks_off[] = {
 		.devname	= SYSMMU_CLOCK_NAME(2d, 9),
 		.enable		= exynos4_clk_ip_image_ctrl,
 		.ctrlbit	= (1 << 3),
+#ifdef CONFIG_INTERNAL_MODEM_IF
 	}, {
 		.name		= "modem",
 		.enable		= exynos4_clk_ip_peril_ctrl,
 		.ctrlbit	= (1 << 28),
+#endif
 	}
 };
 

@@ -34,8 +34,8 @@ extern int spi_is_restart;
 
 extern void spi_dev_init(void *data);
 extern void spi_dev_destroy(void);
-extern int spi_dev_send(void *buf, void * sync_buf, unsigned int length);
-extern int spi_dev_receive(void *sync_buf, void *buf, unsigned int length);
+extern int spi_dev_send(void *buf, unsigned int length);
+extern int spi_dev_receive(void *buf, unsigned int length);
 extern void spi_dev_set_gpio(int gpio_id, enum SPI_DEV_GPIOLEVEL_T value);
 extern enum SPI_DEV_GPIOLEVEL_T spi_dev_get_gpio(int gpio_id);
 extern int spi_dev_reigster_irq_handler(int gpio_id,

@@ -87,6 +87,7 @@ struct mfc_enc_h264 {
 
 	unsigned int sei_gen;		/* H */
 	struct mfc_frame_packing fp;	/* H */
+	unsigned int sps_pps_gen;
 };
 
 int mfc_init_encoding(struct mfc_inst_ctx *ctx, union mfc_args *args);

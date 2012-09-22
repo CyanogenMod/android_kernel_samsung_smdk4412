@@ -15,6 +15,9 @@
 #define __MFC_INST_H __FILE__
 
 #include <linux/list.h>
+#ifdef CONFIG_SLP
+#include <linux/videodev2.h>
+#endif
 
 #include "mfc.h"
 #include "mfc_interface.h"
@@ -130,7 +133,7 @@ struct mfc_inst_ctx {
 	unsigned int width;
 	unsigned int height;
 	volatile unsigned char *shm;
-	unsigned int shmofs;
+	long shmofs;
 	unsigned int ctxbufofs;
 	unsigned int ctxbufsize;
 	unsigned int descbufofs;	/* FIXME: move to decoder context */
@@ -169,6 +172,10 @@ struct mfc_inst_ctx {
 
 #if SUPPORT_SLICE_ENCODING
 	int slice_flag;
+#endif
+#ifdef CONFIG_SLP
+	struct vb2_plane        *enc_planes[VIDEO_MAX_PLANES];
+	struct vb2_plane        *dec_planes[VIDEO_MAX_PLANES];
 #endif
 };
 

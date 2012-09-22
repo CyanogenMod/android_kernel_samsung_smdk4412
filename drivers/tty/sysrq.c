@@ -142,9 +142,6 @@ static struct sysrq_key_op sysrq_crash_op = {
 
 static void sysrq_handle_reboot(int key)
 {
-#ifdef COFIG_SEC_DEBUG_SYSRQ_B
-	BUG();
-#endif
 	lockdep_off();
 	local_irq_enable();
 	emergency_restart();

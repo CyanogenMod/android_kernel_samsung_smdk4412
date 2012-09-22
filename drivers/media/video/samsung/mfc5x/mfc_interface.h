@@ -242,6 +242,9 @@ struct mfc_enc_exe_arg {
 	unsigned int out_y_cookie;
 	unsigned int out_c_cookie;
 #endif
+#ifdef CONFIG_SLP_DMABUF
+	SSBSIP_MFC_MEMORY_TYPE memory_type;     /* [OUT] memory type */
+#endif
 };
 
 struct mfc_dec_init_arg {
@@ -311,6 +314,9 @@ struct mfc_dec_exe_arg {
 #elif defined(CONFIG_S5P_VMEM)
 	unsigned int out_y_cookie;
 	unsigned int out_c_cookie;
+#endif
+#ifdef CONFIG_SLP_DMABUF
+	SSBSIP_MFC_MEMORY_TYPE memory_type;     /* [OUT] memory type */
 #endif
 	int out_img_width;	/* [OUT] width	of YUV420 frame */
 	int out_img_height;	/* [OUT] height of YUV420 frame */

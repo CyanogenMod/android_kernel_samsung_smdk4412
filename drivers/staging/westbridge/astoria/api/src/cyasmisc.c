@@ -99,7 +99,6 @@ cy_as_bus_from_media_type(cy_as_media_type type,
 	else
 		*bus = 1;
 }
-
 static cy_as_return_status_t
 my_handle_response_no_data(cy_as_device *dev_p,
 			cy_as_ll_request_response *req_p,
@@ -1021,7 +1020,7 @@ cy_as_return_status_t cy_as_misc_set_sd_power_polarity(
 		if (ret != CY_AS_ERROR_SUCCESS)
 			goto destroy;
 
-		return (my_handle_response_no_data(dev_p, req_p, reply_p));
+		return my_handle_response_no_data(dev_p, req_p, reply_p);
 	} else {
 		ret = cy_as_misc_send_request(dev_p, cb, client,
 			CY_FUNCT_CB_MISC_SETSDPOLARITY, 0, dev_p->func_cbs_misc,
@@ -1232,14 +1231,16 @@ my_handle_response_reset(cy_as_device *dev_p,
 		cy_as_device_set_low_level_stopped(dev_p);
 		cy_as_device_set_intr_stopped(dev_p);
 		cy_as_device_clear_suspend_mode(dev_p);
+#if !defined(CONFIG_MACH_U1_NA_SPR) && !defined(CONFIG_MACH_U1_NA_USCC)
 		cy_as_usb_cleanup(dev_p);
+#endif
 		cy_as_storage_cleanup(dev_p);
 
 		/*
 		 * wait for a small amount of time to
 		 * allow reset to be complete.
 		 */
-		cy_as_hal_sleep(100);
+		cy_as_hal_sleep(10) ;
 	}
 
 	cy_as_device_clear_reset_pending(dev_p);
@@ -1264,8 +1265,9 @@ cy_as_misc_reset(cy_as_device_handle handle,
 
 	/* Make sure the device is ready for the command. */
 	dev_p = (cy_as_device *)handle;
-	cy_as_check_device_ready(dev_p);
-
+#if !defined(CONFIG_MACH_U1_NA_SPR) && !defined(CONFIG_MACH_U1_NA_USCC)
+	cy_as_check_device_ready(dev_p) ;
+#endif
 	/*
 	 * soft reset is not supported until we close on the issues
 	 * in the firmware with what needs to happen.

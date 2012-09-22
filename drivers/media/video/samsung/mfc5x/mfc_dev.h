@@ -99,6 +99,12 @@ struct mfc_dev {
 
 	struct mfc_fw		fw;
 
+#if defined(CONFIG_DMA_CMA) && defined(CONFIG_USE_MFC_CMA)
+	/* NEW CMA */
+	void            *cma_vaddr;
+	dma_addr_t      cma_dma_addr;
+#endif
+
 	struct s5p_vcm_mmu	*_vcm_mmu;
 
 	struct device		*device;

@@ -23,6 +23,8 @@
 */
 #ifdef CONFIG_BT_MGMT
 #include "hci_core_mgmt.h"
+#elif defined(CONFIG_BT_TIZEN)
+#include "tizen/hci_core.h"
 #else
 #ifndef __HCI_CORE_H
 #define __HCI_CORE_H

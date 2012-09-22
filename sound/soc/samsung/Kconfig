@@ -77,13 +77,39 @@ config SND_SOC_SAMSUNG_MIDAS_WM1811
 	help
 	  Say Y if you want to add support for SoC audio on the MIDAS.
 
-config SND_SOC_SAMSUNG_SLP_MIDAS_WM1811
-	tristate "SoC I2S Audio support for WM1811 on SLP MIDAS"
-	depends on SND_SOC_SAMSUNG && (MACH_SLP_MIDAS || MACH_SLP_MIDAS_D || MACH_SLP_MIDAS_Q || MACH_SLP_PQ || MACH_SLP_PQ_LTE)
+config SND_SOC_SAMSUNG_GRANDE_WM1811
+	tristate "SoC I2S Audio support for WM1811 on Grande"
+	depends on SND_SOC_SAMSUNG && (MACH_M0_GRANDECTC || MACH_IRON || MACH_M0_DUOSCTC )
+	select SND_SOC_WM8994
+	select SND_SAMSUNG_I2S
+
+config SND_SOC_SAMSUNG_T0_WM1811
+	tristate "SoC I2S Audio support for WM1811 on T0"
+	depends on SND_SOC_SAMSUNG && MACH_T0
 	select SND_SOC_WM8994
 	select SND_SAMSUNG_I2S
 	help
-	  Say Y if you want to add support for SoC audio on the MIDAS.
+	  Say Y if you want to add support for SoC audio on the T0.
+
+config SND_SOC_SAMSUNG_T0DUOS_WM1811
+	tristate "SoC I2S Audio support for WM1811 on T0DUOS"
+	depends on SND_SOC_SAMSUNG && (MACH_T0_CHN_CTC || MACH_T0_CHN_CMCC || MACH_T0_CHN_OPEN_DUOS || MACH_T0_CHN_CU_DUOS)
+	select SND_SOC_WM8994
+	select SND_SAMSUNG_I2S
+
+config SND_SOC_SAMSUNG_M3_WM1811
+	tristate "SoC I2S Audio support for WM1811 on M3"
+	depends on SND_SOC_SAMSUNG && MACH_M3
+	select SND_SOC_WM8994
+	select SND_SAMSUNG_I2S
+
+config SND_SOC_SAMSUNG_SLP_EXYNOS_WM1811
+	tristate "SoC I2S Audio support for WM1811 on SLP MIDAS"
+	depends on SND_SOC_SAMSUNG && (MACH_SLP_PQ || MACH_SLP_PQ_LTE || MACH_REDWOOD || MACH_SLP_T0_LTE)
+	select SND_SOC_WM8994
+	select SND_SAMSUNG_I2S
+	help
+	  Say Y if you want to add support for SoC audio on the SLP Exynos PQ_Proxima, Redwood.
 
 config SND_SOC_SAMSUNG_SLP_NAPLES_WM1811
 	tristate "SoC I2S Audio support for WM1811 on SLP NAPLES"
@@ -106,6 +132,17 @@ config SND_SOC_U1_MC1N2
 	select SND_SAMSUNG_I2S
 	help
 	  Say Y if you want to add support for SoC audio on U1.
+
+config SND_SOC_SLP_TRATS_MC1N2
+	tristate "SoC I2S Audio support for MC1N2 on SLP TRATS"
+	depends on SND_SOC_SAMSUNG && (MACH_TRATS)
+	select SND_SOC_MC1N2
+	select SND_SAMSUNG_I2S
+	help
+	  Say Y if you want to add support for SoC audio on SLP TRATS.
+	  This uses
+	  Samsung Exynos-4210 audio subsystem
+	  and Yamaha MC1N2 codec.
 
 config SND_SOC_SAMSUNG_USE_DMA_WRAPPER
 	bool "DMA wrapper for ALSA Platform(DMA)"
@@ -272,6 +309,10 @@ config SND_SOC_SPEYSIDE
 	select SND_SAMSUNG_I2S
 	select SND_SOC_WM8915
 	select SND_SOC_WM9081
+
+config SND_DUOS_MODEM_SWITCH
+	bool "Select DUOS Modem"
+	depends on SND_SOC_SAMSUNG
 
 config SND_USE_SUB_MIC
 	bool "Use SUB_MIC"

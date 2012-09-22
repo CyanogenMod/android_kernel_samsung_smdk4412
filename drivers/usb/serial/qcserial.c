@@ -16,6 +16,9 @@
 #include <linux/usb.h>
 #include <linux/usb/serial.h>
 #include <linux/slab.h>
+#ifdef CONFIG_MDM_HSIC_PM
+#include "qcserial.h"
+#endif
 #include "usb-wwan.h"
 
 #define DRIVER_AUTHOR "Qualcomm Inc"
@@ -105,6 +108,8 @@ static const struct usb_device_id id_table[] = {
 	{USB_DEVICE(0x413c, 0x8193)},	/* Dell Gobi 3000 QDL */
 	{USB_DEVICE(0x413c, 0x8194)},	/* Dell Gobi 3000 Composite */
 	{USB_DEVICE(0x1199, 0x9013)},	/* Sierra Wireless Gobi 3000 Modem device (MC8355) */
+	{USB_DEVICE(0x05c6, 0x9048)},	/* MDM9x15 device */
+	{USB_DEVICE(0x05c6, 0x904C)},	/* MDM9x15 device */
 	{USB_DEVICE(0x12D1, 0x14F0)},	/* Sony Gobi 3000 QDL */
 	{USB_DEVICE(0x12D1, 0x14F1)},	/* Sony Gobi 3000 Composite */
 	{ }				/* Terminating entry */
@@ -120,9 +125,26 @@ static struct usb_driver qcdriver = {
 	.id_table		= id_table,
 	.suspend		= usb_serial_suspend,
 	.resume			= usb_serial_resume,
+	.reset_resume		= usb_serial_resume,
 	.supports_autosuspend	= true,
 };
 
+#ifdef CONFIG_MDM_HSIC_PM
+void check_chip_configuration(char *product)
+{
+	if (!product)
+		return;
+
+	pr_info("%s: usb product name = %s\n", __func__, product);
+
+	if (!strncmp(product, PRODUCT_DLOAD, sizeof(PRODUCT_DLOAD)))
+		mdm_set_chip_configuration(true);
+	else if (!strncmp(product, PRODUCT_SAHARA, sizeof(PRODUCT_SAHARA)))
+		mdm_set_chip_configuration(false);
+	else
+		panic("UnKnown MDM product");
+}
+#endif
 static int qcprobe(struct usb_serial *serial, const struct usb_device_id *id)
 {
 	struct usb_wwan_intf_private *data;
@@ -146,9 +168,17 @@ static int qcprobe(struct usb_serial *serial, const struct usb_device_id *id)
 		return -ENOMEM;
 
 	spin_lock_init(&data->susp_lock);
+#ifdef CONFIG_MDM_HSIC_PM
+	if (id->idVendor == 0x05c6 && id->idProduct == 0x9008)
+		check_chip_configuration(serial->dev->product);
 
+	if (id->idVendor == 0x05c6 &&
+			(id->idProduct == 0x9008 || id->idProduct == 0x9048 ||
+					id->idProduct == 0x904c))
+		goto set_interface;
 	usb_enable_autosuspend(serial->dev);
-
+set_interface:
+#endif
 	switch (nintf) {
 	case 1:
 		/* QDL mode */

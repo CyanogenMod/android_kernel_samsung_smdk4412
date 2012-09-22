@@ -31,7 +31,11 @@ extern int usb_wwan_resume(struct usb_serial *serial);
 
 /* per port private data */
 
+#ifdef CONFIG_MDM_HSIC_PM
+#define N_IN_URB 1
+#else
 #define N_IN_URB 5
+#endif
 #define N_OUT_URB 5
 #define IN_BUFLEN 65536
 #define OUT_BUFLEN 65536

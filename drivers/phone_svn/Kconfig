@@ -58,14 +58,4 @@ config CHN_CMCC_SPI_SPRD
 	depends on SAMSUNG_PHONE_SVNET
         default n
 
-config SEC_MODEM_M0_TD
-        tristate "Samsung M0-TD modemctl driver"
-        depends on SAMSUNG_PHONE_SVNET
-        default n
-
-config WORKQUEUE_FRONT
-	tristate "IPC_SPI workqueue front"
-	depends on SAMSUNG_PHONE_SVNET
-	default n
-
 endif # SAMSUNG_PHONE_SVNET

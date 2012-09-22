@@ -26,6 +26,15 @@ config PM_WATCHDOG_TIMEOUT
 	  Enable PM watchdog timer to catch lockup during early_suspend,
 	  late_resume and suspend_finish.
 
+config FAST_BOOT
+	bool "Force suspend and show fake turn off which is same with suspend"
+	depends on SUSPEND
+	default n
+	---help---
+	  This allows you go to suspend instead to turn off. If this is
+	  done, it goes to wake up instead to turn on. This works with power
+	  source.
+
 config HAS_WAKELOCK
 	bool
 
@@ -151,6 +160,14 @@ config FULL_PAGE_RECLAIM
 	  With this config, the size of hibernation snapshot image is
 	  dramatically decreased and small size of hibernation snapshot image
 	  has benefit for fast booting.
+
+config FAST_RESUME
+	bool "Using fast resume during Suspend-to-Disk"
+	depends on HIBERNATION
+	---help---
+	  software_resume() function which triggers hibernation restore is
+	  called faster on booting time by introducing new initcalls. This has
+	  benefit for fast booting on hibernation
 
 config PM_STD_PARTITION
 	string "Default resume partition"

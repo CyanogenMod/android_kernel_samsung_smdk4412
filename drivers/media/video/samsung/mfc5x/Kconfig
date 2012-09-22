@@ -9,8 +9,8 @@ config VIDEO_MFC5X
 	  This is a Samsung Multi Format Codecs (MFC) FIMV V5.x
 
 config VIDEO_MFC_MAX_INSTANCE
-	int "Maximum size of MFC instance (1-4)"
-	range 1 4
+	int "Maximum size of MFC instance (1-8)"
+	range 1 8
 	depends on VIDEO_MFC5X
 	default 4
 
@@ -36,4 +36,10 @@ config VIDEO_MFC5X_DEC_CHROMA_LUMA_4K_ALIGN
 	---help---
 	  To use physical address on the gem interface.
 
-
+config USE_MFC_CMA
+	bool "Use CMA for MFC_SECURE region (EXPERIMENTAL)"
+	depends on DMA_CMA
+	default n
+	help
+	  This enables the Contiguous Memory Allocator for MFC SECURE region.
+	  If unsure, say "n".

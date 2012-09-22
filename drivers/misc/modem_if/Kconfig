@@ -34,6 +34,16 @@ config CDMA_MODEM_MDM6600
 	depends on SEC_MODEM
 	default n
 
+config TDSCDMA_MODEM_SPRD8803
+	bool "modem chip : SPRD SC8803"
+	depends on SEC_MODEM
+	default n
+
+config GSM_MODEM_ESC6270
+	bool "modem chip : QC ESC6270"
+	depends on SEC_MODEM
+	default n
+
 config LINK_DEVICE_MIPI
 	bool "modem driver link device MIPI-HSI"
 	depends on SEC_MODEM
@@ -44,6 +54,10 @@ config LINK_DEVICE_DPRAM
 	depends on SEC_MODEM
 	default n
 
+config LINK_DEVICE_PLD
+	bool "modem driver link device PLD"
+	depends on SEC_MODEM
+	default n
 config LINK_DEVICE_USB
 	bool "modem driver link device USB"
 	depends on SEC_MODEM
@@ -59,6 +73,16 @@ config LINK_DEVICE_C2C
 	depends on SEC_MODEM
 	default n
 
+config LINK_DEVICE_SPI
+	bool "modem driver link device SPI"
+	depends on SEC_MODEM
+	default n
+
+config WORKQUEUE_FRONT
+	bool "IPC: SPI workqueue front"
+	depends on SEC_MODEM
+	default n
+
 config IPC_CMC22x_OLD_RFS
 	bool "IPC: CMC22x ancient RFS"
 	depends on SEC_MODEM
@@ -71,5 +95,10 @@ config SIPC_VER_5
 
 config SIM_DETECT
 	bool "SIM_DETECT pin"
+	depends on SEC_MODEM
+	default n
+
+config SIM_SLOT_SWITCH
+	bool "SIM_SLOT_SWITCH"
 	depends on SEC_MODEM
 	default n

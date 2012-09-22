@@ -40,7 +40,7 @@
 
 #define S3C_MEM_GET_PADDR		_IOWR(MEM_IOCTL_MAGIC, 320, struct s3c_mem_alloc)
 
-#ifdef CONFIG_S3C_MEM_CMA_ALLOC
+#ifdef CONFIG_VIDEO_SAMSUNG_USE_DMA_MEM
 #define S3C_MEM_CMA_ALLOC		\
 			_IOWR(MEM_IOCTL_MAGIC, 321, struct s3c_mem_alloc)
 #define S3C_MEM_CMA_FREE		\
@@ -52,7 +52,7 @@
 #define MEM_ALLOC_CACHEABLE		3
 #define MEM_ALLOC_CACHEABLE_SHARE	4
 
-#ifdef CONFIG_S3C_MEM_CMA_ALLOC
+#ifdef CONFIG_VIDEO_SAMSUNG_USE_DMA_MEM
 #define MEM_CMA_ALLOC	5
 #endif
 
@@ -68,7 +68,7 @@ static DEFINE_MUTEX(mem_share_free_lock);
 static DEFINE_MUTEX(mem_cacheable_alloc_lock);
 static DEFINE_MUTEX(mem_cacheable_share_alloc_lock);
 
-#ifdef CONFIG_S3C_MEM_CMA_ALLOC
+#ifdef CONFIG_VIDEO_SAMSUNG_USE_DMA_MEM
 static DEFINE_MUTEX(mem_open_lock);
 static DEFINE_MUTEX(mem_release_lock);
 #endif
@@ -89,52 +89,14 @@ struct s3c_mem_alloc {
 #define s3c_dma_init() do { } while (0)
 #endif
 
-#ifdef CONFIG_S3C_MEM_CMA_ALLOC
-#ifdef CONFIG_VIDEO_SAMSUNG_SLOTSIZE_S3C_MEM_CMA
-#define SLOT_SIZE CONFIG_VIDEO_SAMSUNG_SLOTSIZE_S3C_MEM_CMA
-#else
-#define SLOT_SIZE 1024
-#endif
-
+#ifdef CONFIG_VIDEO_SAMSUNG_USE_DMA_MEM
+#define S3C_MEM_CMA_MAX_CTX_BUF 3
 extern int s3c_mem_open(struct inode *inode, struct file *filp);
 extern int s3c_mem_release(struct inode *inode, struct file *filp);
 
-#ifdef CONFIG_VIDEO_SAMSUNG_USE_DMA_MEM
-extern struct device *s3c_mem_cma_dev;
-
 struct s3c_dev_info {
-	struct s3c_mem_alloc s_cur_mem_info;
-	struct device *s3c_mem_cma_dev;
+	struct s3c_mem_alloc s_cur_mem_info[S3C_MEM_CMA_MAX_CTX_BUF];
+	int s3c_mem_ctx_buf_num;
 };
-
-#else
-
-struct s3c_cur_mem_info {
-	unsigned int vaddr;
-	unsigned int paddr;
-	int mapped_size;
-	int req_memblock;
-};
-struct s3c_slot_info {
-	unsigned int s_start_addr;
-	unsigned int s_end_addr;
-	int s_size;
-	bool s_mapped;
-};
-
-struct s3c_dev_info {
-	struct s3c_cur_mem_info s_cur_mem_info;
-	struct s3c_slot_info *s_slot_info;
-	int dev_max_slot_num;
-	int dev_slot_size;
-
-};
-
-extern struct s3c_slot_info *s3c_slot_info;
-extern int s3c_cma_max_block_num;
-extern int s3c_cma_block_size;
-#endif
-
-
 
 #endif

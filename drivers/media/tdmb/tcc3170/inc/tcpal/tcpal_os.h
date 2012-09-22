@@ -24,8 +24,11 @@
 #define __TCPAL_OS_H__
 #include "tcpal_types.h"
 #include <linux/init.h>
-#include <linux/module.h>
 #include <linux/kernel.h>
+#include <linux/module.h>
+#include <linux/moduleparam.h>
+#include <linux/fs.h>
+#include <linux/uaccess.h>
 
 /* For TimeCheck */
 #define TCPAL_MAX_TIMECNT 0xFFFFFFFFFFFFFFFFULL

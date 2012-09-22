@@ -62,6 +62,12 @@ enum capacity_type {
 	CAPACITY_TYPE_REP,
 };
 
+enum dock_type {
+	DOCK_NONE = 0,
+	DOCK_DESK,
+	DOCK_KEYBOARD,
+};
+
 extern int low_batt_compensation(int fg_soc, int fg_vcell, int fg_current);
 extern void reset_low_batt_comp_cnt(void);
 extern int get_fuelgauge_value(int data);

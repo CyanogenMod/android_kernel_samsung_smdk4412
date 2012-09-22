@@ -43,9 +43,10 @@
 #include "s3c_dma_mem.h"
 #endif
 
-#ifdef CONFIG_S3C_MEM_CMA_ALLOC
+#ifdef CONFIG_VIDEO_SAMSUNG_USE_DMA_MEM
 #include <linux/cma.h>
 #include <linux/platform_device.h>
+#include <linux/backing-dev.h>
 #endif
 
 static int flag;
@@ -56,99 +57,7 @@ static unsigned int physical_address;
 static unsigned int virtual_address;
 #endif
 
-#ifdef CONFIG_S3C_MEM_CMA_ALLOC
-
 #ifdef CONFIG_VIDEO_SAMSUNG_USE_DMA_MEM
-struct device *s3c_mem_cma_dev;
-static struct device *s3c_mem_get_dev(void)
-{
-	return s3c_mem_cma_dev;
-}
-
-#else
-struct s3c_slot_info *s3c_slot_info;
-int s3c_cma_max_block_num;
-int s3c_cma_block_size;
-
-
-static void s3c_mem_log(struct s3c_dev_info *prv_data, bool mem_info)
-{
-	int i = 0;
-	for (i = 0; i < prv_data->dev_max_slot_num; i++)
-		printk(KERN_INFO
-		       "s_slot_info[%d].s_start_addr=0x%x s_mapped=%d\n", i,
-		       prv_data->s_slot_info[i].s_start_addr,
-		       prv_data->s_slot_info[i].s_mapped);
-	if (mem_info)
-		printk(KERN_INFO
-		       "s_cur_mem_info->paddr=0x%x s_mem_info->vaddr=0x%x s_mem_info->size=%d\n",
-		       prv_data->s_cur_mem_info.paddr,
-		       prv_data->s_cur_mem_info.vaddr,
-		       prv_data->s_cur_mem_info.mapped_size);
-}
-
-static unsigned long s3c_mapping_slot(struct s3c_dev_info *prv_data)
-{
-	int i, j, k, v_start_slot = 0;
-	unsigned long lv_ret = 0;
-
-	for (i = 0; i < prv_data->dev_max_slot_num; i++) {
-		if (prv_data->s_slot_info[i].s_mapped == false) {
-			if (i + prv_data->s_cur_mem_info.req_memblock >
-			    prv_data->dev_max_slot_num) {
-				printk(KERN_ERR "ERROR : not enough memory\n");
-				return lv_ret;
-			}
-			v_start_slot = i;
-			for (j = i;
-			     j < i + prv_data->s_cur_mem_info.req_memblock;
-			     j++) {
-				if (prv_data->s_slot_info[j].s_mapped == true)
-					break;
-			}
-			if (j == i + prv_data->s_cur_mem_info.req_memblock) {
-				lv_ret =
-				    __phys_to_pfn(prv_data->s_slot_info
-						  [v_start_slot].s_start_addr);
-				physical_address = (unsigned int)
-				    prv_data->s_slot_info[v_start_slot].
-				    s_start_addr;
-				for (k = v_start_slot; k < j; k++) {
-					prv_data->s_slot_info[k].s_mapped =
-					    true;
-					printk(KERN_INFO
-					       "prv_data->s_slot_info[%d].s_mapped=1\n",
-					       k);
-				}
-				break;
-			}
-		} else
-			continue;
-	}
-	if (i == prv_data->dev_max_slot_num)
-		printk(KERN_ERR "ERROR :can not find the suitable slot\n");
-
-	return lv_ret;
-}
-
-static int s3c_unmapping_slot(struct s3c_dev_info *prv_data)
-{
-	int i, j, lv_ret = 0;
-	for (i = 0; i < prv_data->dev_max_slot_num; i++) {
-		if (prv_data->s_slot_info[i].s_start_addr ==
-		    prv_data->s_cur_mem_info.paddr) {
-			for (j = i;
-			     j < i + prv_data->s_cur_mem_info.req_memblock;
-			     j++) {
-				prv_data->s_slot_info[j].s_mapped = false;
-				printk(KERN_INFO
-				       "s_slot_info[%d].s_mapped = 0\n", j);
-			}
-		}
-	}
-	return lv_ret;
-}
-#endif
 
 int s3c_mem_open(struct inode *inode, struct file *filp)
 {
@@ -158,22 +67,10 @@ int s3c_mem_open(struct inode *inode, struct file *filp)
 	prv_data = kzalloc(sizeof(struct s3c_dev_info), GFP_KERNEL);
 	if (!prv_data) {
 		pr_err("%s: not enough memory\n", __func__);
+		mutex_unlock(&mem_open_lock);
 		return -ENOMEM;
 	}
-#ifdef CONFIG_VIDEO_SAMSUNG_USE_DMA_MEM
-	prv_data->s3c_mem_cma_dev = s3c_mem_get_dev();
-	prv_data->s_cur_mem_info.phy_addr = 0;
-	prv_data->s_cur_mem_info.vir_addr = 0;
-	prv_data->s_cur_mem_info.size = 0;
-#else
-	prv_data->s_slot_info = s3c_slot_info;
-	prv_data->dev_slot_size = s3c_cma_block_size;
-	prv_data->dev_max_slot_num = s3c_cma_max_block_num;
-	prv_data->s_cur_mem_info.paddr = 0;
-	prv_data->s_cur_mem_info.vaddr = 0;
-	prv_data->s_cur_mem_info.mapped_size = 0;
-	prv_data->s_cur_mem_info.req_memblock = 0;
-#endif
+
 	filp->private_data = prv_data;
 
 	mutex_unlock(&mem_open_lock);
@@ -186,47 +83,36 @@ int s3c_mem_release(struct inode *inode, struct file *filp)
 	struct mm_struct *mm = current->mm;
 	struct s3c_dev_info *prv_data =
 	    (struct s3c_dev_info *)filp->private_data;
-
+	int i, err = 0;
 	mutex_lock(&mem_release_lock);
-#ifdef CONFIG_VIDEO_SAMSUNG_USE_DMA_MEM
-	if (prv_data->s_cur_mem_info.vir_addr) {
-		if (do_munmap
-		    (mm, prv_data->s_cur_mem_info.vir_addr,
-		     prv_data->s_cur_mem_info.size) < 0) {
-			printk(KERN_ERR "do_munmap() failed !!\n");
-			mutex_unlock(&mem_free_lock);
-			return -EINVAL;
-		}
-		if (prv_data->s_cur_mem_info.phy_addr)
-			cma_free(prv_data->s_cur_mem_info.phy_addr);
-		prv_data->s_cur_mem_info.vir_addr = 0;
-		prv_data->s_cur_mem_info.size = 0;
-		prv_data->s_cur_mem_info.phy_addr = 0;
-		DEBUG("do_munmap() succeed !!\n");
-	}
-#else
 
-	printk(KERN_INFO
-	       "prv_data->s_cur_mem_info->paddr=0x%x vaddr=0x%x size=%d\n",
-	       prv_data->s_cur_mem_info.paddr, prv_data->s_cur_mem_info.vaddr,
-	       prv_data->s_cur_mem_info.mapped_size);
+	for (i = 0; i < S3C_MEM_CMA_MAX_CTX_BUF; i++) {
+		if (prv_data->s_cur_mem_info[i].vir_addr) {
+			if (do_munmap
+			    (mm, prv_data->s_cur_mem_info[i].vir_addr,
+			     prv_data->s_cur_mem_info[i].size) < 0) {
+				printk(KERN_ERR "do_munmap() failed !!\n");
+				err = -EINVAL;
+			}
+			if (prv_data->s_cur_mem_info[i].phy_addr) {
+				cma_free(prv_data->s_cur_mem_info[i].phy_addr);
 
-	if (prv_data->s_cur_mem_info.vaddr) {
-		s3c_unmapping_slot(prv_data);
-		if (do_munmap
-		    (mm, prv_data->s_cur_mem_info.vaddr,
-		     prv_data->s_cur_mem_info.mapped_size) < 0) {
-			printk(KERN_ERR "do_munmap() failed !!\n");
-			mutex_unlock(&mem_release_lock);
-			return -EINVAL;
+				prv_data->s_cur_mem_info[i].vir_addr = 0;
+				prv_data->s_cur_mem_info[i].phy_addr = 0;
+				prv_data->s_cur_mem_info[i].size = 0;
+				prv_data->s3c_mem_ctx_buf_num--;
+			}
+
 		}
 	}
-#endif
-	kfree(filp->private_data);
-	filp->private_data = NULL;
+
+	if (!err) {
+		kfree(filp->private_data);
+		filp->private_data = NULL;
+	}
 	mutex_unlock(&mem_release_lock);
 
-	return 0;
+	return err;
 }
 #endif
 
@@ -285,15 +171,14 @@ long s3c_mem_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 		mutex_unlock(&mem_alloc_lock);
 
 		break;
-#ifdef CONFIG_S3C_MEM_CMA_ALLOC
+#ifdef CONFIG_VIDEO_SAMSUNG_USE_DMA_MEM
 	case S3C_MEM_CMA_ALLOC:
 		{
-#ifdef CONFIG_VIDEO_SAMSUNG_USE_DMA_MEM
 			struct cma_info mem_info;
-			int err;
-#endif
+			int err, i = 0;
 			struct s3c_dev_info *prv_data =
 			    (struct s3c_dev_info *)file->private_data;
+			struct device *dev;
 
 			mutex_lock(&mem_alloc_lock);
 			if (copy_from_user(&param, (struct s3c_mem_alloc *)arg,
@@ -303,9 +188,26 @@ long s3c_mem_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 			}
 			flag = MEM_CMA_ALLOC;
 
-#ifdef CONFIG_VIDEO_SAMSUNG_USE_DMA_MEM
-			err = cma_info(&mem_info, prv_data->s3c_mem_cma_dev, 0);
-			printk(KERN_DEBUG "%s : [cma_info] start_addr : 0x%x, end_addr	: 0x%x, "
+			if (prv_data->s3c_mem_ctx_buf_num >=
+			    S3C_MEM_CMA_MAX_CTX_BUF) {
+				printk(KERN_ERR "%s: exceed max_ctx\n",
+				       __func__);
+				mutex_unlock(&mem_alloc_lock);
+				return -ENOMEM;
+			}
+
+			if (file->f_mapping->backing_dev_info->dev)
+				dev = file->f_mapping->backing_dev_info->dev;
+			else {
+				printk(KERN_ERR "%s: get dev info failed\n",
+				       __func__);
+				mutex_unlock(&mem_alloc_lock);
+				return -EFAULT;
+			}
+
+			err = cma_info(&mem_info, dev, 0);
+			printk(KERN_DEBUG
+			       "%s : [cma_info] start_addr : 0x%x, end_addr	: 0x%x, "
 				"total_size : 0x%x, free_size : 0x%x req_size : 0x%x\n",
 				__func__, mem_info.lower_bound,
 				mem_info.upper_bound, mem_info.total_size,
@@ -317,8 +219,8 @@ long s3c_mem_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 				mutex_unlock(&mem_alloc_lock);
 				return -ENOMEM;
 			}
-			param.phy_addr = (dma_addr_t) cma_alloc
-			    (prv_data->s3c_mem_cma_dev, "dma",
+			physical_address = param.phy_addr =
+			    (dma_addr_t) cma_alloc(dev, "dma",
 			     (size_t) param.size, 0);
 
 			printk(KERN_INFO "param.phy_addr = 0x%x\n",
@@ -330,9 +232,6 @@ long s3c_mem_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 				mutex_unlock(&mem_alloc_lock);
 				return -ENOMEM;
 			}
-			prv_data->s_cur_mem_info.size = param.size;
-			prv_data->s_cur_mem_info.phy_addr = param.phy_addr;
-#endif
 
 			param.vir_addr =
 			    do_mmap(file, 0, param.size,
@@ -342,27 +241,40 @@ long s3c_mem_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 
 			if (param.vir_addr == -EINVAL) {
 				printk(KERN_ERR "S3C_MEM_ALLOC FAILED\n");
+				if (param.phy_addr)
+					cma_free(param.phy_addr);
 				flag = 0;
 				mutex_unlock(&mem_alloc_lock);
 				return -EFAULT;
 			}
-#ifdef CONFIG_VIDEO_SAMSUNG_USE_DMA_MEM
-			prv_data->s_cur_mem_info.vir_addr = param.vir_addr;
-#else
-			param.phy_addr = physical_address;
-			printk(KERN_INFO "physical_address=0x%x\n",
-			       physical_address);
-			prv_data->s_cur_mem_info.paddr = param.phy_addr;
-			prv_data->s_cur_mem_info.vaddr = param.vir_addr;
-			prv_data->s_cur_mem_info.mapped_size =
-			    PAGE_ALIGN(param.size);
-#endif
+
 			if (copy_to_user((struct s3c_mem_alloc *)arg, &param,
 					 sizeof(struct s3c_mem_alloc))) {
+				if (param.vir_addr)
+					do_munmap(mm, param.vir_addr,
+						  param.size);
+				if (param.phy_addr)
+					cma_free(param.phy_addr);
+
 				flag = 0;
 				mutex_unlock(&mem_alloc_lock);
 				return -EFAULT;
 			}
+
+			for (i = 0; i < S3C_MEM_CMA_MAX_CTX_BUF; i++) {
+				if (!prv_data->s_cur_mem_info[i].vir_addr
+				    && !prv_data->s_cur_mem_info[i].phy_addr) {
+					prv_data->s_cur_mem_info[i].vir_addr =
+					    param.vir_addr;
+					prv_data->s_cur_mem_info[i].phy_addr =
+					    param.phy_addr;
+					prv_data->s_cur_mem_info[i].size =
+					    param.size;
+					break;
+				}
+			}
+			prv_data->s3c_mem_ctx_buf_num++;
+
 			flag = 0;
 
 			mutex_unlock(&mem_alloc_lock);
@@ -518,11 +430,12 @@ long s3c_mem_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 		mutex_unlock(&mem_free_lock);
 
 		break;
-#ifdef CONFIG_S3C_MEM_CMA_ALLOC
+#ifdef CONFIG_VIDEO_SAMSUNG_USE_DMA_MEM
 	case S3C_MEM_CMA_FREE:
 		{
 			struct s3c_dev_info *prv_data =
 			    (struct s3c_dev_info *)file->private_data;
+			int i = 0;
 
 			mutex_lock(&mem_free_lock);
 			if (copy_from_user(&param, (struct s3c_mem_alloc *)arg,
@@ -539,7 +452,6 @@ long s3c_mem_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 			printk
 			    ("FREE : pa = 0x%x size = %d va = 0x%x\n",
 			     param.phy_addr, param.size, param.vir_addr);
-#ifdef CONFIG_VIDEO_SAMSUNG_USE_DMA_MEM
 			if (param.vir_addr) {
 				if (do_munmap(mm, param.vir_addr, param.size) <
 				    0) {
@@ -548,36 +460,31 @@ long s3c_mem_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 					mutex_unlock(&mem_free_lock);
 					return -EINVAL;
 				}
-				if (prv_data->s_cur_mem_info.phy_addr) {
-					cma_free(prv_data->
-						 s_cur_mem_info.phy_addr);
-				}
+				if (param.phy_addr)
+					cma_free(param.phy_addr);
 
+				for (i = 0; i < S3C_MEM_CMA_MAX_CTX_BUF; i++) {
+					if ((prv_data->s_cur_mem_info[i].
+					     phy_addr == param.phy_addr)
+					    && (prv_data->s_cur_mem_info[i].
+						vir_addr == param.vir_addr)) {
+						prv_data->s_cur_mem_info[i].
+						    phy_addr = 0;
+						prv_data->s_cur_mem_info[i].
+						    vir_addr = 0;
+						prv_data->s_cur_mem_info[i].
+						    size = 0;
+						if (prv_data->
+							s3c_mem_ctx_buf_num > 0)
+							prv_data->
+							s3c_mem_ctx_buf_num--;
+						break;
+					}
+				}
 				param.size = 0;
-				prv_data->s_cur_mem_info.vir_addr = 0;
-				prv_data->s_cur_mem_info.size = 0;
-				prv_data->s_cur_mem_info.phy_addr = 0;
 				DEBUG("do_munmap() succeed !!\n");
 			}
-#else
-			if (param.vir_addr) {
-				s3c_unmapping_slot(prv_data);
 
-				if (do_munmap(mm, param.vir_addr, param.size) <
-				    0) {
-					printk(KERN_ERR
-					       "do_munmap() failed !!\n");
-					mutex_unlock(&mem_free_lock);
-					return -EINVAL;
-				}
-				param.size = 0;
-				prv_data->s_cur_mem_info.paddr = 0;
-				prv_data->s_cur_mem_info.vaddr = 0;
-				prv_data->s_cur_mem_info.mapped_size = 0;
-				prv_data->s_cur_mem_info.req_memblock = 0;
-				DEBUG("do_munmap() succeed !!\n");
-			}
-#endif
 			if (copy_to_user((struct s3c_mem_alloc *)arg, &param,
 					 sizeof(struct s3c_mem_alloc))) {
 				mutex_unlock(&mem_free_lock);
@@ -714,29 +621,12 @@ int s3c_mem_mmap(struct file *filp, struct vm_area_struct *vma)
 #endif
 		pageFrameNo = __phys_to_pfn(phys_addr);
 		break;
-#ifdef CONFIG_S3C_MEM_CMA_ALLOC
+#ifdef CONFIG_VIDEO_SAMSUNG_USE_DMA_MEM
 	case MEM_CMA_ALLOC:
 		{
-			struct s3c_dev_info *prv_data =
-			    (struct s3c_dev_info *)filp->private_data;
 			vma->vm_page_prot =
 			    pgprot_writecombine(vma->vm_page_prot);
-#ifdef CONFIG_VIDEO_SAMSUNG_USE_DMA_MEM
-			pageFrameNo =
-			    __phys_to_pfn(prv_data->s_cur_mem_info.phy_addr);
-#else
-			prv_data->s_cur_mem_info.req_memblock =
-			    PAGE_ALIGN(size) / prv_data->dev_slot_size;
-
-			if (PAGE_ALIGN(size) % prv_data->dev_slot_size)
-				prv_data->s_cur_mem_info.req_memblock++;
-
-			printk(KERN_INFO "required slot=%d size=%lu\n",
-			       prv_data->s_cur_mem_info.req_memblock, size);
-
-
-			pageFrameNo = s3c_mapping_slot(prv_data);
-#endif
+			pageFrameNo = __phys_to_pfn(physical_address);
 			if (!pageFrameNo) {
 				printk(KERN_ERR "mapping failed !\n");
 				return -EINVAL;

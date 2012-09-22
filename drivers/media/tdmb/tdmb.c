@@ -50,6 +50,14 @@
 #include <linux/io.h>
 #include <mach/gpio.h>
 
+#if defined(CONFIG_TDMB_ANT_DET)
+#include <linux/input.h>
+#endif
+
+#ifdef CONFIG_MACH_C1
+#include <linux/wakelock.h>
+static struct wake_lock tdmb_wlock;
+#endif
 #include "tdmb.h"
 #define TDMB_PRE_MALLOC 1
 
@@ -75,20 +83,34 @@ static struct tdmb_drv_func *tdmbdrv_func;
 static bool tdmb_pwr_on;
 static bool tdmb_power_on(void)
 {
-	bool ret;
-
 	if (tdmb_create_databuffer(tdmbdrv_func->get_int_size()) == false) {
-		DPRINTK("%s : tdmb_create_databuffer fail\n", __func__);
-		ret = false;
-	} else if (tdmb_create_workqueue() == true) {
-		DPRINTK("%s : tdmb_create_workqueue ok\n", __func__);
-		ret = tdmbdrv_func->power_on();
-	} else {
-		ret = false;
+		DPRINTK("tdmb_create_databuffer fail\n");
+		goto create_databuffer_fail;
 	}
-	tdmb_pwr_on = ret;
-	DPRINTK("%s : ret(%d)\n", __func__, ret);
-	return ret;
+	if (tdmb_create_workqueue() == false) {
+		DPRINTK("tdmb_create_workqueue fail\n");
+		goto create_workqueue_fail;
+	}
+	if (tdmbdrv_func->power_on() == false) {
+		DPRINTK("power_on fail\n");
+		goto power_on_fail;
+	}
+
+	DPRINTK("power_on success\n");
+#ifdef CONFIG_MACH_C1
+	wake_lock(&tdmb_wlock);
+#endif
+	tdmb_pwr_on = true;
+	return true;
+
+power_on_fail:
+	tdmb_destroy_workqueue();
+create_workqueue_fail:
+	tdmb_destroy_databuffer();
+create_databuffer_fail:
+	tdmb_pwr_on = false;
+
+	return false;
 }
 static bool tdmb_power_off(void)
 {
@@ -98,10 +120,12 @@ static bool tdmb_power_off(void)
 		tdmbdrv_func->power_off();
 		tdmb_destroy_workqueue();
 		tdmb_destroy_databuffer();
+#ifdef CONFIG_MACH_C1
+		wake_unlock(&tdmb_wlock);
+#endif
 		tdmb_pwr_on = false;
 	}
 	tdmb_last_ch = 0;
-
 	return true;
 }
 
@@ -518,6 +542,182 @@ static struct tdmb_drv_func *tdmb_get_drv_func(void)
 	return func();
 }
 
+#if defined(CONFIG_TDMB_ANT_DET)
+
+static struct input_dev *tdmb_ant_input;
+static int tdmb_check_ant;
+static int ant_prev_status;
+
+#define TDMB_ANT_CHECK_DURATION 500000
+#define TDMB_ANT_CHECK_COUNT 2
+static bool tdmb_ant_det_check_value(void)
+{
+	int loop = 0;
+	int cur_val = 0, prev_val = 0;
+	bool ret = false;
+
+	tdmb_check_ant = 1;
+
+	prev_val = ant_prev_status ? 0 : 1;
+	for (loop = 0; loop < TDMB_ANT_CHECK_COUNT; loop++) {
+		usleep_range(TDMB_ANT_CHECK_DURATION, TDMB_ANT_CHECK_DURATION);
+		cur_val = gpio_get_value_cansleep(gpio_cfg.gpio_ant_det);
+		if (prev_val != cur_val || ant_prev_status == cur_val)
+			break;
+		prev_val = cur_val;
+	}
+
+	if (loop == TDMB_ANT_CHECK_COUNT) {
+		if (ant_prev_status == 0 && cur_val == 1)
+			ret = true;
+
+		ant_prev_status = cur_val;
+	}
+
+	tdmb_check_ant = 0;
+
+	DPRINTK("%s cnt(%d) cur(%d) ret(%d)\n", __func__, loop, cur_val, ret);
+
+	return ret;
+}
+
+static int tdmb_ant_det_ignore_irq(void)
+{
+	DPRINTK("%s tdmb_check_ant=%d\n", __func__, tdmb_check_ant);
+	return tdmb_check_ant;
+}
+
+static void tdmb_ant_det_work_func(struct work_struct *work)
+{
+	int val = 0;
+
+	if (!tdmb_ant_input) {
+		DPRINTK("%s: input device is not registered\n", __func__);
+		return;
+	}
+
+	if (tdmb_ant_det_check_value()) {
+		input_report_key(tdmb_ant_input, KEY_DMB_ANT_DET_UP, 1);
+		input_report_key(tdmb_ant_input, KEY_DMB_ANT_DET_UP, 0);
+		input_sync(tdmb_ant_input);
+		DPRINTK("%s: sys_rev:%d\n", __func__, system_rev);
+	}
+}
+
+static struct workqueue_struct *tdmb_ant_det_wq;
+static DECLARE_WORK(tdmb_ant_det_work, tdmb_ant_det_work_func);
+static bool tdmb_ant_det_reg_input(struct platform_device *pdev)
+{
+	struct input_dev *input;
+	int err;
+
+	DPRINTK("%s\n", __func__);
+
+	input = input_allocate_device();
+	if (!input) {
+		DPRINTK("Can't allocate input device\n");
+		err = -ENOMEM;
+	}
+	set_bit(EV_KEY, input->evbit);
+	set_bit(KEY_DMB_ANT_DET_UP & KEY_MAX, input->keybit);
+	set_bit(KEY_DMB_ANT_DET_DOWN & KEY_MAX, input->keybit);
+	input->name = "sec_dmb_key";
+	input->phys = "sec_dmb_key/input0";
+	input->dev.parent = &pdev->dev;
+
+	err = input_register_device(input);
+	if (err) {
+		DPRINTK("Can't register dmb_ant_det key: %d\n", err);
+		goto free_input_dev;
+	}
+	tdmb_ant_input = input;
+	ant_prev_status = gpio_get_value_cansleep(gpio_cfg.gpio_ant_det);
+
+	return true;
+
+free_input_dev:
+	input_free_device(input);
+	return false;
+}
+
+static void tdmb_ant_det_unreg_input(void)
+{
+	DPRINTK("%s\n", __func__);
+	if (tdmb_ant_input) {
+		input_unregister_device(tdmb_ant_input);
+		tdmb_ant_input = NULL;
+	}
+}
+static bool tdmb_ant_det_create_wq(void)
+{
+	DPRINTK("%s\n", __func__);
+	tdmb_ant_det_wq = create_singlethread_workqueue("tdmb_ant_det_wq");
+	if (tdmb_ant_det_wq)
+		return true;
+	else
+		return false;
+}
+
+static bool tdmb_ant_det_destroy_wq(void)
+{
+	DPRINTK("%s\n", __func__);
+	if (tdmb_ant_det_wq) {
+		flush_workqueue(tdmb_ant_det_wq);
+		destroy_workqueue(tdmb_ant_det_wq);
+		tdmb_ant_det_wq = NULL;
+	}
+	return true;
+}
+
+static irqreturn_t tdmb_ant_det_irq_handler(int irq, void *dev_id)
+{
+	int ret = 0;
+
+	if (tdmb_ant_det_ignore_irq())
+		return IRQ_HANDLED;
+
+	if (tdmb_ant_det_wq) {
+		ret = queue_work(tdmb_ant_det_wq, &tdmb_ant_det_work);
+		if (ret == 0)
+			DPRINTK("%s queue_work fail\n", __func__);
+	}
+
+	return IRQ_HANDLED;
+}
+
+static bool tdmb_ant_det_irq_set(bool set)
+{
+	bool ret = true;
+	int irq_ret;
+	DPRINTK("%s\n", __func__);
+
+	if (set) {
+		if (system_rev >= 6)
+			irq_set_irq_type(gpio_cfg.irq_ant_det
+					, IRQ_TYPE_EDGE_BOTH);
+		else
+			irq_set_irq_type(gpio_cfg.irq_ant_det
+					, IRQ_TYPE_EDGE_RISING);
+
+		irq_ret = request_irq(gpio_cfg.irq_ant_det
+						, tdmb_ant_det_irq_handler
+						, IRQF_DISABLED
+						, "tdmb_ant_det"
+						, NULL);
+		if (irq_ret < 0) {
+			DPRINTK("%s %d\r\n", __func__, irq_ret);
+			ret = false;
+		}
+		enable_irq_wake(gpio_cfg.irq_ant_det);
+	} else {
+		disable_irq_wake(gpio_cfg.irq_ant_det);
+		free_irq(gpio_cfg.irq_ant_det, NULL);
+	}
+
+	return ret;
+}
+#endif
+
 static int tdmb_probe(struct platform_device *pdev)
 {
 	int ret;
@@ -561,12 +761,40 @@ static int tdmb_probe(struct platform_device *pdev)
 #if TDMB_PRE_MALLOC
 	tdmb_make_ring_buffer();
 #endif
+#ifdef CONFIG_MACH_C1
+	wake_lock_init(&tdmb_wlock, WAKE_LOCK_SUSPEND, "tdmb_wlock");
+#endif
+
+#if defined(CONFIG_TDMB_ANT_DET)
+	if (!tdmb_ant_det_reg_input(pdev))
+		goto err_reg_input;
+	if (!tdmb_ant_det_create_wq())
+		goto free_reg_input;
+	if (!tdmb_ant_det_irq_set(true))
+		goto free_ant_det_wq;
 
 	return 0;
+
+free_ant_det_wq:
+	tdmb_ant_det_destroy_wq();
+free_reg_input:
+	tdmb_ant_det_unreg_input();
+err_reg_input:
+	return -EFAULT;
+#else
+	return 0;
+#endif
+
 }
 
 static int tdmb_remove(struct platform_device *pdev)
 {
+	DPRINTK("tdmb_remove!\n");
+#if defined(CONFIG_TDMB_ANT_DET)
+	tdmb_ant_det_unreg_input();
+	tdmb_ant_det_destroy_wq();
+	tdmb_ant_det_irq_set(false);
+#endif
 	return 0;
 }
 
@@ -626,6 +854,9 @@ static void __exit tdmb_exit(void)
 	platform_driver_unregister(&tdmb_driver);
 
 	tdmb_exit_bus();
+#ifdef CONFIG_MACH_C1
+	wake_lock_destroy(&tdmb_wlock);
+#endif
 }
 
 module_init(tdmb_init);

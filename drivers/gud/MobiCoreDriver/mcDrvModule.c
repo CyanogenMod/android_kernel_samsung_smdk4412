@@ -486,7 +486,7 @@ static struct mcL2TablesDescr *allocateWsmL2TableContainer(
 			SetPageReserved(pPage);
 
 			/* allocate a descriptor */
-			pWsmL2TablesChunk = kmalloc(sizeof(*pWsmL2TablesChunk),
+			pWsmL2TablesChunk = kmalloc(sizeof(struct mcL2TablesChunk),
 						    GFP_KERNEL);
 			if (NULL == pWsmL2TablesChunk) {
 				kfree(pWsmL2Page);
@@ -526,7 +526,8 @@ static struct mcL2TablesDescr *allocateWsmL2TableContainer(
 	if (0 != ret) {
 		if (NULL != pWsmL2TableDescr) {
 			/* remove from list */
-			list_del(&(pWsmL2TablesChunk->list));
+			if (pWsmL2TablesChunk != NULL)
+				list_del(&(pWsmL2TablesChunk->list));
 			/* free memory */
 			kfree(pWsmL2TableDescr);
 			pWsmL2TableDescr = NULL;

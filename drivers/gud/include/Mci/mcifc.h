@@ -38,6 +38,7 @@
 #define MC_FC_CP15_REG             ((uint32_t)(-101))  /**< general CP15/cache register update */
 // --- store value in sDDRRAM ---
 #define MC_FC_STORE_BINFO          ((uint32_t)(-201))  /**< write a 32bit value in secure DDRRAM in incremented art (max 2kB) */
+#define MC_FC_LOAD_BINFO           ((uint32_t)(-202))  /**< load a 32bit value from secure DDRRAM using an offset */
 
 #define MC_FC_MAX_ID         ((uint32_t)(0xFFFF0000))  /**< Maximum allowed FastCall ID */
 

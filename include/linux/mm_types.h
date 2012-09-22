@@ -198,6 +198,9 @@ struct vm_area_struct {
 #ifdef CONFIG_NUMA
 	struct mempolicy *vm_policy;	/* NUMA policy for the VMA */
 #endif
+#ifdef CONFIG_ZRAM_FOR_ANDROID
+	int vma_swap_done;
+#endif /* CONFIG_ZRAM_FOR_ANDROID */
 };
 
 struct core_thread {
@@ -330,6 +333,9 @@ struct mm_struct {
 #ifdef CONFIG_CPUMASK_OFFSTACK
 	struct cpumask cpumask_allocation;
 #endif
+#ifdef CONFIG_ZRAM_FOR_ANDROID
+	int mm_swap_done;
+#endif /* CONFIG_ZRAM_FOR_ANDROID */
 };
 
 static inline void mm_init_cpumask(struct mm_struct *mm)

@@ -38,8 +38,6 @@
 #include "tcc_fic_decoder.h"
 #include "tcbd_hal.h"
 
-#define __WORKQUEUE__
-
 struct tcbd_irq_data {
 	struct work_struct work;
 	struct workqueue_struct *work_queue;
@@ -51,6 +49,7 @@ struct tcbd_irq_data {
 
 static struct tcbd_irq_data tcbd_irq_handler_data;
 
+#if defined(__CSPI_ONLY__)
 static inline void tcpal_split_stream(struct tcbd_irq_data *irq_data)
 {
 	s32 size, ret = 0;
@@ -60,10 +59,12 @@ static inline void tcpal_split_stream(struct tcbd_irq_data *irq_data)
 	struct tcbd_device *device = irq_data->device;
 
 	ret = tcbd_read_irq_status(device, &irq_status, &irq_error);
+	ret |= tcbd_clear_irq(device, irq_status);
+
 	ret |= tcbd_read_stream(device, buff_read, &size);
-	if (ret == 0 && !irq_error) {
-		tcbd_split_stream(buff_read, size);
-	} else {
+	if (ret == 0 && !irq_error)
+		tcbd_split_stream(0, buff_read, size);
+	else {
 		tcbd_debug(DEBUG_ERROR, "### buffer is full, skip the data "
 			"(ret:%d, status=0x%02X, error=0x%02X, %d)  ###\n",
 			ret, irq_status, irq_error,
@@ -74,26 +75,11 @@ static inline void tcpal_split_stream(struct tcbd_irq_data *irq_data)
 			device->selected_buff,
 			device->intr_threshold);
 		/*tcbd_reset_ip(device, TCBD_SYS_COMP_ALL, TCBD_SYS_COMP_EP);*/
-		tcbd_init_parser(NULL);
+		tcbd_init_parser(0, NULL);
 	}
-	ret = tcbd_read_irq_status(device, &irq_status, &irq_error);
-	if (ret != 0 || irq_error != 0) {
-		tcbd_debug(DEBUG_ERROR, "### buffer is full, skip the data "
-				"(ret:%d, status=0x%02X, error=0x%02X)  ###\n",
-				ret, irq_status, irq_error);
-		tcbd_init_stream_data_config(device,
-			ENABLE_CMD_FIFO,
-			device->selected_buff,
-			device->intr_threshold);
-		/*tcbd_reset_ip(device, TCBD_SYS_COMP_ALL, TCBD_SYS_COMP_EP);*/
-		tcbd_init_parser(NULL);
-
-	}
-	tcbd_clear_irq(device, irq_status);
 }
 
-#if defined(__WORKQUEUE__)
-static void tcpal_stream_parsing_work(struct work_struct *_param)
+static void tcpal_work_parse_stream(struct work_struct *_param)
 {
 	u64 diff = tcpal_diff_time(tcbd_irq_handler_data.start_tick);
 	struct tcbd_irq_data *irq_data =
@@ -106,28 +92,11 @@ static void tcpal_stream_parsing_work(struct work_struct *_param)
 	tcpal_split_stream(irq_data);
 	enable_irq(irq_data->tcbd_irq);
 }
-#endif /*__WORKQUEUE__*/
 
-static irqreturn_t tcpal_irq_handler(s32 _irq, void *_param)
-{
-	struct tcbd_irq_data *irq_data = (struct tcbd_irq_data *)_param;
-	struct tcbd_device *device = irq_data->device;
-	disable_irq_nosync(irq_data->tcbd_irq);
-
-	if (device->is_pal_irq_en) {
-#if defined(__WORKQUEUE__)
-		irq_data->start_tick = tcpal_get_time();
-		queue_work(irq_data->work_queue, &irq_data->work);
-#else  /*__WORKQUEUE__*/
-		tcpal_split_stream(irq_data);
-#endif /*!__WORKQUEUE__*/
-		tcbd_debug(DEBUG_INTRRUPT, "\n");
-	}
-	return IRQ_HANDLED;
-}
 
 s32 start_tune;
 static s32 tcpal_irq_stream_callback(
+	s32 _dev_idx,
 	u8 *_stream,
 	s32 _size,
 	u8 _subch_id,
@@ -175,27 +144,77 @@ skip_fic_parse:
 	}
 	return 0;
 }
+#endif /*__CSPI_ONLY__*/
+
+#if defined(__I2C_STS__)
+static void tcpal_work_read_fic(struct work_struct *_param)
+{
+	s32 size = TCBD_FIC_SIZE, ret;
+	u8 buff[TCBD_FIC_SIZE];
+	u64 diff;
+	struct tcbd_irq_data *irq_data = container_of(_param,
+						struct tcbd_irq_data, work);
+	struct tcbd_device *device = irq_data->device;
+
+	diff = tcpal_diff_time(irq_data->start_tick);
+	tcbd_debug(DEBUG_INTRRUPT, "work delay :%d\n", (u32)diff);
+
+	ret = tcbd_read_fic_data(device, buff, size);
+	if (ret < 0) {
+		tcbd_debug(DEBUG_ERROR, "failed to read fic! %d\n", ret);
+		goto exit_work;
+	}
+
+	tcbd_enqueue_data(buff, size, 0, 1);
+	if (!start_tune) /* set by tune_frequency*/
+		goto exit_work;
+
+	ret = tcc_fic_run_decoder(buff, MAX_FIC_SIZE);
+	if (ret > 0) {
+		tcc_fic_get_ensbl_info(1);
+		start_tune = 0;
+		tcc_fic_parser_init();
+	}
+exit_work:
+	enable_irq(irq_data->tcbd_irq);
+}
+#endif /*__I2C_STS__*/
+
+static irqreturn_t tcpal_irq_handler(s32 _irq, void *_param)
+{
+	struct tcbd_irq_data *irq_data = (struct tcbd_irq_data *)_param;
+	struct tcbd_device *device = irq_data->device;
+
+	disable_irq_nosync(irq_data->tcbd_irq);
+	if (device->is_pal_irq_en) {
+		irq_data->start_tick = tcpal_get_time();
+		queue_work(irq_data->work_queue, &irq_data->work);
+		tcbd_debug(DEBUG_INTRRUPT, "\n");
+	}
+	return IRQ_HANDLED;
+}
 
 s32 tcpal_irq_register_handler(void *_device)
 {
 	s32 ret;
-#if defined(__WORKQUEUE__)
+
 	tcbd_irq_handler_data.work_queue =
 		create_singlethread_workqueue("tdmb_work");
 	tcbd_irq_handler_data.device = (struct tcbd_device *)_device;
 #if defined(__USE_TC_CPU__)
 	tcbd_irq_handler_data.tcbd_irq = IRQ_TC317X;
 #endif /*__USE_TC_CPU__*/
-	INIT_WORK(&tcbd_irq_handler_data.work, tcpal_stream_parsing_work);
-#endif /*__WORKQUEUE__*/
-	tcbd_init_parser(tcpal_irq_stream_callback);
 
-	ret = request_irq(
-			tcbd_irq_handler_data.tcbd_irq,
-			tcpal_irq_handler,
+#if defined(__I2C_STS__)
+	INIT_WORK(&tcbd_irq_handler_data.work, tcpal_work_read_fic);
+#elif defined(__CSPI_ONLY__)
+	INIT_WORK(&tcbd_irq_handler_data.work, tcpal_work_parse_stream);
+	tcbd_init_parser(0, tcpal_irq_stream_callback);
+#endif /*__CSPI_ONLY__*/
+
+	ret = request_irq(tcbd_irq_handler_data.tcbd_irq, tcpal_irq_handler,
 			IRQF_TRIGGER_FALLING | IRQF_DISABLED,
-			"tdmb_irq",
-			&tcbd_irq_handler_data);
+				"tdmb_irq", &tcbd_irq_handler_data);
 	tcbd_debug(DEBUG_INTRRUPT, "request_irq : %d\n", (int)ret);
 	return ret;
 }
@@ -211,7 +230,9 @@ s32 tcpal_irq_unregister_handler(void)
 
 s32 tcpal_irq_enable(void)
 {
-	tcbd_init_parser(NULL);
+#if defined(__CSPI_ONLY__)
+	tcbd_init_parser(0, NULL);
+#endif /*__CSPI_ONLY__*/
 	tcbd_debug(DEBUG_INTRRUPT, "\n");
 	/* enable_irq(tcbd_irq_handler_data.tcbd_irq); */
 	return 0;

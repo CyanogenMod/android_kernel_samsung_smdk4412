@@ -39,7 +39,6 @@ struct spi_data_div_buf *spi_div_buf;
 char *gspi_data_prepare_packet;
 
 char *gspi_data_packet_buf;
-char *gspi_data_sync_buf;
 
 static int _prepare_tx_type_packet(void *buf,
 		struct spi_data_queue_info *queue_info,
@@ -98,7 +97,6 @@ void spi_data_queue_init(void)
 	gspi_data_prepare_packet = (char *) spi_os_vmalloc(
 		SPI_DEV_MAX_PACKET_SIZE);
 	gspi_data_packet_buf = (char *) spi_os_malloc(SPI_DEV_MAX_PACKET_SIZE);
-	gspi_data_sync_buf = (char *) spi_os_malloc(SPI_DEV_MAX_PACKET_SIZE);
 
 	for (i = 0 ; i < SPI_DATA_QUEUE_TYPE_NB ; i++) {
 		spi_queue_info[i].header = &spi_queue[i];
@@ -169,11 +167,6 @@ void spi_data_queue_destroy(void)
 	if (gspi_data_packet_buf != NULL) {
 		spi_os_free(gspi_data_packet_buf);
 		gspi_data_packet_buf = NULL;
-	}
-
-	if (gspi_data_sync_buf != NULL) {
-		spi_os_free(gspi_data_sync_buf);
-		gspi_data_sync_buf = NULL;
 	}
 
 	if (spi_div_buf != NULL) {

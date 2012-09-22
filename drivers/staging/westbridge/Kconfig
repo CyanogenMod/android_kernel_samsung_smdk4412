@@ -39,6 +39,12 @@ config MACH_OMAP3_WESTBRIDGE_AST_PNAND_HAL
 	help
 	   Include the OMAP3430 HAL for PNAND interface
 
+config MACH_C110_WESTBRIDGE_AST_PNAND_HAL
+	bool "WESTBRIDGE C110 Astoria PNAND HAL"
+	select WESTBRIDGE_HAL_SELECTED
+	help
+	   Include the C110 HAL for PNAND interface
+
 config MACH_NO_WESTBRIDGE
 	bool "no West Bridge HAL selected"
 	help
@@ -48,6 +54,7 @@ endchoice
 config WESTBRIDGE_DEBUG
 	bool "West Bridge debugging"
 	depends on WESTBRIDGE != n
+	default y
 	help
 	  This is an option for use by developers; most people should
 	  say N here.  This enables WESTBRIDGE core and driver debugging.

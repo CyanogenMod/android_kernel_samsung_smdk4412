@@ -142,6 +142,10 @@ struct mfc_alloc_buffer {
 	unsigned char *addr;	/* kernel virtual address space */
 	unsigned int type;	/* buffer type			*/
 	int owner;		/* instance context id		*/
+#if defined(CONFIG_DMA_CMA) && defined(CONFIG_USE_MFC_CMA)
+	struct device *dev;
+	dma_addr_t dma_addr;
+#endif
 #if defined(CONFIG_VIDEO_MFC_VCM_UMP)
 	struct vcm_mmu_res *vcm_s;
 	struct vcm_res *vcm_k;
@@ -159,6 +163,9 @@ struct mfc_alloc_buffer {
 				 * when user use mmap,
 				 * user can access whole of memory by offset.
 				 */
+#ifdef CONFIG_SLP_DMABUF
+	int	dmabuf_fd;
+#endif
 #endif
 };
 
@@ -187,6 +194,9 @@ unsigned long mfc_get_buf_real(int owner, unsigned int key);
 unsigned char *mfc_get_buf_addr(int owner, unsigned char *user);
 unsigned char *_mfc_get_buf_addr(int owner, unsigned char *user);
 */
+#ifdef CONFIG_SLP_DMABUF
+int mfc_get_buf_dmabuf(unsigned long real);
+#endif
 #ifdef CONFIG_VIDEO_MFC_VCM_UMP
 unsigned int mfc_vcm_bind_from_others(struct mfc_inst_ctx *ctx,
 				struct mfc_buf_alloc_arg *args, int flag);

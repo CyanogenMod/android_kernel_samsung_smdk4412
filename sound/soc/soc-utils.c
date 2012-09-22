@@ -18,6 +18,9 @@
 #include <sound/pcm.h>
 #include <sound/pcm_params.h>
 #include <sound/soc.h>
+#ifdef CONFIG_SLP_WIP
+#include <linux/slab.h>
+#endif
 
 int snd_soc_calc_frame_size(int sample_size, int channels, int tdm_slots)
 {
@@ -72,16 +75,116 @@ static const struct snd_pcm_hardware dummy_dma_hardware = {
 	.periods_max		= 128,
 };
 
+#ifdef CONFIG_SLP_WIP
+struct dma_dummy {
+	unsigned long base_time;
+	unsigned long pos;
+	unsigned long max;
+};
+#endif
+
 static int dummy_dma_open(struct snd_pcm_substream *substream)
 {
+#ifdef CONFIG_SLP_WIP
+	struct snd_pcm_runtime *runtime = substream->runtime;
+	struct dma_dummy *pdma;
+
+	pdma = kzalloc(sizeof(struct dma_dummy), GFP_KERNEL);
+	if (!pdma)
+		return -ENOMEM;
+
+	runtime->private_data = pdma;
+#endif
 	snd_soc_set_runtime_hwparams(substream, &dummy_dma_hardware);
 
 	return 0;
 }
 
+#ifdef CONFIG_SLP_WIP
+static int dummy_dma_close(struct snd_pcm_substream *substream)
+{
+	struct snd_pcm_runtime *runtime = substream->runtime;
+	struct dma_dummy *pdma = runtime->private_data;
+
+	kfree(pdma);
+
+	return 0;
+}
+
+static int dummy_dma_prepare(struct snd_pcm_substream *substream)
+{
+	struct snd_pcm_runtime *runtime = substream->runtime;
+	struct dma_dummy *pdma = runtime->private_data;
+
+	pdma->base_time = jiffies;
+	pdma->pos = 0;
+	pdma->max = runtime->buffer_size * HZ;
+
+	return 0;
+}
+
+static int dummy_dma_copy(struct snd_pcm_substream *substream,
+				int channel, snd_pcm_uframes_t pos,
+				void __user *dst, snd_pcm_uframes_t count)
+{
+	/* do nothing */
+	return 0;
+}
+
+static snd_pcm_uframes_t
+dummy_dma_pointer(struct snd_pcm_substream *substream)
+{
+	struct snd_pcm_runtime *runtime = substream->runtime;
+	struct dma_dummy *pdma = runtime->private_data;
+	unsigned long delta;
+	unsigned long pos;
+
+	delta = jiffies - pdma->base_time;
+	if (!delta)
+		return pdma->pos;
+
+	/* update base_time */
+	pdma->base_time += delta;
+
+	/* calc */
+	delta *= runtime->rate;
+	pdma->pos += delta;
+	while (pdma->pos >= pdma->max)
+		pdma->pos -= pdma->max;
+
+	pos = pdma->pos / HZ;
+
+	return pos;
+}
+
+static int dummy_dma_trigger(struct snd_pcm_substream *substream, int cmd)
+{
+	struct snd_pcm_runtime *runtime = substream->runtime;
+	struct dma_dummy *pdma = runtime->private_data;
+
+	switch (cmd) {
+	case SNDRV_PCM_TRIGGER_START:
+	case SNDRV_PCM_TRIGGER_RESUME:
+		pdma->base_time = jiffies;
+		break;
+	default:
+		break;
+	}
+
+	return 0;
+}
+#endif
+
 static struct snd_pcm_ops dummy_dma_ops = {
 	.open		= dummy_dma_open,
 	.ioctl		= snd_pcm_lib_ioctl,
+#ifdef CONFIG_SLP_WIP
+	.close		= dummy_dma_close,
+	.copy		= dummy_dma_copy,
+	.pointer	= dummy_dma_pointer,
+	.prepare	= dummy_dma_prepare,
+	.trigger	= dummy_dma_trigger,
+#endif
 };
 
 static struct snd_soc_platform_driver dummy_platform = {

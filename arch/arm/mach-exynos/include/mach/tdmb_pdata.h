@@ -25,7 +25,11 @@
 struct tdmb_platform_data {
 	void (*gpio_on) (void);
 	void (*gpio_off)(void);
-	int	irq;
+	unsigned int	irq;
+#if defined(CONFIG_TDMB_ANT_DET)
+	unsigned int	gpio_ant_det;
+	unsigned int	irq_ant_det;
+#endif
 };
 #endif
 #endif

@@ -56,8 +56,9 @@ void exynos4_setup_sdhci_cfg_card(struct platform_device *dev, void __iomem *r,
 		  S3C_SDHCI_CTRL2_DFCNT_NONE |
 		  S3C_SDHCI_CTRL2_ENCLKOUTHOLD);
 
-#ifdef CONFIG_MACH_M0
-        /* set 2ns delay for TX. This setting is just for wifi sdio i/f of
+#if defined(CONFIG_MACH_M0) || defined(CONFIG_MACH_C1_USA_ATT) || \
+	defined(CONFIG_MACH_T0) || defined(CONFIG_MACH_M3)
+	/* set 2ns delay for TX. This setting is just for wifi sdio i/f of
 	   M0 and his brother projects. */
 	if (pdata->pm_flags == S3C_SDHCI_PM_IGNORE_SUSPEND_RESUME &&
 		(ios->clock >= 25 * 1000000)) {

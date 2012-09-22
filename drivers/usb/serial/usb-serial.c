@@ -355,9 +355,10 @@ static int serial_write(struct tty_struct *tty, const unsigned char *buf,
 
 	if (port->serial->dev->state == USB_STATE_NOTATTACHED)
 		goto exit;
-
-	dbg("%s - port %d, %d byte(s)", __func__, port->number, count);
-
+#ifdef CONFIG_MACH_M0
+	printk(KERN_INFO "%s - port %d, %d byte(s)",
+			__func__, port->number, count);
+#endif
 	/* pass on to the driver specific version of this function */
 	retval = port->serial->type->write(tty, port, buf, count);
 

@@ -247,6 +247,7 @@ void (*pm_cpu_sleep)(void);
 void (*pm_cpu_restore)(void);
 int (*pm_prepare)(void);
 void (*pm_finish)(void);
+unsigned int (*pm_check_eint_pend)(void);
 
 #define any_allowed(mask, allow) (((mask) & (allow)) != (allow))
 
@@ -254,7 +255,9 @@ void (*pm_finish)(void);
  *
  * central control for sleep/resume process
 */
-
+#ifdef CONFIG_FAST_BOOT
+extern bool fake_shut_down;
+#endif
 static int s3c_pm_enter(suspend_state_t state)
 {
 	/* ensure the debug is initialised (if enabled) */
@@ -278,6 +281,15 @@ static int s3c_pm_enter(suspend_state_t state)
 		printk(KERN_ERR "%s: No wake-up sources!\n", __func__);
 		printk(KERN_ERR "%s: Aborting sleep\n", __func__);
 		return -EINVAL;
+	}
+
+	if (pm_check_eint_pend) {
+		u32 pending_eint = pm_check_eint_pend();
+		if (pending_eint) {
+			pr_warn("%s: Aborting sleep, EINT PENDING(0x%08x)\n",
+					__func__, pending_eint);
+			return -EBUSY;
+		}
 	}
 
 	/* save all necessary core registers not covered by the drivers */
@@ -305,6 +317,16 @@ static int s3c_pm_enter(suspend_state_t state)
 	flush_cache_all();
 
 	s3c_pm_check_store();
+
+#ifdef CONFIG_FAST_BOOT
+	if (fake_shut_down) {
+		/* Masking external wake up source
+		 * only enable  power key, FUEL ALERT, AP/IF PMIC IRQ */
+		__raw_writel(0xff77df7f, S5P_EINT_WAKEUP_MASK);
+		/* disable all system int */
+		__raw_writel(0xffffffff, S5P_WAKEUP_MASK);
+	}
+#endif
 
 	/* send the cpu to sleep... */
 
@@ -359,7 +381,11 @@ static int s3c_pm_enter(suspend_state_t state)
 static int s3c_pm_prepare(void)
 {
 	/* prepare check area if configured */
-
+#if defined(CONFIG_MACH_P8LTE) \
+	|| defined(CONFIG_MACH_U1_NA_SPR) \
+	|| defined(CONFIG_MACH_U1_NA_USCC)
+	disable_hlt();
+#endif
 	s3c_pm_check_prepare();
 
 	if (pm_prepare)
@@ -374,6 +400,11 @@ static void s3c_pm_finish(void)
 		pm_finish();
 
 	s3c_pm_check_cleanup();
+#if defined(CONFIG_MACH_P8LTE) \
+	|| defined(CONFIG_MACH_U1_NA_SPR) \
+	|| defined(CONFIG_MACH_U1_NA_USCC)
+	enable_hlt();
+#endif
 }
 
 #if defined(CONFIG_CHARGER_MANAGER)

@@ -56,6 +56,24 @@
 #include <net/bluetooth/l2cap.h>
 #include <net/bluetooth/smp.h>
 
+/* BEGIN SLP_Bluetooth :: fix av chopping issue. */
+#ifdef CONFIG_SLP
+#define HCI_BROADCOMM_QOS_PATCH
+#endif
+
+#ifdef HCI_BROADCOMM_QOS_PATCH
+#define L2CAP_PSM_AVDTP 25
+#define HCI_BROADCOM_QOS_CMD 0xFC57  /* For bcm4329/bcm4330 chipset */
+#define PRIORITY_NORMAL 0x00 /* Broadcom ACL priority for bcm4330 chipset */
+#define PRIORITY_HIGH 0x01
+
+struct hci_cp_broadcom_cmd {
+	__le16   handle;
+	__u8     priority; /* Only for bcm4330 chipset */
+} __attribute__ ((__packed__));
+#endif
+/* END SLP_Bluetooth */
+
 int disable_ertm;
 
 static u32 l2cap_feat_mask = L2CAP_FEAT_FIXED_CHAN;
@@ -2551,6 +2569,20 @@ static inline int l2cap_connect_rsp(struct l2cap_conn *conn, struct l2cap_cmd_hd
 
 		if (test_and_set_bit(CONF_REQ_SENT, &chan->conf_state))
 			break;
+
+/* BEGIN SLP_Bluetooth :: fix av chopping issue. */
+#ifdef HCI_BROADCOMM_QOS_PATCH
+		/* To gurantee the A2DP packet*/
+		if (chan->psm == L2CAP_PSM_AVDTP) {
+			struct hci_cp_broadcom_cmd cp;
+			cp.handle = cpu_to_le16(conn->hcon->handle);
+			cp.priority = PRIORITY_HIGH;
+
+			hci_send_cmd(conn->hcon->hdev, HCI_BROADCOM_QOS_CMD,
+					sizeof(cp), &cp);
+		}
+#endif
+/* END SLP_Bluetooth */
 
 		l2cap_send_cmd(conn, l2cap_get_ident(conn), L2CAP_CONF_REQ,
 					l2cap_build_conf_req(chan, req), req);

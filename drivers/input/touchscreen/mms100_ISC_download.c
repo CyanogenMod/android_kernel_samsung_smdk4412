@@ -48,7 +48,7 @@ UINT8 ucInitial_Download = FALSE;
 
 extern void mcsdl_delay(UINT32 nCount);
 
-#if defined(CONFIG_MACH_C1CTC) || defined(CONFIG_MACH_M0_CHNOPEN) ||\
+#if defined(CONFIG_MACH_M0_CHNOPEN) ||					\
 	defined(CONFIG_MACH_M0_CMCC) || defined(CONFIG_MACH_M0_CTC)
 extern unsigned int lcdtype;
 #endif
@@ -241,8 +241,7 @@ int mms100_ISC_download_binary_data(struct melfas_tsi_platform_data *ts_data)
 		if (dl_enable_bit & (1 << i)) {
 			if (i < 2) {	/* 0: core, 1: private custom */
 
-#if defined(CONFIG_MACH_C1CTC) || defined(CONFIG_MACH_M0_CHNOPEN) ||\
-	defined(CONFIG_MACH_M0_CTC)
+#if defined(CONFIG_MACH_M0_CHNOPEN) || defined(CONFIG_MACH_M0_CTC)
 			if (lcdtype == 0x20) {
 				nRet = mms100_ISC_download((const UINT8*)
 				MELFAS_binary_4_65,

@@ -15,6 +15,7 @@
 #include <linux/wakelock.h>
 #include <plat/adc.h>
 #include <linux/earlysuspend.h>
+#include <linux/power_supply.h>
 
 #include <asm/irq.h>
 #include <linux/mfd/tps6586x.h>
@@ -314,6 +315,26 @@ static void acc_dock_uevent(struct acc_con_info *acc, bool connected)
 	ACC_CONDEV_DBG("%s : %s", env_ptr, stat_ptr);
 }
 
+/* power supply name for set state */
+#define PSY_NAME	"battery"
+static void acc_dock_psy(struct acc_con_info *acc)
+{
+	struct power_supply *psy = power_supply_get_by_name(PSY_NAME);
+	union power_supply_propval value;
+
+/* only support p4note(high current charging) */
+#ifndef CONFIG_MACH_P4NOTE
+	return;
+#endif
+
+	if (!psy || !psy->set_property) {
+		pr_err("%s: fail to get %s psy\n", __func__, PSY_NAME);
+		return;
+	}
+
+	value.intval = acc->current_dock;
+	psy->set_property(psy, POWER_SUPPLY_PROP_ONLINE, &value);
+}
 
 static void acc_check_dock_detection(struct acc_con_info *acc)
 {
@@ -326,6 +347,12 @@ static void acc_check_dock_detection(struct acc_con_info *acc)
 #ifdef CONFIG_SEC_KEYBOARD_DOCK
 		if (acc->pdata->check_keyboard &&
 			acc->pdata->check_keyboard(true)) {
+			if (DOCK_KEYBOARD == acc->current_dock) {
+				switch_set_state(&acc->dock_switch,
+					UEVENT_DOCK_NONE);
+				acc_dock_uevent(acc, false);
+			}
+
 			acc->current_dock = DOCK_KEYBOARD;
 			ACC_CONDEV_DBG
 			("[30PIN] keyboard dock station attached!!!");
@@ -377,6 +404,8 @@ static void acc_check_dock_detection(struct acc_con_info *acc)
 		acc_dock_uevent(acc, false);
 
 	}
+
+	acc_dock_psy(acc);
 }
 
 static irqreturn_t acc_dock_isr(int irq, void *ptr)
@@ -405,7 +434,8 @@ static int acc_init_dock_int(struct acc_con_info *acc)
 	int ret = 0;
 	acc->accessory_irq = gpio_to_irq(acc->pdata->accessory_irq_gpio);
 	ret = request_threaded_irq(acc->accessory_irq, NULL, acc_dock_isr,
-			IRQF_TRIGGER_RISING | IRQF_TRIGGER_FALLING,
+			IRQF_TRIGGER_RISING | IRQF_TRIGGER_FALLING
+			| IRQF_NO_SUSPEND,
 			"accessory_detect", acc);
 	if (ret)
 		ACC_CONDEV_DBG("request_irq(accessory_irq) return : %d\n", ret);

@@ -585,7 +585,7 @@ static int s3c24xx_i2c_doxfer(struct s3c24xx_i2c *i2c,
 
 	/* if that timed out sleep */
 	if (!spins) {
-		msleep(1);
+		usleep_range(1000, 1000);
 		iicstat = readl(i2c->regs + S3C2410_IICSTAT);
 	}
 
@@ -1114,7 +1114,11 @@ static int __init i2c_adap_s3c_init(void)
 {
 	return platform_driver_register(&s3c24xx_i2c_driver);
 }
+#ifdef CONFIG_FAST_RESUME
+beforeresume_initcall(i2c_adap_s3c_init);
+#else
 subsys_initcall(i2c_adap_s3c_init);
+#endif
 
 static void __exit i2c_adap_s3c_exit(void)
 {

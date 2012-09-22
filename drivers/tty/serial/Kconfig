@@ -1646,4 +1646,9 @@ config SERIAL_XILINX_PS_UART_CONSOLE
 	help
 	  Enable a Xilinx PS UART port to be the system console.
 
+config CSR_GSD4T_CDMA
+	bool "GPS UART CTS/RTS support"
+	default n
+	help
+	  Enable GPS UART CTS/RTS operation for CDMA CSR model.
 endmenu

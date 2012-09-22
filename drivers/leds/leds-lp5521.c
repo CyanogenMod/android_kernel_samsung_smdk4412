@@ -5,8 +5,6 @@
  *
  * Contact: Samu Onkalo <samu.p.onkalo@nokia.com>
  *
- * Updated: Milo(Woogyom) Kim <milo.kim@ti.com>
- *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
  * version 2 as published by the Free Software Foundation.
@@ -36,11 +34,6 @@
 #include <linux/leds-lp5521.h>
 #include <linux/workqueue.h>
 #include <linux/slab.h>
-
-#ifdef CONFIG_DEBUG_FS
-#include <linux/debugfs.h>
-#include <linux/uaccess.h>
-#endif
 
 #define LP5521_PROGRAM_LENGTH		32	/* in bytes */
 
@@ -88,13 +81,28 @@
 #define LP5521_MASTER_ENABLE		0x40	/* Chip master enable */
 #define LP5521_LOGARITHMIC_PWM		0x80	/* Logarithmic PWM adjustment */
 #define LP5521_EXEC_RUN			0x2A
+#define LP5521_ENABLE_DEFAULT	\
+	(LP5521_MASTER_ENABLE | LP5521_LOGARITHMIC_PWM)
+#define LP5521_ENABLE_RUN_PROGRAM	\
+	(LP5521_ENABLE_DEFAULT | LP5521_EXEC_RUN)
 
 /* Status */
 #define LP5521_EXT_CLK_USED		0x08
 
-#define LED_DEBUG		1
+/* default R channel current register value */
+#define LP5521_REG_R_CURR_DEFAULT	0xAF
 
-extern struct class *sec_class;
+/* Pattern Mode */
+#define PATTERN_OFF			0
+
+/* Blink time unit */
+#define MAX_BLINK_TIME			7500
+
+/* Program Commands */
+#define CMD_SET_PWM			0x40
+#define CMD_WAIT_MSB			0x60	/* 500ms unit */
+#define CMD_WAIT_LSB			0x00
+#define WAIT_UNIT			500
 
 struct lp5521_engine {
 	int		id;
@@ -113,13 +121,6 @@ struct lp5521_led {
 	u8			brightness;
 };
 
-#ifdef CONFIG_DEBUG_FS
-struct dbg_dentry {
-	struct dentry *dir;
-	struct dentry *reg;
-};
-#endif
-
 struct lp5521_chip {
 	struct lp5521_platform_data *pdata;
 	struct mutex		lock; /* Serialize control */
@@ -128,17 +129,16 @@ struct lp5521_chip {
 	struct lp5521_led	leds[LP5521_MAX_LEDS];
 	u8			num_channels;
 	u8			num_leds;
-#ifdef CONFIG_DEBUG_FS
-	struct dbg_dentry dd;
-#endif
-	struct device	*led_dev;
 };
 
-static struct lp5521_chip *g_chip;
-
-#ifdef LED_DEBUG
-static struct i2c_client *g_client;
-#endif
+struct lp5521_pattern_cmd {
+	u8 r[LP5521_PROGRAM_LENGTH];
+	u8 g[LP5521_PROGRAM_LENGTH];
+	u8 b[LP5521_PROGRAM_LENGTH];
+	int pc_r;
+	int pc_g;
+	int pc_b;
+};
 
 static inline struct lp5521_led *cdev_to_led(struct led_classdev *cdev)
 {
@@ -156,8 +156,6 @@ static inline struct lp5521_chip *led_to_lp5521(struct lp5521_led *led)
 	return container_of(led, struct lp5521_chip,
 			    leds[led->id]);
 }
-
-void lp5521_led_brightness(u8 channel, u8 brightness);
 
 static void lp5521_led_brightness_work(struct work_struct *work);
 
@@ -193,14 +191,14 @@ static int lp5521_set_engine_mode(struct lp5521_engine *engine, u8 mode)
 		mode = LP5521_CMD_DIRECT;
 
 	ret = lp5521_read(client, LP5521_REG_OP_MODE, &engine_state);
+	if (ret < 0)
+		return ret;
 
 	/* set mode only for this engine */
 	engine_state &= ~(engine->engine_mask);
 	mode &= engine->engine_mask;
 	engine_state |= mode;
-	ret |= lp5521_write(client, LP5521_REG_OP_MODE, engine_state);
-
-	return ret;
+	return lp5521_write(client, LP5521_REG_OP_MODE, engine_state);
 }
 
 static int lp5521_load_program(struct lp5521_engine *eng, const u8 *pattern)
@@ -213,9 +211,14 @@ static int lp5521_load_program(struct lp5521_engine *eng, const u8 *pattern)
 
 	/* move current engine to direct mode and remember the state */
 	ret = lp5521_set_engine_mode(eng, LP5521_CMD_DIRECT);
+	if (ret)
+		return ret;
+
 	/* Mode change requires min 500 us delay. 1 - 2 ms  with margin */
 	usleep_range(1000, 2000);
-	ret |= lp5521_read(client, LP5521_REG_OP_MODE, &mode);
+	ret = lp5521_read(client, LP5521_REG_OP_MODE, &mode);
+	if (ret)
+		return ret;
 
 	/* For loading, all the engines to load mode */
 	lp5521_write(client, LP5521_REG_OP_MODE, LP5521_CMD_DIRECT);
@@ -231,8 +234,7 @@ static int lp5521_load_program(struct lp5521_engine *eng, const u8 *pattern)
 				LP5521_PROG_MEM_SIZE,
 				pattern);
 
-	ret |= lp5521_write(client, LP5521_REG_OP_MODE, mode);
-	return ret;
+	return lp5521_write(client, LP5521_REG_OP_MODE, mode);
 }
 
 static int lp5521_set_led_current(struct lp5521_chip *chip, int led, u8 curr)
@@ -255,16 +257,17 @@ static void lp5521_init_engine(struct lp5521_chip *chip)
 static int lp5521_configure(struct i2c_client *client)
 {
 	struct lp5521_chip *chip = i2c_get_clientdata(client);
-	u8 cfg = chip->pdata->update_config;
 	int ret;
+	u8 cfg;
 
 	lp5521_init_engine(chip);
 
 	/* Set all PWMs to direct control mode */
-	ret = lp5521_write(client, LP5521_REG_OP_MODE, 0x3F);
+	ret = lp5521_write(client, LP5521_REG_OP_MODE, LP5521_CMD_DIRECT);
 
-	if (cfg)
-		ret |= lp5521_write(client, LP5521_REG_CONFIG, cfg);
+	cfg = chip->pdata->update_config ?
+		: (LP5521_PWRSAVE_EN | LP5521_CP_MODE_AUTO | LP5521_R_TO_BATT);
+	ret |= lp5521_write(client, LP5521_REG_CONFIG, cfg);
 
 	/* Initialize all channels PWM to zero -> leds off */
 	ret |= lp5521_write(client, LP5521_REG_R_PWM, 0);
@@ -273,8 +276,7 @@ static int lp5521_configure(struct i2c_client *client)
 
 	/* Set engines are set to run state when OP_MODE enables engines */
 	ret |= lp5521_write(client, LP5521_REG_ENABLE,
-			LP5521_MASTER_ENABLE | LP5521_LOGARITHMIC_PWM |
-			LP5521_EXEC_RUN);
+			LP5521_ENABLE_RUN_PROGRAM);
 	/* enable takes 500us. 1 - 2 ms leaves some margin */
 	usleep_range(1000, 2000);
 
@@ -325,8 +327,7 @@ static int lp5521_detect(struct i2c_client *client)
 	int ret;
 	u8 buf;
 
-	ret = lp5521_write(client, LP5521_REG_ENABLE,
-			LP5521_MASTER_ENABLE | LP5521_LOGARITHMIC_PWM);
+	ret = lp5521_write(client, LP5521_REG_ENABLE, LP5521_ENABLE_DEFAULT);
 	if (ret)
 		return ret;
 	/* enable takes 500us. 1 - 2 ms leaves some margin */
@@ -334,7 +335,7 @@ static int lp5521_detect(struct i2c_client *client)
 	ret = lp5521_read(client, LP5521_REG_ENABLE, &buf);
 	if (ret)
 		return ret;
-	if (buf != (LP5521_MASTER_ENABLE | LP5521_LOGARITHMIC_PWM))
+	if (buf != LP5521_ENABLE_DEFAULT)
 		return -ENODEV;
 
 	return 0;
@@ -519,7 +520,7 @@ static ssize_t store_current(struct device *dev,
 	ssize_t ret;
 	unsigned long curr;
 
-	if (strict_strtoul(buf, 0, &curr))
+	if (kstrtoul(buf, 0, &curr))
 		return -EINVAL;
 
 	if (curr > led->max_current)
@@ -551,6 +552,190 @@ static ssize_t lp5521_selftest(struct device *dev,
 	return sprintf(buf, "%s\n", ret ? "FAIL" : "OK");
 }
 
+static void lp5521_clear_program_memory(struct i2c_client *cl)
+{
+	int i;
+	u8 rgb_mem[] = {
+		LP5521_REG_R_PROG_MEM,
+		LP5521_REG_G_PROG_MEM,
+		LP5521_REG_B_PROG_MEM,
+	};
+
+	for (i = 0; i < ARRAY_SIZE(rgb_mem); i++) {
+		lp5521_write(cl, rgb_mem[i], 0);
+		lp5521_write(cl, rgb_mem[i] + 1, 0);
+	}
+}
+
+static void lp5521_write_program_memory(struct i2c_client *cl,
+				u8 base, u8 *rgb, int size)
+{
+	int i;
+
+	if (!rgb || size <= 0)
+		return;
+
+	for (i = 0; i < size; i++)
+		lp5521_write(cl, base + i, *(rgb + i));
+
+	lp5521_write(cl, base + i, 0);
+	lp5521_write(cl, base + i + 1, 0);
+}
+
+static inline struct lp5521_led_pattern *lp5521_get_pattern
+					(struct lp5521_chip *chip, u8 offset)
+{
+	struct lp5521_led_pattern *ptn;
+	ptn = chip->pdata->patterns + (offset - 1);
+	return ptn;
+}
+
+static void _run_led_pattern(struct lp5521_chip *chip,
+			struct lp5521_led_pattern *ptn)
+{
+	struct i2c_client *cl = chip->client;
+
+	lp5521_write(cl, LP5521_REG_OP_MODE, LP5521_CMD_LOAD);
+	usleep_range(1000, 2000);
+
+	lp5521_clear_program_memory(cl);
+
+	lp5521_write_program_memory(cl, LP5521_REG_R_PROG_MEM,
+				ptn->r, ptn->size_r);
+	lp5521_write_program_memory(cl, LP5521_REG_G_PROG_MEM,
+				ptn->g, ptn->size_g);
+	lp5521_write_program_memory(cl, LP5521_REG_B_PROG_MEM,
+				ptn->b, ptn->size_b);
+
+	lp5521_write(cl, LP5521_REG_OP_MODE, LP5521_CMD_RUN);
+	usleep_range(1000, 2000);
+	lp5521_write(cl, LP5521_REG_ENABLE, LP5521_ENABLE_RUN_PROGRAM);
+}
+
+static void lp5521_run_led_pattern(int mode, struct lp5521_chip *chip)
+{
+	struct lp5521_led_pattern *ptn;
+	struct i2c_client *cl = chip->client;
+	int num_patterns = chip->pdata->num_patterns;
+
+	if (mode > num_patterns || !(chip->pdata->patterns))
+		return;
+
+	if (mode == PATTERN_OFF) {
+		lp5521_write(cl, LP5521_REG_ENABLE, LP5521_ENABLE_DEFAULT);
+		usleep_range(1000, 2000);
+		lp5521_write(cl, LP5521_REG_OP_MODE, LP5521_CMD_DIRECT);
+	} else {
+		ptn = lp5521_get_pattern(chip, mode);
+		if (!ptn)
+			return;
+
+		_run_led_pattern(chip, ptn);
+	}
+}
+
+static ssize_t store_led_pattern(struct device *dev,
+				struct device_attribute *attr,
+				const char *buf, size_t len)
+{
+	struct lp5521_chip *chip = i2c_get_clientdata(to_i2c_client(dev));
+	unsigned long val;
+	int ret;
+
+	ret = strict_strtoul(buf, 16, &val);
+	if (ret)
+		return ret;
+
+	lp5521_run_led_pattern(val, chip);
+
+	return len;
+}
+
+static void _set_pwm_cmd(struct lp5521_pattern_cmd *cmd, unsigned int color)
+{
+	u8 r = (color >> 16) & 0xFF;
+	u8 g = (color >> 8) & 0xFF;
+	u8 b = color & 0xFF;
+
+	cmd->r[cmd->pc_r++] = CMD_SET_PWM;
+	cmd->r[cmd->pc_r++] = r;
+	cmd->g[cmd->pc_g++] = CMD_SET_PWM;
+	cmd->g[cmd->pc_g++] = g;
+	cmd->b[cmd->pc_b++] = CMD_SET_PWM;
+	cmd->b[cmd->pc_b++] = b;
+}
+
+static void _set_wait_cmd(struct lp5521_pattern_cmd *cmd,
+			unsigned int ms, u8 jump)
+{
+	u8 msb, lsb;
+	u16 branch;
+	int loop = ms / WAIT_UNIT;
+
+	/* wait command */
+	cmd->r[cmd->pc_r++] = CMD_WAIT_MSB;
+	cmd->r[cmd->pc_r++] = CMD_WAIT_LSB;
+	cmd->g[cmd->pc_g++] = CMD_WAIT_MSB;
+	cmd->g[cmd->pc_g++] = CMD_WAIT_LSB;
+	cmd->b[cmd->pc_b++] = CMD_WAIT_MSB;
+	cmd->b[cmd->pc_b++] = CMD_WAIT_LSB;
+
+	/* branch command : if wait time is bigger than 980ms,
+			branch is used for command looping */
+	if (loop > 1) {
+		branch = (5 << 13) | ((loop - 1) << 7) | jump;
+		msb = (branch >> 8) & 0xFF;
+		lsb = branch & 0xFF;
+
+		cmd->r[cmd->pc_r++] = msb;
+		cmd->r[cmd->pc_r++] = lsb;
+		cmd->g[cmd->pc_g++] = msb;
+		cmd->g[cmd->pc_g++] = lsb;
+		cmd->b[cmd->pc_b++] = msb;
+		cmd->b[cmd->pc_b++] = lsb;
+	}
+}
+
+static ssize_t store_led_blink(struct device *dev,
+				struct device_attribute *attr,
+				const char *buf, size_t len)
+{
+	struct lp5521_chip *chip = i2c_get_clientdata(to_i2c_client(dev));
+	unsigned int rgb = 0, on = 0, off = 0;
+	struct lp5521_led_pattern ptn = { };
+	struct lp5521_pattern_cmd cmd = { };
+	u8 jump_pc;
+
+	sscanf(buf, "0x%06x %d %d", &rgb, &on, &off);
+
+	if (on > MAX_BLINK_TIME || off > MAX_BLINK_TIME)
+		return len;
+
+	lp5521_run_led_pattern(PATTERN_OFF, chip);
+
+	if (on == 0 && off == 0) {
+		_set_pwm_cmd(&cmd, rgb);
+	} else {
+		jump_pc = 0;
+		_set_pwm_cmd(&cmd, rgb);
+		_set_wait_cmd(&cmd, on, jump_pc);
+		jump_pc = cmd.pc_r / 2; /* 16bit size program counter */
+		_set_pwm_cmd(&cmd, 0);
+		_set_wait_cmd(&cmd, off, jump_pc);
+	}
+
+	ptn.r = cmd.r;
+	ptn.size_r = cmd.pc_r;
+	ptn.g = cmd.g;
+	ptn.size_g = cmd.pc_g;
+	ptn.b = cmd.b;
+	ptn.size_b = cmd.pc_b;
+
+	_run_led_pattern(chip, &ptn);
+
+	return len;
+}
+
 /* led class device attributes */
 static DEVICE_ATTR(led_current, S_IRUGO | S_IWUSR, show_current, store_current);
 static DEVICE_ATTR(max_current, S_IRUGO , show_max_current, NULL);
@@ -576,6 +761,8 @@ static DEVICE_ATTR(engine1_load, S_IWUSR, NULL, store_engine1_load);
 static DEVICE_ATTR(engine2_load, S_IWUSR, NULL, store_engine2_load);
 static DEVICE_ATTR(engine3_load, S_IWUSR, NULL, store_engine3_load);
 static DEVICE_ATTR(selftest, S_IRUGO, lp5521_selftest, NULL);
+static DEVICE_ATTR(led_pattern, S_IWUSR, NULL, store_led_pattern);
+static DEVICE_ATTR(led_blink, S_IWUSR, NULL, store_led_blink);
 
 static struct attribute *lp5521_attributes[] = {
 	&dev_attr_engine1_mode.attr,
@@ -585,224 +772,14 @@ static struct attribute *lp5521_attributes[] = {
 	&dev_attr_engine1_load.attr,
 	&dev_attr_engine2_load.attr,
 	&dev_attr_engine3_load.attr,
+	&dev_attr_led_pattern.attr,
+	&dev_attr_led_blink.attr,
 	NULL
 };
 
 static const struct attribute_group lp5521_group = {
 	.attrs = lp5521_attributes,
 };
-
-#ifdef CONFIG_DEBUG_FS
-static int lp5521_dbg_open(struct inode *inode, struct file *file)
-{
-	file->private_data = inode->i_private;
-	return 0;
-}
-
-static ssize_t lp5521_help_register(struct file *file, char __user *userbuf,
-				    size_t count, loff_t *ppos)
-{
-	char buf[320];
-	unsigned int len;
-	const char *help = "\n How to read/write LP5521 registers\n\n";
-/*	(example) To read 0x00 register,\n \
-	echo 0x00 r > /sys/kernel/debug/lp5521/registers\n \
-	To write 0xff into 0x1 address,\n \
-	echo 0x00 0xff w > /sys/kernel/debug/lp5521/registers \n \
-	To dump values from 0x00 to 0x0a address,\n \
-	echo 0x00 0x0a d > /sys/kernel/debug/lp5521/registers\n";
-*/
-	len = snprintf(buf, sizeof(buf), "%s\n", help);
-	if (len > sizeof(buf))
-		len = sizeof(buf);
-
-	return simple_read_from_buffer(userbuf, count, ppos, buf, len);
-}
-
-static char *lp5521_parse_register_cmd(const char *cmd, u8 *byte)
-{
-	char tmp[10];
-	char *blank;
-	unsigned long arg;
-
-	blank = strchr(cmd, ' ');
-	memset(tmp, 0x0, sizeof(tmp));
-	memcpy(tmp, cmd, blank - cmd);
-
-	if (strict_strtol(tmp, 16, &arg) < 0)
-		return NULL;
-
-	*byte = arg;
-	return blank;
-}
-
-static ssize_t lp5521_ctrl_register(struct file *file,
-				    const char __user *userbuf, size_t count,
-				    loff_t *ppos)
-{
-	char mode, buf[20];
-	char *pos, *pos2;
-	u8 i, arg1, arg2, val = 0;
-	struct lp5521_chip *chip = file->private_data;
-	struct i2c_client *cl = chip->client;
-
-	if (copy_from_user(buf, userbuf, min(count, sizeof(buf))))
-		return -EFAULT;
-
-	mode = buf[count - 2];
-	switch (mode) {
-	case 'r':
-		if (!lp5521_parse_register_cmd(buf, &arg1))
-			return -EINVAL;
-
-		lp5521_read(cl, arg1, &val);
-		dev_info(&cl->dev, "Read [0x%.2x] = 0x%.2x\n", arg1, val);
-		break;
-	case 'w':
-		pos = lp5521_parse_register_cmd(buf, &arg1);
-		if (!pos)
-			return -EINVAL;
-		pos2 = lp5521_parse_register_cmd(pos + 1, &arg2);
-		if (!pos2)
-			return -EINVAL;
-
-		lp5521_write(cl, arg1, arg2);
-		dev_info(&cl->dev, "Written [0x%.2x] = 0x%.2x\n", arg1, arg2);
-		break;
-	case 'd':
-		pos = lp5521_parse_register_cmd(buf, &arg1);
-		if (!pos)
-			return -EINVAL;
-		pos2 = lp5521_parse_register_cmd(pos + 1, &arg2);
-		if (!pos2)
-			return -EINVAL;
-
-		for (i = arg1; i <= arg2; i++) {
-			lp5521_read(cl, i, &val);
-			dev_info(&cl->dev, "Read [0x%.2x] = 0x%.2x\n", i, val);
-		}
-		break;
-	default:
-		break;
-	}
-
-	return count;
-}
-
-static const struct file_operations fops_registers = {
-	.open = lp5521_dbg_open,
-	.read = lp5521_help_register,
-	.write = lp5521_ctrl_register,
-	.owner = THIS_MODULE,
-	.llseek = default_llseek,
-};
-
-static void lp5521_create_debugfs(struct lp5521_chip *chip)
-{
-	struct dbg_dentry *dd = &chip->dd;
-
-	dd->dir = debugfs_create_dir("lp5521", NULL);
-	dd->reg = debugfs_create_file("registers", S_IWUSR | S_IRUGO,
-				      dd->dir, chip, &fops_registers);
-}
-
-static void lp5521_remove_debugfs(struct lp5521_chip *chip)
-{
-	struct dbg_dentry *dd = &chip->dd;
-
-	debugfs_remove(dd->reg);
-	debugfs_remove(dd->dir);
-}
-#else
-static inline void lp5521_create_debugfs(struct lp5521_chip *chip)
-{
-	return;
-}
-
-static inline void lp5521_remove_debugfs(struct lp5521_chip *chip)
-{
-	return;
-}
-#endif
-
-#define LP5521_ENABLE_DEFAULT	\
-	(LP5521_MASTER_ENABLE | LP5521_LOGARITHMIC_PWM)
-#define LP5521_ENABLE_RUN_PROGRAM	\
-	(LP5521_ENABLE_DEFAULT | LP5521_EXEC_RUN)
-
-static void lp5521_program_pattern(int mode, struct lp5521_chip *chip)
-{
-	struct i2c_client *cl = chip->client;
-	int i;
-	u8 mode1_red[] = {
-			0x40, 0xED, 0x41, 0x00, /* 15.6ms on with red 0xff */
-			0x40, 0x00, 0x46, 0x00, /* 100ms off */
-			0x40, 0xED, 0x41, 0x00, /* 15.6ms on with red 0xff */
-			0x40, 0x00, 0x60, 0x00, /* 500ms off */
-			0xa4, 0x87, /* 4500ms off = 500ms off x 9 times */
-			};
-
-	u8 mode1_green[] = {
-			0x40, 0x59, 0x41, 0x00, /* 15.6ms on with green 0x25 */
-			0x40, 0x00, 0x46, 0x00, /* 100ms off */
-			0x40, 0x59, 0x41, 0x00, /* 15.6ms on with green 0x25 */
-			0x40, 0x00, 0x60, 0x00, /* 500ms off */
-			0xa4, 0x87, /* 4500ms off = 500ms off x 9 times */
-			};
-
-	if (mode == 0) {
-		lp5521_write(cl, LP5521_REG_ENABLE, LP5521_ENABLE_DEFAULT);
-		lp5521_write(cl, LP5521_REG_OP_MODE, LP5521_CMD_DIRECT);
-	} else if (mode == 1) {
-		lp5521_write(cl, LP5521_REG_OP_MODE, LP5521_CMD_LOAD);
-
-		for (i = 0 ; i < ARRAY_SIZE(mode1_red) ; i++)
-			lp5521_write(cl, LP5521_REG_R_PROG_MEM + i,
-			mode1_red[i]);
-
-		for (i = 0 ; i < ARRAY_SIZE(mode1_green) ; i++)
-			lp5521_write(cl, LP5521_REG_G_PROG_MEM + i,
-			mode1_green[i]);
-
-		lp5521_write(cl, LP5521_REG_OP_MODE, LP5521_CMD_RUN);
-		lp5521_write(cl, LP5521_REG_ENABLE, LP5521_ENABLE_RUN_PROGRAM);
-	}
-}
-
-static ssize_t lp5521_store_pattern(struct device *dev,
-				struct device_attribute *attr,
-				const char *buf,
-				size_t count)
-{
-	unsigned long val;
-	int ret;
-
-	ret = strict_strtoul(buf, 16, &val);
-	if (ret)
-		return ret;
-
-	lp5521_program_pattern(val, g_chip);
-
-	return count;
-}
-
-static struct device_attribute lp5521_pattern_attr = {
-	.attr = {
-		.name = "led-pattern",
-		.mode = 0644,
-	},
-	.store = lp5521_store_pattern,
-};
-
-static int lp5521_create_pattern_nodes(struct lp5521_chip *chip)
-{
-	return device_create_file(chip->led_dev, &lp5521_pattern_attr);
-}
-
-static void lp5521_remove_pattern_nodes(struct lp5521_chip *chip)
-{
-	device_remove_file(chip->led_dev, &lp5521_pattern_attr);
-}
 
 static int lp5521_register_sysfs(struct i2c_client *client)
 {
@@ -848,7 +825,6 @@ static int __devinit lp5521_init_led(struct lp5521_led *led,
 	}
 
 	led->cdev.brightness_set = lp5521_set_brightness;
-
 	if (pdata->led_config[chan].name) {
 		led->cdev.name = pdata->led_config[chan].name;
 	} else {
@@ -879,6 +855,7 @@ static int __devinit lp5521_probe(struct i2c_client *client,
 	struct lp5521_chip		*chip;
 	struct lp5521_platform_data	*pdata;
 	int ret, i, led;
+	u8 buf;
 
 	chip = kzalloc(sizeof(*chip), GFP_KERNEL);
 	if (!chip)
@@ -886,11 +863,7 @@ static int __devinit lp5521_probe(struct i2c_client *client,
 
 	i2c_set_clientdata(client, chip);
 	chip->client = client;
-	g_chip = chip;
 
-#ifdef LED_DEBUG
-	g_client = client;
-#endif
 	pdata = client->dev.platform_data;
 
 	if (!pdata) {
@@ -921,6 +894,20 @@ static int __devinit lp5521_probe(struct i2c_client *client,
 				     * Exact value is not available. 10 - 20ms
 				     * appears to be enough for reset.
 				     */
+
+	/*
+	 * Make sure that the chip is reset by reading back the r channel
+	 * current reg. This is dummy read is required on some platforms -
+	 * otherwise further access to the R G B channels in the
+	 * LP5521_REG_ENABLE register will not have any effect - strange!
+	 */
+	ret = lp5521_read(client, LP5521_REG_R_CURRENT, &buf);
+	if (ret || buf != LP5521_REG_R_CURR_DEFAULT) {
+		dev_err(&client->dev, "error in resetting chip\n");
+		goto fail2;
+	}
+	usleep_range(10000, 20000);
+
 	ret = lp5521_detect(client);
 
 	if (ret) {
@@ -940,7 +927,6 @@ static int __devinit lp5521_probe(struct i2c_client *client,
 	chip->num_channels = pdata->num_channels;
 	chip->num_leds = 0;
 	led = 0;
-	chip->led_dev = device_create(sec_class, NULL, 0, NULL, "leds");
 	for (i = 0; i < pdata->num_channels; i++) {
 		/* Do not initialize channels that are not connected */
 		if (pdata->led_config[i].led_current == 0)
@@ -969,10 +955,6 @@ static int __devinit lp5521_probe(struct i2c_client *client,
 		dev_err(&client->dev, "registering sysfs failed\n");
 		goto fail3;
 	}
-
-	lp5521_create_pattern_nodes(chip);
-	lp5521_create_debugfs(chip);
-
 	return ret;
 fail3:
 	for (i = 0; i < chip->num_leds; i++) {
@@ -989,24 +971,12 @@ fail1:
 	return ret;
 }
 
-#ifdef LED_DEBUG
-void lp5521_led_brightness(u8 channel, u8 brightness)
-{
-
-	lp5521_write(g_client, LP5521_REG_LED_PWM_BASE + channel,
-			brightness);
-}
-EXPORT_SYMBOL(lp5521_led_brightness);
-#endif
-
-static int lp5521_remove(struct i2c_client *client)
+static int __devexit lp5521_remove(struct i2c_client *client)
 {
 	struct lp5521_chip *chip = i2c_get_clientdata(client);
 	int i;
 
-	lp5521_program_pattern(0, chip);
-	lp5521_remove_pattern_nodes(chip);
-	lp5521_remove_debugfs(chip);
+	lp5521_run_led_pattern(PATTERN_OFF, chip);
 	lp5521_unregister_sysfs(client);
 
 	for (i = 0; i < chip->num_leds; i++) {
@@ -1033,7 +1003,7 @@ static struct i2c_driver lp5521_driver = {
 		.name	= "lp5521",
 	},
 	.probe		= lp5521_probe,
-	.remove		= lp5521_remove,
+	.remove		= __devexit_p(lp5521_remove),
 	.id_table	= lp5521_id,
 };
 

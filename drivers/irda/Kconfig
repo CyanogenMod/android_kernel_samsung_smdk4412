@@ -8,13 +8,31 @@ menuconfig IR_REMOCON
 
 	  If unsure, say N.
 
-if IR_REMOCON
-
-config IR_REMOCON_EUR
-	bool "IR_LED driver of EUR model"
+choice
+	prompt "Control type"
 	depends on IR_REMOCON
+	default IR_REMOCON_GPIO
+
+config IR_REMOCON_GPIO
+	bool "GPIO-based IR LED driver"
+
+config IR_REMOCON_MC96
+	bool "Micom(ABOV)-based IR LED driver"
+
+endchoice
+
+config IR_REMOCON_GPIO_EUR
+	bool "GPIO-based IR LED driver of EUR model"
+	depends on IR_REMOCON && IR_REMOCON_GPIO
 	default n
 	help
-		Say Y here to enable the driver for IR_LED of EUR model.
+	  Say Y here to enable the GPIO-based driver for IR_LED of EUR model.
 
-endif
+config IR_REMOCON_GPIO_TMO
+        bool "GPIO-based IR LED driver of TMO model"
+        depends on IR_REMOCON && IR_REMOCON_GPIO
+        default n
+        help
+          Say Y here to enable the GPIO-based driver for IR_LED of TMO model.
+
+

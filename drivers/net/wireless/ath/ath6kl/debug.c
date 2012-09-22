@@ -400,8 +400,10 @@ static ssize_t ath6kl_fwlog_block_read(struct file *file,
 
 		ret = wait_for_completion_interruptible(
 			&ar->debug.fwlog_completion);
-		if (ret == -ERESTARTSYS)
+		if (ret == -ERESTARTSYS) {
+			vfree(buf);
 			return ret;
+		}
 
 		spin_lock(&ar->debug.fwlog_queue.lock);
 	}
@@ -1787,6 +1789,139 @@ static const struct file_operations fops_power_params = {
 	.llseek = default_llseek,
 };
 
+static ssize_t ath6kl_lrssi_roam_config_write(struct file *file,
+				       const char __user *user_buf,
+				       size_t count, loff_t *ppos)
+{
+	struct ath6kl *ar = file->private_data;
+	struct low_rssi_scan_params lrssi_params;
+	char buf[32];
+	ssize_t len;
+	char *sptr, *token;
+	u16 val16;
+
+	len = min(count, sizeof(buf) - 1);
+	if (copy_from_user(buf, user_buf, len))
+		return -EFAULT;
+
+	buf[len] = '\0';
+	sptr = buf;
+
+	token = strsep(&sptr, " ");
+	if (!token)
+		return -EINVAL;
+	if (kstrtou16(token, 0, &val16))
+		return -EINVAL;
+	lrssi_params.lrssi_scan_period = cpu_to_le16(val16);
+
+	token = strsep(&sptr, " ");
+	if (!token)
+		return -EINVAL;
+	if (kstrtou16(token, 0, &val16))
+		return -EINVAL;
+	lrssi_params.lrssi_scan_threshold = cpu_to_le16(val16);
+
+	token = strsep(&sptr, " ");
+	if (!token)
+		return -EINVAL;
+	if (kstrtou16(token, 0, &val16))
+		return -EINVAL;
+	lrssi_params.lrssi_roam_threshold = cpu_to_le16(val16);
+
+	token = strsep(&sptr, " ");
+	if (!token)
+		return -EINVAL;
+	if (kstrtou8(token, 0, &lrssi_params.roam_rssi_floor))
+		return -EINVAL;
+
+	ath6kl_wmi_set_roam_lrssi_config_cmd(ar->wmi, &lrssi_params);
+
+	return count;
+}
+
+static const struct file_operations fops_lrssi_roam_config = {
+	.write = ath6kl_lrssi_roam_config_write,
+	.open = ath6kl_debugfs_open,
+	.owner = THIS_MODULE,
+	.llseek = default_llseek,
+};
+
+static ssize_t ath6kl_ht_cap_write(struct file *file,
+				       const char __user *user_buf,
+				       size_t count, loff_t *ppos)
+{
+	struct ath6kl *ar = file->private_data;
+	struct ath6kl_vif *vif;
+	struct wmi_set_ht_cap_cmd ht_cap;
+	char buf[32];
+	ssize_t len;
+	char *sptr, *token;
+
+	vif = ath6kl_vif_first(ar);
+	if (!vif)
+		return -EIO;
+
+	len = min(count, sizeof(buf) - 1);
+	if (copy_from_user(buf, user_buf, len))
+		return -EFAULT;
+
+	buf[len] = '\0';
+	sptr = buf;
+
+	token = strsep(&sptr, " ");
+	if (!token)
+		return -EINVAL;
+	if (kstrtou8(token, 0, &ht_cap.band))
+		return -EINVAL;
+
+	token = strsep(&sptr, " ");
+	if (!token)
+		return -EINVAL;
+	if (kstrtou8(token, 0, &ht_cap.enable))
+		return -EINVAL;
+
+	token = strsep(&sptr, " ");
+	if (!token)
+		return -EINVAL;
+	if (kstrtou8(token, 0, &ht_cap.chan_width_40m_supported))
+		return -EINVAL;
+
+	token = strsep(&sptr, " ");
+	if (!token)
+		return -EINVAL;
+	if (kstrtou8(token, 0, &ht_cap.short_gi_20mhz))
+		return -EINVAL;
+
+	token = strsep(&sptr, " ");
+	if (!token)
+		return -EINVAL;
+	if (kstrtou8(token, 0, &ht_cap.short_gi_40mhz))
+		return -EINVAL;
+
+	token = strsep(&sptr, " ");
+	if (!token)
+		return -EINVAL;
+	if (kstrtou8(token, 0, &ht_cap.intolerance_40mhz))
+		return -EINVAL;
+
+	token = strsep(&sptr, " ");
+	if (!token)
+		return -EINVAL;
+	if (kstrtou8(token, 0, &ht_cap.max_ampdu_len_exp))
+		return -EINVAL;
+
+	ath6kl_wmi_set_ht_cap_cmd(ar->wmi, vif->fw_vif_idx, &ht_cap);
+
+	return count;
+}
+
+static const struct file_operations fops_ht_cap = {
+	.write = ath6kl_ht_cap_write,
+	.open = ath6kl_debugfs_open,
+	.owner = THIS_MODULE,
+	.llseek = default_llseek,
+};
+
 int ath6kl_debug_init(struct ath6kl *ar)
 {
 	skb_queue_head_init(&ar->debug.fwlog_queue);
@@ -1868,6 +2003,12 @@ int ath6kl_debug_init(struct ath6kl *ar)
 
 	debugfs_create_file("power_params", S_IWUSR, ar->debugfs_phy, ar,
 						&fops_power_params);
+
+	debugfs_create_file("lrssi_roam_config", S_IRUSR, ar->debugfs_phy, ar,
+			    &fops_lrssi_roam_config);
+
+	debugfs_create_file("ht_cap", S_IRUSR, ar->debugfs_phy, ar,
+			    &fops_ht_cap);
 
 	return ath6kl_init_debugfs_pri(ar);
 }

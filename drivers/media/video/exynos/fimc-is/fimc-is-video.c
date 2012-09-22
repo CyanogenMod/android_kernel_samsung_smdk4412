@@ -45,6 +45,11 @@
 
 static struct fimc_is_fmt fimc_is_formats[] = {
 	{
+		.name	= "Bayer8",
+		.fourcc	= V4L2_PIX_FMT_SGRBG8,
+		.flags = 1,
+	},
+	{
 		.name	= "Bayer10",
 		.fourcc	= V4L2_PIX_FMT_SGRBG10,
 		.flags = 1,
@@ -233,6 +238,21 @@ static int fimc_is_isp_video_s_fmt_mplane(struct file *file, void *priv,
 
 	pix = &f->fmt.pix_mp;
 	switch (f->fmt.pix.pixelformat) {
+	case V4L2_PIX_FMT_SGRBG8:
+		width = pix->width - is_dev->sensor.offset_x;
+		height = pix->height - is_dev->sensor.offset_y;
+		IS_ISP_SET_PARAM_DMA_OUTPUT2_CMD(is_dev,
+						DMA_OUTPUT_COMMAND_DISABLE);
+		IS_ISP_SET_PARAM_DMA_OUTPUT2_WIDTH(is_dev, width);
+		IS_ISP_SET_PARAM_DMA_OUTPUT2_HEIGHT(is_dev, height);
+		IS_ISP_SET_PARAM_DMA_OUTPUT2_FORMAT(is_dev,
+						DMA_OUTPUT_FORMAT_BAYER);
+		IS_ISP_SET_PARAM_DMA_OUTPUT2_BITWIDTH(is_dev,
+						DMA_OUTPUT_BIT_WIDTH_8BIT);
+		IS_ISP_SET_PARAM_DMA_OUTPUT2_PLANE(is_dev, DMA_OUTPUT_PLANE_1);
+		IS_ISP_SET_PARAM_DMA_OUTPUT2_ORDER(is_dev,
+						DMA_OUTPUT_ORDER_GB_BG);
+		break;
 	case V4L2_PIX_FMT_SGRBG10:
 		width = pix->width - is_dev->sensor.offset_x;
 		height = pix->height - is_dev->sensor.offset_y;
@@ -518,6 +538,8 @@ static int fimc_is_isp_start_streaming(struct vb2_queue *q)
 				+ 32 * sizeof(u32));
 		IS_ISP_SET_PARAM_DMA_OUTPUT2_NODIFY_DMA_DONE(is_dev,
 				DMA_OUTPUT_NOTIFY_DMA_DONE_ENBABLE);
+		/* All buffers are available to write image data */
+		IS_ISP_SET_PARAM_DMA_OUTPUT2_MASK(is_dev, 0xFFFFFFFF);
 		IS_SET_PARAM_BIT(is_dev, PARAM_ISP_DMA2_OUTPUT);
 		IS_INC_PARAM_NUM(is_dev);
 

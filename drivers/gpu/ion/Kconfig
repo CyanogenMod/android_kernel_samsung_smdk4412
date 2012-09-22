@@ -21,3 +21,8 @@ config ION_EXYNOS_CONTIGHEAP_SIZE
 	int "Size in Kilobytes of memory pool of EXYNOS_CONTIG_HEAP"
 	depends on ION_EXYNOS && CMA
 	default 45056
+
+config ION_EXYNOS_CONTIGHEAP_DEBUG
+	bool "Debug message for allocation, free of CONTIGHEAP"
+	depends on ION_EXYNOS && CMA
+	default n

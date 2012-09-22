@@ -85,7 +85,7 @@ static int exynos_drm_ump_add_buffer(void *obj,
 		 * physically continuous buffer so let a ump descriptor
 		 * have one buffer address.
 		 */
-		ump_mem_desc[0].addr = (unsigned long)buf->dma_addr;
+		ump_mem_desc[0].addr = (unsigned long)buf->paddr;
 		ump_mem_desc[0].size = buf->size;
 	}
 
@@ -115,13 +115,6 @@ static int exynos_drm_ump_add_buffer(void *obj,
 static void exynos_drm_ump_release_buffer(unsigned int handle)
 {
 	DRM_DEBUG_KMS("%s\n", __FILE__);
-
-	if (!handle) {
-		DRM_DEBUG_KMS("invalid ump handle.\n");
-		return;
-	}
-
-	ump_dd_reference_release((ump_dd_handle)handle);
 }
 
 static struct exynos_drm_private_cb ump_callback = {

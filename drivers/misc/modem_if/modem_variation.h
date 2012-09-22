@@ -73,6 +73,18 @@ DECLARE_MODEM_INIT(mdm6600);
 DECLARE_MODEM_INIT_DUMMY(mdm6600)
 #endif
 
+#ifdef CONFIG_GSM_MODEM_ESC6270
+DECLARE_MODEM_INIT(esc6270);
+#else
+DECLARE_MODEM_INIT_DUMMY(esc6270)
+#endif
+
+#ifdef CONFIG_TDSCDMA_MODEM_SPRD8803
+DECLARE_MODEM_INIT(sprd8803);
+#else
+DECLARE_MODEM_INIT_DUMMY(sprd8803)
+#endif
+
 /* link device support */
 DECLARE_LINK_INIT_DUMMY(undefined)
 
@@ -86,6 +98,12 @@ DECLARE_LINK_INIT_DUMMY(mipi)
 DECLARE_LINK_INIT(dpram);
 #else
 DECLARE_LINK_INIT_DUMMY(dpram)
+#endif
+
+#ifdef CONFIG_LINK_DEVICE_PLD
+DECLARE_LINK_INIT(pld);
+#else
+DECLARE_LINK_INIT_DUMMY(pld)
 #endif
 
 #ifdef CONFIG_LINK_DEVICE_SPI
@@ -120,6 +138,8 @@ static modem_init_call modem_init_func[] = {
 	MODEM_INIT_CALL(cbp72),
 	MODEM_INIT_CALL(cmc221),
 	MODEM_INIT_CALL(mdm6600),
+	MODEM_INIT_CALL(esc6270),
+	MODEM_INIT_CALL(sprd8803),
 	MODEM_INIT_CALL(dummy),
 };
 
@@ -132,6 +152,7 @@ static link_init_call link_init_func[] = {
 	LINK_INIT_CALL(usb),
 	LINK_INIT_CALL(hsic),
 	LINK_INIT_CALL(c2c),
+	LINK_INIT_CALL(pld),
 };
 
 static int call_modem_init_func(struct modem_ctl *mc, struct modem_data *pdata)

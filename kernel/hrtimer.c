@@ -49,6 +49,7 @@
 #include <asm/uaccess.h>
 
 #include <trace/events/timer.h>
+#include <mach/sec_debug.h>
 
 /*
  * The timer bases:
@@ -1215,7 +1216,9 @@ static void __run_hrtimer(struct hrtimer *timer, ktime_t *now)
 	 */
 	raw_spin_unlock(&cpu_base->lock);
 	trace_hrtimer_expire_entry(timer, now);
+	sec_debug_hrtimer_log(timer, fn, 1);
 	restart = fn(timer);
+	sec_debug_hrtimer_log(timer, fn, 2);
 	trace_hrtimer_expire_exit(timer);
 	raw_spin_lock(&cpu_base->lock);
 

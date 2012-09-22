@@ -136,6 +136,8 @@ source "drivers/samsung/Kconfig"
 
 source "drivers/sensor/Kconfig"
 
+source "drivers/sensorhub/Kconfig"
+
 source "drivers/devfreq/Kconfig"
 
 source "drivers/phone_svn/Kconfig"
@@ -148,9 +150,17 @@ source "drivers/irda/Kconfig"
 
 source "drivers/extcon/Kconfig"
 
+source "drivers/barcode_emul/Kconfig"
+
 # Secure OS Mobicore
 source "drivers/gud/Kconfig"
 
 source "drivers/iommu/Kconfig"
+
+# FELICA
+source "drivers/felica/Kconfig"
+
+# Authentec
+source "drivers/interceptor/Kconfig"
 
 endmenu

@@ -527,8 +527,26 @@ static void ehci_stop (struct usb_hcd *hcd)
 
 	/* root hub is shut down separately (first, when possible) */
 	spin_lock_irq (&ehci->lock);
+#ifdef CONFIG_MDM_HSIC_PM
+	if (ehci->async) {
+		/*
+		 * TODO: Observed that ehci->async next ptr is not
+		 * NULL sometimes which leads to crash in mem_cleanup.
+		 * Root cause is not yet known why this messup is
+		 * happenning.
+		 * The follwing workaround fixes the crash caused
+		 * by this temporarily.
+		 * check if async next ptr is not NULL and unlink
+		 * explictly.
+		 */
+		if (ehci->async->qh_next.ptr != NULL)
+			start_unlink_async(ehci, ehci->async->qh_next.qh);
+		ehci_work(ehci);
+	}
+#else
 	if (ehci->async)
 		ehci_work (ehci);
+#endif
 	spin_unlock_irq (&ehci->lock);
 	ehci_mem_cleanup (ehci);
 
@@ -881,6 +899,13 @@ static irqreturn_t ehci_irq (struct usb_hcd *hcd)
 			pstatus = ehci_readl(ehci,
 					 &ehci->regs->port_status[i]);
 
+#ifdef CONFIG_MDM_HSIC_PM
+			/*set RS bit in case of remote wakeup*/
+			if (ehci_is_TDI(ehci) && !(cmd & CMD_RUN) &&
+					(pstatus & PORT_SUSPEND))
+				ehci_writel(ehci, cmd | CMD_RUN,
+						&ehci->regs->command);
+#endif
 			if (pstatus & PORT_OWNER)
 				continue;
 			if (!(test_bit(i, &ehci->suspended_ports) &&
@@ -911,7 +936,7 @@ static irqreturn_t ehci_irq (struct usb_hcd *hcd)
 			 */
 #ifdef CONFIG_LINK_DEVICE_HSIC
 			/* ensure suspend bit clear by adding 5 msec delay. */
-			ehci->reset_done[i] = jiffies + msecs_to_jiffies(30);
+			ehci->reset_done[i] = jiffies + msecs_to_jiffies(50);
 #else
 			ehci->reset_done[i] = jiffies + msecs_to_jiffies(25);
 #endif

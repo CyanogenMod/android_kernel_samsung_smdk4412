@@ -63,7 +63,7 @@ config AD525X_DPOT_SPI
 
 config ANDROID_PMEM
 	bool "Android pmem allocator"
-	depends on MACH_U1 || MACH_PX
+	depends on MACH_U1 || MACH_PX || MACH_TRATS
 	default n
 
 if ANDROID_PMEM
@@ -558,12 +558,40 @@ config UART_SELECT
 	help
 	 This is uart selection driver.
 
+config SWITCH_DUAL_MODEM
+	bool "Switch UART/USB to dual MODEM"
+	default n
+	help
+	 This feature can be active when do dual CP project such as Grande.
+	 This can offer an interface to switch UART/USB to AP/CP1/CP2 at *#7284# keystring application.
+	 Need to change UI at *#7284# also to have effect on this.
+	 Use a combination of MAX77693 switch function and GPIO control.
+
+config WIMAX_CMC
+        bool "SUB PMIC FOR WIMAX CMC"
+        depends on I2C
+        default n
+	help
+	 This is feature for WIMAX ICS on gaudi Devices.
+	 This is a 4G technology and connected through the SDIO interface 3.
+	 This is powered through the max8893.
+	 This feature is enabled by default if Wimax is enabled.
+
 config SEC_DEV_JACK
 	bool "Earjack detection driver for Samsung devices"
 	depends on INPUT
 	default n
 	---help---
 	 This is Earjack detection driver for Samsung devices.
+
+config MUIC_DET_JACK
+	bool "Earjack detection driver using MUIC"
+	default n
+	help
+	 This is Earjack detection driver using MUIC.
+	 MUIC can recognize earjack device type and earkey using ADC values.
+	 Some project use muic earjack instead of 3.5phi earjack.
+	 Max77693 muic also support earjack detection.
 
 config FM34_WE395
 	bool "Forte Media 2MIC driver"
@@ -603,11 +631,56 @@ config MUIC_MAX8997_OVPUI
 	  is used in Chinese models. When OVP is occurred, the battery UI
 	  must be changed to uncharging status.
 
+config MUIC_MAX77693_SEPARATE_MHL_PORT
+	bool "MUIC_MAX77693_SEPARATE_MHL_PORT"
+	depends on MFD_MAX77693
+	default n
+	help
+	  If you say yes here you will get support for the separated
+	  MHL port.
+
+config MUIC_MAX77693_SUPPORT_OTG_AUDIO_DOCK
+	bool "MUIC_MAX77693_SUPPORT_OTG_AUDIO_DOCK"
+	depends on MFD_MAX77693
+	default n
+	help
+	  If you say yes here you will get support for the OTG audio dock.
+
+config MUIC_MAX77693_SUPPORT_SMART_DOCK
+	bool "MUIC_MAX77693_SUPPORT_SMART_DOCK"
+	depends on MFD_MAX77693
+	default n
+	help
+	  If you say yes here you will get support for the smart dock.
+
+config MUIC_MAX77693_SUPPORT_CAR_DOCK
+	bool "MUIC_MAX77693_SUPPORT_CAR_DOCK"
+	depends on MFD_MAX77693
+	default n
+	help
+	  If you say yes here you will get support for the car dock.
+
 config USBHUB_USB3503
 	bool "USB3503 USB HUB Driver"
 	depends on I2C
 	help
 	 Enables USB HUB USB3503
+
+config USBHUB_USB3503_OTG_CONN
+	bool "USB3503 USB HUB Driver"
+	depends on I2C
+	help
+	 Enables USB HUB USB3503
+
+config USBHUB_USB3803
+	bool "USB3803 USB HUB Driver"
+	depends on I2C
+	help
+	 Enables USB HUB USB3803. Say yes to use USB3803 usb hub
+	 for the device. This hub is used to switch the usb
+	 connection between AP and CP.
+
+	 If unsure, say N
 
 config PN544
         bool "NXP PN544 NFC Controller Driver"
@@ -644,6 +717,7 @@ source "drivers/misc/lis3lv02d/Kconfig"
 source "drivers/misc/carma/Kconfig"
 source "drivers/misc/c2c/Kconfig"
 source "drivers/misc/modem_if/Kconfig"
+source "drivers/misc/modem_if_na/Kconfig"
 
 config SLP_LOWMEM_NOTIFY
 	bool "Driver for SLP Low Memory Notification"

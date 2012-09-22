@@ -54,6 +54,17 @@ config MMC_MSHCI_ASYNC_OPS
 
 	  If unsure, say N.
 
+config MMC_MSHCI_ENABLE_CACHE
+	tristate "Use Cache defined in eMMC 4.5"
+	depends on MMC_MSHCI
+	default n
+	help
+	  This selects eMMC cache control feature of eMMC4.5.
+	  These functions might make the performance of MMC better.
+	  This should be used when the eMMC device  supports cache feature.
+
+	  If unsure, say N.
+
 config MMC_SDHCI
 	tristate "Secure Digital Host Controller Interface support"
 	depends on HAS_DMA

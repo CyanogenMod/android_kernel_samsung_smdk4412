@@ -340,8 +340,10 @@ void kernel_restart(char *cmd)
 	syscore_shutdown();
 	if (!cmd)
 		printk(KERN_EMERG "Restarting system.\n");
-	else
+	else{
 		printk(KERN_EMERG "Restarting system with command '%s'.\n", cmd);
+		printk(KERN_EMERG "pid = %d name:%s\n", task_tgid_vnr(current), current->comm);
+	}
 	kmsg_dump(KMSG_DUMP_RESTART);
 	machine_restart(cmd);
 }

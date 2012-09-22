@@ -32,6 +32,9 @@
 #include <asm/mach/map.h>
 #include <plat/regs-watchdog.h>
 
+#if defined(CONFIG_SEC_MODEM_P8LTE)
+#include <linux/miscdevice.h>
+#endif
 /* klaatu - schedule log */
 #ifdef CONFIG_SEC_DEBUG_SCHED_LOG
 #define SCHED_LOG_MAX 2048
@@ -54,12 +57,17 @@ struct sched_log {
 		struct work_struct *work;
 		work_func_t f;
 	} work[NR_CPUS][SCHED_LOG_MAX];
+	struct hrtimer_log {
+		unsigned long long time;
+		struct hrtimer *timer;
+		enum hrtimer_restart (*fn)(struct hrtimer *);
+		int en;
+	} hrtimers[NR_CPUS][8];
 };
 #endif				/* CONFIG_SEC_DEBUG_SCHED_LOG */
 
 #ifdef CONFIG_SEC_DEBUG_AUXILIARY_LOG
 #define AUX_LOG_CPU_CLOCK_MAX 64
-#define AUX_LOG_LOGBUF_LOCK_MAX 64
 #define AUX_LOG_LENGTH 128
 
 struct auxiliary_info {
@@ -71,7 +79,6 @@ struct auxiliary_info {
 /* This structure will be modified if some other items added for log */
 struct auxiliary_log {
 	struct auxiliary_info CpuClockLog[AUX_LOG_CPU_CLOCK_MAX];
-	struct auxiliary_info LogBufLockLog[AUX_LOG_LOGBUF_LOCK_MAX];
 };
 
 #else
@@ -229,6 +236,7 @@ static struct sched_log sec_debug_log[NR_CPUS][SCHED_LOG_MAX]
 static atomic_t task_log_idx[NR_CPUS] = { ATOMIC_INIT(-1), ATOMIC_INIT(-1) };
 static atomic_t irq_log_idx[NR_CPUS] = { ATOMIC_INIT(-1), ATOMIC_INIT(-1) };
 static atomic_t work_log_idx[NR_CPUS] = { ATOMIC_INIT(-1), ATOMIC_INIT(-1) };
+static atomic_t hrtimer_log_idx[NR_CPUS] = { ATOMIC_INIT(-1), ATOMIC_INIT(-1) };
 static struct sched_log (*psec_debug_log) = (&sec_debug_log);
 /*
 static struct sched_log (*psec_debug_log)[NR_CPUS][SCHED_LOG_MAX]
@@ -242,7 +250,6 @@ static unsigned long long gExcpIrqExitTime[NR_CPUS];
 static struct auxiliary_log gExcpAuxLog	__cacheline_aligned;
 static struct auxiliary_log *gExcpAuxLogPtr;
 static atomic_t gExcpAuxCpuClockLogIdx = ATOMIC_INIT(-1);
-static atomic_t gExcpAuxLogBufLockLogIdx = ATOMIC_INIT(-1);
 #endif
 
 static int checksum_sched_log(void)
@@ -548,6 +555,62 @@ static inline void sec_debug_disable_watchdog(void)
 }
 #endif
 
+#if defined(CONFIG_SEC_MODEM_P8LTE)
+static void __iomem *idpram_base;
+void sec_set_cp_upload(void)
+{
+	unsigned int send_mail, wait_count;
+	volatile u16 *cp_dpram_mbx_BA;/*send mail box*/
+	volatile u16 *cp_dpram_mbx_AB;/*receive mail box*/
+
+	cp_dpram_mbx_BA = (volatile u16 *)(idpram_base + 0x3FFC);
+	cp_dpram_mbx_AB = (volatile u16 *)(idpram_base + 0x3FFE);
+
+	send_mail = 0xc9; /*KERNEL_SEC_DUMP_AP_DEAD_INDICATOR_DPRAM*/
+
+	*cp_dpram_mbx_BA = send_mail;
+
+	pr_err("%s : set cp upload mode, MailboxBA 0x%x\n",
+		__func__, send_mail);
+
+	wait_count = 0;
+	while (1) {
+		if (*cp_dpram_mbx_AB == 0xc6) {
+			pr_err("%s  - Done.\n", __func__);
+			break;
+		}
+		mdelay(10);
+		if (++wait_count > 2500) {
+			pr_err("%s - Fail to set CP uploadmode.\n", __func__);
+			break;
+		}
+	}
+	pr_err("%s : modem_wait_count : %d\n", __func__, wait_count);
+}
+
+static struct miscdevice sec_cp_upload_dev = {
+	.minor = MISC_DYNAMIC_MINOR,
+	.name = "cp_upload",
+};
+static __init int sec_cp_upload_init(void)
+{
+	/*DPRAM_START_ADDRESS_PHYS + DPRAM_SHARED_BANK_SIZE*/
+	idpram_base = ioremap_nocache(0x13A00000, 0x4000);
+
+	if (idpram_base == NULL)
+		printk(KERN_ERR "%s : failed ioremap\n", __func__);
+
+	return misc_register(&sec_cp_upload_dev);
+}
+
+static __exit void sec_cp_upload_exit(void)
+{
+	misc_deregister(&sec_cp_upload_dev);
+}
+
+module_init(sec_cp_upload_init);
+module_exit(sec_cp_upload_exit);
+#endif
 static int sec_debug_panic_handler(struct notifier_block *nb,
 				   unsigned long l, void *buf)
 {
@@ -577,20 +640,62 @@ static int sec_debug_panic_handler(struct notifier_block *nb,
 	show_state();
 
 	sec_debug_dump_stack();
+#if defined(CONFIG_SEC_MODEM_P8LTE)
+	sec_set_cp_upload();
+#endif
 	sec_debug_hw_reset();
 
 	return 0;
 }
 
+#if defined(CONFIG_MACH_Q1_BD)
+/*
+ * This function can be used while current pointer is invalid.
+ */
+int sec_debug_panic_handler_safe(void *buf)
+{
+	local_irq_disable();
+
+	sec_debug_set_upload_magic(0x66262564, buf);
+
+	sec_debug_set_upload_cause(UPLOAD_CAUSE_KERNEL_PANIC);
+
+	pr_err("(%s) checksum_sched_log: %x\n", __func__, checksum_sched_log());
+
+	sec_debug_dump_stack();
+	sec_debug_hw_reset();
+
+	return 0;
+}
+#endif
+
 #ifdef CONFIG_SEC_DEBUG_FUPLOAD_DUMP_MORE
 static void dump_state_and_upload(void);
 #endif
 
+#if !defined(CONFIG_TARGET_LOCALE_NA)
 void sec_debug_check_crash_key(unsigned int code, int value)
 {
 	static bool volup_p;
 	static bool voldown_p;
 	static int loopcount;
+
+	/* In Case of GC1,
+	 * use Tele key as Volume up,
+	 * use Wide key as volume down.
+	 */
+#ifdef CONFIG_MACH_GC1
+	static unsigned int VOLUME_UP = 0x221;
+	static unsigned int VOLUME_DOWN = 0x222;
+
+	if (system_rev < 2) {
+		VOLUME_UP = KEY_CAMERA_ZOOMIN;
+		VOLUME_DOWN = KEY_CAMERA_ZOOMOUT;
+	}
+#else
+	static const unsigned int VOLUME_UP = KEY_VOLUMEUP;
+	static const unsigned int VOLUME_DOWN = KEY_VOLUMEDOWN;
+#endif
 
 	if (!sec_debug_level.en.kernel_fault)
 		return;
@@ -607,9 +712,9 @@ void sec_debug_check_crash_key(unsigned int code, int value)
 	 *  and volume up key should not be pressed
 	 */
 	if (value) {
-		if (code == KEY_VOLUMEUP)
+		if (code == VOLUME_UP)
 			volup_p = true;
-		if (code == KEY_VOLUMEDOWN)
+		if (code == VOLUME_DOWN)
 			voldown_p = true;
 		if (!volup_p && voldown_p) {
 			if (code == KEY_POWER) {
@@ -629,14 +734,73 @@ void sec_debug_check_crash_key(unsigned int code, int value)
 			}
 		}
 	} else {
-		if (code == KEY_VOLUMEUP)
+		if (code == VOLUME_UP)
 			volup_p = false;
-		if (code == KEY_VOLUMEDOWN) {
+		if (code == VOLUME_DOWN) {
 			loopcount = 0;
 			voldown_p = false;
 		}
 	}
 }
+#else
+static struct hrtimer upload_start_timer;
+
+static enum hrtimer_restart force_upload_timer_func(struct hrtimer *timer)
+{
+	panic("Crash Key");
+
+	return HRTIMER_NORESTART;
+}
+
+/*  Volume UP + Volume Down = Force Upload Mode
+    1. check for VOL_UP and VOL_DOWN
+    2. if both key pressed start a timer with timeout period 3s
+    3. if any one of two keys is released before 3s disable timer. */
+void sec_debug_check_crash_key(unsigned int code, int value)
+{
+	static bool vol_up, vol_down, check;
+
+	if (!sec_debug_level.en.kernel_fault)
+		return;
+
+	if ((code == KEY_VOLUMEUP) || (code == KEY_VOLUMEDOWN)) {
+		if (value) {
+			if (code == KEY_VOLUMEUP)
+				vol_up = true;
+
+			if (code == KEY_VOLUMEDOWN)
+				vol_down = true;
+
+			if (vol_up == true && vol_down == true) {
+				hrtimer_start(&upload_start_timer,
+					      ktime_set(3, 0),
+					      HRTIMER_MODE_REL);
+				check = true;
+			}
+		} else {
+			if (vol_up == true)
+				vol_up = false;
+			if (vol_down == true)
+				vol_down = false;
+			if (check) {
+				hrtimer_cancel(&upload_start_timer);
+				check = 0;
+			}
+		}
+	}
+}
+
+static int __init upload_timer_init(void)
+{
+	hrtimer_init(&upload_start_timer, CLOCK_MONOTONIC, HRTIMER_MODE_REL);
+	upload_start_timer.function = force_upload_timer_func;
+	return 0;
+}
+
+/* this should be initialized prior to keypad driver */
+early_initcall(upload_timer_init);
+
+#endif
 
 static struct notifier_block nb_reboot_block = {
 	.notifier_call = sec_debug_normal_reboot_handler
@@ -719,7 +883,8 @@ void __sec_debug_task_log(int cpu, struct task_struct *task)
 {
 	unsigned i;
 
-	i = atomic_inc_return(&task_log_idx[cpu]) & (SCHED_LOG_MAX - 1);
+	i = atomic_inc_return(&task_log_idx[cpu]) &
+	    (ARRAY_SIZE(psec_debug_log->task[0]) - 1);
 	psec_debug_log->task[cpu][i].time = cpu_clock(cpu);
 	strcpy(psec_debug_log->task[cpu][i].comm, task->comm);
 	psec_debug_log->task[cpu][i].pid = task->pid;
@@ -730,7 +895,8 @@ void __sec_debug_irq_log(unsigned int irq, void *fn, int en)
 	int cpu = raw_smp_processor_id();
 	unsigned i;
 
-	i = atomic_inc_return(&irq_log_idx[cpu]) & (SCHED_LOG_MAX - 1);
+	i = atomic_inc_return(&irq_log_idx[cpu]) &
+	    (ARRAY_SIZE(psec_debug_log->irq[0]) - 1);
 	psec_debug_log->irq[cpu][i].time = cpu_clock(cpu);
 	psec_debug_log->irq[cpu][i].irq = irq;
 	psec_debug_log->irq[cpu][i].fn = (void *)fn;
@@ -743,11 +909,26 @@ void __sec_debug_work_log(struct worker *worker,
 	int cpu = raw_smp_processor_id();
 	unsigned i;
 
-	i = atomic_inc_return(&work_log_idx[cpu]) & (SCHED_LOG_MAX - 1);
+	i = atomic_inc_return(&work_log_idx[cpu]) &
+	    (ARRAY_SIZE(psec_debug_log->work[0]) - 1);
 	psec_debug_log->work[cpu][i].time = cpu_clock(cpu);
 	psec_debug_log->work[cpu][i].worker = worker;
 	psec_debug_log->work[cpu][i].work = work;
 	psec_debug_log->work[cpu][i].f = f;
+}
+
+void __sec_debug_hrtimer_log(struct hrtimer *timer,
+		     enum hrtimer_restart (*fn) (struct hrtimer *), int en)
+{
+	int cpu = raw_smp_processor_id();
+	unsigned i;
+
+	i = atomic_inc_return(&hrtimer_log_idx[cpu]) &
+	    (ARRAY_SIZE(psec_debug_log->hrtimers[0]) - 1);
+	psec_debug_log->hrtimers[cpu][i].time = cpu_clock(cpu);
+	psec_debug_log->hrtimers[cpu][i].timer = timer;
+	psec_debug_log->hrtimers[cpu][i].fn = fn;
+	psec_debug_log->hrtimers[cpu][i].en = en;
 }
 
 #ifdef CONFIG_SEC_DEBUG_IRQ_EXIT_LOG
@@ -781,14 +962,6 @@ void sec_debug_aux_log(int idx, char *fmt, ...)
 		(*gExcpAuxLogPtr).CpuClockLog[i].time = cpu_clock(cpu);
 		(*gExcpAuxLogPtr).CpuClockLog[i].cpu = cpu;
 		strncpy((*gExcpAuxLogPtr).CpuClockLog[i].log,
-			buf, AUX_LOG_LENGTH);
-		break;
-	case SEC_DEBUG_AUXLOG_LOGBUF_LOCK_CHANGE:
-		i = atomic_inc_return(&gExcpAuxLogBufLockLogIdx)
-			& (AUX_LOG_LOGBUF_LOCK_MAX - 1);
-		(*gExcpAuxLogPtr).LogBufLockLog[i].time = cpu_clock(cpu);
-		(*gExcpAuxLogPtr).LogBufLockLog[i].cpu = cpu;
-		strncpy((*gExcpAuxLogPtr).LogBufLockLog[i].log,
 			buf, AUX_LOG_LENGTH);
 		break;
 	default:
@@ -981,7 +1154,7 @@ static int __init sec_debug_user_fault_init(void)
 {
 	struct proc_dir_entry *entry;
 
-	entry = proc_create("user_fault", S_IWUGO, NULL,
+	entry = proc_create("user_fault", S_IWUSR | S_IWGRP, NULL,
 			    &sec_user_fault_proc_fops);
 	if (!entry)
 		return -ENOMEM;
@@ -999,6 +1172,7 @@ int sec_debug_magic_init(void)
 	}
 
 	pr_info("%s: success reserving magic code area\n", __func__);
+
 	return 0;
 }
 

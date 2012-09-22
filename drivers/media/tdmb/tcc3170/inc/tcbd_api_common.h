@@ -1,5 +1,5 @@
 /*
- * tcbd_api_common.c
+ * tcbd_api_common.h
  *
  * Author:  <linux@telechips.com>
  * Description: Telechips broadcast driver

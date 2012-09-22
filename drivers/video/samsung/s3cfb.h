@@ -475,14 +475,6 @@ extern void s3cfb_set_lcd_info(struct s3cfb_global *ctrl);
 #ifdef CONFIG_FB_S5P_MIPI_DSIM
 extern void s5p_dsim_early_suspend(void);
 extern void s5p_dsim_late_resume(void);
-#ifdef CONFIG_FB_S5P_S6E63M0
-extern void s6e63m0_early_suspend(void);
-extern void s6e63m0_late_resume(void);
-#else
-extern void s6e8ax0_early_suspend(void);
-extern void s6e8ax0_late_resume(void);
-#endif
-extern int s5p_dsim_fifo_clear(void);
 extern void set_dsim_hs_clk_toggle_count(u8 count);
 extern void set_dsim_lcd_enabled(u8 enable);
 extern u32 read_dsim_register(u32 num);

@@ -19,11 +19,21 @@
 #include <linux/delay.h>
 #include <linux/power_supply.h>
 #include <linux/android_alarm.h>
+#if defined(CONFIG_S3C_ADC)
+#include <plat/adc.h>
+#endif
+#if defined(CONFIG_STMPE811_ADC)
+#include <linux/stmpe811-adc.h>
+#endif
+
 
 /* macro */
 #define MAX(x, y)	((x) > (y) ? (x) : (y))
 #define MIN(x, y)	((x) < (y) ? (x) : (y))
 #define ABS(x)		((x) < 0 ? (-1 * (x)) : (x))
+#define INRANGE(val, x, y)	(((x <= val) && (val <= y)) ||	\
+				 ((y <= val) && (val <= x)) ? 1 : 0)
+
 
 /* common */
 enum {
@@ -79,6 +89,7 @@ struct battery_info {
 	unsigned int charge_virt_state;
 	unsigned int charge_type;
 	unsigned int charge_current;
+	int charge_current_avg;
 	unsigned int input_current;
 
 	/* battery state */
@@ -91,6 +102,7 @@ struct battery_info {
 	unsigned int battery_raw_soc;
 	int battery_r_s_delta;
 	int battery_full_soc;
+	int battery_vf_adc;
 
 	/* temperature */
 	int battery_temper;
@@ -101,6 +113,8 @@ struct battery_info {
 
 	/* cable type */
 	unsigned int cable_type;
+	unsigned int cable_sub_type;
+	unsigned int cable_pwr_type;
 
 	/* For SAMSUNG charge spec */
 	unsigned int vf_state;
@@ -109,23 +123,43 @@ struct battery_info {
 	unsigned int freezed_state;
 	unsigned int full_charged_state;
 	unsigned int abstimer_state;
+	unsigned int abstimer_active;
 	unsigned int recharge_phase;
 	unsigned int recharge_start;
 	unsigned int health_state;
 
-	unsigned int lpm_state;
+	/* SIOP */
 	unsigned int siop_state;
 	unsigned int siop_charge_current;
+	unsigned int siop_lv;
+
+	/* etc... */
+	unsigned int lpm_state;
 	unsigned int led_state;
+	unsigned int slate_mode;
 
 	/* ambiguous state */
 	unsigned int ambiguous_state;
 
+	/* event sceanario */
+	unsigned int event_state;
+	unsigned int event_type;
+
 	/* time management */
 	unsigned int charge_start_time;
-	struct alarm	alarm;
+	struct timespec current_time;
+	struct alarm	monitor_alarm;
+	struct alarm	event_alarm;
 	bool		slow_poll;
 	ktime_t		last_poll;
+
+	/* irq */
+	int batdet_gpio;
+	int batdet_irq;
+	bool batdet_irq_st;
+
+	/* adc power */
+	bool adc_pwr_st;
 
 	struct proc_dir_entry *entry;
 
@@ -135,6 +169,11 @@ struct battery_info {
 
 	/* factory mode */
 	bool factory_mode;
+
+#if defined(CONFIG_TARGET_LOCALE_KOR)
+	/* error test charging off mode */
+	bool errortest_stopcharging;
+#endif
 
 #if defined(CONFIG_TARGET_LOCALE_KOR) || defined(CONFIG_MACH_M0_CTC)
 	bool is_unspec_phase;
@@ -149,6 +188,29 @@ struct battery_info {
 
 /* jig state */
 extern bool is_jig_attached;
+
+/* charger detect source */
+#if defined(CONFIG_MACH_C1_KOR_SKT) || \
+	defined(CONFIG_MACH_C1_KOR_KT) || defined(CONFIG_MACH_C1_KOR_LGT) || \
+	defined(CONFIG_MACH_BAFFIN)
+#undef USE_CHGIN_INTR
+#else
+#define USE_CHGIN_INTR
+#endif
+
+/* extended online type */
+#if defined(CONFIG_MACH_T0)
+#define EXTENDED_ONLINE_TYPE
+#else
+#undef EXTENDED_ONLINE_TYPE
+#endif
+
+/* use 2step charge termination */
+#if defined(CONFIG_MACH_T0)
+#define USE_2STEP_TERM
+#else
+#undef USE_2STEP_TERM
+#endif
 
 /*
  * Use for charger
@@ -180,6 +242,13 @@ enum soc_type {
 /*
  * Use for battery
  */
+
+enum status_full_type {
+	STATUS_NOT_FULL		= 0,
+	STATUS_1ST_FULL,
+	STATUS_2ND_FULL,
+};
+
 #define OFF_CURR	0	/* charger off current */
 #define KEEP_CURR	-1	/* keep previous current */
 
@@ -198,13 +267,23 @@ enum soc_type {
 #define ADC_ERR_CNT	5
 #define ADC_ERR_DELAY	200
 
+/* WORKAROUND: define audio dock current */
+#define DOCK_TYPE_AUDIO_CURR		1000
+#define DOCK_TYPE_SMART_NOTG_CURR	1700
+#define DOCK_TYPE_SMART_OTG_CURR	1000
+#define DOCK_TYPE_LOW_CURR		475
+
 /* voltage diff for recharge voltage calculation */
-#if defined(CONFIG_TARGET_LOCALE_KOR)
+#if defined(CONFIG_TARGET_LOCALE_KOR) || defined(CONFIG_MACH_M0_CTC)
 /* KOR model spec : max-voltage minus 60mV */
 #define RECHG_DROP_VALUE	60000
 #else
 #define RECHG_DROP_VALUE	50000	/* 4300mV */
 #endif
+
+/* power off condition, low %duV than VOLTAGE_MIN_DESIGN & SOC 0% */
+#define PWROFF_MARGIN		100000
+#define PWROFF_SOC		0
 
 enum {
 	CHARGE_DISABLE = 0,
@@ -235,10 +314,27 @@ enum {
 	TEMPER_UNKNOWN,
 };
 
+/* vf detect source */
+enum {
+	VF_DET_ADC = 0,
+	VF_DET_CHARGER,
+	VF_DET_GPIO,
+
+	VF_DET_UNKNOWN,
+};
+
+
 /* siop state */
 enum {
 	SIOP_DEACTIVE = 0,
 	SIOP_ACTIVE,
+};
+
+enum siop_level {
+	SIOP_LV0 = 0,
+	SIOP_LV1,
+	SIOP_LV2,
+	SIOP_LV3,
 };
 
 /* monitoring mode */
@@ -278,6 +374,31 @@ enum led_pattern {
 	BATT_LED_PATT_NOT_CHG,
 };
 
+/* event case */
+enum event_type {
+	EVENT_TYPE_WCDMA_CALL = 0,
+	EVENT_TYPE_GSM_CALL,
+	EVENT_TYPE_CALL,
+	EVENT_TYPE_VIDEO,
+	EVENT_TYPE_MUSIC,
+	EVENT_TYPE_BROWSER,
+	EVENT_TYPE_HOTSPOT,
+	EVENT_TYPE_CAMERA,
+	EVENT_TYPE_DATA_CALL,
+	EVENT_TYPE_GPS,
+	EVENT_TYPE_LTE,
+	EVENT_TYPE_WIFI,
+	EVENT_TYPE_USE,
+
+	EVENT_TYPE_MAX,
+};
+
+enum event_state {
+	EVENT_STATE_CLEAR = 0,
+	EVENT_STATE_IN_TIMER,
+	EVENT_STATE_SET,
+};
+
 /**
  * struct sec_bat_plaform_data - init data for sec batter driver
  * @fuel_gauge_name: power supply name of fuel gauge
@@ -301,6 +422,9 @@ struct samsung_battery_platform_data {
 	unsigned int chg_curr_wpc;
 	unsigned int chg_curr_dock;
 	unsigned int chg_curr_etc;
+	unsigned int chg_curr_siop_lv1;
+	unsigned int chg_curr_siop_lv2;
+	unsigned int chg_curr_siop_lv3;
 
 	/* variable monitoring interval */
 	unsigned int chng_interval;
@@ -327,12 +451,35 @@ struct samsung_battery_platform_data {
 	int freeze_stop_temp;
 	int freeze_recovery_temp;
 
-	/* Temperature source 0: fuelgauge, 1: ap adc, 2: ex. adc */
+	/* CTIA spec */
+	bool ctia_spec;
+
+	/* event sceanario */
+	unsigned int event_time;
+
+	/* CTIA temperature */
+	int event_overheat_stop_temp;
+	int event_overheat_recovery_temp;
+	int event_freeze_stop_temp;
+	int event_freeze_recovery_temp;
+	int lpm_overheat_stop_temp;
+	int lpm_overheat_recovery_temp;
+	int lpm_freeze_stop_temp;
+	int lpm_freeze_recovery_temp;
+
+	/* temperature source 0: fuelgauge, 1: ap adc, 2: ex. adc */
 	int temper_src;
 	int temper_ch;
 #ifdef CONFIG_S3C_ADC
 	int (*covert_adc) (int, int);
 #endif
+
+	/* battery vf source 0: adc(polling), 1: charger(interrupt) */
+	int vf_det_src;
+	int vf_det_ch;
+	int vf_det_th_l;
+	int vf_det_th_h;
+	int batt_present_gpio;
 
 	/* suspend in charging */
 	bool suspend_chging;

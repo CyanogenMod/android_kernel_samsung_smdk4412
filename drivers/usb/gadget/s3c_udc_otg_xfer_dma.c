@@ -52,7 +52,7 @@ static u8 test_pkt[TEST_PKT_SIZE] __attribute__((aligned(8))) = {
 
 static void s3c_udc_ep_set_stall(struct s3c_ep *ep);
 
-#if defined(CONFIG_BATTERY_SAMSUNG) || defined(CONFIG_BATTERY_SAMSUNG_S2PLUS)
+#if defined(CONFIG_BATTERY_SAMSUNG)
 u32 cable_connected;
 
 void s3c_udc_cable_connect(struct s3c_udc *dev)
@@ -559,7 +559,7 @@ static irqreturn_t s3c_udc_irq(int irq, void *_dev)
 				spin_lock(&dev->lock);
 			}
 
-#if defined(CONFIG_BATTERY_SAMSUNG) || defined(CONFIG_BATTERY_SAMSUNG_S2PLUS)
+#if defined(CONFIG_BATTERY_SAMSUNG)
 			s3c_udc_cable_disconnect(dev);
 #endif
 		}
@@ -1346,7 +1346,7 @@ static void s3c_ep0_setup(struct s3c_udc *dev)
 			reset_available = 1;
 			dev->req_config = 1;
 		}
-#if defined(CONFIG_BATTERY_SAMSUNG) || defined(CONFIG_BATTERY_SAMSUNG_S2PLUS)
+#if defined(CONFIG_BATTERY_SAMSUNG)
 		s3c_udc_cable_connect(dev);
 #endif
 		break;

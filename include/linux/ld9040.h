@@ -43,3 +43,10 @@ struct spi_ops {
 #define	LCDTYPE_M2			(1)
 #define	LCDTYPE_SM2_A1		(0)
 #define	LCDTYPE_SM2_A2		(2)
+
+enum {
+	ACL_STATUS_0P = 0,
+	ACL_STATUS_40P,
+	ACL_STATUS_50P,
+	ACL_STATUS_MAX
+};

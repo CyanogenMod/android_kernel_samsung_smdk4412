@@ -83,3 +83,7 @@ endchoice
 config TDMB_SIMUL
 	depends on TDMB
 	bool "Simulation"
+
+config TDMB_ANT_DET
+	depends on TDMB
+	bool "tdmb antenna detector"

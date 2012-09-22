@@ -208,8 +208,11 @@ ARRAY_SIZE(wlan_sdio_on_table), wlan_sdio_on_table);
 ARRAY_SIZE(wlan_sdio_off_table), wlan_sdio_off_table); }
 
 	udelay(200);
-
+#if defined(CONFIG_MACH_U1_NA_SPR) || defined(CONFIG_MACH_U1_NA_USCC)
+	mmc_force_presence_change(&s3c_device_hsmmc2);
+#else
 	mmc_force_presence_change(&s3c_device_hsmmc3);
+#endif
 	msleep(500); /* wait for carddetect */
 	return 0;
 }
@@ -290,9 +293,10 @@ static struct resource brcm_wlan_resources[] = {
 		.start	= IRQ_EINT(21),
 		.end	= IRQ_EINT(21),
 #ifdef CONFIG_MACH_Q1_BD
-		.flags  = IORESOURCE_IRQ | IORESOURCE_IRQ_HIGHLEVEL | IORESOURCE_IRQ_SHAREABLE,
+		.flags = IORESOURCE_IRQ | IORESOURCE_IRQ_HIGHLEVEL
+				|IORESOURCE_IRQ_SHAREABLE,
 #else
-		.flags	= IORESOURCE_IRQ | IORESOURCE_IRQ_LOWEDGE,
+		.flags = IORESOURCE_IRQ | IORESOURCE_IRQ_LOWEDGE,
 #endif
 	},
 };

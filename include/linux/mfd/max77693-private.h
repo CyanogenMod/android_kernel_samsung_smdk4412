@@ -177,9 +177,11 @@ enum max77693_haptic_reg {
 /* MAX77693 STATUS2 register */
 #define STATUS2_CHGTYP_SHIFT		0
 #define STATUS2_CHGDETRUN_SHIFT		3
+#define STATUS2_DXOVP_SHIFT		5
 #define STATUS2_VBVOLT_SHIFT		6
 #define STATUS2_CHGTYP_MASK		(0x7 << STATUS2_CHGTYP_SHIFT)
 #define STATUS2_CHGDETRUN_MASK		(0x1 << STATUS2_CHGDETRUN_SHIFT)
+#define STATUS2_DXOVP_MASK		(0x1 << STATUS2_DXOVP_SHIFT)
 #define STATUS2_VBVOLT_MASK		(0x1 << STATUS2_VBVOLT_SHIFT)
 
 /* MAX77693 CDETCTRL1 register */
@@ -232,7 +234,12 @@ enum max77693_reg_ctrl1_val {
 	MAX77693_MUIC_CTRL1_BIN_6_110 = 0x06,
 	MAX77693_MUIC_CTRL1_BIN_7_111 = 0x07,
 };
-
+#if defined(CONFIG_SWITCH_DUAL_MODEM)
+enum max77693_switch_sel_val {
+	MAX77693_SWITCH_SEL_1st_BIT_USB		= 0x3 << 0,
+	MAX77693_SWITCH_SEL_2nd_BIT_UART	= 0x3 << 2,
+};
+#else
 enum max77693_switch_sel_val {
 	MAX77693_SWITCH_SEL_1st_BIT_USB		= 0x1 << 0,
 	MAX77693_SWITCH_SEL_2nd_BIT_UART	= 0x1 << 1,
@@ -240,6 +247,7 @@ enum max77693_switch_sel_val {
 	MAX77693_SWITCH_SEL_3rd_BIT_LTE_UART	= 0x1 << 2,
 #endif
 };
+#endif
 
 enum max77693_reg_ctrl1_type {
 	CTRL1_AP_USB =
@@ -349,6 +357,10 @@ enum max77693_types {
 	TYPE_MAX77693,
 };
 
+#ifdef CONFIG_FAST_BOOT
+extern bool fake_shut_down;
+#endif
+
 extern struct device *switch_dev;
 extern int max77693_irq_init(struct max77693_dev *max77693);
 extern void max77693_irq_exit(struct max77693_dev *max77693);
@@ -385,6 +397,12 @@ enum cable_type_muic {
 	CABLE_TYPE_MHL_MUIC,
 	CABLE_TYPE_MHL_VB_MUIC,
 	CABLE_TYPE_SMARTDOCK_MUIC,
+	CABLE_TYPE_SMARTDOCK_TA_MUIC,
+	CABLE_TYPE_SMARTDOCK_USB_MUIC,
+	CABLE_TYPE_AUDIODOCK_MUIC,
+#if defined(CONFIG_MUIC_DET_JACK)
+	CABLE_TYPE_EARJACK_MUIC,
+#endif
 	CABLE_TYPE_UNKNOWN_MUIC
 };
 
@@ -392,6 +410,10 @@ enum {
 	AP_USB_MODE = 0,
 	CP_USB_MODE,
 	AUDIO_MODE,
+#if defined(CONFIG_SWITCH_DUAL_MODEM)
+	CP_ESC_USB_MODE,
+#endif
+
 };
 
 enum {
@@ -400,6 +422,10 @@ enum {
 #ifdef CONFIG_LTE_VIA_SWITCH
 	UART_PATH_LTE,
 #endif
+#if defined(CONFIG_SWITCH_DUAL_MODEM)
+	UART_PATH_CP_ESC,
+#endif
+
 };
 #endif /* CONFIG_MFD_MAX77693 */
 

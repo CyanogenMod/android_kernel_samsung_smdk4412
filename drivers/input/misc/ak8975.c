@@ -12,7 +12,9 @@
  *	GNU General Public License for more details.
  *
 */
-
+#ifdef CONFIG_MPU_SENSORS_MPU3050
+#define FACTORY_TEST
+#endif
 #include <linux/i2c.h>
 #include <linux/interrupt.h>
 #include <linux/irq.h>
@@ -803,6 +805,7 @@ return 0;
 
 exit_class_create_failed:
 exit_i2c_failed:
+	misc_deregister(&akm->akmd_device);
 exit_akmd_device_register_failed:
 #if USING_IRQ
 	free_irq(akm->irq, akm);

@@ -172,9 +172,16 @@ enum {
 
 #define SCO_ESCO_MASK	(ESCO_HV1 | ESCO_HV2 | ESCO_HV3)
 #define EDR_ESCO_MASK	(ESCO_2EV3 | ESCO_3EV3 | ESCO_2EV5 | ESCO_3EV5)
-#define ALL_ESCO_MASK	(SCO_ESCO_MASK | ESCO_EV3 | ESCO_EV4 | ESCO_EV5 | \
-			EDR_ESCO_MASK)
-
+/* SS_BLUETOOTH(is80.hwang) 2012.03.02 */
+/* change applied EDR ESCO packet */
+#ifdef CONFIG_BT_CSR8811
+#define ALL_ESCO_MASK (SCO_ESCO_MASK | ESCO_EV3 | ESCO_EV4 | ESCO_EV5 | \
+ESCO_2EV3 /*EDR_ESCO_MASK*/)
+#else
+#define ALL_ESCO_MASK (SCO_ESCO_MASK | ESCO_EV3 | ESCO_EV4 | ESCO_EV5 | \
+EDR_ESCO_MASK)
+#endif
+/* SS_BLUEZ_BT(is80.hwang) End */
 /* wbs */
 /* Air Coding Format */
 #define ACF_TRANS	0x0003;

@@ -105,6 +105,31 @@ out:
 
 __setup("sec_log=", sec_log_setup);
 
+#ifdef CONFIG_CORESIGHT_ETM
+static int __init sec_etb_setup(char *str)
+{
+	unsigned size = memparse(str, &str);
+	unsigned long base = 0;
+
+	/* If we encounter any problem parsing str ... */
+	if (!size || size != roundup_pow_of_two(size) || *str != '@'
+	    || kstrtoul(str + 1, 0, &base))
+		goto out;
+
+	if (reserve_bootmem(base, size, BOOTMEM_EXCLUSIVE)) {
+		pr_err("%s: failed reserving size %d "
+		       "at base 0x%lx\n", __func__, size, base);
+		goto out;
+	}
+
+	return 1;
+out:
+	return 0;
+}
+
+__setup("sec_etb=", sec_etb_setup);
+#endif
+
 #ifdef CONFIG_SEC_LOG_LAST_KMSG
 static void __init sec_log_save_old(void)
 {

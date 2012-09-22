@@ -505,6 +505,7 @@ int s3cfb_extdsp_ioctl(struct fb_info *fb, unsigned int cmd, unsigned long arg)
 		struct s3cfb_extdsp_user_window user_window;
 		int vsync;
 		int lock;
+		struct s3cfb_extdsp_buf_list buf_list;
 	} p;
 
 	switch (cmd) {
@@ -522,13 +523,80 @@ int s3cfb_extdsp_ioctl(struct fb_info *fb, unsigned int cmd, unsigned long arg)
 			win->lock_buf_offset = fix->smem_start +
 				((var->xres_virtual * var->yoffset
 				  + var->xoffset) * (var->bits_per_pixel / 8));
+			for (i = 0; i < CONFIG_FB_S5P_EXTDSP_NR_BUFFERS; i++) {
+				if (fbdev->buf_list[i].phys_addr ==
+					(unsigned int)win->lock_buf_offset)
+					fbdev->buf_list[i].buf_status =
+						BUF_LOCKED;
+			}
 		} else { /* Unlocked */
+			for (i = 0; i < CONFIG_FB_S5P_EXTDSP_NR_BUFFERS; i++) {
+				if (fbdev->buf_list[i].phys_addr ==
+					(unsigned int)win->lock_buf_offset)
+					fbdev->buf_list[i].buf_status =
+						BUF_FREE;
+			}
 			win->lock_buf_offset = 0;
+		}
+		break;
+	case S3CFB_EXTDSP_LOCK_AND_GET_BUF:
+		if (copy_from_user(&p.buf_list,
+				   (struct s3cfb_extdsp_buf_list __user *)arg,
+				   sizeof(p.buf_list)))
+			return -EFAULT;
+
+		if (p.buf_list.buf_status == BUF_LOCKED) { /* Locked */
+			memset(&p.buf_list, 0, sizeof(p.buf_list));
+			for (i = 0; i < CONFIG_FB_S5P_EXTDSP_NR_BUFFERS; i++) {
+				if (fbdev->buf_list[i].buf_status ==
+						BUF_ACTIVE) {
+					fbdev->buf_list[i].buf_status =
+						BUF_LOCKED;
+
+					p.buf_list.phys_addr =
+						fbdev->buf_list[i].phys_addr;
+					p.buf_list.time_marker =
+						fbdev->buf_list[i].time_marker;
+					p.buf_list.buf_status =
+						fbdev->buf_list[i].buf_status;
+					break;
+				}
+			}
+		} else if (p.buf_list.buf_status == BUF_FREE) { /* Unlocked */
+			for (i = 0; i < CONFIG_FB_S5P_EXTDSP_NR_BUFFERS; i++) {
+				if (fbdev->buf_list[i].phys_addr ==
+						p.buf_list.phys_addr) {
+					fbdev->buf_list[i].buf_status =
+						BUF_FREE;
+					break;
+				}
+			}
+		}
+		if (copy_to_user((void *)arg, &(p.buf_list),
+					sizeof(unsigned int))) {
+			dev_err(fbdev->dev, "copy_to_user error\n");
+			return -EFAULT;
 		}
 		break;
 
 	case S3CFB_EXTDSP_GET_LOCKED_BUFFER:
 		if (copy_to_user((void *)arg, &(win->lock_buf_offset),
+					sizeof(unsigned int))) {
+			dev_err(fbdev->dev, "copy_to_user error\n");
+			return -EFAULT;
+		}
+		break;
+
+	case S3CFB_EXTDSP_GET_FREE_BUFFER:
+		win->free_buf_offset = 0;
+		for (i = 0; i < CONFIG_FB_S5P_EXTDSP_NR_BUFFERS; i++) {
+			if (fbdev->buf_list[i].buf_status == BUF_FREE) {
+				win->free_buf_offset =
+					fbdev->buf_list[i].phys_addr;
+				break;
+			}
+		}
+		if (copy_to_user((void *)arg, &(win->free_buf_offset),
 					sizeof(unsigned int))) {
 			dev_err(fbdev->dev, "copy_to_user error\n");
 			return -EFAULT;
@@ -606,20 +674,20 @@ int s3cfb_extdsp_ioctl(struct fb_info *fb, unsigned int cmd, unsigned long arg)
 		}
 		do_gettimeofday(&time_stamp.time_marker);
 		for(i = 0; i < CONFIG_FB_S5P_EXTDSP_NR_BUFFERS; i++) {
-			if (fbdev->time_stamp[i].phys_addr == time_stamp.phys_addr) {
-				fbdev->time_stamp[i].time_marker = time_stamp.time_marker;
+			if (fbdev->buf_list[i].phys_addr == time_stamp.phys_addr) {
+				fbdev->buf_list[i].time_marker = time_stamp.time_marker;
 				break;
 			}
-			if (!fbdev->time_stamp[i].phys_addr) {
-				fbdev->time_stamp[i].phys_addr = time_stamp.phys_addr;
-				fbdev->time_stamp[i].time_marker = time_stamp.time_marker;
+			if (!fbdev->buf_list[i].phys_addr) {
+				fbdev->buf_list[i].phys_addr = time_stamp.phys_addr;
+				fbdev->buf_list[i].time_marker = time_stamp.time_marker;
 				break;
 			}
 			if (i == (CONFIG_FB_S5P_EXTDSP_NR_BUFFERS -1)) {
-				fbdev->time_stamp[0].phys_addr = time_stamp.phys_addr;
-				fbdev->time_stamp[0].time_marker = time_stamp.time_marker;
+				fbdev->buf_list[0].phys_addr = time_stamp.phys_addr;
+				fbdev->buf_list[0].time_marker = time_stamp.time_marker;
 				for(i = 1; i < CONFIG_FB_S5P_EXTDSP_NR_BUFFERS; i++)
-					fbdev->time_stamp[i].phys_addr = 0;
+					fbdev->buf_list[i].phys_addr = 0;
 				break;
 			}
 		}
@@ -633,8 +701,8 @@ int s3cfb_extdsp_ioctl(struct fb_info *fb, unsigned int cmd, unsigned long arg)
 			return -EFAULT;
 		}
 		for(i = 0; i < CONFIG_FB_S5P_EXTDSP_NR_BUFFERS; i++) {
-			if (fbdev->time_stamp[i].phys_addr == time_stamp.phys_addr) {
-				time_stamp.time_marker = fbdev->time_stamp[i].time_marker;
+			if (fbdev->buf_list[i].phys_addr == time_stamp.phys_addr) {
+				time_stamp.time_marker = fbdev->buf_list[i].time_marker;
 				break;
 			}
 		}
@@ -644,6 +712,15 @@ int s3cfb_extdsp_ioctl(struct fb_info *fb, unsigned int cmd, unsigned long arg)
 			dev_err(fbdev->dev, "copy_to_user error\n");
 			return -EFAULT;
 		}
+		break;
+
+	case S3CFB_EXTDSP_GET_LOCKED_NUMBER:
+		fbdev->lock_cnt = 0;
+		for (i = 0; i < CONFIG_FB_S5P_EXTDSP_NR_BUFFERS; i++) {
+			if (fbdev->buf_list[i].buf_status == BUF_LOCKED)
+				fbdev->lock_cnt++;
+		}
+		ret = memcpy(argp, &fbdev->lock_cnt, sizeof(fbdev->lock_cnt)) ? 0 : -EFAULT;
 		break;
 
 	case FBIOGET_FSCREENINFO:
@@ -700,6 +777,13 @@ int s3cfb_extdsp_ioctl(struct fb_info *fb, unsigned int cmd, unsigned long arg)
 
 	case S3CFB_EXTDSP_SET_WIN_ADDR:
 		fix->smem_start = (unsigned long)argp;
+		for (i = 0; i < CONFIG_FB_S5P_EXTDSP_NR_BUFFERS; i++) {
+			if (fbdev->buf_list[i].phys_addr ==
+					(unsigned int)fix->smem_start)
+				fbdev->buf_list[i].buf_status = BUF_ACTIVE;
+			else if (fbdev->buf_list[i].buf_status != BUF_LOCKED)
+				fbdev->buf_list[i].buf_status = BUF_FREE;
+		}
 		break;
 
 	case S3CFB_EXTDSP_GET_TZ_MODE:

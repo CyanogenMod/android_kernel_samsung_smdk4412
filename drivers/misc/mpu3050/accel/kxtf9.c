@@ -1,20 +1,19 @@
 /*
- $License:
-    Copyright (C) 2010 InvenSense Corporation, All Rights Reserved.
+ * $License:
+ * Copyright (C) 2010 InvenSense Corporation, All Rights Reserved.
 
-    This program is free software; you can redistribute it and/or modify
-    it under the terms of the GNU General Public License as published by
-    the Free Software Foundation; either version 2 of the License, or
-    (at your option) any later version.
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation; either version 2 of the License, or
+ * (at your option) any later version.
 
-    This program is distributed in the hope that it will be useful,
-    but WITHOUT ANY WARRANTY; without even the implied warranty of
-    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-    GNU General Public License for more details.
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
 
-    You should have received a copy of the GNU General Public License
-    along with this program.  If not, see <http://www.gnu.org/licenses/>.
-  $
+ * You should have received a copy of the GNU General Public License
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
 /**
@@ -46,45 +45,45 @@
 #undef MPL_LOG_TAG
 #define MPL_LOG_TAG "MPL-acc"
 
-#define KXTF9_XOUT_HPF_L                (0x00)	/* 0000 0000 */
-#define KXTF9_XOUT_HPF_H                (0x01)	/* 0000 0001 */
-#define KXTF9_YOUT_HPF_L                (0x02)	/* 0000 0010 */
-#define KXTF9_YOUT_HPF_H                (0x03)	/* 0000 0011 */
-#define KXTF9_ZOUT_HPF_L                (0x04)	/* 0001 0100 */
-#define KXTF9_ZOUT_HPF_H                (0x05)	/* 0001 0101 */
-#define KXTF9_XOUT_L                    (0x06)	/* 0000 0110 */
-#define KXTF9_XOUT_H                    (0x07)	/* 0000 0111 */
-#define KXTF9_YOUT_L                    (0x08)	/* 0000 1000 */
-#define KXTF9_YOUT_H                    (0x09)	/* 0000 1001 */
-#define KXTF9_ZOUT_L                    (0x0A)	/* 0001 1010 */
-#define KXTF9_ZOUT_H                    (0x0B)	/* 0001 1011 */
-#define KXTF9_ST_RESP                   (0x0C)	/* 0000 1100 */
-#define KXTF9_WHO_AM_I                  (0x0F)	/* 0000 1111 */
-#define KXTF9_TILT_POS_CUR              (0x10)	/* 0001 0000 */
-#define KXTF9_TILT_POS_PRE              (0x11)	/* 0001 0001 */
-#define KXTF9_INT_SRC_REG1            (0x15)	/* 0001 0101 */
-#define KXTF9_INT_SRC_REG2              (0x16)	/* 0001 0110 */
-#define KXTF9_STATUS_REG                (0x18)	/* 0001 1000 */
-#define KXTF9_INT_REL                   (0x1A)	/* 0001 1010 */
-#define KXTF9_CTRL_REG1                 (0x1B)	/* 0001 1011 */
-#define KXTF9_CTRL_REG2                 (0x1C)	/* 0001 1100 */
-#define KXTF9_CTRL_REG3                 (0x1D)	/* 0001 1101 */
-#define KXTF9_INT_CTRL_REG1             (0x1E)	/* 0001 1110 */
-#define KXTF9_INT_CTRL_REG2             (0x1F)	/* 0001 1111 */
-#define KXTF9_INT_CTRL_REG3           (0x20)	/* 0010 0000 */
-#define KXTF9_DATA_CTRL_REG             (0x21)	/* 0010 0001 */
-#define KXTF9_TILT_TIMER                (0x28)	/* 0010 1000 */
-#define KXTF9_WUF_TIMER                 (0x29)	/* 0010 1001 */
-#define KXTF9_TDT_TIMER                 (0x2B)	/* 0010 1011 */
-#define KXTF9_TDT_H_THRESH              (0x2C)	/* 0010 1100 */
-#define KXTF9_TDT_L_THRESH              (0x2D)	/* 0010 1101 */
-#define KXTF9_TDT_TAP_TIMER             (0x2E)	/* 0010 1110 */
-#define KXTF9_TDT_TOTAL_TIMER           (0x2F)	/* 0010 1111 */
-#define KXTF9_TDT_LATENCY_TIMER         (0x30)	/* 0011 0000 */
-#define KXTF9_TDT_WINDOW_TIMER          (0x31)	/* 0011 0001 */
-#define KXTF9_WUF_THRESH                (0x5A)	/* 0101 1010 */
-#define KXTF9_TILT_ANGLE                (0x5C)	/* 0101 1100 */
-#define KXTF9_HYST_SET                  (0x5F)	/* 0101 1111 */
+#define KXTF9_XOUT_HPF_L	(0x00)	/* 0000 0000 */
+#define KXTF9_XOUT_HPF_H	(0x01)	/* 0000 0001 */
+#define KXTF9_YOUT_HPF_L	(0x02)	/* 0000 0010 */
+#define KXTF9_YOUT_HPF_H	(0x03)	/* 0000 0011 */
+#define KXTF9_ZOUT_HPF_L	(0x04)	/* 0001 0100 */
+#define KXTF9_ZOUT_HPF_H	(0x05)	/* 0001 0101 */
+#define KXTF9_XOUT_L		(0x06)	/* 0000 0110 */
+#define KXTF9_XOUT_H		(0x07)	/* 0000 0111 */
+#define KXTF9_YOUT_L		(0x08)	/* 0000 1000 */
+#define KXTF9_YOUT_H		(0x09)	/* 0000 1001 */
+#define KXTF9_ZOUT_L		(0x0A)	/* 0001 1010 */
+#define KXTF9_ZOUT_H		(0x0B)	/* 0001 1011 */
+#define KXTF9_ST_RESP		(0x0C)	/* 0000 1100 */
+#define KXTF9_WHO_AM_I		(0x0F)	/* 0000 1111 */
+#define KXTF9_TILT_POS_CUR	(0x10)	/* 0001 0000 */
+#define KXTF9_TILT_POS_PRE	(0x11)	/* 0001 0001 */
+#define KXTF9_INT_SRC_REG1	(0x15)	/* 0001 0101 */
+#define KXTF9_INT_SRC_REG2	(0x16)	/* 0001 0110 */
+#define KXTF9_STATUS_REG	(0x18)	/* 0001 1000 */
+#define KXTF9_INT_REL		(0x1A)	/* 0001 1010 */
+#define KXTF9_CTRL_REG1		(0x1B)	/* 0001 1011 */
+#define KXTF9_CTRL_REG2		(0x1C)	/* 0001 1100 */
+#define KXTF9_CTRL_REG3		(0x1D)	/* 0001 1101 */
+#define KXTF9_INT_CTRL_REG1	(0x1E)	/* 0001 1110 */
+#define KXTF9_INT_CTRL_REG2	(0x1F)	/* 0001 1111 */
+#define KXTF9_INT_CTRL_REG3	(0x20)	/* 0010 0000 */
+#define KXTF9_DATA_CTRL_REG	(0x21)	/* 0010 0001 */
+#define KXTF9_TILT_TIMER	(0x28)	/* 0010 1000 */
+#define KXTF9_WUF_TIMER		(0x29)	/* 0010 1001 */
+#define KXTF9_TDT_TIMER		(0x2B)	/* 0010 1011 */
+#define KXTF9_TDT_H_THRESH	(0x2C)	/* 0010 1100 */
+#define KXTF9_TDT_L_THRESH	(0x2D)	/* 0010 1101 */
+#define KXTF9_TDT_TAP_TIMER	(0x2E)	/* 0010 1110 */
+#define KXTF9_TDT_TOTAL_TIMER	(0x2F)	/* 0010 1111 */
+#define KXTF9_TDT_LATENCY_TIMER	(0x30)	/* 0011 0000 */
+#define KXTF9_TDT_WINDOW_TIMER	(0x31)	/* 0011 0001 */
+#define KXTF9_WUF_THRESH	(0x5A)	/* 0101 1010 */
+#define KXTF9_TILT_ANGLE	(0x5C)	/* 0101 1100 */
+#define KXTF9_HYST_SET		(0x5F)	/* 0101 1111 */
 
 #define KXTF9_MAX_DUR (0xFF)
 #define KXTF9_MAX_THS (0xFF)
@@ -114,9 +113,9 @@ struct kxtf9_private_data {
 };
 
 extern struct acc_data cal_data;
-/*****************************************
-    Accelerometer Initialization Functions
-*****************************************/
+/*
+ * Accelerometer Initialization Functions
+ */
 
 static int kxtf9_set_ths(void *mlsl_handle,
 			 struct ext_slave_platform_data *pdata,
@@ -364,6 +363,8 @@ static int kxtf9_resume(void *mlsl_handle,
 				       KXTF9_CTRL_REG1,
 				       private_data->resume.ctrl_reg1);
 	ERROR_CHECK(result);
+	MLOSSleep(20);
+
 	result = MLSLSerialRead(mlsl_handle, pdata->address,
 				KXTF9_INT_REL, 1, &data);
 	ERROR_CHECK(result);
@@ -377,28 +378,51 @@ static int kxtf9_init(void *mlsl_handle,
 {
 
 	struct kxtf9_private_data *private_data;
+	unsigned char i, buf;
+	unsigned char tf9_addr[] = { 0x0F, 0x0E, 0x0D, 0x0C };
+	unsigned char tmp_addr = 0;
+
 	int result = ML_SUCCESS;
 
 	private_data = (struct kxtf9_private_data *)
-	    MLOSMalloc(sizeof(struct kxtf9_private_data));
+		MLOSMalloc(sizeof(struct kxtf9_private_data));
 
 	if (!private_data)
 		return ML_ERROR_MEMORY_EXAUSTED;
 
+	for (i = 0; i < 4; i++) {
+		pr_info("%s: #%d: try to access with 0x%02x slave address",
+			__func__, i, tf9_addr[i]);
+
+		/* Check Device ID */
+		result = MLSLSerialRead(mlsl_handle,
+					tf9_addr[i], KXTF9_WHO_AM_I, 1, &buf);
+
+		pr_info("%s : WHO_AM_I = 0x%02x", __func__, buf);
+		if (result == ML_SUCCESS) {
+			tmp_addr = tf9_addr[i];
+			pr_info("%s : slave addr = 0x%02x", __func__, tmp_addr);
+			break;
+		}
+	}
+
 	/* RAM reset */
-	result = MLSLSerialWriteSingle(mlsl_handle,
-			pdata->address, KXTF9_CTRL_REG1, 0x40);
-			/* Fastest Reset */
+	result = MLSLSerialWriteSingle(mlsl_handle, tmp_addr,
+			KXTF9_CTRL_REG3, 0xcd);
 	ERROR_CHECK(result);
-	result = MLSLSerialWriteSingle(mlsl_handle,
-			pdata->address, KXTF9_DATA_CTRL_REG, 0x36);
-			/* Fastest Reset */
+	MLOSSleep(100);
+
+	/* Set ODR(Output Data Rate) */
+	result = MLSLSerialWriteSingle(mlsl_handle, pdata->address,
+				       KXTF9_DATA_CTRL_REG, 0x36);
 	ERROR_CHECK(result);
-	result = MLSLSerialWriteSingle(mlsl_handle,
-			pdata->address, KXTF9_CTRL_REG3, 0xcd);
-			/* Reset */
+
+	/* Set Main feature as 2g(Bit4/3=00)
+	   12-bit(Bit-6=1) and turn on standby mode(Bit-7=0)
+	 */
+	result = MLSLSerialWriteSingle(mlsl_handle, pdata->address,
+				       KXTF9_CTRL_REG1, 0x40);
 	ERROR_CHECK(result);
-	MLOSSleep(2);
 
 	pdata->private_data = private_data;
 
@@ -594,20 +618,20 @@ static int kxtf9_read(void *mlsl_handle,
 }
 
 static struct ext_slave_descr kxtf9_descr = {
-	/*.init             = */ kxtf9_init,
-	/*.exit             = */ kxtf9_exit,
-	/*.suspend          = */ kxtf9_suspend,
-	/*.resume           = */ kxtf9_resume,
-	/*.read             = */ kxtf9_read,
-	/*.config           = */ kxtf9_config,
-	/*.get_config       = */ kxtf9_get_config,
-	/*.name             = */ "kxtf9",
-	/*.type             = */ EXT_SLAVE_TYPE_ACCELEROMETER,
-	/*.id               = */ ACCEL_ID_KXTF9,
-	/*.reg              = */ 0x06,
-	/*.len              = */ 6,
-	/*.endian           = */ EXT_SLAVE_LITTLE_ENDIAN,
-	/*.range            = */ {2, 0},
+	/*.init		= */ kxtf9_init,
+	/*.exit		= */ kxtf9_exit,
+	/*.suspend	= */ kxtf9_suspend,
+	/*.resume	= */ kxtf9_resume,
+	/*.read		= */ kxtf9_read,
+	/*.config	= */ kxtf9_config,
+	/*.get_config	= */ kxtf9_get_config,
+	/*.name		= */ "kxtf9",
+	/*.type		= */ EXT_SLAVE_TYPE_ACCELEROMETER,
+	/*.id		= */ ACCEL_ID_KXTF9,
+	/*.reg		= */ 0x06,
+	/*.len		= */ 6,
+	/*.endian	= */ EXT_SLAVE_LITTLE_ENDIAN,
+	/*.range	= */ {2, 0},
 };
 
 struct ext_slave_descr *kxtf9_get_slave_descr(void)

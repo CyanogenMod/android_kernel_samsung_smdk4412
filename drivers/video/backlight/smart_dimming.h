@@ -23,7 +23,7 @@
 
 #define MAX_GRADATION		300
 #define PANEL_ID_MAX		3
-#define GAMMA_300CD_MAX	14
+#define GAMMA_300CD_MAX	15
 
 
 enum {

@@ -241,12 +241,6 @@ config BATTERY_SAMSUNG
 	help
 	  Say Y to enable support for batteries with samsung chip.
 
-config BATTERY_SAMSUNG_S2PLUS
-	tristate "Fake battery driver for samsung s2plus boards"
-	depends on PLAT_SAMSUNG
-	help
-	  Say Y to enable support for batteries with s2plus board.
-
 config CHARGER_MAX8997
 	tristate "Maxim MAX8997/MAX8966 PMIC battery charger driver"
 	depends on MFD_MAX8997 && REGULATOR_MAX8997
@@ -278,14 +272,6 @@ config BATTERY_SEC_PX
 config CHARGER_MAX8922_U1
 	tristate "MAX8922 battery charger support for Samsung Galaxy S2 ICS upgrade"
 	depends on PLAT_SAMSUNG
-	help
-	  Say Y here to enable support for the battery charger in the Maxim
-	  MAX8922 Charger IC.
-
-config CHARGER_MAX8922_S2PLUS
-	tristate "MAX8922 battery charger support for Samsung Galaxy S2 ICS upgrade"
-	depends on PLAT_SAMSUNG
-	default n
 	help
 	  Say Y here to enable support for the battery charger in the Maxim
 	  MAX8922 Charger IC.

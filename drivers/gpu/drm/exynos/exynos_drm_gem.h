@@ -61,9 +61,10 @@ struct exynos_drm_iommu_info {
  * exynos drm gem buffer structure.
  *
  * @kvaddr: kernel virtual address to allocated memory region.
+ * *userptr: user space address.
  * @dma_addr: bus address(accessed by dma) to allocated memory region.
- *	- this address could be physical address without IOMMU and
- *	device address with IOMMU.
+ * @dev_addr: device address for IOMMU.
+ * @paddr: physical address to allocated buffer.
  * @write: whether pages will be written to by the caller.
  * @sgt: sg table to transfer page data.
  * @pages: contain all pages to allocated memory region.
@@ -71,21 +72,22 @@ struct exynos_drm_iommu_info {
  * @size: size of allocated memory region.
  * @shared: indicate shared mfc memory region.
  *	(temporarily used and it should be removed later.)
- * @shared_refcount: a reference count for this buffer being shared with others.
  * @pfnmap: indicate whether memory region from userptr is mmaped with
  *	VM_PFNMAP or not.
  */
 struct exynos_drm_gem_buf {
 	struct device		*dev;
 	void __iomem		*kvaddr;
+	unsigned long		userptr;
 	dma_addr_t		dma_addr;
+	dma_addr_t		dev_addr;
+	dma_addr_t		paddr;
 	unsigned int		write;
 	struct sg_table		*sgt;
 	struct page		**pages;
 	unsigned long		page_size;
 	unsigned long		size;
 	bool			shared;
-	atomic_t		shared_refcount;
 	bool			pfnmap;
 };
 
@@ -102,8 +104,12 @@ struct exynos_drm_gem_buf {
  *	or at framebuffer creation.
  * @iommu_info: contain iommu mapping information to each device driver
  *	using its own iommu.
- * @size: total memory size to physically non-continuous memory region.
+ * @size: size requested from user, in bytes and this size is aligned
+ *	in page unit.
+ * @packed_size: real size of the gem object, in bytes and
+ *	this size isn't aligned in page unit.
  * @flags: indicate memory type to allocated buffer and cache attruibute.
+ * @vmm: vmm object for iommu framework.
  * @priv_handle: handle to specific buffer object.
  * @priv_id: unique id to specific buffer object.
  *
@@ -115,10 +121,10 @@ struct exynos_drm_gem_obj {
 	struct exynos_drm_gem_buf	*buffer;
 	struct exynos_drm_iommu_info	iommu_info;
 	unsigned long			size;
+	unsigned long			packed_size;
 	struct vm_area_struct		*vma;
 	unsigned int			flags;
-	void				*dma_buf_vmapping;
-	int				vmapping_count;
+	void				*vmm;
 	unsigned int			priv_handle;
 	unsigned int			priv_id;
 };
@@ -131,6 +137,9 @@ int register_buf_to_priv_mgr(struct exynos_drm_gem_obj *obj,
 		unsigned int *priv_handle, unsigned int *priv_id);
 
 struct page **exynos_gem_get_pages(struct drm_gem_object *obj, gfp_t gfpmask);
+
+int exynos_drm_gem_user_limit_ioctl(struct drm_device *dev, void *data,
+				      struct drm_file *filp);
 
 /* destroy a buffer with gem object */
 void exynos_drm_gem_destroy(struct exynos_drm_gem_obj *exynos_gem_obj);
@@ -159,16 +168,15 @@ int exynos_drm_gem_create_ioctl(struct drm_device *dev, void *data,
  */
 void *exynos_drm_gem_get_dma_addr(struct drm_device *dev,
 					unsigned int gem_handle,
-					struct drm_file *file_priv);
+					struct drm_file *filp,
+					unsigned int *gem_obj);
 
 /*
  * put dma address from gem handle and this function could be used for
  * other drivers such as 2d/3d acceleration drivers.
  * with this function call, gem object reference count would be decreased.
  */
-void exynos_drm_gem_put_dma_addr(struct drm_device *dev,
-					unsigned int gem_handle,
-					struct drm_file *file_priv);
+void exynos_drm_gem_put_dma_addr(struct drm_device *dev, void *gem_obj);
 
 /* get buffer offset to map to user space. */
 int exynos_drm_gem_map_offset_ioctl(struct drm_device *dev, void *data,
@@ -188,6 +196,11 @@ int exynos_drm_gem_userptr_ioctl(struct drm_device *dev, void *data,
 /* get buffer information to memory region allocated by gem. */
 int exynos_drm_gem_get_ioctl(struct drm_device *dev, void *data,
 				      struct drm_file *file_priv);
+
+/* get buffer size to gem handle. */
+unsigned long exynos_drm_gem_get_size(struct drm_device *dev,
+						unsigned int gem_handle,
+						struct drm_file *file_priv);
 
 /* initialize gem object. */
 int exynos_drm_gem_init_object(struct drm_gem_object *obj);

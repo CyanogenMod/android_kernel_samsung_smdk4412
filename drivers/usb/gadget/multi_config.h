@@ -132,4 +132,11 @@ void set_interface_count(struct usb_configuration *config,
  *		  - Windows and Linux PC always request 255 size.
  */
 void set_string_mode(u16 w_length);
+
+/* Description  : Get Host OS type
+ * Return value : type - u16
+ *		- 0 : MAC PC
+ *		- 1 : Windows and Linux PC
+ */
+u16 get_host_os_type(void);
 #endif /* __MULTI_CONFIG_H */

@@ -20,8 +20,8 @@ extern void midas_config_sleep_gpio_table(void);
 #define GPIO_PMIC_SDA		EXYNOS4_GPB(2)
 #define GPIO_PMIC_SCL		EXYNOS4_GPB(3)
 
-#define GPIO_ADC_SCL		EXYNOS4_GPY0(2)
-#define GPIO_ADC_SDA		EXYNOS4_GPY0(3)
+#define GPIO_FM_SCL		EXYNOS4_GPY0(2)
+#define GPIO_FM_SDA		EXYNOS4_GPY0(3)
 #define GPIO_ADC_INT		EXYNOS4_GPX2(4)	/* rev0.0, 0.1 */
 
 #define GPIO_CAM_SPI_SCLK	EXYNOS4_GPB(4)
@@ -71,6 +71,7 @@ extern void midas_config_sleep_gpio_table(void);
 #define GPIO_MSENSOR_INT	EXYNOS4212_GPJ0(7)
 #define GPIO_MSENSOR_SDA_18V	EXYNOS4_GPY2(4)
 #define GPIO_MSENSOR_SCL_18V	EXYNOS4_GPY2(5)
+#define GPIO_MSENSE_RST_N	EXYNOS4_GPC1(1)
 
 #define GPIO_BENSE_SCL_18V	EXYNOS4_GPY2(3)
 #define GPIO_BSENSE_SDA_18V	EXYNOS4_GPY2(2)

@@ -329,6 +329,7 @@ static long Si4709_ioctl(struct file *filp, unsigned int ioctl_cmd,
 			debug("Si4709_IOC_VOLUME_GET called\n");
 
 			ret = (long)Si4709_dev_volume_get(&volume);
+
 			if (ret < 0)
 				debug("Si4709_IOC_VOLUME_GET failed\n");
 			else if (copy_to_user
@@ -757,9 +758,14 @@ void debug_ioctls(void)
 int __init Si4709_driver_init(void)
 {
 	int ret = 0;
+	unsigned int gpio_fm_rst = GPIO_FM_RST;
 
 	debug("Si4709_driver_init called\n");
 
+#if defined(CONFIG_MACH_T0)
+	if (system_rev >= 3)
+		gpio_fm_rst = GPIO_FM_RST_REV03;
+#endif
 	/*Initialize the Si4709 dev mutex */
 	Si4709_dev_mutex_init();
 
@@ -791,19 +797,19 @@ int __init Si4709_driver_init(void)
 		debug("Si4709_driver_init request_irq "
 		"success %d", Si4709_int);
 
-	if (gpio_is_valid(GPIO_FM_RST)) {
-		if (gpio_request(GPIO_FM_RST, "GPC1"))
+	if (gpio_is_valid(gpio_fm_rst)) {
+		if (gpio_request(gpio_fm_rst, "FM_RST"))
 			debug(KERN_ERR "Failed to request "
 			"FM_RESET!\n\n");
-		gpio_direction_output(GPIO_FM_RST, GPIO_LEVEL_LOW);
+		gpio_direction_output(gpio_fm_rst, GPIO_LEVEL_LOW);
 	}
 
 #if defined(CONFIG_MACH_M0) || defined(CONFIG_MACH_M0_CTC)
 	if (gpio_is_valid(GPIO_FM_MIC_SW)) {
-		if (gpio_request(GPIO_FM_MIC_SW, "GPL0"))
+		if (gpio_request(GPIO_FM_MIC_SW, "FM_MIC_SW"))
 			debug(KERN_ERR "Failed to request "
 			"FM_MIC_SW!\n\n");
-		gpio_direction_output(GPIO_FM_RST, GPIO_LEVEL_LOW);
+		gpio_direction_output(GPIO_FM_MIC_SW, GPIO_LEVEL_LOW);
 	}
 #endif
 
@@ -812,15 +818,15 @@ int __init Si4709_driver_init(void)
 	as the FM Radio device gives 5ms low pulse*/
 	s3c_gpio_setpull(Si4709_int, S3C_GPIO_PULL_UP);
 	/****Resetting the device****/
-	gpio_set_value(GPIO_FM_RST, GPIO_LEVEL_LOW);
+	gpio_set_value(gpio_fm_rst, GPIO_LEVEL_LOW);
 	s3c_gpio_cfgpin(Si4709_int, S3C_GPIO_OUTPUT);
 	s3c_gpio_setpull(Si4709_int, S3C_GPIO_PULL_DOWN);
-	gpio_set_value(GPIO_FM_RST, GPIO_LEVEL_HIGH);
+	gpio_set_value(gpio_fm_rst, GPIO_LEVEL_HIGH);
 	usleep_range(10, 15);
 	s3c_gpio_cfgpin(Si4709_int, S3C_GPIO_SFN(0xF));
 	s3c_gpio_setpull(Si4709_int, S3C_GPIO_PULL_UP);
 
-	gpio_free(FM_RESET);
+	gpio_free(gpio_fm_rst);
 
 	/*Add the i2c driver */
 	ret = Si4709_i2c_drv_init();
@@ -837,6 +843,8 @@ MISC_IRQ_DREG:
 	free_irq(Si4709_irq, NULL);
 MISC_DREG:
 	misc_deregister(&Si4709_misc_device);
+
+	Si4709_dev_mutex_destroy();
 
 	return ret;
 }

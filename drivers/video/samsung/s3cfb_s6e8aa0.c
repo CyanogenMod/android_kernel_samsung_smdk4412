@@ -532,7 +532,7 @@ static int s6e8ax0_set_acl(struct lcd_info *lcd, u8 force)
 		break;
 	}
 
-	if ((!lcd->acl_enable) || (lcd->auto_brightness >= 5))
+	if (!lcd->acl_enable)
 		level = ACL_STATUS_0P;
 
 	enable = !!level;

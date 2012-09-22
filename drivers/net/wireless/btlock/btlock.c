@@ -74,8 +74,8 @@ PR("release, cookie_mismatch:%s, owner:%s\n", cookie_msg,
 				owner_cookie == 0 ? "NULL" : owner_msg);
 	} else if (lock_para.lock == 1) {
 		#if 1
-		if (down_interruptible(&lock)) {
-			PR("interrupted\n");
+		if (down_killable(&lock)) {
+			PR("killed\n");
 			return -ERESTARTSYS;
 		}
 		#else

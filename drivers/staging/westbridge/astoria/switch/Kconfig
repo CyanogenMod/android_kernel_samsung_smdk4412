@@ -1,0 +1,10 @@
+#
+# West Bridge switch driver configuration
+#
+
+config WESTBRIDGE_SWITCH_DRIVER
+	tristate "West Bridge switch Driver"
+	default m
+	help
+		Include the West Bridge based switch peripheral controller driver
+

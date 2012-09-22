@@ -2933,6 +2933,8 @@ source "drivers/net/tokenring/Kconfig"
 
 source "drivers/net/wireless/Kconfig"
 
+source "drivers/net/wimax_cmc/Kconfig"
+
 source "drivers/net/wimax/Kconfig"
 
 source "drivers/net/usb/Kconfig"

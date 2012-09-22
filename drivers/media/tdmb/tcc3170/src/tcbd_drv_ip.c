@@ -50,7 +50,7 @@ struct tcbd_boot_bin {
 
 static u32 clock_config_table[3][5] = {
 	{ 0x60, 0x00, 0x0F, 0x03, 19200},
-	{ 0x60, 0x00, 0x0C, 0x03, 24576},
+	{ 0x60, 0x01, 0x18, 0x03, 24576},
 	{ 0x60, 0x01, 0x0F, 0x03, 38400}
 };
 
@@ -70,13 +70,26 @@ static struct tcbd_spur_data spur_data_table_default[] = {
 };
 
 static struct tcbd_spur_data spur_data_table_24576[] = {
+	{ 180064, 2, {(0x03C3<<16)|(0x030D), (0x03C2<<16)|(0x0308)} },
 	{ 184736, 2, {(0x0092<<16)|(0x033A), (0x0098<<16)|(0x0332)} },
+	{ 188928, 2, {(0x00B1<<16)|(0x034F), (0x00B5<<16)|(0x034B)} },
+	{ 189008, 2, {(0x00C6<<16)|(0x0366), (0x00CA<<16)|(0x0363)} },
+	{ 195936, 2, {(0x0328<<16)|(0x037F), (0x0324<<16)|(0x037C)} },
 	{ 196736, 2, {(0x0030<<16)|(0x030F), (0x0032<<16)|(0x0305)} },
-	{ 199280, 2, {(0x0373<<16)|(0x0337), (0x036D<<16)|(0x032F)} },
-	{ 205280, 2, {(0x00A5<<16)|(0x0349), (0x00AC<<16)|(0x0342)} },
-	{ 213008, 2, {(0x0006<<16)|(0x030A), (0x0006<<16)|(0x0300)} },
+	{ 199280, 2, {(0x000B<<16)|(0x030A), (0x000B<<16)|(0x0300)} },
+	{ 204640, 2, {(0x03C3<<16)|(0x030D), (0x03C2<<16)|(0x0308)} },
+	{ 205280, 2, {(0x039F<<16)|(0x031E), (0x039B<<16)|(0x0315)} },
+	{ 208736, 2, {(0x03C4<<16)|(0x0312), (0x03C2<<16)|(0x0308)} },
+	{ 213008, 2, {(0x0006<<16)|(0x0305), (0x0006<<16)|(0x0300)} },
+	{ 213360, 2, {(0x0086<<16)|(0x032C), (0x0089<<16)|(0x0328)} },
+	{ 229072, 2, {(0x038F<<16)|(0x031F), (0x038D<<16)|(0x031B)} },
+	{ 237488, 2, {(0x03E2<<16)|(0x0307), (0x03E1<<16)|(0x0302)} },
+	{ 1458096, 2, {(0x03E2<<16)|(0x0307), (0x03E1<<16)|(0x0302)} },
+	{ 1466656, 2, {(0x006B<<16)|(0x031E), (0x006D<<16)|(0x0319)} },
+	{ 1475216, 2, {(0x00D4<<16)|(0x037A), (0x00D8<<16)|(0x0377)} },
+	{ 1482064, 2, {(0x0325<<16)|(0x0384), (0x0321<<16)|(0x0382)} },
+	{ 1490624, 2, {(0x0389<<16)|(0x0322), (0x0387<<16)|(0x031E)} },
 };
-
 
 #if defined(__AGC_TABLE_IN_DSP__)
 static struct tcbd_agc_data agc_data_table_lband[] = {
@@ -159,7 +172,6 @@ s32 tcbd_send_spur_data(struct tcbd_device *_device, s32 _freq_khz)
 {
 	s32 ret = 0, i;
 	s32 size_table;
-	struct tcbd_mail_data mail = {0, };
 	struct tcbd_spur_data *spur_table;
 
 	switch (_device->clock_type) {
@@ -174,31 +186,27 @@ s32 tcbd_send_spur_data(struct tcbd_device *_device, s32 _freq_khz)
 		size_table = ARRAY_SIZE(spur_data_table_default);
 		break;
 	}
-	mail.flag = MB_CMD_WRITE;
-	mail.cmd = MBCMD_FP_DAB_IIR;
 	for (i = 0; i < size_table; i++) {
-		if (spur_table[i].freq_khz == _freq_khz) {
-			mail.count = spur_table[i].num_data;
-			memcpy(mail.data, spur_table[i].data,
-				mail.count * sizeof(u32));
-			tcbd_debug(DEBUG_DRV_COMP,
-				"freq:%d, num mail data:%d\n",
-					_freq_khz, mail.count);
-			ret = tcbd_send_mail(_device, &mail);
+		if (spur_table[i].freq_khz != _freq_khz)
+			continue;
+
+		tcbd_debug(DEBUG_DRV_COMP, "freq:%d, num mail data:%d\n",
+					_freq_khz, spur_table[i].num_data);
+		ret = tcbd_write_mail_box(_device, MBCMD_FP_DAB_IIR,
+						spur_table[i].num_data,
+						spur_table[i].data);
 			break;
 		}
-	}
 
 	return ret;
 }
 
-s32 tcbd_send_agc_data(
-	struct tcbd_device *_device, enum tcbd_band_type _band_type)
+s32 tcbd_send_agc_data(struct tcbd_device *_device,
+			enum tcbd_band_type _band_type)
 {
 	s32 ret = 0, i;
 	s32 size_table;
 	struct tcbd_agc_data *agc_table;
-	struct tcbd_mail_data mail = {0, };
 
 	switch (_band_type) {
 	case BAND_TYPE_LBAND:
@@ -210,20 +218,16 @@ s32 tcbd_send_agc_data(
 		agc_table = agc_table_data_vhf;
 		break;
 	default:
-		tcbd_debug(DEBUG_ERROR,
-			"Unknown band type:%d\n", _band_type);
+		tcbd_debug(DEBUG_ERROR, "Unknown band type:%d\n", _band_type);
 		return -1;
 	}
-	tcbd_debug(DEBUG_DRV_COMP, "agc table size:%d, band:%s\n",
-		size_table,
+	tcbd_debug(DEBUG_DRV_COMP, "agc table size:%d, band:%s\n", size_table,
 		(_band_type == BAND_TYPE_LBAND) ? "Lband" : "Band3");
 
-	mail.flag = MB_CMD_WRITE;
 	for (i = 0; i < size_table; i++) {
-		mail.cmd = agc_table[i].cmd;
-		mail.count = agc_table[i].num_data;
-		memcpy(mail.data, agc_table[i].data, mail.count * sizeof(u32));
-		ret = tcbd_send_mail(_device, &mail);
+		ret |= tcbd_write_mail_box(_device, agc_table[i].cmd,
+						agc_table[i].num_data,
+						agc_table[i].data);
 	}
 
 	return ret;
@@ -231,26 +235,19 @@ s32 tcbd_send_agc_data(
 
 s32 tcbd_send_frequency(struct tcbd_device *_device, s32 _freq_khz)
 {
-	s32 ret = 0;
-	struct tcbd_mail_data mail;
+	s32 data, ret = 0;
 
 	tcbd_debug(DEBUG_DRV_COMP, "freq:%d\n", _freq_khz);
 
-	mail.flag = MB_CMD_WRITE;
-	mail.cmd = MBPARA_SYS_NUM_FREQ;
-	mail.count = 1;
-	mail.data[0] = 1;
-	ret |= tcbd_send_mail(_device, &mail);
-
-	mail.cmd = MBPARA_SYS_FREQ_0_6;
-	mail.data[0] = _freq_khz;
-	ret |= tcbd_send_mail(_device, &mail);
+	data = 1;
+	ret |= tcbd_write_mail_box(_device, MBPARA_SYS_NUM_FREQ, 1, &data);
+	ret |= tcbd_write_mail_box(_device, MBPARA_SYS_FREQ_0_6, 1, &_freq_khz);
 
 	return ret;
 }
 
-static inline void tcbd_sort_start_cu(
-	struct tcbd_multi_service *_multi_svc, u32 *_svc_info)
+static inline void tcbd_sort_start_cu(struct tcbd_multi_service *_multi_svc,
+								u32 *_svc_info)
 {
 	s32 i, j;
 	s32 start_cu[TCBD_MAX_NUM_SERVICE];
@@ -283,36 +280,24 @@ static inline void tcbd_sort_start_cu(
 		}
 	}
 	for (i = 0; i < TCBD_MAX_NUM_SERVICE * 2; i++)
-		tcbd_debug(DEBUG_DRV_COMP,
-			"%02d: 0x%08X\n", i, _svc_info[i]);
+		tcbd_debug(DEBUG_DRV_COMP, "%02d: 0x%08X\n", i, _svc_info[i]);
 }
 
 s32 tcbd_send_service_info(struct tcbd_device *_device)
 {
 	s32 ret = 0;
-	struct tcbd_mail_data mail = {0, } ;
 	struct tcbd_multi_service *mult_service = &_device->mult_service;
 	u32 sorted_svc_info[TCBD_MAX_NUM_SERVICE * 2];
 	u8 num_svc = TCBD_MAX_NUM_SERVICE;
 
 	tcbd_sort_start_cu(mult_service, sorted_svc_info);
 
-	mail.cmd = MBPARA_SEL_CH_INFO_PRAM;
-	mail.count = num_svc;
-	memcpy(mail.data, sorted_svc_info,
-		num_svc * sizeof(u32));
-	ret = tcbd_send_mail(_device, &mail);
-
-	mail.cmd = MBPARA_SEL_CH_INFO_PRAM + 1;
-	mail.count = num_svc;
-	memcpy(mail.data, sorted_svc_info + num_svc,
-		num_svc * sizeof(u32));
-	ret = tcbd_send_mail(_device, &mail);
-
-	mail.cmd = MBPARA_SYS_DAB_MCI_UPDATE;
-	mail.count = 1;
-	mail.data[0] = mult_service->service_count;
-	ret |= tcbd_send_mail(_device, &mail);
+	ret = tcbd_write_mail_box(_device, MBPARA_SEL_CH_INFO_PRAM,
+					num_svc, sorted_svc_info);
+	ret |= tcbd_write_mail_box(_device, MBPARA_SEL_CH_INFO_PRAM + 1,
+					num_svc, sorted_svc_info + num_svc);
+	ret |= tcbd_write_mail_box(_device, MBPARA_SYS_DAB_MCI_UPDATE, 1,
+					&mult_service->service_count);
 	tcbd_debug(DEBUG_DRV_COMP, "service count:%d\n",
 		mult_service->service_count);
 	return ret;
@@ -355,7 +340,7 @@ s32 tcbd_enable_buffer(struct tcbd_device *_device)
 	ret |= tcbd_reg_write(_device, TCBD_OBUFF_CONFIG, buff_en);
 	return ret;
 }
-
+/*__DEBUG_TCBD__*/
 s32 tcbd_init_buffer_region(struct tcbd_device *_device)
 {
 	s32 i, ret = 0;
@@ -410,8 +395,7 @@ s32 tcbd_init_buffer_region(struct tcbd_device *_device)
 	return ret;
 }
 
-s32 tcbd_change_memory_view(
-	struct tcbd_device *_device,
+s32 tcbd_change_memory_view(struct tcbd_device *_device,
 	enum tcbd_remap_type _remap)
 {
 	return tcbd_reg_write(_device, TCBD_INIT_REMAP, (u8)_remap);
@@ -432,8 +416,7 @@ u32 tcbd_get_osc_clock(struct tcbd_device *_device)
 	return clock_config_table[(int)_device->clock_type][4];
 }
 
-s32 tcbd_init_pll(
-	struct tcbd_device *_device, enum tcbd_clock_type _ctype)
+s32 tcbd_init_pll(struct tcbd_device *_device, enum tcbd_clock_type _ctype)
 {
    /*
 	* _pll_data[0] = PLL_WAIT_TIME
@@ -453,7 +436,11 @@ s32 tcbd_init_pll(
 
 	_device->clock_type = _ctype;
 
-	clock_config = clock_config_table[(s32)_ctype];
+	if (!tcbd_debug_spur_dbg())
+		clock_config = clock_config_table[(s32)_ctype];
+	else
+		clock_config = tcbd_debug_spur_clk_cfg();
+
 	tcbd_debug(DEBUG_DRV_COMP, "osc clock:%d, P:%X, M:%X, S:%d\n",
 		clock_config[1], clock_config[2],
 		clock_config[3], clock_config[4]);
@@ -497,18 +484,15 @@ static s32 tcbd_check_dsp(struct tcbd_device *_device)
 		_device, TCBD_MAIL_FIFO_WIND, (u8 *)&status, 4);
 
 	if (status != 0x1ACCE551) {
-		tcbd_debug(DEBUG_ERROR,
-			" # Error access mail [0x%X]\n", status);
+		tcbd_debug(DEBUG_ERROR, " # Error access mail [0x%X]\n",
+								status);
 		return -TCERR_CANNOT_ACCESS_MAIL;
 	}
 
 	return ret;
 }
 
-s32 tcbd_reset_ip(
-	struct tcbd_device *_device,
-	u8 _comp_en,
-	u8 _comp_rst)
+s32 tcbd_reset_ip(struct tcbd_device *_device, u8 _comp_en, u8 _comp_rst)
 {
 	s32 ret = 0;
 	_device->processor = _comp_en;
@@ -521,18 +505,13 @@ s32 tcbd_reset_ip(
 
 s32 tcbd_change_stream_type(struct tcbd_device *_device, u32 _format)
 {
-	struct tcbd_mail_data mail = {0, };
-
-	mail.flag = MB_CMD_WRITE;
-	mail.cmd = MBPARA_SYS_DAB_STREAM_SET;
-	mail.count = 1;
-	mail.data[0] = _format;
 	_device->selected_stream = _format;
-	return tcbd_send_mail(_device, &mail);
+	return tcbd_write_mail_box(_device, MBPARA_SYS_DAB_STREAM_SET,
+							1, &_format);
 }
 
-s32 tcbd_demod_tune_frequency(
-	struct tcbd_device *_device, u32 _freq_khz, s32 _bw_khz)
+s32 tcbd_demod_tune_frequency(struct tcbd_device *_device, u32 _freq_khz,
+								s32 _bw_khz)
 {
 	s32 ret = 0;
 	u32 sel_stream = 0;
@@ -562,6 +541,7 @@ s32 tcbd_demod_tune_frequency(
 	if (_device->curr_band != _device->prev_band)
 		tcbd_send_agc_data(_device, _device->curr_band);
 
+	ret |= tcbd_set_pid_filter(_device, FILTER_ENABLE | FILTER_SYNCERR);
 	ret |= tcbd_dsp_warm_start(_device);
 	return ret;
 }
@@ -626,15 +606,14 @@ s32 tcbd_dsp_warm_start(struct tcbd_device *_device)
 	ret |= tcbd_recv_mail(_device, &mail);
 
 	if (ret < 0 || mail.data[0] != 0x1ACCE551) {
-		tcbd_debug(DEBUG_ERROR,
-			" # Could not warm boot! [%08X]\n", mail.data[0]);
+		tcbd_debug(DEBUG_ERROR, " # Could not warm boot! [%08X]\n",
+							mail.data[0]);
 		return -TCERR_WARMBOOT_FAIL;
 	}
 	ret = tcbd_start_demod(_device);
 
 	if (ret >= 0)
-		tcbd_debug(DEBUG_DRV_COMP,
-			"Warm boot succeed! [0x%X] ret:%d\n",
+		tcbd_debug(DEBUG_DRV_COMP, "Warm boot succeed! [0x%X] ret:%d\n",
 				mail.data[0], ret);
 	return ret;
 }
@@ -747,23 +726,17 @@ s32 tcbd_init_dsp(struct tcbd_device *_device, u8 *_boot_code, s32 _size)
 	ret |= tcbd_change_memory_view(_device, EP_RAM0_RAM1);
 
 	for (i = 0; i < num_table_entry && boot_bin[i].size; i++) {
-		tcbd_debug(DEBUG_API_COMMON,
-			"# download boot to 0x%X, size %d\n",
-				boot_bin[i].addr, boot_bin[i].size);
-		ret |= tcbd_mem_write(
-				_device,
-				boot_bin[i].addr,
-				boot_bin[i].data,
+		tcbd_debug(DEBUG_API_COMMON, "# download boot to 0x%X, "
+						"size %d\n", boot_bin[i].addr,
 				boot_bin[i].size);
-		ret |= tcbd_reg_read_burst_cont(_device,
-				TCBD_CMDDMA_CRC32,
-				(u8 *)&dma_crc,
-				4);
-		if (boot_bin[i].crc &&
-				(SWAP32(dma_crc) != boot_bin[i].crc)) {
-			tcbd_debug(DEBUG_ERROR,
-				"# CRC Error DMA[0x%08X] != BIN[0x%08X]\n",
-					dma_crc, boot_bin[i].crc);
+		ret |= tcbd_mem_write(_device, boot_bin[i].addr,
+					boot_bin[i].data, boot_bin[i].size);
+		ret |= tcbd_reg_read_burst_cont(_device, TCBD_CMDDMA_CRC32,
+				(u8 *)&dma_crc, 4);
+		if (boot_bin[i].crc && (SWAP32(dma_crc) != boot_bin[i].crc)) {
+			tcbd_debug(DEBUG_ERROR, "# CRC Error DMA[0x%08X] !="
+						" BIN[0x%08X]\n", dma_crc,
+						boot_bin[i].crc);
 			return -TCERR_CRC_FAIL;
 		}
 	}
@@ -827,4 +800,9 @@ s32 tcbd_check_dsp_status(struct tcbd_device *_device)
 		tcbd_debug(DEBUG_INFO, "%s\n", dbg_buff);
 	}
 	return 0;
+}
+
+s32 tcbd_set_pid_filter(struct tcbd_device *_device, u32 _filter)
+{
+	return tcbd_write_mail_box(_device, MBPARA_SYS_DAB_DP_FLT, 1, &_filter);
 }

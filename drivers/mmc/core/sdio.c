@@ -1058,6 +1058,7 @@ static const struct mmc_bus_ops mmc_sdio_ops = {
 	.alive = mmc_sdio_alive,
 };
 
+
 /*
  * Starting point for SDIO card init.
  */

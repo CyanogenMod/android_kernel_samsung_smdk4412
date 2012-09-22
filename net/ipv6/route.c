@@ -235,7 +235,8 @@ static inline struct rt6_info *ip6_dst_alloc(struct dst_ops *ops,
 
 	if (rt != NULL)
 		memset(&rt->rt6i_table, 0,
-		       sizeof(*rt) - sizeof(struct dst_entry));
+			sizeof(*rt) - sizeof(struct dst_entry));
+
 	return rt;
 }
 

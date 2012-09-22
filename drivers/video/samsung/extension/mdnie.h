@@ -15,7 +15,7 @@
 #define _MDNIE_H_
 
 #define MDNIE_MAX_STR 255
-#define MDNIE_FW_PATH "mdnie/%s/%s.bin"
+#define MDNIE_FW_PATH "mdnie/%s_tune_%s.dat"
 
 /* set - main, optional */
 enum mdnie_set {

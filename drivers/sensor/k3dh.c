@@ -70,7 +70,7 @@ struct k3dh_data {
 	struct mutex read_lock;
 	struct mutex write_lock;
 	struct completion data_ready;
-#ifdef CONFIG_MACH_U1
+#if defined(CONFIG_MACH_U1) || defined(CONFIG_MACH_TRATS)
 	struct class *acc_class;
 #else
 	struct device *dev;
@@ -426,7 +426,7 @@ static ssize_t k3dh_fs_read(struct device *dev,
 {
 	struct k3dh_data *data = dev_get_drvdata(dev);
 
-#ifdef CONFIG_MACH_U1
+#if defined(CONFIG_MACH_U1) || defined(CONFIG_MACH_TRATS)
 	int err = 0;
 	int on;
 
@@ -526,7 +526,7 @@ static ssize_t k3dh_calibration_store(struct device *dev,
 	return count;
 }
 
-#ifdef CONFIG_MACH_U1
+#if defined(CONFIG_MACH_U1) || defined(CONFIG_MACH_TRATS)
 static DEVICE_ATTR(acc_file, 0664, k3dh_fs_read, NULL);
 #else
 static ssize_t k3dh_accel_vendor_show(struct device *dev,
@@ -565,7 +565,7 @@ static int k3dh_probe(struct i2c_client *client,
 		       const struct i2c_device_id *id)
 {
 	struct k3dh_data *data;
-#ifdef CONFIG_MACH_U1
+#if defined(CONFIG_MACH_U1) || defined(CONFIG_MACH_TRATS)
 	struct device *dev_t, *dev_cal;
 #endif
 	struct accel_platform_data *pdata;
@@ -619,7 +619,7 @@ static int k3dh_probe(struct i2c_client *client,
 
 	pdata = client->dev.platform_data;
 
-#ifdef CONFIG_MACH_U1
+#if defined(CONFIG_MACH_U1) || defined(CONFIG_MACH_TRATS)
 	/* creating class/device for test */
 	data->acc_class = class_create(THIS_MODULE, "accelerometer");
 	if (IS_ERR(data->acc_class)) {
@@ -704,7 +704,7 @@ static int k3dh_probe(struct i2c_client *client,
 
 	return 0;
 
-#ifdef CONFIG_MACH_U1
+#if defined(CONFIG_MACH_U1) || defined(CONFIG_MACH_TRATS)
 err_cal_device_create_file:
 	device_destroy(sec_class, 0);
 err_cal_device_create:
@@ -748,7 +748,7 @@ static int k3dh_remove(struct i2c_client *client)
 			pr_err("%s: pm_off failed %d\n", __func__, err);
 	}
 
-#ifdef CONFIG_MACH_U1
+#if defined(CONFIG_MACH_U1) || defined(CONFIG_MACH_TRATS)
 	device_destroy(sec_class, 0);
 	device_destroy(data->acc_class, MKDEV(ACC_DEV_MAJOR, 0));
 	class_destroy(data->acc_class);

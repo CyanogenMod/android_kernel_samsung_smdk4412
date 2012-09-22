@@ -222,6 +222,13 @@
 static struct wacom_g5_callbacks *wacom_callbacks;
 #endif /* CONFIG_EPEN_WACOM_G5SP */
 
+#ifdef CONFIG_USBHUB_USB3503_OTG_CONN
+#include <linux/usb.h>
+#include <linux/usb/hcd.h>
+#include <linux/platform_data/usb3503_otg_conn.h>
+#endif
+
+
 static struct charging_status_callbacks {
 	void (*tsp_set_charging_cable) (int type);
 } charging_cbs;
@@ -363,9 +370,13 @@ static struct tasklet_struct hostwake_task;
 
 static void wlan_hostwake_task(unsigned long data)
 {
+#if defined(CONFIG_MACH_P8LTE)
+	printk(KERN_INFO "WLAN: wake lock timeout 1 sec...\n");
+	wake_lock_timeout(&wsi->wake_lock, HZ);
+#else
 	printk(KERN_INFO "WLAN: wake lock timeout 0.5 sec...\n");
-
 	wake_lock_timeout(&wsi->wake_lock, HZ / 2);
+#endif
 }
 
 static irqreturn_t wlan_hostwake_isr(int irq, void *dev_id)
@@ -6015,9 +6026,9 @@ static void __init smdkc210_usbgadget_init(void)
 		pdata->phy_tune |= 0x1 << 11;
 #elif defined(CONFIG_TARGET_LOCALE_P2EUR_TEMP)
 		/* P2 EUR OPEN */
-		/*squelch threshold tune [13:11] (000 : +15%) */
+		/*squelch threshold tune [13:11] (100 : -5%) */
 		pdata->phy_tune_mask |= 0x7 << 11;
-		pdata->phy_tune |= 0x0 << 11;
+		pdata->phy_tune |= 0x4 << 11;
 #endif
 		printk(KERN_DEBUG "usb: %s tune_mask=0x%x, tune=0x%x\n",
 			__func__, pdata->phy_tune_mask, pdata->phy_tune);
@@ -6258,6 +6269,82 @@ static struct platform_device sec_battery_device = {
 };
 #endif /* CONFIG_BATTERY_SEC_PX */
 
+#ifdef CONFIG_USBHUB_USB3503_OTG_CONN
+int usb3503_hw_config(void)
+{
+	s3c_gpio_cfgpin(GPIO_USB_HUB_RST, S3C_GPIO_OUTPUT);
+	s3c_gpio_setpull(GPIO_USB_HUB_RST, S3C_GPIO_PULL_NONE);
+	gpio_set_value(GPIO_USB_HUB_RST, S3C_GPIO_SETPIN_ZERO);
+	s5p_gpio_set_drvstr(GPIO_USB_HUB_RST,
+		S5P_GPIO_DRVSTR_LV1); /* need to check drvstr 1 or 2 */
+
+	return 0;
+}
+
+int usb3503_reset_n(int val)
+{
+	gpio_set_value(GPIO_USB_HUB_RST, !!val);
+
+	pr_info("Board : %s = %d\n", __func__,
+		gpio_get_value(GPIO_USB_HUB_RST));
+
+	return 0;
+}
+
+static int host_port_enable(int port, int enable)
+{
+	int err;
+
+	pr_info("port(%d) control(%d)\n", port, enable);
+
+	if (enable) {
+		err = s5p_ehci_port_control(&s5p_device_ehci, port, 1);
+		if (err < 0) {
+			pr_err("ERR: port(%d) enable fail\n", port);
+			goto exit;
+		}
+	} else {
+		err = s5p_ehci_port_control(&s5p_device_ehci, port, 0);
+		if (err < 0) {
+			pr_err("ERR: port(%d) enable fail\n", port);
+			goto exit;
+		}
+	}
+
+exit:
+	return err;
+}
+
+/* I2C17_EMUL */
+static struct i2c_gpio_platform_data i2c17_platdata = {
+	.sda_pin = GPIO_USB_HUB_I2C_SDA,
+	.scl_pin = GPIO_USB_HUB_I2C_SCL,
+};
+
+struct platform_device s3c_device_i2c17 = {
+	.name = "i2c-gpio",
+	.id = 17,
+	.dev.platform_data = &i2c17_platdata,
+};
+
+struct usb3503_platform_data usb3503_pdata = {
+	.init_needed    =  1,
+	.es_ver         = 1,
+	.inital_mode    = USB_3503_MODE_STANDBY,
+	.hw_config      = usb3503_hw_config,
+	.reset_n        = usb3503_reset_n,
+	.port_enable = host_port_enable,
+};
+
+static struct i2c_board_info i2c_devs17_emul[] __initdata = {
+	{
+		I2C_BOARD_INFO(USB3503_I2C_NAME, 0x08),
+		.platform_data  = &usb3503_pdata,
+	},
+};
+#endif
+
+
 #ifdef CONFIG_30PIN_CONN
 static void smdk_accessory_gpio_init(void)
 {
@@ -6456,8 +6543,17 @@ struct platform_device host_notifier_device = {
 	.dev.platform_data = &host_notifier_pdata,
 };
 
+#ifdef CONFIG_USBHUB_USB3503_OTG_CONN
+#define RETRY_CNT_LIMIT 100
+#endif
+
 static void px_usb_otg_en(int active)
 {
+#ifdef CONFIG_USBHUB_USB3503_OTG_CONN
+	struct usb_hcd *ehci_hcd = platform_get_drvdata(&s5p_device_ehci);
+	int retry_cnt = 1;
+#endif
+
 	pr_info("otg %s : %d\n", __func__, active);
 
 	usb_switch_lock();
@@ -6484,6 +6580,16 @@ static void px_usb_otg_en(int active)
 #endif
 #ifdef CONFIG_USB_EHCI_S5P
 		pm_runtime_put_sync(&s5p_device_ehci.dev);
+#ifdef CONFIG_USBHUB_USB3503_OTG_CONN
+		/* waiting for ehci root hub suspend is done */
+		while (ehci_hcd->state != HC_STATE_SUSPENDED) {
+			msleep(50);
+			if (retry_cnt++ > RETRY_CNT_LIMIT) {
+				printk(KERN_ERR "ehci suspend not completed\n");
+				break;
+			}
+		}
+#endif
 #endif
 
 		usb_switch_clr_path(USB_PATH_HOST);
@@ -6494,6 +6600,23 @@ static void px_usb_otg_en(int active)
 	}
 
 	usb_switch_unlock();
+
+#ifdef CONFIG_USBHUB_USB3503_OTG_CONN
+	if (!active) {
+		host_port_enable(2, 0);
+		usb3503_set_mode(USB_3503_MODE_STANDBY);
+	}
+
+	gpio_request(GPIO_USB_OTG_EN, "GPIO_USB_OTG_EN");
+	gpio_direction_output(GPIO_USB_OTG_EN, active);
+	gpio_free(GPIO_USB_OTG_EN);
+
+	if (active) {
+		usb3503_set_mode(USB_3503_MODE_HUB);
+		host_port_enable(2, 1);
+	}
+#endif
+
 }
 #endif
 
@@ -6540,6 +6663,77 @@ static struct platform_device watchdog_reset_device = {
 	.id = -1,
 };
 #endif
+
+#ifdef CONFIG_CORESIGHT_ETM
+
+#define CORESIGHT_PHYS_BASE             0x10880000
+#define CORESIGHT_ETB_PHYS_BASE         (CORESIGHT_PHYS_BASE + 0x1000)
+#define CORESIGHT_TPIU_PHYS_BASE        (CORESIGHT_PHYS_BASE + 0x3000)
+#define CORESIGHT_FUNNEL_PHYS_BASE      (CORESIGHT_PHYS_BASE + 0x4000)
+#define CORESIGHT_ETM_PHYS_BASE         (CORESIGHT_PHYS_BASE + 0x1C000)
+
+static struct resource coresight_etb_resources[] = {
+	{
+		.start = CORESIGHT_ETB_PHYS_BASE,
+		.end   = CORESIGHT_ETB_PHYS_BASE + SZ_4K - 1,
+		.flags = IORESOURCE_MEM,
+	},
+};
+
+struct platform_device coresight_etb_device = {
+	.name          = "coresight_etb",
+	.id            = -1,
+	.num_resources = ARRAY_SIZE(coresight_etb_resources),
+	.resource      = coresight_etb_resources,
+};
+
+static struct resource coresight_tpiu_resources[] = {
+	{
+		.start = CORESIGHT_TPIU_PHYS_BASE,
+		.end   = CORESIGHT_TPIU_PHYS_BASE + SZ_4K - 1,
+		.flags = IORESOURCE_MEM,
+	},
+};
+
+struct platform_device coresight_tpiu_device = {
+	.name          = "coresight_tpiu",
+	.id            = -1,
+	.num_resources = ARRAY_SIZE(coresight_tpiu_resources),
+	.resource      = coresight_tpiu_resources,
+};
+
+static struct resource coresight_funnel_resources[] = {
+	{
+		.start = CORESIGHT_FUNNEL_PHYS_BASE,
+		.end   = CORESIGHT_FUNNEL_PHYS_BASE + SZ_4K - 1,
+		.flags = IORESOURCE_MEM,
+	},
+};
+
+struct platform_device coresight_funnel_device = {
+	.name          = "coresight_funnel",
+	.id            = -1,
+	.num_resources = ARRAY_SIZE(coresight_funnel_resources),
+	.resource      = coresight_funnel_resources,
+};
+
+static struct resource coresight_etm_resources[] = {
+	{
+		.start = CORESIGHT_ETM_PHYS_BASE,
+		.end   = CORESIGHT_ETM_PHYS_BASE + (SZ_4K * 2) - 1,
+		.flags = IORESOURCE_MEM,
+	},
+};
+
+struct platform_device coresight_etm_device = {
+	.name          = "coresight_etm",
+	.id            = -1,
+	.num_resources = ARRAY_SIZE(coresight_etm_resources),
+	.resource      = coresight_etm_resources,
+};
+
+#endif
+
 static struct platform_device *smdkc210_devices[] __initdata = {
 #ifdef CONFIG_SEC_WATCHDOG_RESET
 	&watchdog_reset_device,
@@ -6621,6 +6815,9 @@ static struct platform_device *smdkc210_devices[] __initdata = {
 #endif
 #ifdef CONFIG_S3C_DEV_I2C16_EMUL
 	&s3c_device_i2c16,
+#endif
+#ifdef CONFIG_USBHUB_USB3503_OTG_CONN
+	&s3c_device_i2c17,	/* USB HUB */
 #endif
 #endif
 
@@ -6801,6 +6998,12 @@ static struct platform_device *smdkc210_devices[] __initdata = {
 #ifdef CONFIG_SEC_KEYBOARD_DOCK
 	&sec_keyboard,
 #endif
+#endif
+#ifdef CONFIG_CORESIGHT_ETM
+	&coresight_etb_device,
+	&coresight_tpiu_device,
+	&coresight_funnel_device,
+	&coresight_etm_device,
 #endif
 };
 
@@ -7396,6 +7599,10 @@ static void __init smdkc210_machine_init(void)
 #endif
 #ifdef CONFIG_S3C_DEV_I2C16_EMUL
 	i2c_register_board_info(16, i2c_devs16, ARRAY_SIZE(i2c_devs16));
+#endif
+#ifdef CONFIG_USBHUB_USB3503_OTG_CONN
+	i2c_register_board_info(17, i2c_devs17_emul,
+		ARRAY_SIZE(i2c_devs17_emul));
 #endif
 #endif
 	smdkc210_smsc911x_init();

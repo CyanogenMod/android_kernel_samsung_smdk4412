@@ -334,8 +334,6 @@ void exynos4_cpu_suspend(void)
 
 	outer_flush_all();
 
-	/* Disable the full line of zero */
-	disable_cache_foz();
 #ifdef CONFIG_ARM_TRUSTZONE
 	exynos_smc(SMC_CMD_SLEEP, 0, 0, 0);
 #else
@@ -378,10 +376,29 @@ static void exynos4_cpu_prepare(void)
 
 	/* Before enter central sequence mode, clock src register have to set */
 
+#ifdef CONFIG_CACHE_L2X0
+	/* Disable the full line of zero */
+	disable_cache_foz();
+#endif
+
 	s3c_pm_do_restore_core(exynos4_set_clksrc, ARRAY_SIZE(exynos4_set_clksrc));
 
 	if (soc_is_exynos4210())
 		s3c_pm_do_restore_core(exynos4210_set_clksrc, ARRAY_SIZE(exynos4210_set_clksrc));
+}
+
+static unsigned int exynos4_pm_check_eint_pend(void)
+{
+	int i;
+	u32 wakeup_int_pend, pending_eint = 0;
+
+	for (i = 0; i < 4; i++) {
+		wakeup_int_pend =
+			(__raw_readl(S5P_EINT_PEND(i)) & 0xff) << (i * 8);
+		pending_eint |= wakeup_int_pend & ~s3c_irqwake_eintmask;
+	}
+
+	return pending_eint;
 }
 
 static int exynos4_pm_add(struct sys_device *sysdev)
@@ -393,6 +410,9 @@ static int exynos4_pm_add(struct sys_device *sysdev)
 #ifdef CONFIG_SLP
 	pm_finish = exynos4_pm_finish;
 #endif
+
+	if (soc_is_exynos4210())
+		pm_check_eint_pend = exynos4_pm_check_eint_pend;
 
 	return 0;
 }
@@ -540,10 +560,10 @@ static void exynos4_pm_resume(void)
 	CHECK_POINT;
 
 	if ((__raw_readl(S5P_WAKEUP_STAT) == 0) && soc_is_exynos4412()) {
-		__raw_writel(0, S5P_EINT_PEND(0));
-		__raw_writel(0, S5P_EINT_PEND(1));
-		__raw_writel(0, S5P_EINT_PEND(2));
-		__raw_writel(0, S5P_EINT_PEND(3));
+		__raw_writel(__raw_readl(S5P_EINT_PEND(0)), S5P_EINT_PEND(0));
+		__raw_writel(__raw_readl(S5P_EINT_PEND(1)), S5P_EINT_PEND(1));
+		__raw_writel(__raw_readl(S5P_EINT_PEND(2)), S5P_EINT_PEND(2));
+		__raw_writel(__raw_readl(S5P_EINT_PEND(3)), S5P_EINT_PEND(3));
 		__raw_writel(0x01010001, S5P_ARM_CORE_OPTION(0));
 		__raw_writel(0x00000001, S5P_ARM_CORE_OPTION(1));
 		__raw_writel(0x00000001, S5P_ARM_CORE_OPTION(2));
@@ -582,8 +602,6 @@ static void exynos4_pm_resume(void)
 	/* enable L2X0*/
 	writel_relaxed(1, S5P_VA_L2CC + L2X0_CTRL);
 #endif
-	/* Enable the full line of zero */
-	enable_cache_foz();
 #endif
 
 	CHECK_POINT;
@@ -591,6 +609,11 @@ static void exynos4_pm_resume(void)
 early_wakeup:
 	if (!soc_is_exynos4210())
 		exynos4_reset_assert_ctrl(1);
+
+#ifdef CONFIG_CACHE_L2X0
+	/* Enable the full line of zero */
+	enable_cache_foz();
+#endif
 
 	CHECK_POINT;
 

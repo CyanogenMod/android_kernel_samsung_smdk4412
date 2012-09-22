@@ -129,5 +129,7 @@ enum {
 
 int get_tsp_status(void);
 extern struct class *sec_class;
-
+#if defined(CONFIG_MACH_T0)
+extern bool is_cable_attached;
+#endif
 #endif

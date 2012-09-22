@@ -182,6 +182,20 @@ static long Si4709_ioctl(struct file *filp, unsigned int ioctl_cmd,
 		}
 		break;
 
+	case Si4709_IOC_SEEK_FULL:
+		{
+			u32 frequency = 0;
+			debug("Si4709_IOC_SEEK_FULL called\n");
+
+			ret = (long)Si4709_dev_seek_full(&frequency);
+			if (ret < 0)
+				debug("Si4709_IOC_SEEK_FULL failed\n");
+			else if (copy_to_user
+				 (argp, (void *)&frequency, sizeof(u32)))
+				ret = -EFAULT;
+		}
+		break;
+
 	case Si4709_IOC_SEEK_UP:
 		{
 			u32 frequency = 0;

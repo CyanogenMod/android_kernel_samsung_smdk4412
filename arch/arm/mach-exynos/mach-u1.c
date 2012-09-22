@@ -127,6 +127,9 @@
 #include <media/s5k5bafx_platform.h>
 #endif
 
+#ifdef CONFIG_VIDEO_S5K5BBGX
+#include <media/s5k5bbgx_platform.h>
+#endif
 #if defined(CONFIG_EXYNOS4_SETUP_THERMAL)
 #include <plat/s5p-tmu.h>
 #include <mach/regs-tmu.h>
@@ -134,6 +137,10 @@
 
 #ifdef CONFIG_SEC_DEV_JACK
 #include <linux/sec_jack.h>
+#endif
+
+#ifdef CONFIG_USBHUB_USB3803
+#include <linux/usb3803.h>
 #endif
 
 #ifdef CONFIG_BT_BCM4330
@@ -207,6 +214,9 @@ static struct wacom_g5_callbacks *wacom_callbacks;
 #if defined(CONFIG_PHONE_IPC_SPI)
 #include <linux/phone_svn/ipc_spi.h>
 #include <linux/irq.h>
+#endif
+#if defined(CONFIG_MACH_U1_NA_SPR) || defined(CONFIG_MACH_U1_NA_USCC)
+#include "../../../drivers/usb/gadget/s3c_udc.h"
 #endif
 
 /* Following are default values for UCON, ULCON and UFCON UART registers */
@@ -288,6 +298,7 @@ static int m5mo_get_i2c_busnum(void)
 	return 0;
 #endif
 }
+
 
 static int m5mo_power_on(void)
 {
@@ -1186,6 +1197,300 @@ static struct s3c_platform_camera s5k5bafx = {
 };
 #endif
 
+#ifdef CONFIG_VIDEO_S5K5BBGX
+static int s5k5bbgx_get_i2c_busnum(void)
+{
+	return 12;
+}
+
+static int s5k5bbgx_power_on(void)
+{
+	struct regulator *regulator;
+	int ret = 0;
+
+	/* printk("%s: in\n", __func__); */
+
+	ret = gpio_request(GPIO_ISP_RESET, "GPY3");
+	if (ret) {
+		printk(KERN_ERR "faile to request gpio(ISP_RESET)\n");
+		return ret;
+	}
+	ret = gpio_request(GPIO_CAM_IO_EN, "GPE2");
+	if (ret) {
+		printk(KERN_ERR "faile to request gpio(GPIO_CAM_IO_EN)\n");
+		return ret;
+	}
+	ret = gpio_request(GPIO_VT_CAM_15V, "GPE2");
+	if (ret) {
+		printk(KERN_ERR "faile to request gpio(GPIO_VT_CAM_15V)\n");
+		return ret;
+	}
+	ret = gpio_request(GPIO_CAM_VGA_nSTBY, "GPL2");
+	if (ret) {
+		printk(KERN_ERR "faile to request gpio(GPIO_CAM_VGA_nSTBY)\n");
+		return ret;
+	}
+	ret = gpio_request(GPIO_CAM_VGA_nRST, "GPL2");
+	if (ret) {
+		printk(KERN_ERR "faile to request gpio(GPIO_CAM_VGA_nRST)\n");
+		return ret;
+	}
+
+	s3c_gpio_setpull(VT_CAM_SDA_18V, S3C_GPIO_PULL_NONE);
+	s3c_gpio_setpull(VT_CAM_SCL_18V, S3C_GPIO_PULL_NONE);
+
+	/* ISP_RESET low*/
+	ret = gpio_direction_output(GPIO_ISP_RESET, 0);
+	CAM_CHECK_ERR_RET(ret, "output reset");
+	udelay(100);
+
+	/* CAM_ISP_CORE_1.2V */
+	regulator = regulator_get(NULL, "cam_isp_core");
+	if (IS_ERR(regulator))
+		return -ENODEV;
+	ret = regulator_enable(regulator);
+	regulator_put(regulator);
+	CAM_CHECK_ERR_RET(ret, "enable isp_core");
+	udelay(10);
+
+	/* CAM_SENSOR_A2.8V */
+	ret = gpio_direction_output(GPIO_CAM_IO_EN, 1);
+	CAM_CHECK_ERR_RET(ret, "output io_en");
+	udelay(300); /* don't change me */
+
+	/* VT_CORE_1.5V */
+	ret = gpio_direction_output(GPIO_VT_CAM_15V, 1);
+	CAM_CHECK_ERR_RET(ret, "output vt_15v");
+	udelay(100);
+
+	/* CAM_ISP_1.8V */
+	regulator = regulator_get(NULL, "cam_isp");
+	if (IS_ERR(regulator))
+		return -ENODEV;
+	ret = regulator_enable(regulator);
+	regulator_put(regulator);
+	CAM_CHECK_ERR_RET(ret, "enable cam_isp");
+	udelay(10);
+
+	/* VT_CAM_1.8V */
+	regulator = regulator_get(NULL, "vt_cam_1.8v");
+	if (IS_ERR(regulator))
+		return -ENODEV;
+	ret = regulator_enable(regulator);
+	regulator_put(regulator);
+	CAM_CHECK_ERR_RET(ret, "enable vt_1.8v");
+	udelay(10);
+
+	/* Mclk */
+	ret = s3c_gpio_cfgpin(GPIO_CAM_MCLK, S3C_GPIO_SFN(2));
+	s3c_gpio_setpull(GPIO_CAM_MCLK, S3C_GPIO_PULL_NONE);
+	CAM_CHECK_ERR_RET(ret, "cfg mclk");
+	udelay(10);
+
+	/* CAM_VGA_nSTBY */
+	ret = gpio_direction_output(GPIO_CAM_VGA_nSTBY, 1);
+	CAM_CHECK_ERR_RET(ret, "output VGA_nSTBY");
+	udelay(50);
+
+	/* CAM_VGA_nRST	 */
+	ret = gpio_direction_output(GPIO_CAM_VGA_nRST, 1);
+	CAM_CHECK_ERR_RET(ret, "output VGA_nRST");
+	udelay(100);
+
+	gpio_free(GPIO_ISP_RESET);
+	gpio_free(GPIO_CAM_IO_EN);
+	gpio_free(GPIO_VT_CAM_15V);
+	gpio_free(GPIO_CAM_VGA_nSTBY);
+	gpio_free(GPIO_CAM_VGA_nRST);
+
+	return 0;
+}
+
+static int s5k5bbgx_power_off(void)
+{
+	struct regulator *regulator;
+	int ret = 0;
+
+	/* printk("n%s: in\n", __func__); */
+
+	ret = gpio_request(GPIO_CAM_VGA_nRST, "GPL2");
+	if (ret) {
+		printk(KERN_ERR "faile to request gpio(GPIO_CAM_VGA_nRST)\n");
+		return ret;
+	}
+	ret = gpio_request(GPIO_CAM_VGA_nSTBY, "GPL2");
+	if (ret) {
+		printk(KERN_ERR "faile to request gpio(GPIO_CAM_VGA_nSTBY)\n");
+		return ret;
+	}
+	ret = gpio_request(GPIO_VT_CAM_15V, "GPE2");
+	if (ret) {
+		printk(KERN_ERR "faile to request gpio(GPIO_VT_CAM_15V)\n");
+		return ret;
+	}
+	ret = gpio_request(GPIO_CAM_IO_EN, "GPE2");
+	if (ret) {
+		printk(KERN_ERR "faile to request gpio(GPIO_CAM_IO_EN)\n");
+		return ret;
+	}
+
+	/* CAM_VGA_nRST	 */
+	ret = gpio_direction_output(GPIO_CAM_VGA_nRST, 0);
+	CAM_CHECK_ERR(ret, "output VGA_nRST");
+	udelay(100);
+
+	/* CAM_VGA_nSTBY */
+	ret = gpio_direction_output(GPIO_CAM_VGA_nSTBY, 0);
+	CAM_CHECK_ERR(ret, "output VGA_nSTBY");
+	udelay(20);
+
+	/* Mclk */
+	ret = s3c_gpio_cfgpin(GPIO_CAM_MCLK, S3C_GPIO_INPUT);
+	s3c_gpio_setpull(GPIO_CAM_MCLK, S3C_GPIO_PULL_DOWN);
+	CAM_CHECK_ERR(ret, "cfg mclk");
+	udelay(20);
+
+	/* VT_CAM_1.8V */
+	regulator = regulator_get(NULL, "vt_cam_1.8v");
+	if (IS_ERR(regulator))
+		return -ENODEV;
+	if (regulator_is_enabled(regulator))
+		ret = regulator_disable(regulator);
+	regulator_put(regulator);
+	CAM_CHECK_ERR(ret, "disable vt_1.8v");
+	udelay(10);
+
+	/* CAM_ISP_1.8V */
+	regulator = regulator_get(NULL, "cam_isp");
+	if (IS_ERR(regulator))
+		return -ENODEV;
+	if (regulator_is_enabled(regulator))
+		ret = regulator_force_disable(regulator);
+	regulator_put(regulator);
+	CAM_CHECK_ERR(ret, "disable cam_isp");
+	udelay(10);
+
+	/* VT_CORE_1.5V */
+	ret = gpio_direction_output(GPIO_VT_CAM_15V, 0);
+	CAM_CHECK_ERR(ret, "output vt_1.5v");
+	udelay(10);
+
+	/* CAM_SENSOR_A2.8V */
+	ret = gpio_direction_output(GPIO_CAM_IO_EN, 0);
+	CAM_CHECK_ERR(ret, "output io_en");
+	udelay(10);
+
+	/* CAM_ISP_CORE_1.2V */
+	regulator = regulator_get(NULL, "cam_isp_core");
+	if (IS_ERR(regulator))
+		return -ENODEV;
+	if (regulator_is_enabled(regulator))
+		ret = regulator_force_disable(regulator);
+	regulator_put(regulator);
+	CAM_CHECK_ERR(ret, "disable isp_core");
+
+	gpio_direction_input(VT_CAM_SDA_18V);
+	s3c_gpio_setpull(VT_CAM_SDA_18V, S3C_GPIO_PULL_DOWN);
+	gpio_direction_input(VT_CAM_SCL_18V);
+	s3c_gpio_setpull(VT_CAM_SCL_18V, S3C_GPIO_PULL_DOWN);
+
+	gpio_free(GPIO_CAM_VGA_nRST);
+	gpio_free(GPIO_CAM_VGA_nSTBY);
+	gpio_free(GPIO_VT_CAM_15V);
+	gpio_free(GPIO_CAM_IO_EN);
+
+	return 0;
+}
+
+static int s5k5bbgx_power(int onoff)
+{
+	int ret = 0;
+
+	printk(KERN_INFO "%s(): %s\n", __func__, onoff ? "on" : "down");
+	if (onoff) {
+#if defined(CONFIG_TARGET_LOCALE_NA)
+		exynos_cpufreq_lock(DVFS_LOCK_ID_CAM, 1);
+		ret = s5k5bbgx_power_on();
+		exynos_cpufreq_lock_free(DVFS_LOCK_ID_CAM);
+#else
+		ret = s5k5bbgx_power_on();
+#endif
+		if (unlikely(ret))
+			goto error_out;
+	} else {
+#if defined(CONFIG_TARGET_LOCALE_NA)
+		exynos_cpufreq_lock(DVFS_LOCK_ID_CAM, 1);
+		ret = s5k5bbgx_power_off();
+		exynos_cpufreq_lock_free(DVFS_LOCK_ID_CAM);
+#else
+		ret = s5k5bbgx_power_off();
+#endif
+		/* s3c_i2c0_force_stop();*/ /* DSLIM. Should be implemented */
+	}
+
+	/* ret = s3c_csis_power(onoff); */
+
+error_out:
+	return ret;
+}
+
+static struct s5k5bbgx_platform_data s5k5bbgx_plat = {
+	.default_width = 640,
+	.default_height = 480,
+	.pixelformat = V4L2_PIX_FMT_UYVY,
+	.freq = 24000000,
+	.is_mipi = 0,
+};
+
+static struct i2c_board_info  s5k5bbgx_i2c_info = {
+	I2C_BOARD_INFO("S5K5BBGX", 0x5A >> 1),
+	.platform_data = &s5k5bbgx_plat,
+};
+
+static struct s3c_platform_camera s5k5bbgx = {
+#if defined(CONFIG_VIDEO_S5K5BBGX_MIPI)
+	.id		= CAMERA_CSI_D,
+	.type		= CAM_TYPE_MIPI,
+	.fmt		= ITU_601_YCBCR422_8BIT,
+	.order422	= CAM_ORDER422_8BIT_CBYCRY,
+
+	.mipi_lanes	= 1,
+	.mipi_settle	= 6,
+	.mipi_align	= 32,
+#else
+	.id		= CAMERA_PAR_A,
+	.type		= CAM_TYPE_ITU,
+	.fmt		= ITU_601_YCBCR422_8BIT,
+	.order422	= CAM_ORDER422_8BIT_YCBYCR,
+#endif
+	.get_i2c_busnum	= s5k5bbgx_get_i2c_busnum,
+	.info		= &s5k5bbgx_i2c_info,
+	.pixelformat	= V4L2_PIX_FMT_UYVY,
+	.srclk_name	= "xusbxti",
+	.clk_name	= "sclk_cam0",
+	.clk_rate	= 24000000,
+	.line_length	= 640,
+	.width		= 640,
+	.height		= 480,
+	.window		= {
+		.left	= 0,
+		.top	= 0,
+		.width	= 640,
+		.height	= 480,
+	},
+
+	/* Polarity */
+	.inv_pclk	= 0,
+	.inv_vsync	= 1,
+	.inv_href	= 0,
+	.inv_hsync	= 0,
+	.reset_camera	= 0,
+	.initialized	= 0,
+	.cam_power	= s5k5bbgx_power,
+};
+#endif
+
+
 #ifdef WRITEBACK_ENABLED
 static int get_i2c_busnum_writeback(void)
 {
@@ -1261,6 +1566,10 @@ static struct s3c_platform_fimc fimc_plat = {
 #ifdef CONFIG_VIDEO_M5MO
 		&m5mo,
 #endif
+#ifdef CONFIG_VIDEO_S5K5BBGX
+		&s5k5bbgx,
+#endif
+
 #ifdef CONFIG_VIDEO_S5K5BAFX
 		&s5k5bafx,
 #endif
@@ -1269,7 +1578,11 @@ static struct s3c_platform_fimc fimc_plat = {
 #endif
 	},
 	.hw_ver = 0x51,
+#if defined(CONFIG_VIDEO_S5K5BBGX)
+	.cfg_gpio = s3c_fimc0_cfg_gpio,
+#else
 	.cfg_gpio = cam_cfg_gpio,
+#endif
 };
 #endif				/* CONFIG_VIDEO_FIMC */
 
@@ -1296,6 +1609,12 @@ static int ext_cd_cleanup_hsmmc##num(void (*notify_func)( \
 	return 0; \
 }
 
+#if defined(CONFIG_MACH_U1_NA_SPR) || defined(CONFIG_MACH_U1_NA_USCC)
+#ifdef CONFIG_S3C_DEV_HSMMC2
+	DEFINE_MMC_CARD_NOTIFIER(2)
+#endif
+#endif
+
 #ifdef CONFIG_S3C_DEV_HSMMC3
 	DEFINE_MMC_CARD_NOTIFIER(3)
 #endif
@@ -1309,12 +1628,24 @@ void mmc_force_presence_change(struct platform_device *pdev)
 {
 	void (*notify_func)(struct platform_device *, int state) = NULL;
 	mutex_lock(&notify_lock);
+#if defined(CONFIG_MACH_U1_NA_SPR) || defined(CONFIG_MACH_U1_NA_USCC)
+#ifdef CONFIG_S3C_DEV_HSMMC2
+	if (pdev == &s3c_device_hsmmc2) {
+		printk(KERN_INFO "Test logs pdev : %p s3c_device_hsmmc2 %p\n",
+				pdev, &s3c_device_hsmmc2);
+		notify_func = hsmmc2_notify_func;
+		printk(KERN_INFO "Test logs notify_func = hsmmc2_notify_func : %p\n",
+				notify_func);
+	}
+#endif
+#endif
 #ifdef CONFIG_S3C_DEV_HSMMC3
-	printk("---------test logs pdev : %p s3c_device_hsmmc3 %p \n",
-		pdev, &s3c_device_hsmmc3);
 	if (pdev == &s3c_device_hsmmc3) {
+		printk(KERN_INFO "Test logs pdev : %p s3c_device_hsmmc3 %p\n",
+				pdev, &s3c_device_hsmmc3);
 		notify_func = hsmmc3_notify_func;
-		printk("---------test logs notify_func : %p \n", notify_func);
+		printk(KERN_INFO"Test logs notify_func = hsmmc3_notify_func: %p\n",
+				notify_func);
 	}
 #endif
 
@@ -1339,11 +1670,21 @@ static struct s3c_sdhci_platdata exynos4_hsmmc0_pdata __initdata = {
 
 #ifdef CONFIG_S3C_DEV_HSMMC2
 static struct s3c_sdhci_platdata exynos4_hsmmc2_pdata __initdata = {
+#if defined(CONFIG_MACH_U1_NA_SPR) || defined(CONFIG_MACH_U1_NA_USCC)
+	.cd_type = S3C_SDHCI_CD_EXTERNAL,
+#else
 	.cd_type = S3C_SDHCI_CD_GPIO,
 	.ext_cd_gpio = EXYNOS4_GPX3(4),
-	.ext_cd_gpio_invert = 1,
-	.clk_type = S3C_SDHCI_CLK_DIV_EXTERNAL,
 	.vmmc_name = "vtf_2.8v",
+	.ext_cd_gpio_invert = 1,
+#endif
+	.clk_type = S3C_SDHCI_CLK_DIV_EXTERNAL,
+#if defined(CONFIG_MACH_U1_NA_SPR) || defined(CONFIG_MACH_U1_NA_USCC)
+/* For Wi-Fi */
+	.ext_cd_init = ext_cd_init_hsmmc2,
+	.ext_cd_cleanup = ext_cd_cleanup_hsmmc2,
+	.pm_flags = S3C_SDHCI_PM_IGNORE_SUSPEND_RESUME,
+#endif
 };
 #endif
 
@@ -2167,10 +2508,12 @@ static void __init ld9040_fb_init(void)
 
 	lcdtype = max(ld9040_lcdtype, lcdtype);
 
+#if !defined(CONFIG_PANEL_U1_NA_SPR) && !defined(CONFIG_MACH_U1_NA_USCC)
 	if (lcdtype == LCDTYPE_SM2_A2)
 		ld9040_platform_data.pdata = &u1_panel_data_a2;
 	else if (lcdtype == LCDTYPE_M2)
 		ld9040_platform_data.pdata = &u1_panel_data_m2;
+#endif
 
 	pdata = ld9040_platform_data.pdata;
 	pdata->ops = &ops;
@@ -2636,7 +2979,7 @@ static struct regulator_consumer_supply led_movie_supply[] = {
 	REGULATOR_SUPPLY("led_movie", NULL),
 };
 
-#if defined(CONFIG_MACH_Q1_BD)
+#if defined(CONFIG_MACH_Q1_BD) || defined(CONFIG_LEDS_MAX8997)
 static struct regulator_consumer_supply led_torch_supply[] = {
 	REGULATOR_SUPPLY("led_torch", NULL),
 };
@@ -2875,7 +3218,7 @@ static struct regulator_init_data led_movie_init_data = {
 		.max_uA = 250000,
 		.valid_ops_mask	= REGULATOR_CHANGE_CURRENT |
 				  REGULATOR_CHANGE_STATUS,
-#if !defined(CONFIG_MACH_Q1_BD)
+#if !defined(CONFIG_MACH_Q1_BD) && !defined(CONFIG_LEDS_MAX8997)
 		.state_mem	= {
 			.disabled	= 1,
 		},
@@ -2885,7 +3228,7 @@ static struct regulator_init_data led_movie_init_data = {
 	.consumer_supplies = &led_movie_supply[0],
 };
 
-#if defined(CONFIG_MACH_Q1_BD)
+#if defined(CONFIG_MACH_Q1_BD) || defined(CONFIG_LEDS_MAX8997)
 static struct regulator_init_data led_torch_init_data = {
 	.constraints = {
 		.name	= "FLASH_TORCH",
@@ -2926,7 +3269,7 @@ static struct max8997_regulator_data max8997_regulators[] = {
 	{ MAX8997_ESAFEOUT2, &safeout2_init_data, NULL, },
 	{ MAX8997_FLASH_CUR, &led_flash_init_data, NULL, },
 	{ MAX8997_MOVIE_CUR, &led_movie_init_data, NULL, },
-#if defined CONFIG_MACH_Q1_BD
+#if defined(CONFIG_MACH_Q1_BD) || defined(CONFIG_LEDS_MAX8997)
 	{ MAX8997_FLASH_TORCH, &led_torch_init_data, NULL, },
 #endif /* CONFIG_MACH_Q1_BD */
 };
@@ -3237,6 +3580,26 @@ static void max8997_muic_usb_cb(u8 usb_mode)
 	} else
 		pr_info("otg error s3c_udc is null.\n");
 }
+#elif defined(CONFIG_MACH_U1_NA_SPR) || defined(CONFIG_MACH_U1_NA_USCC)
+static void max8997_muic_usb_cb(u8 usb_mode)
+{
+	struct s3c_udc *udc_dev = platform_get_drvdata(&s3c_device_usbgadget);
+	int ret = 0;
+
+	pr_info("%s: usb mode=%d\n", __func__, usb_mode);
+	if (udc_dev) {
+		switch (usb_mode) {
+		case USB_CABLE_DETACHED:
+			if (udc_dev->udc_enabled)
+				usb_gadget_vbus_disconnect(&udc_dev->gadget);
+			break;
+		case USB_CABLE_ATTACHED:
+			if (!udc_dev->udc_enabled)
+				usb_gadget_vbus_connect(&udc_dev->gadget);
+			break;
+		}
+	}
+}
 #endif
 
 static void max8997_muic_mhl_cb(int attached)
@@ -3318,7 +3681,7 @@ static void max8997_muic_jig_uart_cb(int path)
 	gpio_set_value(GPIO_UART_SEL, val);
 	pr_info("%s: val:%d\n", __func__, val);
 }
-
+#ifdef CONFIG_USB_HOST_NOTIFY
 static int max8997_muic_host_notify_cb(int enable)
 {
 	struct host_notify_dev *ndev = &host_notifier_pdata.ndev;
@@ -3334,6 +3697,7 @@ static int max8997_muic_host_notify_cb(int enable)
 
 	return -1;
 }
+#endif
 
 static struct max8997_muic_data max8997_muic = {
 	.usb_cb = max8997_muic_usb_cb,
@@ -3344,9 +3708,18 @@ static struct max8997_muic_data max8997_muic = {
 	.init_cb = max8997_muic_init_cb,
 	.deskdock_cb = max8997_muic_deskdock_cb,
 	.cardock_cb = max8997_muic_cardock_cb,
+#if !defined(CONFIG_MACH_U1_NA_USCC)
 	.cfg_uart_gpio = max8997_muic_cfg_uart_gpio,
+#endif
 	.jig_uart_cb = max8997_muic_jig_uart_cb,
+#ifdef CONFIG_USB_HOST_NOTIFY
 	.host_notify_cb = max8997_muic_host_notify_cb,
+#else
+	.host_notify_cb = NULL,
+#endif
+#if !defined(CONFIG_MACH_U1_NA_USCC)
+	.gpio_uart_sel =  GPIO_UART_SEL,
+#endif
 	.gpio_usb_sel = GPIO_USB_SEL,
 };
 
@@ -3864,6 +4237,85 @@ static struct sec_bat_adc_table_data temper_table[] =  {
 };
 #else
 /* temperature table for ADC 6 */
+#if defined(CONFIG_MACH_U1_NA_SPR) || defined(CONFIG_MACH_U1_NA_USCC)
+static struct sec_bat_adc_table_data temper_table[] = {
+	{  273,	 670 },
+	{  289,	 660 },
+	{  304,	 650 },
+	{  314,	 640 },
+	{  325,	 630 },
+	{  337,	 620 },
+	{  347,	 610 },
+	{  361,	 600 },
+	{  376,	 590 },
+	{  391,	 580 },
+	{  406,	 570 },
+	{  417,	 560 },
+	{  431,	 550 },
+	{  447,	 540 },
+	{  474,	 530 },
+	{  491,	 520 },
+	{  499,	 510 },
+	{  511,	 500 },
+	{  519,	 490 },
+	{  547,	 480 },
+	{  568,	 470 },
+	{  585,	 460 },
+	{  597,	 450 },
+	{  614,	 440 },
+	{  629,	 430 },
+	{  647,	 420 },
+	{  672,	 410 },
+	{  690,	 400 },
+	{  720,	 390 },
+	{  735,	 380 },
+	{  755,	 370 },
+	{  775,	 360 },
+	{  795,	 350 },
+	{  818,	 340 },
+	{  841,	 330 },
+	{  864,	 320 },
+	{  887,	 310 },
+	{  909,	 300 },
+	{  932,	 290 },
+	{  954,	 280 },
+	{  976,	 270 },
+	{  999,	 260 },
+	{ 1021,	 250 },
+	{ 1051,	 240 },
+	{ 1077,	 230 },
+	{ 1103,	 220 },
+	{ 1129,	 210 },
+	{ 1155,	 200 },
+	{ 1177,	 190 },
+	{ 1199,	 180 },
+	{ 1220,	 170 },
+	{ 1242,	 160 },
+	{ 1263,	 150 },
+	{ 1284,	 140 },
+	{ 1306,	 130 },
+	{ 1326,	 120 },
+	{ 1349,	 110 },
+	{ 1369,	 100 },
+	{ 1390,	  90 },
+	{ 1411,	  80 },
+	{ 1433,	  70 },
+	{ 1454,	  60 },
+	{ 1474,	  50 },
+	{ 1486,	  40 },
+	{ 1499,	  30 },
+	{ 1512,	  20 },
+	{ 1531,	  10 },
+	{ 1548,	   0 },
+	{ 1570,	 -10 },
+	{ 1597,	 -20 },
+	{ 1624,	 -30 },
+	{ 1633,	 -40 },
+	{ 1643,	 -50 },
+	{ 1652,	 -60 },
+	{ 1663,	 -70 },
+};
+#else
 static struct sec_bat_adc_table_data temper_table[] = {
 	{  165,	 800 },
 	{  171,	 790 },
@@ -3967,6 +4419,7 @@ static struct sec_bat_adc_table_data temper_table[] = {
 	{ 1798, -190 },
 	{ 1815, -200 },
 };
+#endif
 #endif
 #ifdef CONFIG_TARGET_LOCALE_NTT
 /* temperature table for ADC 7 */
@@ -4279,6 +4732,35 @@ static struct i2c_board_info i2c_devs19_emul[] = {
 #endif
 };
 #endif
+#ifdef CONFIG_LEDS_GPIO
+struct gpio_led leds_gpio[] = {
+	{
+		.name = "red",
+		.default_trigger = NULL,
+			/* "default-on", // Turn ON RED LED at boot time ! */
+		.gpio = GPIO_SVC_LED_RED,
+		.active_low = 0,
+	},
+	{
+		.name = "blue",
+		.default_trigger = NULL,
+			/* "default-on", // Turn ON BLUE LED at boot time ! */
+		.gpio = GPIO_SVC_LED_BLUE,
+		.active_low = 0,
+	}
+};
+
+struct gpio_led_platform_data leds_gpio_platform_data = {
+		.num_leds = ARRAY_SIZE(leds_gpio),
+		.leds = leds_gpio,
+};
+
+struct platform_device sec_device_leds_gpio = {
+		.name   = "leds-gpio",
+		.id     = -1,
+		.dev = { .platform_data = &leds_gpio_platform_data },
+};
+#endif /* CONFIG_LEDS_GPIO */
 
 #if defined(CONFIG_SEC_THERMISTOR)
 #if defined(CONFIG_MACH_Q1_BD)
@@ -4538,14 +5020,16 @@ struct gpio_keys_button u1_buttons[] = {
 		.isr_hook = sec_debug_check_crash_key,
 		.debounce_interval = 10,
 	},			/* power key */
+#if !defined(CONFIG_MACH_U1_NA_SPR) && !defined(CONFIG_MACH_U1_NA_USCC)
 	{
-		.code = KEY_HOME,
+		.code = KEY_HOMEPAGE,
 		.gpio = GPIO_OK_KEY,
 		.active_low = 1,
 		.type = EV_KEY,
 		.wakeup = 1,
 		.debounce_interval = 10,
 	},			/* ok key */
+#endif
 };
 
 struct gpio_keys_platform_data u1_keypad_platform_data = {
@@ -4606,13 +5090,8 @@ static struct sec_jack_zone sec_jack_zones[] = {
 		 * stays in this range for 100ms (10ms delays, 10 samples)
 		 */
 		.adc_high = 3800,
-#if defined(CONFIG_MACH_Q1_BD)
 		.delay_ms = 15,
 		.check_count = 20,
-#else
-		.delay_ms = 10,
-		.check_count = 5,
-#endif
 		.jack_type = SEC_HEADSET_4POLE,
 	},
 	{
@@ -4688,10 +5167,10 @@ static void mxt224_power_on(void)
 	s3c_gpio_cfgpin(GPIO_TSP_LDO_ON, S3C_GPIO_OUTPUT);
 	s3c_gpio_setpull(GPIO_TSP_LDO_ON, S3C_GPIO_PULL_NONE);
 	gpio_set_value(GPIO_TSP_LDO_ON, 1);
-	mdelay(70);
+	msleep(70);
 	s3c_gpio_setpull(GPIO_TSP_INT, S3C_GPIO_PULL_NONE);
 	s3c_gpio_cfgpin(GPIO_TSP_INT, S3C_GPIO_SFN(0xf));
-	mdelay(40);
+	msleep(40);
 }
 
 static void mxt224_power_off(void)
@@ -4796,10 +5275,10 @@ static void mxt224_power_on(void)
 	s3c_gpio_cfgpin(GPIO_TSP_LDO_ON, S3C_GPIO_OUTPUT);
 	s3c_gpio_setpull(GPIO_TSP_LDO_ON, S3C_GPIO_PULL_NONE);
 	gpio_set_value(GPIO_TSP_LDO_ON, 1);
-	mdelay(70);
+	msleep(70);
 	s3c_gpio_setpull(GPIO_TSP_INT, S3C_GPIO_PULL_NONE);
 	s3c_gpio_cfgpin(GPIO_TSP_INT, S3C_GPIO_SFN(0xf));
-	mdelay(40);
+	msleep(40);
 	/* printk("mxt224_power_on is finished\n"); */
 }
 
@@ -4822,7 +5301,11 @@ static void mxt224_power_off(void)
 #define MXT224_THRESHOLD_CHRG		70
 #define MXT224_NOISE_THRESHOLD_BATT		30
 #define MXT224_NOISE_THRESHOLD_CHRG		40
+#if defined(CONFIG_MACH_U1_NA_SPR) || defined(CONFIG_MACH_U1_NA_USCC)
+#define MXT224_MOVFILTER_BATT           47
+#else
 #define MXT224_MOVFILTER_BATT		11
+#endif
 #define MXT224_MOVFILTER_CHRG		47
 #define MXT224_ATCHCALST		4
 #define MXT224_ATCHCALTHR		35
@@ -4899,6 +5382,7 @@ static const u8 *mxt224_config[] = {
 #define MXT224E_NEXTTCHDI_CHRG		1
 #else
 #define MXT224E_THRESHOLD_BATT		50
+#define MXT224E_T48_THRESHOLD_BATT		28
 #define MXT224E_THRESHOLD_CHRG		40
 #define MXT224E_CALCFG_BATT		0x42
 #define MXT224E_CALCFG_CHRG		0x52
@@ -4909,12 +5393,14 @@ static const u8 *mxt224_config[] = {
 #define MXT224E_ATCHFRCCALTHR_NORMAL		40
 #define MXT224E_ATCHFRCCALRATIO_NORMAL		55
 #endif
-#define MXT224E_GHRGTIME_BATT		27
+#define MXT224E_GHRGTIME_BATT		22
 #define MXT224E_GHRGTIME_CHRG		22
 #define MXT224E_ATCHCALST		4
 #define MXT224E_ATCHCALTHR		35
 #define MXT224E_BLEN_BATT		32
 #define MXT224E_BLEN_CHRG		16
+#define MXT224E_T48_BLEN_BATT		0
+#define MXT224E_T48_BLEN_CHRG		0
 #define MXT224E_MOVFILTER_BATT		13
 #define MXT224E_MOVFILTER_CHRG		46
 #define MXT224E_ACTVSYNCSPERX_NORMAL		32
@@ -5017,7 +5503,6 @@ static u8 t8_config_e[] = { GEN_ACQUISITIONCONFIG_T8,
 /* MXT224E_0V5_CONFIG */
 /* NEXTTCHDI added */
 #ifdef CONFIG_TARGET_LOCALE_NA
-#ifdef CONFIG_MACH_U1_NA_USCC_REV05
 static u8 t9_config_e[] = { TOUCH_MULTITOUCHSCREEN_T9,
 	139, 0, 0, 19, 11, 0, MXT224E_BLEN_BATT, MXT224E_THRESHOLD_BATT, 2, 1,
 	10,
@@ -5026,17 +5511,6 @@ static u8 t9_config_e[] = { TOUCH_MULTITOUCHSCREEN_T9,
 	223, 1, 10, 10, 10, 10, 143, 40, 143, 80,
 	18, 15, 50, 50, 0
 };
-
-#else
-static u8 t9_config_e[] = { TOUCH_MULTITOUCHSCREEN_T9,
-	139, 0, 0, 19, 11, 0, MXT224E_BLEN_BATT, MXT224E_THRESHOLD_BATT, 2, 1,
-	10,
-	10,			/* MOVHYSTI */
-	1, MXT224E_MOVFILTER_BATT, MXT224_MAX_MT_FINGERS, 5, 40, 10, 31, 3,
-	223, 1, 10, 10, 10, 10, 143, 40, 143, 80,
-	18, 15, 50, 50, 2
-};
-#endif
 #else
 static u8 t9_config_e[] = { TOUCH_MULTITOUCHSCREEN_T9,
 	139, 0, 0, 19, 11, 0, MXT224E_BLEN_BATT, MXT224E_THRESHOLD_BATT, 2, 1,
@@ -5064,15 +5538,9 @@ static u8 t25_config_e[] = { SPT_SELFTEST_T25,
 	0, 0, 0, 0, 0, 0, 0, 0
 };
 
-#ifdef CONFIG_MACH_U1_NA_USCC_REV05
-static u8 t38_config_e[] = { SPT_USERDATA_T38,
-	0, 1, 13, 19, 44, 0, 0, 0
-};
-#else
 static u8 t38_config_e[] = { SPT_USERDATA_T38,
 	0, 1, 14, 23, 44, 0, 0, 0
 };
-#endif
 
 static u8 t40_config_e[] = { PROCI_GRIPSUPPRESSION_T40,
 	0, 0, 0, 0, 0
@@ -5092,51 +5560,27 @@ static u8 t47_config_e[] = { PROCI_STYLUS_T47,
 
 /*MXT224E_0V5_CONFIG */
 #ifdef CONFIG_TARGET_LOCALE_NA
-#ifdef CONFIG_MACH_U1_NA_USCC_REV05
 static u8 t48_config_chrg_e[] = { PROCG_NOISESUPPRESSION_T48,
-	3, 132, 0x52, 0, 0, 0, 0, 0, 10, 15,
+	3, 132, MXT224E_CALCFG_CHRG, 0, 0, 0, 0, 0, 0, 0,
 	0, 0, 0, 6, 6, 0, 0, 64, 4, 64,
-	10, 0, 10, 5, 0, 19, 0, 20, 0, 0,
-	0, 0, 0, 0, 0, 40, 2,	/*blen=0,threshold=50 */
+	10, 0, 9, 5, 0, 15, 0, 20, 0, 0,
+	0, 0, 0, 0, MXT224E_T48_BLEN_CHRG, MXT224E_THRESHOLD_CHRG, 2,
 	10,			/* MOVHYSTI */
 	1, 47,
-	10, 5, 40, 240, 245, 10, 10, 148, 50, 143,
+	MXT224_MAX_MT_FINGERS, 5, 40, 240, 245, 10, 10, 148, 50, 143,
 	80, 18, 10, 0
 };
 
 static u8 t48_config_e[] = { PROCG_NOISESUPPRESSION_T48,
-	3, 132, 0x40, 0, 0, 0, 0, 0, 10, 15,
-	0, 0, 0, 6, 6, 0, 0, 64, 4, 64,
-	10, 0, 20, 5, 0, 38, 0, 5, 0, 0,	/*byte 27 original value 20 */
-	0, 0, 0, 0, 32, MXT224E_THRESHOLD, 2,
+	3, 132, MXT224E_CALCFG_BATT, 0, 0, 0, 0, 0, 0, 0,
+	0, 0, 0, 6, 6, 0, 0, 48, 4, 48,
+	10, 0, 10, 5, 0, 20, 0, 5, 0, 0,	/*byte 27 original value 20 */
+	0, 0, 0, 0, MXT224E_T48_BLEN_BATT, MXT224E_T48_THRESHOLD_BATT, 2,
 	10,
 	1, 46,
-	MXT224_MAX_MT_FINGERS, 5, 40, 10, 0, 10, 10, 143, 40, 143,
-	80, 18, 15, 0
+	MXT224_MAX_MT_FINGERS, 5, 40, 240, 245, 10, 10, 148, 50, 143,
+	80, 18, 15, MXT224E_NEXTTCHDI_NORMAL
 };
-#else
-static u8 t48_config_chrg_e[] = { PROCG_NOISESUPPRESSION_T48,
-	1, 4, 0x50, 0, 0, 0, 0, 0, 0, 0,
-	0, 0, 0, 6, 6, 0, 0, 100, 4, 64,
-	10, 0, 20, 5, 0, 38, 0, 20, 0, 0,
-	0, 0, 0, 0, 0, 40, 2,	/*blen=0,threshold=50 */
-	10,			/* MOVHYSTI */
-	1, 15,
-	10, 5, 40, 240, 245, 10, 10, 148, 50, 143,
-	80, 18, 10, 2
-};
-
-static u8 t48_config_e[] = { PROCG_NOISESUPPRESSION_T48,
-	1, 4, 0x40, 0, 0, 0, 0, 0, 0, 0,
-	0, 0, 0, 6, 6, 0, 0, 100, 4, 64,
-	10, 0, 20, 5, 0, 38, 0, 5, 0, 0,	/*byte 27 original value 20 */
-	0, 0, 0, 0, 32, 50, 2,
-	10,
-	1, 46,
-	MXT224_MAX_MT_FINGERS, 5, 40, 10, 0, 10, 10, 143, 40, 143,
-	80, 18, 15, 2
-};
-#endif				/*CONFIG_MACH_U1_NA_USCC_REV05 */
 #else
 static u8 t48_config_chrg_e[] = { PROCG_NOISESUPPRESSION_T48,
 	3, 132, MXT224E_CALCFG_CHRG, 0, 0, 0, 0, 0, 10, 15,
@@ -5216,7 +5660,7 @@ static struct mxt224_platform_data mxt224_data = {
 	.chrgtime_batt_e = MXT224E_GHRGTIME_BATT,
 	.chrgtime_charging_e = MXT224E_GHRGTIME_CHRG,
 	.blen_batt_e = MXT224E_BLEN_BATT,
-	.blen_charging_e = MXT224E_BLEN_CHRG,
+	.blen_charging_e = MXT224E_T48_BLEN_CHRG,
 	.movfilter_batt_e = MXT224E_MOVFILTER_BATT,
 	.movfilter_charging_e = MXT224E_MOVFILTER_CHRG,
 	.actvsyncsperx_e = MXT224E_ACTVSYNCSPERX_NORMAL,
@@ -5600,12 +6044,13 @@ static int touchkey_power_on(bool on)
 
 	if (on) {
 		gpio_direction_output(GPIO_3_TOUCH_INT, 1);
-		irq_set_irq_type(gpio_to_irq(GPIO_3_TOUCH_INT), IRQF_TRIGGER_FALLING);
+		irq_set_irq_type(gpio_to_irq(GPIO_3_TOUCH_INT),
+					IRQF_TRIGGER_FALLING);
 		s3c_gpio_cfgpin(GPIO_3_TOUCH_INT, S3C_GPIO_SFN(0xf));
 		s3c_gpio_setpull(GPIO_3_TOUCH_INT, S3C_GPIO_PULL_NONE);
-	}
-	else
+	} else {
 		gpio_direction_input(GPIO_3_TOUCH_INT);
+	}
 
 	if (on)
 		ret = touchkey_resume();
@@ -5618,11 +6063,10 @@ static int touchkey_power_on(bool on)
 static int touchkey_led_power_on(bool on)
 {
 #if defined(LED_LDO_WITH_EN_PIN)
-	if (on) {
+	if (on)
 		gpio_direction_output(GPIO_3_TOUCH_EN, 1);
-	} else {
+	else
 		gpio_direction_output(GPIO_3_TOUCH_EN, 0);
-	}
 #else
 	struct regulator *regulator;
 
@@ -5713,6 +6157,12 @@ static struct i2c_board_info i2c_devs3[] __initdata = {
 #ifdef CONFIG_S3C_DEV_I2C4
 /* I2C4 */
 static struct i2c_board_info i2c_devs4[] __initdata = {
+#if defined(CONFIG_WIMAX_CMC)
+	{
+		I2C_BOARD_INFO("max8893_wmx", 0x3E),
+		.platform_data = NULL,
+	},
+#endif /* CONFIG_WIMAX_CMC */
 };
 #endif
 
@@ -5986,6 +6436,43 @@ static int cm3663_ldo(bool on)
 	return 0;
 }
 
+#ifdef CONFIG_USBHUB_USB3803
+int usb3803_hw_config(void)
+{
+	int i;
+	int usb_gpio[] = {GPIO_USB_RESET_N,
+					GPIO_USB_BYPASS_N,
+					GPIO_USB_CLOCK_EN};
+
+	for (i = 0; i < 3; i++) {
+		s3c_gpio_cfgpin(usb_gpio[i], S3C_GPIO_OUTPUT);
+		s3c_gpio_setpull(usb_gpio[i], S3C_GPIO_PULL_NONE);
+		gpio_set_value(usb_gpio[i], S3C_GPIO_SETPIN_ZERO);
+		s5p_gpio_set_drvstr(usb_gpio[i], S5P_GPIO_DRVSTR_LV1);
+		/* need to check drvstr 1 or 2 */
+	}
+	return 0;
+}
+
+int usb3803_reset_n(int val)
+{
+	gpio_set_value(GPIO_USB_RESET_N, !!val);
+	return 0;
+}
+
+int usb3803_bypass_n(int val)
+{
+	gpio_set_value(GPIO_USB_BYPASS_N, !!val);
+	return 0;
+}
+
+int usb3803_clock_en(int val)
+{
+	gpio_set_value(GPIO_USB_CLOCK_EN, !!val);
+	return 0;
+}
+#endif /* CONFIG_USBHUB_USB3803 */
+
 static struct cm3663_platform_data cm3663_pdata = {
 	.proximity_power = cm3663_ldo,
 };
@@ -6105,7 +6592,7 @@ void nfc_setup_gpio(void)
 }
 #endif
 
-#if defined(CONFIG_VIDEO_S5K5BAFX)
+#if defined(CONFIG_VIDEO_S5K5BAFX) || defined(CONFIG_VIDEO_S5K5BBGX)
 static struct i2c_gpio_platform_data i2c12_platdata = {
 	.sda_pin = VT_CAM_SDA_18V,
 	.scl_pin = VT_CAM_SCL_18V,
@@ -6149,6 +6636,46 @@ static struct i2c_board_info i2c_devs16[] __initdata = {
 	},
 };
 #endif
+
+
+#ifdef CONFIG_S3C_DEV_I2C17_EMUL
+/* I2C17_EMUL */
+static struct i2c_gpio_platform_data i2c17_platdata = {
+	.sda_pin = GPIO_USB_I2C_SDA,
+	.scl_pin = GPIO_USB_I2C_SCL,
+};
+
+struct platform_device s3c_device_i2c17 = {
+	.name = "i2c-gpio",
+	.id = 17,
+	.dev.platform_data = &i2c17_platdata,
+};
+
+
+#endif /* CONFIG_S3C_DEV_I2C17_EMUL */
+
+#ifdef CONFIG_USBHUB_USB3803
+struct usb3803_platform_data usb3803_pdata = {
+	.init_needed    =  1,
+	.es_ver         = 1,
+	.inital_mode    = USB_3803_MODE_STANDBY,
+	.hw_config      = usb3803_hw_config,
+	.reset_n        = usb3803_reset_n,
+	.bypass_n       = usb3803_bypass_n,
+	.clock_en       = usb3803_clock_en,
+};
+
+static struct i2c_board_info i2c_devs17_emul[] __initdata = {
+	{
+		I2C_BOARD_INFO(USB3803_I2C_NAME, 0x08),
+		.platform_data  = &usb3803_pdata,
+	},
+};
+#endif /* CONFIG_USBHUB_USB3803 */
+
+
+
+
 
 #endif
 
@@ -6260,11 +6787,11 @@ static int reset_lcd(void)
 	}
 
 	gpio_direction_output(EXYNOS4_GPY4(5), 1);
-	msleep(5);
+	usleep_range(5000, 5000);
 	gpio_set_value(EXYNOS4_GPY4(5), 0);
-	msleep(5);
+	usleep_range(5000, 5000);
 	gpio_set_value(EXYNOS4_GPY4(5), 1);
-	msleep(5);
+	usleep_range(5000, 5000);
 
 	gpio_free(EXYNOS4_GPY4(5));
 
@@ -6565,6 +7092,10 @@ static struct platform_device *smdkc210_devices[] __initdata = {
 	&exynos4_device_pd[PD_TV],
 	&exynos4_device_pd[PD_GPS],
 
+#if defined(CONFIG_WIMAX_CMC)
+	&s3c_device_cmc732,
+#endif
+
 #ifdef CONFIG_BATTERY_SAMSUNG
 	&samsung_device_battery,
 #endif
@@ -6610,7 +7141,7 @@ static struct platform_device *smdkc210_devices[] __initdata = {
 #if defined(CONFIG_S3C_DEV_I2C14_EMUL)
 	&s3c_device_i2c14,
 #endif
-#if defined(CONFIG_VIDEO_S5K5BAFX)
+#if defined(CONFIG_VIDEO_S5K5BAFX) || defined(CONFIG_VIDEO_S5K5BBGX)
 	&s3c_device_i2c12,
 #endif
 #ifdef CONFIG_SAMSUNG_MHL
@@ -6624,6 +7155,9 @@ static struct platform_device *smdkc210_devices[] __initdata = {
 #endif
 #if defined(CONFIG_SMB136_CHARGER_Q1) || defined(CONFIG_SMB328_CHARGER)
 	&s3c_device_i2c19,	/* SMB136, SMB328 */
+#endif
+#if defined(CONFIG_S3C_DEV_I2C17_EMUL)
+	&s3c_device_i2c17,	/* USB HUB */
 #endif
 #endif
 
@@ -6677,6 +7211,9 @@ static struct platform_device *smdkc210_devices[] __initdata = {
 #endif
 #ifdef CONFIG_BATTERY_SEC_U1
 	&sec_device_battery,
+#endif
+#ifdef CONFIG_LEDS_GPIO
+	&sec_device_leds_gpio,
 #endif
 #ifdef	CONFIG_LEDS_MAX8997
 	&sec_device_leds_max8997,
@@ -6806,7 +7343,9 @@ static struct platform_device *smdkc210_devices[] __initdata = {
 #ifdef CONFIG_USB_HOST_NOTIFY
 	&host_notifier_device,
 #endif
+#ifdef CONFIG_USB_HOST_NOTIFY
 	&s3c_device_usb_otghcd,
+#endif
 };
 
 #ifdef CONFIG_EXYNOS4_SETUP_THERMAL
@@ -6868,7 +7407,7 @@ static void __init exynos4_cma_region_reserve(struct cma_region *regions_normal,
 				reg->reserved = 1;
 		} else {
 			paddr = __memblock_alloc_base(reg->size, reg->alignment,
-						      MEMBLOCK_ALLOC_ACCESSIBLE);
+						MEMBLOCK_ALLOC_ACCESSIBLE);
 			if (paddr) {
 				reg->start = paddr;
 				reg->reserved = 1;
@@ -6956,10 +7495,10 @@ static void __init exynos4_reserve_mem(void)
 		},
 #endif
 #ifdef CONFIG_ION_EXYNOS_CONTIGHEAP_SIZE
-                {
-                        .name   = "ion",
-                        .size   = CONFIG_ION_EXYNOS_CONTIGHEAP_SIZE * SZ_1K,
-                },
+		{
+			.name   = "ion",
+			.size   = CONFIG_ION_EXYNOS_CONTIGHEAP_SIZE * SZ_1K,
+		},
 #endif
 #ifdef CONFIG_VIDEO_SAMSUNG_MEMSIZE_MFC1
 		{
@@ -7028,9 +7567,10 @@ static void __init exynos4_reserve_mem(void)
 		"android_pmem.0=pmem;android_pmem.1=pmem_gpu1;"
 		"s3cfb.0=fimd;exynos4-fb.0=fimd;"
 		"s3c-fimc.0=fimc0;s3c-fimc.1=fimc1;s3c-fimc.2=fimc2;"
-		"exynos4210-fimc.0=fimc0;exynos4210-fimc.1=fimc1;exynos4210-fimc.2=fimc2;exynos4210-fimc3=fimc3;"
+		"exynos4210-fimc.0=fimc0;exynos4210-fimc.1=fimc1;"
+		"exynos4210-fimc.2=fimc2;exynos4210-fimc3=fimc3;"
 #ifdef CONFIG_ION_EXYNOS
-                "ion-exynos=ion;"
+		"ion-exynos=ion;"
 #endif
 #ifdef CONFIG_VIDEO_MFC5X
 		"s3c-mfc/A=mfc0,mfc-secure;"
@@ -7262,7 +7802,7 @@ static void __init smdkc210_machine_init(void)
 	nfc_setup_gpio();
 	i2c_register_board_info(14, i2c_devs14, ARRAY_SIZE(i2c_devs14));
 #endif
-#if defined(CONFIG_VIDEO_S5K5BAFX)
+#if defined(CONFIG_VIDEO_S5K5BAFX) || defined(CONFIG_VIDEO_S5K5BBGX)
 	i2c_register_board_info(12, i2c_devs12_emul,
 				ARRAY_SIZE(i2c_devs12_emul));
 #endif
@@ -7275,9 +7815,14 @@ static void __init smdkc210_machine_init(void)
 
 #if defined(CONFIG_SMB136_CHARGER_Q1) || defined(CONFIG_SMB328_CHARGER)
 	i2c_register_board_info(19, i2c_devs19_emul,
-				ARRAY_SIZE(i2c_devs19_emul));
+						ARRAY_SIZE(i2c_devs19_emul));
+#endif
+#ifdef CONFIG_S3C_DEV_I2C17_EMUL
+	i2c_register_board_info(17, i2c_devs17_emul,
+						ARRAY_SIZE(i2c_devs17_emul));
 #endif
 #endif
+
 
 	/* 400 kHz for initialization of MMC Card  */
 	__raw_writel((__raw_readl(EXYNOS4_CLKDIV_FSYS3) & 0xfffffff0)

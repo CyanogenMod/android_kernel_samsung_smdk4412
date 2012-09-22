@@ -22,4 +22,8 @@ extern void set_gps_uart_op(int onoff);
 extern int u1_switch_get_usb_lock_state(void);
 #endif
 
+#ifdef CONFIG_WIMAX_CMC
+extern struct platform_device s3c_device_cmc732;
+#endif
+
 #endif

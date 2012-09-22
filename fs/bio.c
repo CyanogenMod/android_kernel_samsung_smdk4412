@@ -1689,4 +1689,8 @@ static int __init init_bio(void)
 
 	return 0;
 }
+#ifdef CONFIG_FAST_RESUME
+beforeresume_initcall(init_bio);
+#else
 subsys_initcall(init_bio);
+#endif

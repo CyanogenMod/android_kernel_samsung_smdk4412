@@ -42,7 +42,7 @@ s32 tcbd_io_open(struct tcbd_device *_device)
 	if (tcbd_io_funcs.open == NULL)
 		return -TCERR_IO_NOT_INITIALIZED;
 
-	tcpal_create_lock(&tcbd_io_funcs.sem, "tcbd_io_funcsSemaphore", 0);
+	tcpal_create_lock(&tcbd_io_funcs.sem, "tcbd_io_lock", 0);
 
 	ret = tcbd_io_funcs.open();
 	if (ret < 0)
@@ -80,7 +80,7 @@ s32 tcbd_reg_read(
 		return -TCERR_IO_NOT_INITIALIZED;
 
 	if (_device == NULL || _data == NULL)
-		return TCERR_INVALID_ARG;
+		return -TCERR_INVALID_ARG;
 
 	tcpal_lock(&tcbd_io_funcs.sem);
 	tcbd_io_funcs.chip_addr = _device->chip_addr;
@@ -326,14 +326,14 @@ s32 tcbd_send_mail(
 		sizeof(u32) + count * sizeof(u32));
 	ret |= tcbd_io_funcs.reg_write(TCBD_MAIL_CTRL, TCBD_MAIL_HOSTMAILPOST);
 	if (ret < 0)
-		goto exittcbd_send_mail;
+		goto exit_send_mail;
 
 	time_tick = tcpal_get_time();
 	do {
 		elapsed = tcpal_diff_time(time_tick);
 		if (elapsed > (u64)MAX_TIME_TO_WAIT_MAIL) {
 			ret = -TCERR_WAIT_MAIL_TIMEOUT;
-			goto exittcbd_send_mail;
+			goto exit_send_mail;
 		}
 		/* latch mail status to register	  */
 		ret = tcbd_io_funcs.reg_write(TCBD_MAIL_FIFO_W, 0x5E);
@@ -346,7 +346,7 @@ s32 tcbd_send_mail(
 	tcbd_debug(DEBUG_DRV_IO, "cmd:0x%X, count:%d, elapsed time:%llu\n",
 		_mail->cmd, count, elapsed);
 
-exittcbd_send_mail:
+exit_send_mail:
 	tcpal_unlock(&tcbd_io_funcs.sem);
 	return ret;
 }
@@ -375,11 +375,10 @@ s32 tcbd_recv_mail(
 			ret = -TCERR_WAIT_MAIL_TIMEOUT;
 
 		if (ret < 0)
-			goto exittcbd_recv_mail;
+			goto exit_recv_mail;
 	} while ((reg_data & 0xFC) < 3); /* check fifo status */
 	bytes_read = (reg_data >> 2) & 0x3F;
-	tcbd_debug(DEBUG_DRV_IO,
-		"cmd:0x%X, bytes_read:%d, elapsed time:%llu\n",
+	tcbd_debug(DEBUG_DRV_IO, "cmd:0x%X, bytes_read:%d, elapsed time:%llu\n",
 			_mail->cmd, bytes_read, elapsed);
 
 	ret = tcbd_io_funcs.reg_read_burst_fix(
@@ -387,13 +386,12 @@ s32 tcbd_recv_mail(
 	/*only warm boot cmd */
 	if (bytes_read == 4) {
 		memcpy(_mail->data, mail_data, bytes_read);
-		goto exittcbd_recv_mail;
+		goto exit_recv_mail;
 	}
 
 	mail_hdr = *((u32 *)mail_data);
 	if ((mail_hdr >> 24) != MB_SLAVEMAIL) {
-		tcbd_debug(DEBUG_ERROR,
-			"Error : cmd=0x%X bytes_read=%d\n",
+		tcbd_debug(DEBUG_ERROR, "Error : cmd=0x%X bytes_read=%d\n",
 				_mail->cmd, bytes_read);
 		tcbd_debug(DEBUG_ERROR, " [0x%02X][0x%02X][0x%02X][0x%02X]"
 				"[0x%02X][0x%02X][0x%02X][0x%02X]\n",
@@ -402,7 +400,7 @@ s32 tcbd_recv_mail(
 				mail_data[6], mail_data[7]);
 
 		ret = -TCERR_BROKEN_MAIL_HEADER;
-		goto exittcbd_recv_mail;
+		goto exit_recv_mail;
 	}
 	_mail->cmd = mail_hdr & 0xFFFF;
 	_mail->status = (mail_hdr >> 16) & 0x7;
@@ -410,18 +408,18 @@ s32 tcbd_recv_mail(
 		tcbd_debug(DEBUG_ERROR, "Mail Error : status=0x%X, cmd=0x%X\n",
 				_mail->status, _mail->cmd);
 		ret = -TCERR_UNKNOWN_MAIL_STATUS;
-		goto exittcbd_recv_mail;
+		goto exit_recv_mail;
 	}
 	_mail->count = (bytes_read >> 2) - 1;
 	memcpy(_mail->data, mail_data + 4, bytes_read - 4);
 
-exittcbd_recv_mail:
+exit_recv_mail:
 	tcpal_unlock(&tcbd_io_funcs.sem);
 	return ret;
 }
 
-s32 tcbd_read_mail_box(
-	struct tcbd_device *_device, u16 _cmd, s32 _cnt, u32 *_data)
+s32 tcbd_read_mail_box(struct tcbd_device *_device, u16 _cmd, s32 _cnt,
+								u32 *_data)
 {
 	s32 ret = 0;
 	struct tcbd_mail_data mail = {0, };
@@ -432,17 +430,87 @@ s32 tcbd_read_mail_box(
 	ret = tcbd_send_mail(_device, &mail);
 	if (ret < 0) {
 		tcbd_debug(DEBUG_ERROR, "failed to send mail! %d\n", ret);
-		goto exti_read_mail_box;
+		goto exit_read_mail_box;
 	}
 
 	ret = tcbd_recv_mail(_device, &mail);
 	if (ret < 0) {
 		tcbd_debug(DEBUG_ERROR, "failed to recv mail! %d\n", ret);
-		goto exti_read_mail_box;
+		goto exit_read_mail_box;
 	}
 
 	memcpy((void *)_data, (void *)mail.data, _cnt * sizeof(u32));
 
-exti_read_mail_box:
+exit_read_mail_box:
 	return ret;
 }
+
+s32 tcbd_write_mail_box(struct tcbd_device *_device, u16 _cmd, s32 _cnt,
+								u32 *_data)
+{
+	u32 *data = NULL;
+	struct tcbd_mail_data mail = {0, };
+
+	if (_cnt > MAX_MAIL_COUNT || _data == NULL) {
+		tcbd_debug(DEBUG_ERROR, "invalid param, cnt:%d\n", _cnt);
+		return -TCERR_INVALID_ARG;
+	}
+
+	mail.flag = MB_CMD_WRITE;
+	mail.cmd = _cmd;
+	mail.count = _cnt;
+	memcpy((void *)mail.data, (void *)_data, _cnt * sizeof(u32));
+#if defined(__DEBUG_DSP_ROM__)
+	tcbd_debug_mbox_tx(&_cmd, &_cnt, &data);
+	if (data != NULL) {
+		int i, sz = 0;
+		char print_buff[80];
+		mail.cmd = _cmd;
+		mail.count = _cnt;
+		memcpy((void *)mail.data, (void *)data, _cnt * sizeof(u32));
+		for (i = 0; i < _cnt; i++)
+			sz += sprintf(print_buff + sz, "[%08X]", data[i]);
+
+		tcbd_debug(DEBUG_ERROR, "cmd 0x%X, cnt:%d, %s\n",
+					_cmd, _cnt, print_buff);
+	}
+#endif /*__DEBUG_DSP_ROM__*/
+	return tcbd_send_mail(_device, &mail);
+}
+
+#if defined(__DEBUG_DSP_ROM__)
+s32 tcbd_read_file(struct tcbd_device *_device, char *_path, u8 *_buff,
+								s32 _size)
+{
+	int ret;
+	struct file *flip = NULL;
+	mm_segment_t old_fs;
+
+	if (_path == NULL) {
+		tcbd_debug(DEBUG_ERROR, "invalid filename! %s\n", _path);
+		return -1;
+	}
+
+	if (_buff == NULL) {
+		tcbd_debug(DEBUG_ERROR, "Invaild pointer! 0x%X\n", (u32)_buff);
+		return -1;
+	}
+
+	flip = filp_open(_path, O_RDWR, 0);
+	if (IS_ERR(flip)) {
+		tcbd_debug(DEBUG_ERROR, "%s open failed\n", _path);
+		return -1;
+	}
+
+	old_fs = get_fs();
+	set_fs(KERNEL_DS);
+
+	flip->f_pos = 0;
+	ret = vfs_read(flip, _buff, _size, &flip->f_pos);
+
+	filp_close(flip, NULL);
+	set_fs(old_fs);
+
+	return ret;
+}
+#endif /*__DEBUG_DSP_ROM__*/

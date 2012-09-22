@@ -45,6 +45,13 @@
 #include <linux/wakelock.h>
 #include <linux/io.h>
 #include <mach/map.h>
+
+#if defined(CONFIG_MACH_GRANDE)
+#include <linux/regulator/consumer.h>
+#include <linux/regulator/driver.h>
+#include <linux/regulator/machine.h>
+#endif
+
 #include "tspdrv.h"
 #ifdef CONFIG_MOTOR_DRV_ISA1200
 #include "ImmVibeSPI_isa1200.c"
@@ -485,7 +492,12 @@ static long unlocked_ioctl(struct file *file, unsigned int cmd,
 #ifdef QA_TEST
 	int i;
 #endif
-
+#if defined(CONFIG_MACH_GRANDE)
+	struct regulator *regulator;
+	regulator = regulator_get(NULL, "vmotor");
+	if (IS_ERR(regulator))
+		return 0;
+#endif
 	DbgOut((KERN_INFO "tspdrv: ioctl cmd[0x%x].\n", cmd));
 
 	switch (cmd) {
@@ -522,9 +534,15 @@ static long unlocked_ioctl(struct file *file, unsigned int cmd,
 
 	case TSPDRV_ENABLE_AMP:
 		wake_lock(&vib_wake_lock);
+                #if defined(CONFIG_MACH_GRANDE)
+	        regulator_enable(regulator);
+		printk(KERN_INFO "[TSPDRV] vmotor power on\n");
+		regulator_put(regulator);
+                #else
 		ImmVibeSPI_ForceOut_AmpEnable(arg);
 		DbgRecorderReset((arg));
 		DbgRecord((arg, ";------- TSPDRV_ENABLE_AMP ---------\n"));
+                #endif
 		break;
 
 	case TSPDRV_DISABLE_AMP:
@@ -533,8 +551,14 @@ static long unlocked_ioctl(struct file *file, unsigned int cmd,
 		  * If a stop was requested, ignore the request as the amp
 		  * will be disabled by the timer proc when it's ready
 		  */
+                #if defined(CONFIG_MACH_GRANDE)
+                regulator_disable(regulator);
+		printk(KERN_INFO "[TSPDRV] vmotor power on\n");
+		regulator_put(regulator);
+                #else
 		if (!g_bStopRequested)
 			ImmVibeSPI_ForceOut_AmpDisable(arg);
+                #endif
 		wake_unlock(&vib_wake_lock);
 		break;
 

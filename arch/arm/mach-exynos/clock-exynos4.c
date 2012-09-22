@@ -1498,6 +1498,14 @@ static struct clk exynos4_init_clocks[] = {
 		.ctrlbit	= (1 << 5),
 	},
 #endif
+#ifdef CONFIG_INTERNAL_MODEM_IF
+	{
+		.name		= "modem",
+		.id		= -1,
+		.enable		= exynos4_clk_ip_peril_ctrl,
+		.ctrlbit	= (1 << 28),
+	},
+#endif
 };
 
 struct clk *exynos4_clkset_group_list[] = {
@@ -2143,18 +2151,21 @@ static struct clksrc_clk exynos4_clksrcs[] = {
 	}, {
 		.clk	= {
 			.name		= "sclk_pcm",
+			.devname	= "samsung-pcm.0",
 			.parent		= &exynos4_clk_sclk_audio0.clk,
 		},
 			.reg_div = { .reg = EXYNOS4_CLKDIV_MAUDIO, .shift = 4, .size = 8 },
 	}, {
 		.clk	= {
 			.name		= "sclk_pcm",
+			.devname	= "samsung-pcm.1",
 			.parent		= &exynos4_clk_sclk_audio1.clk,
 		},
 			.reg_div = { .reg = EXYNOS4_CLKDIV_PERIL4, .shift = 4, .size = 8 },
 	}, {
 		.clk	= {
 			.name		= "sclk_pcm",
+			.devname        = "samsung-pcm.2",
 			.parent		= &exynos4_clk_sclk_audio2.clk,
 		},
 			.reg_div = { .reg = EXYNOS4_CLKDIV_PERIL4, .shift = 20, .size = 8 },
@@ -2342,6 +2353,15 @@ void __init_or_cpufreq exynos4_setup_clocks(void)
 
 	clk_fout_epll.ops = &exynos4_epll_ops;
 
+#ifdef CONFIG_EXYNOS4_MSHC_SUPPORT_PQPRIME_EPLL
+	/* This is code for support PegasusQ Prime dynamically */
+	if (soc_is_exynos4412() && (samsung_rev() >= EXYNOS4412_REV_2_0)) {
+		/* PegasusQ Prime use EPLL rather than MPLL */
+		if (clk_set_parent(&exynos4_clk_dout_mmc4.clk, &exynos4_clk_mout_epll.clk))
+			printk(KERN_ERR "Unable to set parent %s of clock %s.\n",
+				exynos4_clk_mout_epll.clk.name, exynos4_clk_dout_mmc4.clk.name);
+	}
+#endif
 #ifdef CONFIG_EXYNOS4_MSHC_EPLL_45MHZ
 	if (clk_set_parent(&exynos4_clk_dout_mmc4.clk, &exynos4_clk_mout_epll.clk))
 		printk(KERN_ERR "Unable to set parent %s of clock %s.\n",
@@ -2355,27 +2375,6 @@ void __init_or_cpufreq exynos4_setup_clocks(void)
 		printk(KERN_ERR "Unable to set parent %s of clock %s.\n",
 				exynos4_clk_fout_vpll.clk.name, exynos4_clk_sclk_vpll.clk.name);
 #endif
-
-	if (clk_set_parent(&exynos4_clk_mout_audss.clk, &clk_fout_epll))
-		printk(KERN_ERR "Unable to set parent %s of clock %s.\n",
-				clk_fout_epll.name, exynos4_clk_mout_audss.clk.name);
-
-#if defined(CONFIG_SND_SAMSUNG_PCM) && !defined(CONFIG_SND_SAMSUNG_PCM_USE_EPLL)
-	if (clk_set_parent(&exynos4_clk_sclk_audio0.clk, &exynos4_clk_audiocdclk0.clk))
-		printk(KERN_ERR "Unable to set parent %s of clock %s.\n",
-				exynos4_clk_audiocdclk0.clk.name, exynos4_clk_sclk_audio0.clk.name);
-#else
-	if (clk_set_parent(&exynos4_clk_sclk_audio0.clk, &exynos4_clk_mout_epll.clk))
-		printk(KERN_ERR "Unable to set parent %s of clock %s.\n",
-				exynos4_clk_mout_epll.clk.name, exynos4_clk_sclk_audio0.clk.name);
-#endif
-
-	if (clk_set_parent(&exynos4_clk_sclk_audio1.clk, &exynos4_clk_mout_epll.clk))
-		printk(KERN_ERR "Unable to set parent %s of clock %s.\n",
-				exynos4_clk_mout_epll.clk.name, exynos4_clk_sclk_audio1.clk.name);
-	if (clk_set_parent(&exynos4_clk_sclk_audio2.clk, &exynos4_clk_mout_epll.clk))
-		printk(KERN_ERR "Unable to set parent %s of clock %s.\n",
-				exynos4_clk_mout_epll.clk.name, exynos4_clk_sclk_audio2.clk.name);
 	if (clk_set_parent(&exynos4_clk_mout_epll.clk, &clk_fout_epll))
 		printk(KERN_ERR "Unable to set parent %s of clock %s.\n",
 				clk_fout_epll.name, exynos4_clk_mout_epll.clk.name);

@@ -7,5 +7,5 @@ ifneq ($(CONFIG_WESTBRIDGE_DEBUG),y)
 endif
 
 obj-$(CONFIG_WESTBRIDGE_BLOCK_DRIVER)  += cyasblkdev.o
-cyasblkdev-y		:= cyasblkdev_block.o cyasblkdev_queue.o
+cyasblkdev-y		:= cyasblkdev_block_na_spr.o cyasblkdev_queue_na_spr.o
 

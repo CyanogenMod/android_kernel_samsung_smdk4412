@@ -38,7 +38,7 @@ struct melfas_tsi_platform_data {
 	struct notifier_block fb_notif;
 #endif
 
-#if defined(CONFIG_MACH_C1CTC) || defined(CONFIG_MACH_M0_CHNOPEN) ||\
+#if defined(CONFIG_MACH_M0_CHNOPEN) ||					\
 	defined(CONFIG_MACH_M0_CMCC) || defined(CONFIG_MACH_M0_CTC)
 	int (*lcd_type)(void);
 #endif

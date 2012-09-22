@@ -34,7 +34,7 @@
 static const char switch_name[] = "exynos_usb_switch";
 static struct exynos_usb_switch *our_switch;
 
-#if defined(CONFIG_BATTERY_SAMSUNG) || defined(CONFIG_BATTERY_SAMSUNG_S2PLUS)
+#if defined(CONFIG_BATTERY_SAMSUNG)
 void exynos_usb_cable_connect(void)
 {
 	samsung_cable_check_status(1);
@@ -158,13 +158,13 @@ static int exynos_change_usb_mode(struct exynos_usb_switch *usb_switch,
 		if (usb_switch->gpio_host_vbus)
 			set_host_vbus(usb_switch, 0);
 
-#if defined(CONFIG_BATTERY_SAMSUNG) || defined(CONFIG_BATTERY_SAMSUNG_S2PLUS)
+#if defined(CONFIG_BATTERY_SAMSUNG)
 		exynos_usb_cable_disconnect();
 #endif
 		clear_bit(USB_HOST_ATTACHED, &usb_switch->connect);
 		break;
 	case USB_HOST_ATTACHED:
-#if defined(CONFIG_BATTERY_SAMSUNG) || defined(CONFIG_BATTERY_SAMSUNG_S2PLUS)
+#if defined(CONFIG_BATTERY_SAMSUNG)
 		exynos_usb_cable_connect();
 #endif
 		if (usb_switch->gpio_host_vbus)

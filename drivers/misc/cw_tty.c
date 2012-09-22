@@ -127,9 +127,6 @@ static int XanCwReceivedWiFiData(int nDestChannelID,
 	}
 
 	if (dev->vs_dev.tty != NULL && dev->vs_dev.refcount) {
-		pr_info("[%s] name: %s, len: %d\n", __func__,
-					dev->vs_dev.tty_name, nRecvdBuflen);
-
 		ret = tty_insert_flip_string(dev->vs_dev.tty,
 					(u8 *)pi8_RecvdBuf, nRecvdBuflen);
 		if (ret < nRecvdBuflen)
@@ -164,9 +161,6 @@ static int XanCwSendToXanadu(int nSrcChannelID,
 	}
 
 	if (dev->vs_dev.tty != NULL && dev->vs_dev.refcount) {
-		pr_info("[%s] name: %s, len: %d\n", __func__,
-					dev->vs_dev.tty_name, nRecvdBuflen);
-
 		ret = tty_insert_flip_string(dev->vs_dev.tty,
 					(u8 *)pi8_RecvdBuf, nRecvdBuflen);
 		if (ret < nRecvdBuflen)
@@ -232,9 +226,6 @@ static int cw_tty_write(struct tty_struct *tty,
 
 	/* Added by Venkatesh GR, SISO For CDMA+WiFi requirements -- Start*/
 	if (strcmp(dev->vs_dev.tty_name, "ttyCWPPP") == 0) {
-		pr_info("[%s] Rx PPPD, Tx CWTunnel : len = %d\n",
-							__func__, count);
-
 		nDestChannelID = ID_CW_TTY_CWXAN;
 
 		/* Send the Buffer Received From PPPD to CWTunnel */
@@ -242,10 +233,6 @@ static int cw_tty_write(struct tty_struct *tty,
 							(u8 *)buf, count);
 
 	} else if (strcmp(dev->vs_dev.tty_name, "ttyCWXAN") == 0) {
-		pr_info("[%s] Rx CWTunnel, Tx PPPD : len = %d\n",
-							__func__, count);
-
-
 		nDestChannelID = ID_CW_TTY_CWPPP;
 
 		/* Send the Buffer Received From CWTunnel to PPPD */

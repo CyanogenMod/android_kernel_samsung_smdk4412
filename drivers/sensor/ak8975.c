@@ -27,7 +27,11 @@
 #include "ak8975-reg.h"
 #include <linux/sensor/sensors_core.h>
 
+#ifdef CONFIG_SLP
+#define FACTORY_TEST
+#else
 #undef FACTORY_TEST
+#endif
 #undef MAGNETIC_LOGGING
 
 #define VENDOR		"AKM"
@@ -744,8 +748,6 @@ int akm8975_probe(struct i2c_client *client,
 	}
 
 #ifdef FACTORY_TEST
-	ak8975c_selftest(akm);
-
 	if (device_create_file(akm->dev, &dev_attr_adc) < 0) {
 		printk(KERN_ERR "Failed to create device file(%s)!\n",
 			dev_attr_adc.attr.name);

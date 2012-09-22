@@ -18,6 +18,7 @@
 #include <linux/cdev.h>
 #include <linux/usb/ch9.h>
 #include <linux/usb/cdc.h>
+#include <linux/wakelock.h>
 
 #define CTRL_DEV_MAX_LEN 10
 
@@ -46,6 +47,8 @@ struct rmnet_ctrl_dev {
 
 	unsigned		is_opened;
 
+	bool			is_connected;
+
 	/*input control lines (DSR, CTS, CD, RI)*/
 	unsigned int		cbits_tolocal;
 
@@ -66,6 +69,14 @@ struct rmnet_ctrl_dev {
 	unsigned int		resp_avail_cnt;
 	unsigned int		set_ctrl_line_state_cnt;
 	unsigned int		tx_ctrl_err_cnt;
+	unsigned int		zlp_cnt;
+	unsigned int		tx_ctrl_in_req_cnt;
+
+	struct wake_lock	ctrl_wake;
+
+	/* reset handler */
+	struct notifier_block	reset_notifier_block;
+	bool			tx_block;
 };
 
 extern struct rmnet_ctrl_dev *ctrl_dev[];

@@ -147,6 +147,8 @@ struct Si4709_device_t {
 
 	/*will be true is the client ans state fields are correct */
 	unsigned short valid_client_state;
+
+	u8 vol_idx;
 };
 
 extern int Si4709_dev_wait_flag;
@@ -174,6 +176,7 @@ extern int Si4709_dev_init(struct i2c_client *);
 extern int Si4709_dev_exit(void);
 
 extern void Si4709_dev_mutex_init(void);
+extern void Si4709_dev_mutex_destroy(void);
 
 extern int Si4709_dev_suspend(void);
 extern int Si4709_dev_resume(void);

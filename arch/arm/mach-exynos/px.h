@@ -13,6 +13,10 @@ extern void p2_config_sleep_gpio_table(void);
 #elif defined(CONFIG_MACH_P8)
 extern void p8_config_gpio_table(void);
 extern void p8_config_sleep_gpio_table(void);
+#elif defined(CONFIG_MACH_P8LTE)
+extern void modem_p8ltevzw_init(void);
+extern void p8lte_config_gpio_table(void);
+extern void p8lte_config_sleep_gpio_table(void);
 #else /* CONFIG_MACH_P4) */
 extern void p4_config_gpio_table(void);
 extern void p4_config_sleep_gpio_table(void);

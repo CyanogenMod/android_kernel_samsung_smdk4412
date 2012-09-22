@@ -156,7 +156,7 @@ static const unsigned short tune_color_tone_3[] = {
 	END_SEQ, 0x0000,
 };
 
-static const unsigned short tune_negative_lcd_cabc_on[] = {
+static const unsigned short tune_negative_cabc[] = {
 	/*start p4 note negative cabcon*/
 	0x0001, 0x0070,	/*SCR LABC CABC HDTR*/
 	0x002c, 0x0fff,	/*DNR bypass*/
@@ -190,7 +190,8 @@ static const unsigned short tune_negative_lcd_cabc_on[] = {
 
 };
 
-static const unsigned short tune_negative_lcd_cabc_off[] = {
+#if defined(CONFIG_FB_MDNIE_PWM)
+static const unsigned short tune_negative[] = {
 	/*start p4 note negative cabcoff*/
 	0x0001, 0x0060,	/*SCR LABC HDTR*/
 	0x002c, 0x0fff,	/*DNR bypass*/
@@ -217,8 +218,8 @@ static const unsigned short tune_negative_lcd_cabc_off[] = {
 	/*end*/
 	END_SEQ, 0x0000,
 };
-
-static const unsigned short tune_negative_amoled[] = {
+#else
+static const unsigned short tune_negative[] = {
 	/*start Q1 negative*/
 	0x0001, 0x0040,	/*SCR HDTR*/
 	0x002c, 0x0fff,	/*DNR bypass 0x003C*/
@@ -244,17 +245,18 @@ static const unsigned short tune_negative_amoled[] = {
 	/*end*/
 	END_SEQ, 0x0000,
 };
+#endif
 
-struct mdnie_tunning_info tune_negative[CABC_MAX] = {
+struct mdnie_tunning_info negative_table[CABC_MAX] = {
 #if defined(CONFIG_FB_MDNIE_PWM)
-	{"NEGATIVE_CABC_OFF",	tune_negative_lcd_cabc_off},
-	{"NEGATIVE_CABC_ON",	tune_negative_lcd_cabc_on},
+	{"NEGATIVE",		tune_negative},
+	{"NEGATIVE_CABC",	tune_negative_cabc},
 #else
-	{"NEGATIVE_ON",		tune_negative_amoled},
+	{"NEGATIVE",		tune_negative},
 #endif
 };
 
-struct mdnie_tunning_info tune_color_tone[COLOR_TONE_MAX - COLOR_TONE_1] = {
+struct mdnie_tunning_info color_tone_table[COLOR_TONE_MAX - COLOR_TONE_1] = {
 	{"COLOR_TONE_1",	tune_color_tone_1},
 	{"COLOR_TONE_2",	tune_color_tone_2},
 	{"COLOR_TONE_3",	tune_color_tone_3},

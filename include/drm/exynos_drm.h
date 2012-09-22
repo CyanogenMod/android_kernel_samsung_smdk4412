@@ -111,6 +111,19 @@ struct drm_exynos_gem_info {
 };
 
 /**
+ * A structure to userptr limited information.
+ *
+ * @userptr_limit: maximum size to userptr buffer.
+ *	the buffer could be allocated by unprivileged user using malloc()
+ *	and the size of the buffer would be limited as userptr_limit value.
+ * @pad: just padding to be 64-bit aligned.
+ */
+struct drm_exynos_user_limit {
+	unsigned int userptr_limit;
+	unsigned int pad;
+};
+
+/**
  * A structure for user connection request of virtual display.
  *
  * @connection: indicate whether doing connetion or not by user.
@@ -211,16 +224,14 @@ enum e_drm_exynos_gem_mem_type {
  *	P.S. it SHOULD BE user space.
  * @size: buffer size for cache operation.
  * @flags: select cache unit and cache operation.
+ * @gem_handle: a handle to a gem object.
+ *	this gem handle is needed for cache range operation to L2 cache.
  */
 struct drm_exynos_gem_cache_op {
 	uint64_t usr_addr;
 	unsigned int size;
 	unsigned int flags;
-};
-
-struct drm_exynos_plane_set_zpos {
-	__u32 plane_id;
-	__s32 zpos;
+	unsigned int gem_handle;
 };
 
 struct drm_exynos_g2d_get_ver {
@@ -256,99 +267,129 @@ struct drm_exynos_g2d_exec {
 	__u32					reserved;
 };
 
-enum drm_exynos_rot_flip {
-	ROT_FLIP_NONE,
-	ROT_FLIP_VERTICAL,
-	ROT_FLIP_HORIZONTAL,
+/* definition of operations types */
+enum drm_exynos_ops_id {
+	EXYNOS_DRM_OPS_SRC,
+	EXYNOS_DRM_OPS_DST,
+	EXYNOS_DRM_OPS_MAX,
 };
 
-enum drm_exynos_rot_degree {
-	ROT_DEGREE_0,
-	ROT_DEGREE_90,
-	ROT_DEGREE_180,
-	ROT_DEGREE_270,
+/* definition of size */
+struct drm_exynos_sz {
+	__u32	hsize;
+	__u32	vsize;
 };
 
-#define DRM_EXYNOS_ROT_MAX_BUF	3
-
-/**
- * A structure for rotator buffer
- *
- * @src_handle: Source GEM handles.
- * @dst_handle: Destination GEM handles.
- *          - *_handle[0] : For RGB or Y buffer.
- *          - *_handle[1] : For CbCr or Cb buffer.
- *          - *_handle[2] : For Cr buffer.
- * @src_cnt: Number of source GEM handles.
- * @dst_cnt: Number of destination GEM handles.
- * @src_w: Source Buffer width.
- * @src_h: Source Buffer height.
- * @dst_w: Destination Buffer width.
- * @dst_h: Destination Buffer height.
- */
-struct drm_exynos_rot_buffer {
-	__u32	src_handle[DRM_EXYNOS_ROT_MAX_BUF];
-	__u32	dst_handle[DRM_EXYNOS_ROT_MAX_BUF];
-	__u32	src_cnt;
-	__u32	dst_cnt;
-	__u32	src_w;
-	__u32	src_h;
-	__u32	dst_w;
-	__u32	dst_h;
+/* definition of position */
+struct drm_exynos_pos {
+	__u32	x;
+	__u32	y;
+	__u32	w;
+	__u32	h;
 };
 
-/**
- * A structure for rotator control.
- *
- * @img_fmt: Source / destination buffer (image)format.
- *           - fourcc code from drm_fourcc.h
- *           - DRM_FORMAT_RGB888
- *           - DRM_FORMAT_RGB565
- *           - DRM_FORMAT_YUYV : YUV 4:2:2 packed, YCbYCr
- *           - DRM_FORMAT_NV12M : YUV 4:2:0 non-contiguous 2-plane, Y/CbCr
- *           - DRM_FORMAT_YUV420M : YUV 4:2:0 non-contiguous 3-plane, Y/Cb/Cr
- * @flip: Flip operation value.
- * @degree: Rotation operation degree value.
- */
-struct drm_exynos_rot_control {
-	__u32				img_fmt;
-	enum drm_exynos_rot_flip	flip;
-	enum drm_exynos_rot_degree	degree;
-	__u32				reserved;
+/* definition of flip */
+enum drm_exynos_flip {
+	EXYNOS_DRM_FLIP_NONE = (0 << 0),
+	EXYNOS_DRM_FLIP_VERTICAL = (1 << 0),
+	EXYNOS_DRM_FLIP_HORIZONTAL = (1 << 1),
+};
+
+/* definition of rotation degree */
+enum drm_exynos_degree {
+	EXYNOS_DRM_DEGREE_0,
+	EXYNOS_DRM_DEGREE_90,
+	EXYNOS_DRM_DEGREE_180,
+	EXYNOS_DRM_DEGREE_270,
+};
+
+/* definition of planar */
+enum drm_exynos_planer {
+	EXYNOS_DRM_PLANAR_Y,
+	EXYNOS_DRM_PLANAR_CB,
+	EXYNOS_DRM_PLANAR_CR,
+	EXYNOS_DRM_PLANAR_MAX,
 };
 
 /**
- * A structure for rotator crop.
+ * A structure for ipp config.
  *
- * @src_x: Cropped image position x in source buffer[FROM].
- * @src_y: Cropped image position y in source buffer[FROM].
- * @src_w: Cropped image width in source buffer.
- * @src_h: Cropped image height in source buffer.
- * @dst_x: Cropped image position x in destination buffer[TO].
- * @dst_y: Cropped image position y in destination buffer[TO].
+ * @ops_id: property of operation directions.
+ * @flip: property of mirror, flip.
+ * @degree: property of rotation degree.
+ * @fmt: property of image format.
+ * @sz: property of image size.
+ * @pos: property of image position(src-cropped,dst-scaler).
  */
-struct drm_exynos_rot_crop {
-	__u32	src_x;
-	__u32	src_y;
-	__u32	src_w;
-	__u32	src_h;
-	__u32	dst_x;
-	__u32	dst_y;
+struct drm_exynos_ipp_config {
+	enum drm_exynos_ops_id ops_id;
+	enum drm_exynos_flip	flip;
+	enum drm_exynos_degree	degree;
+	__u32	fmt;
+	struct drm_exynos_sz	sz;
+	struct drm_exynos_pos	pos;
+};
+
+/* command of ipp operations */
+enum drm_exynos_ipp_cmd {
+	IPP_CMD_NONE,
+	IPP_CMD_M2M,
+	IPP_CMD_WB,
+	IPP_CMD_OUTPUT,
+	IPP_CMD_MAX,
 };
 
 /**
- * A structure for rotator operation.
+ * A structure for ipp property.
  *
- * @buf: (Image)Buffer data.
- * @control: Control data.
- * @crop: Cropped image data.
- * @user_data: Not used yet.
+ * @config: source, destination config.
+ * @cmd: command type.
+ * @ipp_id: id of ipp driver.
+ * @prop_id: id of property.
  */
-struct drm_exynos_rot_exec_data {
-	struct drm_exynos_rot_buffer	buf;
-	struct drm_exynos_rot_control	control;
-	struct drm_exynos_rot_crop	crop;
-	__u64				user_data;
+struct drm_exynos_ipp_property {
+	struct drm_exynos_ipp_config config[EXYNOS_DRM_OPS_MAX];
+	enum drm_exynos_ipp_cmd	cmd;
+	__u32	ipp_id;
+	__u32	prop_id;
+	__u32	reserved;
+};
+
+/* definition of buffer control */
+enum drm_exynos_ipp_buf_ctrl {
+	IPP_BUF_CTRL_QUEUE,
+	IPP_BUF_CTRL_DEQUEUE,
+};
+
+/**
+ * A structure for ipp buffer operations.
+ *
+ * @ops_id: operation directions.
+ * @ctrl: buffer control.
+ * @prop_id: id of property.
+ * @buf_id: id of buffer.
+ * @handle: Y, Cb, Cr each planar handle.
+ * @user_data: user data.
+ */
+struct drm_exynos_ipp_buf {
+	enum drm_exynos_ops_id	ops_id;
+	enum drm_exynos_ipp_buf_ctrl	buf_ctrl;
+	__u32	prop_id;
+	__u32	buf_id;
+	__u32	handle[EXYNOS_DRM_PLANAR_MAX];
+	__u32	reserved;
+	__u64	user_data;
+};
+
+/**
+ * A structure for ipp start/stop operations.
+ *
+ * @prop_id: id of property.
+ * @use: use ipp device.
+ */
+struct drm_exynos_ipp_ctrl {
+	__u32	prop_id;
+	__u32	use;
 };
 
 #define DRM_EXYNOS_GEM_CREATE		0x00
@@ -356,8 +397,7 @@ struct drm_exynos_rot_exec_data {
 #define DRM_EXYNOS_GEM_MMAP		0x02
 #define DRM_EXYNOS_GEM_USERPTR		0x03
 #define DRM_EXYNOS_GEM_GET		0x04
-/* Reserved 0x04 ~ 0x05 for exynos specific gem ioctl */
-#define DRM_EXYNOS_PLANE_SET_ZPOS	0x06
+#define DRM_EXYNOS_USER_LIMIT		0x05
 #define DRM_EXYNOS_VIDI_CONNECTION	0x07
 
 /* temporary ioctl command. */
@@ -372,8 +412,11 @@ struct drm_exynos_rot_exec_data {
 #define DRM_EXYNOS_G2D_SET_CMDLIST	0x21
 #define DRM_EXYNOS_G2D_EXEC		0x22
 
-/* Rotator */
-#define DRM_EXYNOS_ROTATOR_EXEC		0x30
+/* IPP - Image Post Processing */
+#define DRM_EXYNOS_IPP_GET_PROPERTY	0x30
+#define DRM_EXYNOS_IPP_SET_PROPERTY	0x31
+#define DRM_EXYNOS_IPP_BUF			0x32
+#define DRM_EXYNOS_IPP_CTRL			0x33
 
 #define DRM_IOCTL_EXYNOS_GEM_CREATE		DRM_IOWR(DRM_COMMAND_BASE + \
 		DRM_EXYNOS_GEM_CREATE, struct drm_exynos_gem_create)
@@ -390,6 +433,9 @@ struct drm_exynos_rot_exec_data {
 #define DRM_IOCTL_EXYNOS_GEM_GET	DRM_IOWR(DRM_COMMAND_BASE + \
 		DRM_EXYNOS_GEM_GET,	struct drm_exynos_gem_info)
 
+#define DRM_IOCTL_EXYNOS_USER_LIMIT	DRM_IOWR(DRM_COMMAND_BASE + \
+		DRM_EXYNOS_USER_LIMIT,	struct drm_exynos_user_limit)
+
 #define DRM_IOCTL_EXYNOS_GEM_EXPORT_UMP	DRM_IOWR(DRM_COMMAND_BASE + \
 		DRM_EXYNOS_GEM_EXPORT_UMP, struct drm_exynos_gem_ump)
 
@@ -402,9 +448,6 @@ struct drm_exynos_rot_exec_data {
 #define DRM_IOCTL_EXYNOS_GEM_PHY_IMP	DRM_IOWR(DRM_COMMAND_BASE + \
 		DRM_EXYNOS_GEM_PHY_IMP, struct drm_exynos_gem_phy_imp)
 
-#define DRM_IOCTL_EXYNOS_PLANE_SET_ZPOS	DRM_IOWR(DRM_COMMAND_BASE + \
-		DRM_EXYNOS_PLANE_SET_ZPOS, struct drm_exynos_plane_set_zpos)
-
 #define DRM_IOCTL_EXYNOS_VIDI_CONNECTION	DRM_IOWR(DRM_COMMAND_BASE + \
 		DRM_EXYNOS_VIDI_CONNECTION, struct drm_exynos_vidi_connection)
 
@@ -415,11 +458,18 @@ struct drm_exynos_rot_exec_data {
 #define DRM_IOCTL_EXYNOS_G2D_EXEC		DRM_IOWR(DRM_COMMAND_BASE + \
 		DRM_EXYNOS_G2D_EXEC, struct drm_exynos_g2d_exec)
 
-#define DRM_IOCTL_EXYNOS_ROTATOR_EXEC		DRM_IOWR(DRM_COMMAND_BASE + \
-		DRM_EXYNOS_ROTATOR_EXEC, struct drm_exynos_rot_exec_data)
+#define DRM_IOCTL_EXYNOS_IPP_GET_PROPERTY	DRM_IOWR(DRM_COMMAND_BASE + \
+		DRM_EXYNOS_IPP_GET_PROPERTY, struct drm_exynos_ipp_property)
+#define DRM_IOCTL_EXYNOS_IPP_SET_PROPERTY	DRM_IOWR(DRM_COMMAND_BASE + \
+		DRM_EXYNOS_IPP_SET_PROPERTY, struct drm_exynos_ipp_property)
+#define DRM_IOCTL_EXYNOS_IPP_BUF	DRM_IOWR(DRM_COMMAND_BASE + \
+		DRM_EXYNOS_IPP_BUF, struct drm_exynos_ipp_buf)
+#define DRM_IOCTL_EXYNOS_IPP_CTRL		DRM_IOWR(DRM_COMMAND_BASE + \
+		DRM_EXYNOS_IPP_CTRL, struct drm_exynos_ipp_ctrl)
 
 /* EXYNOS specific events */
 #define DRM_EXYNOS_G2D_EVENT		0x80000000
+#define DRM_EXYNOS_IPP_EVENT		0x80000001
 
 struct drm_exynos_g2d_event {
 	struct drm_event	base;
@@ -428,6 +478,16 @@ struct drm_exynos_g2d_event {
 	__u32			tv_usec;
 	__u32			cmdlist_no;
 	__u32			reserved;
+};
+
+struct drm_exynos_ipp_event {
+	struct drm_event	base;
+	__u64			user_data;
+	__u32			tv_sec;
+	__u32			tv_usec;
+	__u32			prop_id;
+	__u32			reserved;
+	__u32			buf_id[EXYNOS_DRM_OPS_MAX];
 };
 
 /**
@@ -490,4 +550,38 @@ struct exynos_drm_hdmi_pdata {
 	int (*get_hpd)(void);
 };
 
+/**
+ * Platform Specific Structure for DRM based FIMC.
+ *
+ * @inv_pclk: if set 1. invert pixel clock
+ * @inv_vsync: if set 1. invert vsync signal for wb
+ * @inv_href: if set 1. invert href signal
+ * @inv_hsync: if set 1. invert hsync signal for wb
+ */
+struct exynos_drm_fimc_pol {
+	unsigned int inv_pclk;
+	unsigned int inv_vsync;
+	unsigned int inv_href;
+	unsigned int inv_hsync;
+};
+
+/* definition of chipset version */
+enum exynos_drm_fimc_ver {
+	FIMC_EXYNOS_4210,
+	FIMC_EXYNOS_4212,
+	FIMC_EXYNOS_4412,
+};
+
+/**
+ * Platform Specific Structure for DRM based FIMC.
+ *
+ * @pol: current hardware block polarity settings.
+ * @ver: current hardware block version.
+ */
+struct exynos_drm_fimc_pdata {
+	struct exynos_drm_fimc_pol pol;
+	enum exynos_drm_fimc_ver ver;
+};
+
 #endif
+

@@ -45,11 +45,28 @@
 #include <linux/i2c/fm34_we395.h>
 #endif
 
+#if defined(CONFIG_FM_SI4709_MODULE) || defined(CONFIG_FM_SI4705) || \
+	defined(CONFIG_FM_SI4705_MODULE)
+#include <linux/i2c/si47xx_common.h>
+#endif
+
+
 #ifdef CONFIG_AUDIENCE_ES305
 #include <linux/i2c/es305.h>
 #endif
 
 static bool midas_snd_mclk_enabled;
+
+#if defined(CONFIG_FM_SI4705)
+struct si47xx_info {
+#if defined(CONFIG_MACH_M0) || defined(CONFIG_MACH_M0_CTC)
+	int gpio_sw;
+#endif
+	int gpio_int;
+	int gpio_rst;
+} si47xx_data;
+
+#endif
 
 #ifdef CONFIG_ARCH_EXYNOS5
 #define I2C_NUM_2MIC	4
@@ -184,8 +201,18 @@ static struct wm8994_drc_cfg drc_value[] = {
 		.regs[0] = 0x008c,
 		.regs[1] = 0x0253,
 		.regs[2] = 0x0028,
-		.regs[3] = 0x028a,
+		.regs[3] = 0x028c,
 		.regs[4] = 0x0000,
+	},
+#endif
+#if defined(CONFIG_MACH_P4NOTE)
+{
+		.name = "cam rec DRC",
+		.regs[0] = 0x019B,
+		.regs[1] = 0x0844,
+		.regs[2] = 0x0408,
+		.regs[3] = 0x0108,
+		.regs[4] = 0x0120,
 	},
 #endif
 };
@@ -222,7 +249,13 @@ static struct wm8994_pdata wm1811_pdata = {
 	.jd_ext_cap = 1,
 
 	/* Regulated mode at highest output voltage */
+#ifdef CONFIG_TARGET_LOCALE_KOR
+	.micbias = {0x22, 0x22},
+#elif defined(CONFIG_MACH_C1_USA_ATT)
+	.micbias = {0x2f, 0x29},
+#else
 	.micbias = {0x2f, 0x27},
+#endif
 
 	.micd_lvl_sel = 0xFF,
 
@@ -231,14 +264,16 @@ static struct wm8994_pdata wm1811_pdata = {
 #ifdef CONFIG_TARGET_LOCALE_KOR
 	.lineout2_diff = 0,
 #endif
-#ifdef CONFIG_MACH_C1
+#if defined(CONFIG_MACH_C1) || defined(CONFIG_MACH_BAFFIN)
 	.lineout1fb = 0,
 #else
 	.lineout1fb = 1,
 #endif
 #if defined(CONFIG_MACH_M0) || defined(CONFIG_MACH_C1_KOR_SKT) || \
 	defined(CONFIG_MACH_C1_KOR_KT) || defined(CONFIG_MACH_C1_KOR_LGT) || \
-	defined(CONFIG_MACH_P4NOTE) || defined(CONFIG_MACH_GC1)
+	defined(CONFIG_MACH_P4NOTE) || defined(CONFIG_MACH_GC1) || \
+	defined(CONFIG_MACH_C1_USA_ATT) || defined(CONFIG_MACH_T0) || \
+	defined(CONFIG_MACH_M3) || defined(CONFIG_MACH_BAFFIN)
 	.lineout2fb = 0,
 #else
 	.lineout2fb = 1,
@@ -270,6 +305,7 @@ static struct fm34_platform_data fm34_we395_pdata_rev05 = {
 	.set_mclk = midas_snd_set_mclk,
 };
 #endif
+
 static struct i2c_board_info i2c_2mic[] __initdata = {
 	{
 		I2C_BOARD_INFO("fm34_we395", (0xC0 >> 1)), /* 2MIC */
@@ -277,7 +313,7 @@ static struct i2c_board_info i2c_2mic[] __initdata = {
 	},
 };
 
-#if defined(CONFIG_MACH_C1_KOR_LGT) || defined(CONFIG_MACH_C1VZW)
+#if defined(CONFIG_MACH_C1_KOR_LGT)
 static struct i2c_gpio_platform_data gpio_i2c_fm34 = {
 	.sda_pin = GPIO_FM34_SDA,
 	.scl_pin = GPIO_FM34_SCL,
@@ -290,6 +326,94 @@ struct platform_device s3c_device_fm34 = {
 };
 #endif
 #endif
+
+#if defined(CONFIG_FM_SI4709_MODULE) || defined(CONFIG_FM_SI4705) || \
+	defined(CONFIG_FM_SI4705_MODULE)
+static void fmradio_power(int on)
+{
+#if defined(CONFIG_MACH_M0) || defined(CONFIG_MACH_M0_CTC)
+	gpio_set_value(si47xx_data.gpio_sw, GPIO_LEVEL_HIGH);
+#endif
+	if (on) {
+		gpio_request(GPIO_FM_INT, "GPC1");
+		gpio_direction_output(GPIO_FM_INT, 1);
+		gpio_set_value(si47xx_data.gpio_rst, GPIO_LEVEL_LOW);
+		gpio_set_value(GPIO_FM_INT, GPIO_LEVEL_LOW);
+		usleep_range(5, 10);
+		gpio_set_value(si47xx_data.gpio_rst, GPIO_LEVEL_HIGH);
+		usleep_range(10, 15);
+		gpio_set_value(GPIO_FM_INT, GPIO_LEVEL_HIGH);
+
+		s3c_gpio_cfgpin(GPIO_FM_INT, S3C_GPIO_SFN(0xF));
+		gpio_free(GPIO_FM_INT);
+	} else {
+		gpio_set_value(si47xx_data.gpio_rst, GPIO_LEVEL_LOW);
+	}
+}
+
+static struct si47xx_platform_data si47xx_pdata = {
+#if defined(CONFIG_MACH_M0_CTC)
+	.rx_vol = {0x0, 0x15, 0x18, 0x1B, 0x1E, 0x21, 0x24, 0x27,
+		0x2A, 0x2D, 0x30, 0x33, 0x36, 0x39, 0x3C, 0x3F},
+#else
+	.rx_vol = {0x0, 0x13, 0x16, 0x19, 0x1C, 0x1F, 0x22, 0x25,
+		0x28, 0x2B, 0x2E, 0x31, 0x34, 0x37, 0x3A, 0x3D},
+#endif
+	.power = fmradio_power,
+};
+
+static struct i2c_gpio_platform_data gpio_i2c_data19 = {
+	.sda_pin = GPIO_FM_SDA,
+	.scl_pin = GPIO_FM_SCL,
+};
+
+struct platform_device s3c_device_i2c19 = {
+	.name = "i2c-gpio",
+	.id = 19,
+	.dev.platform_data = &gpio_i2c_data19,
+};
+
+/* I2C19 */
+static struct i2c_board_info i2c_devs19_emul[] __initdata = {
+#if defined(CONFIG_FM_SI4705) || defined(CONFIG_FM_SI4705_MODULE)
+	{
+		I2C_BOARD_INFO("Si47xx", (0x22 >> 1)),
+		.platform_data = &si47xx_pdata,
+#if defined(CONFIG_MACH_M0_DUOSCTC)
+		.irq = IRQ_EINT(4),
+#else
+		.irq = IRQ_EINT(11),
+#endif
+	},
+#endif
+#ifdef CONFIG_FM_SI4709_MODULE
+	{
+		I2C_BOARD_INFO("Si4709", (0x20 >> 1)),
+	},
+#endif
+
+};
+#endif
+
+static void m0_gpio_init(void)
+{
+#ifdef CONFIG_FM_SI4705
+#if defined(CONFIG_MACH_M0) || defined(CONFIG_MACH_M0_CTC)
+	si47xx_data.gpio_sw = GPIO_FM_MIC_SW;
+#endif
+
+	si47xx_data.gpio_rst = GPIO_FM_RST;
+	s3c_gpio_setpull(GPIO_FM_INT, S3C_GPIO_PULL_UP);
+
+	if (gpio_is_valid(si47xx_data.gpio_rst)) {
+		if (gpio_request(si47xx_data.gpio_rst, "GPC1"))
+			debug(KERN_ERR "Failed to request "
+			"FM_RST!\n\n");
+		gpio_direction_output(si47xx_data.gpio_rst, GPIO_LEVEL_LOW);
+	}
+#endif
+}
+
 
 #ifdef CONFIG_AUDIENCE_ES305
 static struct es305_platform_data es305_pdata = {
@@ -307,16 +431,23 @@ static struct i2c_board_info i2c_2mic[] __initdata = {
 #endif
 
 static struct platform_device *midas_sound_devices[] __initdata = {
-#if defined(CONFIG_MACH_C1_KOR_LGT) || defined(CONFIG_MACH_C1VZW)
+#if defined(CONFIG_MACH_C1_KOR_LGT)
 #ifdef CONFIG_FM34_WE395
 	&s3c_device_fm34,
 #endif
 #endif
+#if defined(CONFIG_FM_SI4709_MODULE) || defined(CONFIG_FM_SI4705) || \
+	defined(CONFIG_FM_SI4705_MODULE)
+	&s3c_device_i2c19,
+#endif
+
 };
 
 void __init midas_sound_init(void)
 {
 	printk(KERN_INFO "Sound: start %s\n", __func__);
+
+	m0_gpio_init();
 
 	platform_add_devices(midas_sound_devices,
 		ARRAY_SIZE(midas_sound_devices));
@@ -334,6 +465,11 @@ void __init midas_sound_init(void)
 	SET_PLATDATA_CODEC(NULL);
 	i2c_register_board_info(I2C_NUM_CODEC, i2c_wm1811,
 					ARRAY_SIZE(i2c_wm1811));
+
+#elif defined(CONFIG_MACH_GC1)
+		SET_PLATDATA_CODEC(NULL);
+		i2c_register_board_info(I2C_NUM_CODEC, i2c_wm1811,
+						ARRAY_SIZE(i2c_wm1811));
 
 #else
 	if (system_rev != 3 && system_rev >= 0) {
@@ -362,4 +498,11 @@ void __init midas_sound_init(void)
 	SET_PLATDATA_2MIC(NULL);
 	i2c_register_board_info(I2C_NUM_2MIC, i2c_2mic, ARRAY_SIZE(i2c_2mic));
 #endif
+#if defined(CONFIG_FM_SI4709_MODULE) || defined(CONFIG_FM_SI4705) || \
+	defined(CONFIG_FM_SI4705_MODULE)
+	i2c_register_board_info(19, i2c_devs19_emul,
+				ARRAY_SIZE(i2c_devs19_emul));
+#endif
+
 }
+
