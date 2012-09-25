@@ -166,8 +166,8 @@ static int get_if_pmic_inifo(char *str)
 	get_option(&str, &if_muic_info);
 	switch_sel = if_muic_info & 0x0f;
 	if_pmic_rev = (if_muic_info & 0xf0) >> 4;
-	pr_info("%s %s: switch_sel: %x if_pmic_rev:%x\n",
-		__FILE__, __func__, switch_sel, if_pmic_rev);
+	pr_info("%s: switch_sel: %x if_pmic_rev:%x\n",
+		__func__, switch_sel, if_pmic_rev);
 	return if_muic_info;
 }
 __setup("pmic_info=", get_if_pmic_inifo);
