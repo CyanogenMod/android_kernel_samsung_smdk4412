@@ -511,6 +511,7 @@ static int max77686_set_voltage(struct regulator_dev *rdev,
 	if (!gpio_get_value(GPIO_HDMI_EN))
 #endif
 #endif
+#endif
 #if MAX77686_DEBUG
 		printk(PMIC_REG_DEBUG "max77686: id=%d, org=%x, val=%x",
 			rdev_get_id(rdev), org, i);
