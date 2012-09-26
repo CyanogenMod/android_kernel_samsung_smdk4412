@@ -3136,14 +3136,6 @@ static int isx012_s_mbus_fmt(struct v4l2_subdev *sd,
 		isx012_set_framesize(sd, isx012_capture_frmsizes,
 			ARRAY_SIZE(isx012_capture_frmsizes), false);
 
-		/* for maket app.
-		 * Samsung camera app does not use unmatched ratio.*/
-		if (unlikely(FRM_RATIO(state->preview.frmsize)
-		    != FRM_RATIO(state->capture.frmsize))) {
-			cam_warn("%s: warning, capture ratio " \
-				"is different with preview ratio\n",
-				__func__);
-		}
 	}
 
 	return 0;
