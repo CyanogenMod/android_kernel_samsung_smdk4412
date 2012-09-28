@@ -542,7 +542,7 @@ do {												\
 												\
 	R_SDREG(intstatuserr, &bus->regs->intstatus, retries);					\
 	printf("dstatussw = 0x%x, dstatushw = 0x%x, intstatus = 0x%x\n",			\
-	        dstatussw, dstatushw, intstatuserr); 						\
+	        dstatussw, dstatushw, intstatuserr);						\
 												\
 	bus->nextlen = 0;									\
 	*finished = TRUE;									\

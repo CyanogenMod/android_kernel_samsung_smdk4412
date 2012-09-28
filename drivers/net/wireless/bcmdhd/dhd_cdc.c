@@ -21,7 +21,7 @@
  * software in any way with any other Broadcom software provided under a license
  * other than the GPL, without Broadcom's express prior written consent.
  *
- * $Id: dhd_cdc.c 353370 2012-08-27 09:10:22Z $
+ * $Id: dhd_cdc.c 355860 2012-09-10 06:08:02Z $
  *
  * BDC is like CDC, except it includes a header for data packets to convey
  * packet priority over the bus, and flags (e.g. to indicate checksum status
@@ -889,6 +889,13 @@ _dhd_wlfc_pullheader(athost_wl_status_info_t* ctx, void* pktbuf)
 
 	/* pull BDC header */
 	PKTPULL(ctx->osh, pktbuf, BDC_HEADER_LEN);
+
+	if (PKTLEN(ctx->osh, pktbuf) < (h->dataOffset << 2)) {
+		WLFC_DBGMESG(("%s: rx data too short (%d < %d)\n", __FUNCTION__,
+		           PKTLEN(ctx->osh, pktbuf), (h->dataOffset << 2)));
+		return BCME_ERROR;
+	}
+
 	/* pull wl-header */
 	PKTPULL(ctx->osh, pktbuf, (h->dataOffset << 2));
 	return BCME_OK;
@@ -952,6 +959,14 @@ _dhd_wlfc_rollback_packet_toq(athost_wl_status_info_t* ctx,
 		else {
 			/* remove header first */
 			_dhd_wlfc_pullheader(ctx, p);
+                        if (rc != BCME_OK)          {
+                                WLFC_DBGMESG(("Error: %s():%d\n", __FUNCTION__, __LINE__));
+                                /* free the hanger slot */
+                                dhd_wlfc_hanger_poppkt(ctx->hanger, hslot, &pktout, 1);
+                                PKTFREE(ctx->osh, p, TRUE);
+                                rc = BCME_ERROR;
+                                return rc;
+                        }
 
 			if (pkt_type == eWLFC_PKTTYPE_DELAYED) {
 				/* delay-q packets are going to delay-q */
@@ -1201,8 +1216,8 @@ _dhd_wlfc_pretx_pktprocess(athost_wl_status_info_t* ctx,
 		int gen;
 
 		/* remove old header */
-		_dhd_wlfc_pullheader(ctx, p);
-
+		rc = _dhd_wlfc_pullheader(ctx, p);
+		if (rc == BCME_OK) {
 		hslot = WLFC_PKTID_HSLOT_GET(DHD_PKTTAG_H2DTAG(PKTTAG(p)));
 		dhd_wlfc_hanger_get_genbit(ctx->hanger, p, hslot, &gen);
 
@@ -1211,6 +1226,7 @@ _dhd_wlfc_pretx_pktprocess(athost_wl_status_info_t* ctx,
 		/* push new header */
 		_dhd_wlfc_pushheader(ctx, p, send_tim_update,
 			entry->traffic_lastreported_bmp, entry->mac_handle, htod);
+	}
 	}
 	*slot = hslot;
 	return rc;

@@ -2230,8 +2230,6 @@ wl_cfgp2p_register_ndev(struct wl_priv *wl)
 	}
 
 	printk("%s: P2P Interface Registered\n", net->name);
-	wdev->wiphy->interface_modes |= (BIT(NL80211_IFTYPE_P2P_CLIENT)
-		| BIT(NL80211_IFTYPE_P2P_GO));
 
 	return ret;
 fail:
@@ -2307,8 +2305,8 @@ static int wl_cfgp2p_if_open(struct net_device *net)
 	 */
 	wl_cfg80211_do_driver_init(net);
 
-//	wdev->wiphy->interface_modes |= (BIT(NL80211_IFTYPE_P2P_CLIENT)
-//		| BIT(NL80211_IFTYPE_P2P_GO));
+	wdev->wiphy->interface_modes |= (BIT(NL80211_IFTYPE_P2P_CLIENT)
+		| BIT(NL80211_IFTYPE_P2P_GO));
 
 	return 0;
 }
@@ -2336,9 +2334,9 @@ static int wl_cfgp2p_if_stop(struct net_device *net)
 	spin_unlock_irqrestore(&wl->cfgdrv_lock, flags);
 	if (clear_flag)
 		wl_clr_drv_status(wl, SCANNING, net);
-//	wdev->wiphy->interface_modes = (wdev->wiphy->interface_modes)
-//					& (~(BIT(NL80211_IFTYPE_P2P_CLIENT)|
-//					BIT(NL80211_IFTYPE_P2P_GO)));
+	wdev->wiphy->interface_modes = (wdev->wiphy->interface_modes)
+					& (~(BIT(NL80211_IFTYPE_P2P_CLIENT)|
+					BIT(NL80211_IFTYPE_P2P_GO)));
 #if defined(CUSTOMER_HW4)
 	if (net->flags & IFF_UP)
 		net->flags &= ~IFF_UP;

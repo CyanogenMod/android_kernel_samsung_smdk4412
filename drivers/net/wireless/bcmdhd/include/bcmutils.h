@@ -663,7 +663,7 @@ extern void *_bcmutils_dummy_fn;
 #else
 #define MACDBG				"%02x:%02x:%02x"
 #define STR_TO_MACD(ea) (ea)[0], (ea)[4], (ea)[5]
-#endif 
+#endif
 
 
 typedef struct bcm_bit_desc {

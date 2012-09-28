@@ -99,6 +99,9 @@ extern int dhd_get_concurrent_capabilites(dhd_pub_t *dhd);
 bool ap_cfg_running = FALSE;
 bool ap_fw_loaded = FALSE;
 
+#if 1
+extern int force_hang;
+#endif
 
 #ifdef DHD_DEBUG
 const char dhd_version[] = "Dongle Host Driver, version " EPI_VERSION_STR "\nCompiled on "
@@ -332,11 +335,16 @@ dhd_doiovar(dhd_pub_t *dhd_pub, const bcm_iovar_t *vi, uint32 actionid, const ch
 		break;
 
 	case IOV_SVAL(IOV_MSGLEVEL):
+#if 0
 #ifdef WL_CFG80211
 		/* Enable DHD and WL logs in oneshot */
 		if (int_val & DHD_WL_VAL)
 			wl_cfg80211_enable_trace(int_val & (~DHD_WL_VAL));
 		else
+#endif
+#else
+		if (!force_hang)
+			force_hang = 1;
 #endif
 		dhd_msg_level = int_val;
 		break;

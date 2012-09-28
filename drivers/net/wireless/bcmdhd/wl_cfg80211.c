@@ -21,7 +21,7 @@
  * software in any way with any other Broadcom software provided under a license
  * other than the GPL, without Broadcom's express prior written consent.
  *
- * $Id: wl_cfg80211.c 354524 2012-08-31 12:10:27Z $
+ * $Id: wl_cfg80211.c 355921 2012-09-10 14:13:29Z $
  */
 
 #include <typedefs.h>
@@ -2833,6 +2833,9 @@ wl_cfg80211_connect(struct wiphy *wiphy, struct net_device *dev,
 	wl_extjoin_params_t *ext_join_params;
 	struct wl_join_params join_params;
 	size_t join_params_size;
+#ifdef ROAM_AP_ENV_DETECTION
+	dhd_pub_t *dhd =  (dhd_pub_t *)(wl->pub);
+#endif /* ROAM_AP_ENV_DETECTION */
 	s32 err = 0;
 	wpa_ie_fixed_t *wpa_ie;
 	bcm_tlv_t *wpa2_ie;
@@ -2941,7 +2944,17 @@ wl_cfg80211_connect(struct wiphy *wiphy, struct net_device *dev,
 			return err;
 		}
 	}
-
+#ifdef ROAM_AP_ENV_DETECTION
+	if (dhd->roam_env_detection && (wldev_iovar_setint(dev, "roam_env_detection",
+		AP_ENV_DETECT_NOT_USED) == BCME_OK)) {
+		s32 roam_trigger[2] = {WL_AUTO_ROAM_TRIGGER, WLC_BAND_ALL};
+		err = wldev_ioctl(dev, WLC_SET_ROAM_TRIGGER, roam_trigger,
+			sizeof(roam_trigger), true);
+		if (unlikely(err)) {
+			WL_ERR((" failed to restore roam_trigger for auto env detection\n"));
+		}
+	}
+#endif /* ROAM_AP_ENV_DETECTION */
 	if (chan) {
 #ifdef ROAM_CHANNEL_CACHE
 		wlc_ssid_t ssid;
@@ -6683,6 +6696,9 @@ wl_bss_connect_done(struct wl_priv *wl, struct net_device *ndev,
 	const wl_event_msg_t *e, void *data, bool completed)
 {
 	struct wl_connect_info *conn_info = wl_to_conn(wl);
+#ifdef ROAM_AP_ENV_DETECTION
+	dhd_pub_t *dhd =  (dhd_pub_t *)(wl->pub);
+#endif /* ROAM_AP_ENV_DETECTION */
 	s32 err = 0;
 	u8 *curbssid = wl_read_prof(wl, ndev, WL_PROF_BSSID);
 
@@ -6719,6 +6735,11 @@ wl_bss_connect_done(struct wl_priv *wl, struct net_device *ndev,
 			wl_update_bss_info(wl, ndev);
 			wl_update_pmklist(ndev, wl->pmk_list, err);
 			wl_set_drv_status(wl, CONNECTED, ndev);
+#ifdef ROAM_AP_ENV_DETECTION
+			if (dhd->roam_env_detection)
+				wldev_iovar_setint(ndev, "roam_env_detection",
+					AP_ENV_INDETERMINATE);
+#endif /* ROAM_AP_ENV_DETECTION */
 		}
 		cfg80211_connect_result(ndev,
 			curbssid,
@@ -8993,7 +9014,6 @@ static s32 __wl_cfg80211_down(struct wl_priv *wl)
 	struct net_info *iter, *next;
 	struct net_device *ndev = wl_to_prmry_ndev(wl);
 #ifdef WL_ENABLE_P2P_IF
-	struct wiphy *wiphy = wl_to_prmry_ndev(wl)->ieee80211_ptr->wiphy;
 #if !defined(CUSTOMER_HW4)
 	struct net_device *p2p_net = wl->p2p_net;
 #endif /* !defined(CUSTOMER_HW4) */
@@ -9026,9 +9046,6 @@ static s32 __wl_cfg80211_down(struct wl_priv *wl)
 	wl_to_prmry_ndev(wl)->ieee80211_ptr->iftype =
 		NL80211_IFTYPE_STATION;
 #ifdef WL_ENABLE_P2P_IF
-//	wiphy->interface_modes = (wiphy->interface_modes)
-//					& (~(BIT(NL80211_IFTYPE_P2P_CLIENT)|
-//					BIT(NL80211_IFTYPE_P2P_GO)));
 #if !defined(CUSTOMER_HW4)
 	if ((p2p_net) && (p2p_net->flags & IFF_UP)) {
 		/* p2p0 interface is still UP. Bring it down */

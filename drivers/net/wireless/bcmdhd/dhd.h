@@ -24,7 +24,7 @@
  * software in any way with any other Broadcom software provided under a license
  * other than the GPL, without Broadcom's express prior written consent.
  *
- * $Id: dhd.h 354524 2012-08-31 12:10:27Z $
+ * $Id: dhd.h 355877 2012-09-10 06:53:46Z $
  */
 
 /****************
@@ -264,6 +264,9 @@ typedef struct dhd_pub {
 #ifdef PROP_TXSTATUS
 	int   wlfc_enabled;
 	void* wlfc_state;
+#endif
+#ifdef ROAM_AP_ENV_DETECTION
+	bool	roam_env_detection;
 #endif
 	bool	dongle_isolation;
 	bool	dongle_trap_occured;	/* flag for sending HANG event to upper layer */
@@ -678,15 +681,15 @@ extern uint dhd_force_tx_queueing;
 #define NULL_PKT_STR	"null_pkt"
 
 /* hooks for custom glom setting option via Makefile */
-#define DEFAULT_GLOM_VALUE 	-1
+#define DEFAULT_GLOM_VALUE	-1
 #ifndef CUSTOM_GLOM_SETTING
-#define CUSTOM_GLOM_SETTING 	DEFAULT_GLOM_VALUE
+#define CUSTOM_GLOM_SETTING	DEFAULT_GLOM_VALUE
 #endif
 
 /* hooks for custom dhd_dpc_prio setting option via Makefile */
 #define DEFAULT_DHP_DPC_PRIO  1
 #ifndef CUSTOM_DPC_PRIO_SETTING
-#define CUSTOM_DPC_PRIO_SETTING 	DEFAULT_DHP_DPC_PRIO
+#define CUSTOM_DPC_PRIO_SETTING		DEFAULT_DHP_DPC_PRIO
 #endif
 
 
@@ -726,6 +729,8 @@ int dhd_deepsleep(struct net_device *dev, int flag);
 #define DHD_MAX_IFS	16
 #define DHD_DEL_IF	-0xe
 #define DHD_BAD_IF	-0xf
+#define WL_AUTO_ROAM_TRIGGER -75
+
 
 #ifdef PROP_TXSTATUS
 /* Please be mindful that total pkttag space is 32 octets only */

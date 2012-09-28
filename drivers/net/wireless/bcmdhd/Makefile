@@ -18,7 +18,7 @@ DHDCFLAGS = -Wall -Wstrict-prototypes -Dlinux -DLINUX -DBCMDRIVER             \
 
 DHDCFLAGS += -DCUSTOMER_HW4
 DHDCFLAGS += -DBLOCK_IPV6_PACKET -DPASS_IPV4_SUSPEND
-DHDCFLAGS += -DSUPPORT_DEEP_SLEEP -DWL_CFG80211_STA_EVENT
+DHDCFLAGS += -DSUPPORT_DEEP_SLEEP
 DHDCFLAGS += -DSIMPLE_MAC_PRINT
 
 # For p2p connection issue
@@ -29,7 +29,7 @@ DHDCFLAGS += -DWL_SCB_TIMEOUT=10
 DHDCFLAGS += -DPASS_ALL_MCAST_PKTS
 
 # Early suspend
-DHDCFLAGS += -DDHD_USE_EARLYSUSPEND  
+DHDCFLAGS += -DDHD_USE_EARLYSUSPEND
 
 DHDCFLAGS += -DSUPPORT_PM2_ONLY
 
@@ -37,7 +37,7 @@ DHDCFLAGS += -DSUPPORT_PM2_ONLY
 DHDCFLAGS += -DESCAN_RESULT_PATCH
 DHDCFLAGS += -DDUAL_ESCAN_RESULT_BUFFER
 
-DHDCFLAGS += -DROAM_ENABLE -DROAM_CHANNEL_CACHE -DROAM_API 
+DHDCFLAGS += -DROAM_ENABLE -DROAM_CHANNEL_CACHE -DROAM_API -DROAM_AP_ENV_DETECTION
 DHDCFLAGS += -DDISABLE_FW_ROAM_SUSPEND
 
 # For Static Buffer
@@ -56,8 +56,8 @@ DHDCFLAGS += -DWL_CFG80211
 
 # SoftAP
 DHDCFLAGS += -DSUPPORT_AUTO_CHANNEL -DSUPPORT_HIDDEN_AP
-DHDCFLAGS += -DSUPPORT_SOFTAP_SINGL_DISASSOC 
-DHDCFLAGS += -DUSE_STAMAC_4SOFTAP 
+DHDCFLAGS += -DSUPPORT_SOFTAP_SINGL_DISASSOC
+DHDCFLAGS += -DUSE_STAMAC_4SOFTAP
 
 # DPC priority
 DHDCFLAGS += -DCUSTOM_DPC_PRIO_SETTING=98
@@ -69,10 +69,11 @@ DHDCFLAGS += -DWIFI_TURNOFF_DELAY=100
 DHDCFLAGS += -DUSE_KTHREAD_API
 
 ############
-# JellyBean 
+# JellyBean
 ############
 DHDCFLAGS += -DWL_ENABLE_P2P_IF
 DHDCFLAGS += -DMULTIPLE_SUPPLICANT
+DHDCFLAGS += -DWL_CFG80211_STA_EVENT
 
 #########################
 # Chip dependent feature
@@ -112,11 +113,20 @@ endif
 # Platform dependent feature
 #############################
 
-# NAT keepalive packet filter for GAN-lite
-ifeq ($(SEC_MODEL_NAME),U1)
-  ifeq ($(X_BUILD_LOCALE),EUR_ORG)
-    DHDCFLAGS += -DGAN_LITE_NAT_KEEPALIVE_FILTER
-  endif
+ifeq ($(CONFIG_SPI_SC8810),y)
+DHDCFLAGS += -DREAD_MACADDR -DBCMSPI -DBCMSPI_ANDROID -DSPI_PIO_32BIT_RW -DSPI_PIO_RW_BIGENDIAN
+
+#Remove defines for SDMMC
+DHDCFLAGS :=$(filter-out -DOOB_INTR_ONLY,$(DHDCFLAGS))
+DHDCFLAGS :=$(filter-out -DBCMLXSDMMC,$(DHDCFLAGS))
+
+#Remove STATIC_WL_PRIV_STRUCT until implemented in the board file.
+DHDCFLAGS :=$(filter-out -DSTATIC_WL_PRIV_STRUCT,$(DHDCFLAGS))
+
+#Remove defines for JB
+DHDCFLAGS :=$(filter-out -DWL_ENABLE_P2P_IF,$(DHDCFLAGS))
+DHDCFLAGS :=$(filter-out -DMULTIPLE_SUPPLICANT,$(DHDCFLAGS))
+DHDCFLAGS :=$(filter-out -DWL_CFG80211_STA_EVENT,$(DHDCFLAGS))
 endif
 
 #For INITIAL 2G scan features
@@ -181,6 +191,13 @@ DHDOFILES := bcmsdh.o bcmsdh_linux.o bcmsdh_sdmmc.o bcmsdh_sdmmc_linux.o \
 	dhd_linux.o dhd_linux_sched.o dhd_cfg80211.o dhd_sdio.o aiutils.o bcmevent.o \
 	bcmutils.o bcmwifi_channels.o hndpmu.o linux_osl.o sbutils.o siutils.o \
 	wl_android.o wl_cfg80211.o wl_cfgp2p.o wldev_common.o wl_linux_mon.o wl_roam.o
+
+# For SPI projects
+ifeq ($(CONFIG_SPI_SC8810),y)
+DHDOFILES += bcmsdspi_linux.o bcmspibrcm.o
+DHDOFILES :=$(filter-out bcmsdh_sdmmc.o,$(DHDOFILES))
+DHDOFILES :=$(filter-out bcmsdh_sdmmc_linux.o,$(DHDOFILES))
+endif
 
 dhd-y := $(DHDOFILES)
 obj-m   += dhd.o

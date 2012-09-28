@@ -76,7 +76,7 @@ do {										\
 	if ((wl_dbg_level & WL_DBG_ERR) && net_ratelimit()) {				\
 			printk(KERN_INFO "CFG80211-INFO2) %s : ", __func__);	\
 			printk args;						\
-		} 								\
+		}								\
 } while (0)
 #endif /* defined(DHD_DEBUG) */
 
@@ -119,7 +119,7 @@ do {										\
 	if (wl_dbg_level & WL_DBG_ERR) {				\
 			printk(KERN_INFO "CFG80211-TRACE) %s : ", __func__);	\
 			printk args;						\
-		} 								\
+		}								\
 } while (0)
 #else
 #define	WL_TRACE_HW4			WL_TRACE
@@ -158,7 +158,7 @@ do {									\
 #define IFACE_MAX_CNT 		2
 #define WL_SCAN_CONNECT_DWELL_TIME_MS 200
 #define WL_SCAN_JOIN_PROBE_INTERVAL_MS 20
-#define WL_AF_TX_MAX_RETRY 	5
+#define WL_AF_TX_MAX_RETRY	5
 
 #define WL_SCAN_TIMER_INTERVAL_MS	8000 /* Scan timeout */
 #define WL_CHANNEL_SYNC_RETRY 	5
