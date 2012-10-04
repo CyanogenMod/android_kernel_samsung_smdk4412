@@ -430,6 +430,7 @@ static int s3cfb_wait_for_vsync_thread(void *data)
 						msecs_to_jiffies(VSYNC_TIMEOUT_MSEC));
 
 		if (ret > 0) {
+#if defined(CONFIG_FB_S5P_VSYNC_SEND_UEVENTS)
 			char *envp[2];
 			char buf[64];
 			snprintf(buf, sizeof(buf), "VSYNC=%llu",
@@ -438,6 +439,7 @@ static int s3cfb_wait_for_vsync_thread(void *data)
 			envp[1] = NULL;
 			kobject_uevent_env(&fbdev->dev->kobj, KOBJ_CHANGE,
 							envp);
+#endif
 		}
 	}
 
