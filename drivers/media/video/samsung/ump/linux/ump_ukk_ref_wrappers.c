@@ -1,9 +1,9 @@
 /*
- * Copyright (C) 2010-2012 ARM Limited. All rights reserved.
- *
+ * Copyright (C) 2010 ARM Limited. All rights reserved.
+ * 
  * This program is free software and is provided to you under the terms of the GNU General Public License version 2
  * as published by the Free Software Foundation, and any use by you of this program is subject to the terms of such GNU licence.
- *
+ * 
  * A copy of the licence is included with the program, and can also be obtained from Free Software
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
  */
@@ -130,6 +130,12 @@ int ump_ion_import_wrapper(u32 __user * argument, struct ump_session_data  * ses
 	sg_ion = ion_map_dma(ion_client_ump,ion_hnd);
 
 	blocks = (ump_dd_physical_block*)_mali_osk_malloc(sizeof(ump_dd_physical_block)*1024);
+
+	if (NULL == blocks) {
+		MSG_ERR(("Failed to allocate blocks in ump_ioctl_allocate()\n"));
+		return -ENOMEM;
+	}
+
 	sg = sg_ion;
 	do {
 		blocks[i].addr = sg_phys(sg);
@@ -190,16 +196,45 @@ int ump_ion_import_wrapper(u32 __user * argument, struct ump_session_data  * ses
 #endif
 
 #ifdef CONFIG_DMA_SHARED_BUFFER
+static ump_dd_handle
+	get_ump_handle_from_dmabuf(struct ump_session_data *session_data,
+					struct dma_buf *dmabuf)
+{
+	ump_session_memory_list_element *session_mem, *tmp;
+	struct dma_buf_attachment *attach;
+	ump_dd_handle ump_handle;
+
+	_mali_osk_lock_wait(session_data->lock, _MALI_OSK_LOCKMODE_RW);
+
+	_MALI_OSK_LIST_FOREACHENTRY(session_mem, tmp,
+				&session_data->list_head_session_memory_list,
+				ump_session_memory_list_element, list) {
+		if (session_mem->mem->import_attach) {
+			attach = session_mem->mem->import_attach;
+			if (attach->dmabuf == dmabuf) {
+				_mali_osk_lock_signal(session_data->lock,
+							_MALI_OSK_LOCKMODE_RW);
+				ump_handle = (ump_dd_handle)session_mem->mem;
+				return ump_handle;
+			}
+		}
+	}
+
+	_mali_osk_lock_signal(session_data->lock, _MALI_OSK_LOCKMODE_RW);
+
+	return NULL;
+}
+
 int ump_dmabuf_import_wrapper(u32 __user *argument,
 				struct ump_session_data  *session_data)
 {
 	ump_session_memory_list_element *session = NULL;
 	struct ump_uk_dmabuf ump_dmabuf;
-	ump_dd_handle *ump_handle;
-	ump_dd_physical_block *blocks;
-	struct dma_buf_attachment *attach;
+	ump_dd_handle ump_handle;
+	ump_dd_physical_block *blocks = NULL;
+	struct dma_buf_attachment *attach = NULL;
 	struct dma_buf *dma_buf;
-	struct sg_table *sgt;
+	struct sg_table *sgt = NULL;
 	struct scatterlist *sgl;
 	unsigned long block_size;
 	/* FIXME */
@@ -224,12 +259,15 @@ int ump_dmabuf_import_wrapper(u32 __user *argument,
 		return PTR_ERR(dma_buf);
 
 	/*
-	 * check whether dma_buf imported already exists or not.
-	 *
-	 * TODO
-	 * if already imported then dma_buf_put() should be called
-	 * and then just return dma_buf imported.
+	 * if already imported then increase a refcount to the ump descriptor
+	 * and call dma_buf_put() and then go to found to return previous
+	 * ump secure id.
 	 */
+	ump_handle = get_ump_handle_from_dmabuf(session_data, dma_buf);
+	if (ump_handle) {
+		dma_buf_put(dma_buf);
+		goto found;
+	}
 
 	attach = dma_buf_attach(dma_buf, &dev);
 	if (IS_ERR(attach)) {
@@ -251,6 +289,13 @@ int ump_dmabuf_import_wrapper(u32 __user *argument,
 	block_size = sizeof(ump_dd_physical_block) * npages;
 
 	blocks = (ump_dd_physical_block *)_mali_osk_malloc(block_size);
+	/*here, need to add error handling*/
+	if (NULL == blocks) {
+		MSG_ERR(("Failed to allocate blocks\n"));
+		ret = -ENOMEM;
+		goto err_dmu_buf_unmap
+	}
+
 	sgl = sgt->sgl;
 
 	while (i < npages) {
@@ -279,6 +324,8 @@ int ump_dmabuf_import_wrapper(u32 __user *argument,
 	}
 
 	session->mem = (ump_dd_mem *)ump_handle;
+	session->mem->import_attach = attach;
+	session->mem->sgt = sgt;
 
 	_mali_osk_lock_wait(session_data->lock, _MALI_OSK_LOCKMODE_RW);
 	_mali_osk_list_add(&(session->list),
@@ -287,7 +334,8 @@ int ump_dmabuf_import_wrapper(u32 __user *argument,
 
 	_mali_osk_free(blocks);
 
-	ump_dmabuf.ump_handle = (uint32_t)ump_handle;
+found:
+	ump_dmabuf.secure_id = ump_dd_secure_id_get(ump_handle);
 	ump_dmabuf.size = ump_dd_size_get(ump_handle);
 
 	if (copy_to_user(argument, &ump_dmabuf,
@@ -305,6 +353,7 @@ err_free_session:
 	_mali_osk_free(session);
 err_free_block:
 	_mali_osk_free(blocks);
+err_dmu_buf_unmap:
 	dma_buf_unmap_attachment(attach, sgt, DMA_BIDIRECTIONAL);
 err_dma_buf_detach:
 	dma_buf_detach(dma_buf, attach);

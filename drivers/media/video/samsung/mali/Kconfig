@@ -6,7 +6,7 @@
 config VIDEO_MALI400MP
 	bool "Enable MALI integration"
 	depends on VIDEO_SAMSUNG
-	default y
+	default n
 	---help---
                 This enables MALI integration in the multimedia device driver
 
@@ -54,6 +54,13 @@ config VIDEO_MALI400MP_DEBUG
 	default n
 	help
 	  This enables Mali driver debug messages.
+
+config VIDEO_MALI400MP_STREAMLINE_PROFILING
+	bool "Enables mali streamline profiling"
+	depends on VIDEO_MALI400MP
+	default n
+	help
+	  This enables Mali streamline profiling.
 
 config VIDEO_MALI400MP_DVFS
 	bool "Enables DVFS"

@@ -1,9 +1,9 @@
 /*
- * Copyright (C) 2010-2012 ARM Limited. All rights reserved.
- *
+ * Copyright (C) 2010 ARM Limited. All rights reserved.
+ * 
  * This program is free software and is provided to you under the terms of the GNU General Public License version 2
  * as published by the Free Software Foundation, and any use by you of this program is subject to the terms of such GNU licence.
- *
+ * 
  * A copy of the licence is included with the program, and can also be obtained from Free Software
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
  */
@@ -52,7 +52,6 @@ static void block_allocator_shutdown(ump_memory_backend * backend);
 static int block_allocator_allocate(void* ctx, ump_dd_mem * mem);
 static void block_allocator_release(void * ctx, ump_dd_mem * handle);
 static inline u32 get_phys(block_allocator * allocator, block_info * block);
-static u32 block_allocator_stat(struct ump_memory_backend *backend);
 
 
 
@@ -105,7 +104,6 @@ ump_memory_backend * ump_block_allocator_create(u32 base_address, u32 size)
 				backend->allocate = block_allocator_allocate;
 				backend->release = block_allocator_release;
 				backend->shutdown = block_allocator_shutdown;
-				backend->stat = block_allocator_stat;
 				backend->pre_allocate_physical_check = NULL;
 				backend->adjust_to_mali_phys = NULL;
 				backend->get = NULL;
@@ -222,7 +220,6 @@ static int block_allocator_allocate(void* ctx, ump_dd_mem * mem)
 	mem->backend_info = last_allocated;
 
 	up(&allocator->mutex);
-	mem->is_cached=0;
 
 	return 1;
 }
@@ -274,14 +271,4 @@ static void block_allocator_release(void * ctx, ump_dd_mem * handle)
 static inline u32 get_phys(block_allocator * allocator, block_info * block)
 {
 	return allocator->base + ((block - allocator->all_blocks) * UMP_BLOCK_SIZE);
-}
-
-static u32 block_allocator_stat(struct ump_memory_backend *backend)
-{
-	block_allocator *allocator;
-	BUG_ON(!backend);
-	allocator = (block_allocator*)backend->ctx;
-	BUG_ON(!allocator);
-
-	return (allocator->num_blocks - allocator->num_free)* UMP_BLOCK_SIZE;
 }
