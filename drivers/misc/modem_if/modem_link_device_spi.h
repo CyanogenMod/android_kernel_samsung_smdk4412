@@ -81,6 +81,11 @@ enum spi_msg_t {
 	SPI_WORK_RECEIVE
 };
 
+enum spi_work_t {
+	SPI_WORK,
+	SPI_WORK_FRONT
+};
+
 enum spi_state_t {
 	SPI_STATE_START,		/* before init complete */
 	SPI_STATE_INIT,		/* initialising */

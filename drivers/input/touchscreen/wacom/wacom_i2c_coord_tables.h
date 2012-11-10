@@ -85,3 +85,6 @@ extern short origin_offset_48[2];
 
 extern char* tuning_version;
 extern char* tuning_version_B713;
+
+extern char *tuning_model;
+

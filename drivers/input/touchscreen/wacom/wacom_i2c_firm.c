@@ -42,15 +42,35 @@ const char Firmware_checksum[] = { 0x1F, 0xee, 0x06, 0x4b, 0xdd, };
 #elif defined(CONFIG_MACH_T0)
 const unsigned int Binary_nLength = 0xEFFF;
 const unsigned char Mpu_type = 0x28;
-unsigned int Firmware_version_of_file = 0x24F;
+
+#if defined(CONFIG_TARGET_LOCALE_KOR)
+#if defined(CONFIG_MACH_T0_KOR_SKT)
+unsigned int Firmware_version_of_file = 0x305;
+unsigned char *firmware_name = "epen/W9001_B746S.bin";
+char Firmware_checksum[] = { 0x1F, 0xE4, 0xB4, 0x71, 0x60, };
+#elif defined(CONFIG_MACH_T0_KOR_KT)
+unsigned int Firmware_version_of_file = 0x305;
+unsigned char *firmware_name = "epen/W9001_B746K.bin";
+char Firmware_checksum[] = { 0x1F, 0xE4, 0xB4, 0x71, 0x60, };
+#elif defined(CONFIG_MACH_T0_KOR_LGT)
+unsigned int Firmware_version_of_file = 0x404;
+unsigned char *firmware_name = "epen/W9001_B746L.bin";
+char Firmware_checksum[] = { 0x1F, 0x23, 0xD7, 0xCF, 0xDF, };
+#endif
+#elif defined(CONFIG_MACH_T0_JPN_LTE_DCM)
+unsigned int Firmware_version_of_file = 0x304;
+unsigned char *firmware_name = "epen/W9001_B746JD.bin";
+char Firmware_checksum[] = { 0x1F, 0xA6, 0xFB, 0xBF, 0x11, };
+#else
+unsigned int Firmware_version_of_file = 0x25F;
 unsigned char *firmware_name = "epen/W9001_B746.bin";
 
-char Firmware_checksum[] = { 0x1F, 0xDD, 0x87, 0x97, 0xFF, };
+char Firmware_checksum[] = { 0x1F, 0x27, 0x85, 0x8B, 0xFB, };
+#endif
 /*checksum for 0x13D*/
 const char B713X_checksum[] = { 0x1F, 0xB5, 0x84, 0x38, 0x34, };
 /*checksum for 0x16*/
 const char B660X_checksum[] = { 0x1F, 0x83, 0x88, 0xD4, 0x67, };
-
 #endif
 
 void wacom_i2c_set_firm_data(unsigned char *Binary_new)

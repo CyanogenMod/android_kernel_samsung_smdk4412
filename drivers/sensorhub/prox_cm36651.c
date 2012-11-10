@@ -12,7 +12,7 @@
  *  GNU General Public License for more details.
  *
  */
-#include "../ssp.h"
+#include "ssp.h"
 
 #define	VENDOR		"CAPELLA"
 #define	CHIP_ID		"CM36651"
@@ -20,15 +20,12 @@
 #define CANCELATION_FILE_PATH	"/efs/prox_cal"
 #define LCD_LDI_FILE_PATH	"/sys/class/lcd/panel/window_type"
 
-#define LINE_1			'6'
-#define LINE_1_LDI_OTHERS	'4'
-#define LINE_1_LDI_GRAY		'5'
-#define LINE_1_LDI_WHITE	'6'
+#define LINE_1		'4'
+#define LINE_2		'2'
 
-#define LINE_2			'3'
-#define LINE_2_LDI_OTHERS	'2'
-#define LINE_2_LDI_GRAY		'3'
-#define LINE_2_LDI_WHITE	'4'
+#define LDI_OTHERS	'0'
+#define LDI_GRAY	'1'
+#define LDI_WHITE	'2'
 /*************************************************************************/
 /* factory Sysfs                                                         */
 /*************************************************************************/
@@ -108,23 +105,20 @@ static ssize_t proximity_state_show(struct device *dev,
 
 static void change_proximity_default_threshold(struct ssp_data *data)
 {
-	if (((data->chLcdLdi[0] == LINE_1)
-		&& (data->chLcdLdi[1] == LINE_1_LDI_GRAY))
-		|| ((data->chLcdLdi[0] == LINE_2)
-		&& (data->chLcdLdi[1] == LINE_2_LDI_GRAY)))
+	switch (data->chLcdLdi[1]) {
+	case LDI_GRAY:
 		data->uProxThresh = GRAY_OCTA_DEFAULT_THRESHOLD;
-	else if (((data->chLcdLdi[0] == LINE_1)
-		&& (data->chLcdLdi[1] == LINE_1_LDI_WHITE))
-		|| ((data->chLcdLdi[0] == LINE_2)
-		&& (data->chLcdLdi[1] == LINE_2_LDI_WHITE)))
+		break;
+	case LDI_WHITE:
 		data->uProxThresh = WHITE_OCTA_DEFAULT_THRESHOLD;
-	else if (((data->chLcdLdi[0] == LINE_1)
-		&& (data->chLcdLdi[1] == LINE_1_LDI_OTHERS))
-		|| ((data->chLcdLdi[0] == LINE_2)
-		&& (data->chLcdLdi[1] == LINE_2_LDI_OTHERS)))
+		break;
+	case LDI_OTHERS:
 		data->uProxThresh = OTHERS_OCTA_DEFAULT_THRESHOLD;
-	else
+		break;
+	default:
 		data->uProxThresh = DEFAULT_THRESHOLD;
+		break;
+	}
 }
 
 int proximity_open_lcd_ldi(struct ssp_data *data)
@@ -155,8 +149,8 @@ int proximity_open_lcd_ldi(struct ssp_data *data)
 		iRet = -EIO;
 	}
 
-	ssp_dbg("[SSP]: %s - 1st : %c\n", __func__, data->chLcdLdi[0]);
-	ssp_dbg("[SSP]: %s - 1st : %c\n", __func__, data->chLcdLdi[1]);
+	ssp_dbg("[SSP]: %s - %c%c\n", __func__,
+		data->chLcdLdi[0], data->chLcdLdi[1]);
 
 	filp_close(cancel_filp, current->files);
 	set_fs(old_fs);
