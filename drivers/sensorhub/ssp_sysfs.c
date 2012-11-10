@@ -65,6 +65,9 @@ static void change_sensor_delay(struct ssp_data *data,
 		data->aiCheckStatus[iSensorType] = RUNNING_SENSOR_STATE;
 
 		if (iSensorType == PROXIMITY_SENSOR) {
+			proximity_open_lcd_ldi(data);
+			proximity_open_calibration(data);
+
 			input_report_abs(data->prox_input_dev, ABS_DISTANCE, 1);
 			input_sync(data->prox_input_dev);
 		}
@@ -167,7 +170,7 @@ static ssize_t show_sensors_enable(struct device *dev,
 	ssp_dbg("[SSP]: %s - cur_enable = %d\n", __func__,
 		 atomic_read(&data->aSensorEnable));
 
-	return sprintf(buf, "%10u", atomic_read(&data->aSensorEnable));
+	return sprintf(buf, "%9u\n", atomic_read(&data->aSensorEnable));
 }
 
 static ssize_t set_sensors_enable(struct device *dev,

@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2010, 2012 ARM Limited. All rights reserved.
+ * Copyright (C) 2010 ARM Limited. All rights reserved.
  * 
  * This program is free software and is provided to you under the terms of the GNU General Public License version 2
  * as published by the Free Software Foundation, and any use by you of this program is subject to the terms of such GNU licence.
@@ -45,11 +45,12 @@ typedef enum
 	_UMP_IOC_MAP_MEM,    /* not used in Linux */
 	_UMP_IOC_UNMAP_MEM,  /* not used in Linux */
 	_UMP_IOC_MSYNC,
-	_UMP_IOC_CACHE_OPERATIONS_CONTROL,
-	_UMP_IOC_SWITCH_HW_USAGE,
-	_UMP_IOC_LOCK,
-	_UMP_IOC_UNLOCK,
+#ifdef CONFIG_ION_EXYNOS
 	_UMP_IOC_ION_IMPORT,
+#endif
+#ifdef CONFIG_DMA_SHARED_BUFFER
+	_UMP_IOC_DMABUF_IMPORT,
+#endif
 }_ump_uk_functions;
 
 typedef enum
@@ -63,29 +64,8 @@ typedef enum
 {
 	_UMP_UK_MSYNC_CLEAN = 0,
 	_UMP_UK_MSYNC_CLEAN_AND_INVALIDATE = 1,
-	_UMP_UK_MSYNC_INVALIDATE = 2,
-	_UMP_UK_MSYNC_FLUSH_L1   = 3,
 	_UMP_UK_MSYNC_READOUT_CACHE_ENABLED = 128,
 } ump_uk_msync_op;
-
-typedef enum
-{
-	_UMP_UK_CACHE_OP_START = 0,
-	_UMP_UK_CACHE_OP_FINISH  = 1,
-} ump_uk_cache_op_control;
-
-typedef enum
-{
-	_UMP_UK_READ = 1,
-	_UMP_UK_READ_WRITE = 3,
-} ump_uk_lock_usage;
-
-typedef enum
-{
-	_UMP_UK_USED_BY_CPU = 0,
-	_UMP_UK_USED_BY_MALI = 1,
-	_UMP_UK_USED_BY_UNKNOWN_DEVICE= 100,
-} ump_uk_user;
 
 /**
  * Get API version ([in,out] u32 api_version, [out] u32 compatible)
@@ -108,14 +88,25 @@ typedef struct _ump_uk_allocate_s
 	ump_uk_alloc_constraints constraints;   /**< Only input to Devicedriver */
 } _ump_uk_allocate_s;
 
+#ifdef CONFIG_ION_EXYNOS
 typedef struct _ump_uk_ion_import_s
 {
 	void *ctx;                              /**< [in,out] user-kernel context (trashed on output) */
-	int ion_fd;                             /**< ion_fd */
+	int ion_fd;
 	u32 secure_id;                          /**< Return value from DD to Userdriver */
 	u32 size;                               /**< Input and output. Requested size; input. Returned size; output */
 	ump_uk_alloc_constraints constraints;   /**< Only input to Devicedriver */
 } _ump_uk_ion_import_s;
+#endif
+
+#ifdef CONFIG_DMA_SHARED_BUFFER
+struct ump_uk_dmabuf {
+	void		*ctx;
+	int		fd;
+	size_t		size;
+	uint32_t	secure_id;
+};
+#endif
 
 /**
  * SIZE_GET ([in] u32 secure_id, [out]size )
@@ -165,37 +156,9 @@ typedef struct _ump_uk_msync_s
 	u32 size;             /**< [in] size to flush */
 	ump_uk_msync_op op;   /**< [in] flush operation */
 	u32 cookie;           /**< [in] cookie stored with reference to the kernel mapping internals */
-	u32 secure_id;        /**< [in] secure_id that identifies the ump buffer */
+	u32 secure_id;        /**< [in] cookie stored with reference to the kernel mapping internals */
 	u32 is_cached;        /**< [out] caching of CPU mappings */
 } _ump_uk_msync_s;
-
-typedef struct _ump_uk_cache_operations_control_s
-{
-	void *ctx;                   /**< [in,out] user-kernel context (trashed on output) */
-	ump_uk_cache_op_control op;  /**< [in] cache operations start/stop */
-} _ump_uk_cache_operations_control_s;
-
-
-typedef struct _ump_uk_switch_hw_usage_s
-{
-	void *ctx;            /**< [in,out] user-kernel context (trashed on output) */
-	u32 secure_id;        /**< [in] secure_id that identifies the ump buffer */
-	ump_uk_user new_user;         /**< [in] cookie stored with reference to the kernel mapping internals */
-
-} _ump_uk_switch_hw_usage_s;
-
-typedef struct _ump_uk_lock_s
-{
-	void *ctx;            /**< [in,out] user-kernel context (trashed on output) */
-	u32 secure_id;        /**< [in] secure_id that identifies the ump buffer */
-	ump_uk_lock_usage lock_usage;
-} _ump_uk_lock_s;
-
-typedef struct _ump_uk_unlock_s
-{
-	void *ctx;            /**< [in,out] user-kernel context (trashed on output) */
-	u32 secure_id;        /**< [in] secure_id that identifies the ump buffer */
-} _ump_uk_unlock_s;
 
 #ifdef __cplusplus
 }

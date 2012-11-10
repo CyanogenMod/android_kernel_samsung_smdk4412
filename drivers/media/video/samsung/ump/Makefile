@@ -1,9 +1,9 @@
 #
 # Copyright (C) 2010 ARM Limited. All rights reserved.
-#
+# 
 # This program is free software and is provided to you under the terms of the GNU General Public License version 2
 # as published by the Free Software Foundation, and any use by you of this program is subject to the terms of such GNU licence.
-#
+# 
 # A copy of the licence is included with the program, and can also be obtained from Free Software
 # Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 #
@@ -30,13 +30,14 @@ DEFINES += -DDEBUG
 endif
 
 # Set up our defines, which will be passed to gcc
+DEFINES += -DKERNEL_BUILTIN=1
 DEFINES += -DMALI_USE_UNIFIED_MEMORY_PROVIDER
 DEFINES += -DUSING_MEMORY=$(USING_MEMORY)
 DEFINES += -DUMP_MEM_SIZE=$(UMP_MEM_SIZE)
 DEFINES += -DMALI_STATE_TRACKING=1
 
 UDD_FILE_PREFIX := drivers/media/video/samsung/ump/
-KBUILDROOT =
+KBUILDROOT = 
 
 # linux build system integration
 
@@ -60,7 +61,7 @@ OSKFILES+=\
 		$(KBUILDROOT)../mali/linux/mali_osk_locks.o \
 		$(KBUILDROOT)../mali/linux/mali_osk_math.o \
 		$(KBUILDROOT)../mali/linux/mali_osk_memory.o \
-		$(KBUILDROOT)../mali/linux/mali_osk_misc.o
+		$(KBUILDROOT)../mali/linux/mali_osk_misc.o 
 
 ump-y := \
 		$(KBUILDROOT)linux/ump_kernel_linux.o \
@@ -82,11 +83,12 @@ ump-$(CONFIG_UMP_VCM_ALLOC) += \
                 $(KBUILDROOT)linux/ump_kernel_memory_backend_vcm.o \
 
 EXTRA_CFLAGS += $(INCLUDES) \
-		$(DEFINES)
-
-
+		$(DEFINES) 
+		
+		
 # Get subversion revision number, fall back to 0000 if no svn info is available
-SVN_REV:=$(shell ((svnversion | grep -E "^[0-9]+" && echo -n 'Revision: ' && svnversion) || git svn info | sed -e 's/$$$$/M/' | grep '^Revision: ' || echo ${MALI_RELEASE_NAME}) 2>/dev/null | sed -e 's/^Revision: //')
-
+SVN_REV:=$(shell ((svnversion | grep -qv exported && echo -n 'Revision: ' && svnversion) || git svn info | sed -e 's/$$$$/M/' | grep '^Revision: ' || echo ${MALI_RELEASE_NAME}) 2>/dev/null | sed -e 's/^Revision: //')
+		
 EXTRA_CFLAGS += -DSVN_REV=$(SVN_REV)
 EXTRA_CFLAGS += -DSVN_REV_STRING=\"$(SVN_REV)\"
+		 

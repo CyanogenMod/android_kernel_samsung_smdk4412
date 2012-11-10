@@ -1,9 +1,9 @@
 /*
- * Copyright (C) 2010-2012 ARM Limited. All rights reserved.
- *
+ * Copyright (C) 2010 ARM Limited. All rights reserved.
+ * 
  * This program is free software and is provided to you under the terms of the GNU General Public License version 2
  * as published by the Free Software Foundation, and any use by you of this program is subject to the terms of such GNU licence.
- *
+ * 
  * A copy of the licence is included with the program, and can also be obtained from Free Software
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
  */
@@ -147,9 +147,6 @@ _mali_osk_errcode_t _ump_ukk_open( void** context )
 
 	*context = (void*)session_data;
 
-	session_data->cache_operations_ongoing = 0 ;
-	session_data->has_pending_level1_cache_flush = 0;
-
 	DBG_MSG(2, ("New session opened\n"));
 
 	return _MALI_OSK_ERR_OK;
@@ -228,17 +225,19 @@ _mali_osk_errcode_t _ump_ukk_map_mem( _ump_uk_map_mem_s *args )
 	int map_id;
 
 	session_data = (ump_session_data *)args->ctx;
-	if(NULL == session_data)
+	if (NULL == session_data)
 	{
 		MSG_ERR(("Session data is NULL in _ump_ukk_map_mem()\n"));
 		return _MALI_OSK_ERR_INVALID_ARGS;
 	}
+
 	/* SEC kernel stability 2012-02-17 */
 	if (NULL == session_data->cookies_map)
 	{
 		MSG_ERR(("session_data->cookies_map is NULL in _ump_ukk_map_mem()\n"));
 		return _MALI_OSK_ERR_INVALID_ARGS;
 	}
+
 	descriptor = (ump_memory_allocation*) _mali_osk_calloc( 1, sizeof(ump_memory_allocation));
 	if (NULL == descriptor)
 	{
@@ -250,7 +249,10 @@ _mali_osk_errcode_t _ump_ukk_map_mem( _ump_uk_map_mem_s *args )
 	if ( UMP_DD_HANDLE_INVALID == handle)
 	{
 		_mali_osk_free(descriptor);
-		DBG_MSG(1, ("Trying to map unknown secure ID %u\n", args->secure_id));
+		/* DBG_MSG(1, ("Trying to map unknown secure ID %u\n",
+				args->secure_id)); */
+		MSG_ERR(("Trying to map unknown secure ID %u\n",
+			args->secure_id));
 		return _MALI_OSK_ERR_FAULT;
 	}
 
@@ -260,7 +262,12 @@ _mali_osk_errcode_t _ump_ukk_map_mem( _ump_uk_map_mem_s *args )
 	{
 		_mali_osk_free(descriptor);
 		ump_dd_reference_release(handle);
-		DBG_MSG(1, ("Trying to map too much or little. ID: %u, virtual size=%lu, UMP size: %lu\n", args->secure_id, args->size, mem->size_bytes));
+		/* DBG_MSG(1, ("Trying to map too much or little. ID: %u,
+			virtual size=%lu, UMP size: %lu\n",
+			args->secure_id, args->size, mem->size_bytes)); */
+		MSG_ERR(("Trying to map too much or little. ID: %u,"
+			" virtual size=%lu, UMP size: %lu\n",
+			args->secure_id, args->size, mem->size_bytes));
 		return _MALI_OSK_ERR_FAULT;
 	}
 
@@ -270,7 +277,10 @@ _mali_osk_errcode_t _ump_ukk_map_mem( _ump_uk_map_mem_s *args )
 	{
 		_mali_osk_free(descriptor);
 		ump_dd_reference_release(handle);
-		DBG_MSG(1, ("ump_ukk_map_mem: unable to allocate a descriptor_mapping for return cookie\n"));
+		/* DBG_MSG(1, ("ump_ukk_map_mem: unable to allocate
+			a descriptor_mapping for return cookie\n")); */
+		MSG_ERR(("ump_ukk_map_mem: unable to allocate"
+			" a descriptor_mapping for return cookie\n"));
 
 		return _MALI_OSK_ERR_NOMEM;
 	}
@@ -306,7 +316,11 @@ _mali_osk_errcode_t _ump_ukk_map_mem( _ump_uk_map_mem_s *args )
 	err = _ump_osk_mem_mapregion_init( descriptor );
 	if( _MALI_OSK_ERR_OK != err )
 	{
-		DBG_MSG(1, ("Failed to initialize memory mapping in _ump_ukk_map_mem(). ID: %u\n", args->secure_id));
+		/* DBG_MSG(1, ("Failed to initialize memory mapping in
+				_ump_ukk_map_mem(). ID: %u\n",
+				args->secure_id)); */
+		MSG_ERR(("Failed to initialize memory mapping in"
+			 " _ump_ukk_map_mem(). ID: %u\n", args->secure_id));
 		ump_descriptor_mapping_free( session_data->cookies_map, map_id );
 		_mali_osk_free(descriptor);
 		ump_dd_reference_release(mem);
@@ -336,7 +350,10 @@ _mali_osk_errcode_t _ump_ukk_map_mem( _ump_uk_map_mem_s *args )
 
 		if (_MALI_OSK_ERR_OK != _ump_osk_mem_mapregion_map(descriptor, offset, (u32 *)&(mem->block_array[block].addr), size_to_map ) )
 		{
-			DBG_MSG(1, ("WARNING: _ump_ukk_map_mem failed to map memory into userspace\n"));
+			/* DBG_MSG(1, ("WARNING: _ump_ukk_map_mem failed to
+					map memory into userspace\n")); */
+			MSG_ERR(("WARNING: _ump_ukk_map_mem failed"
+				"to map memory into userspace\n"));
 			ump_descriptor_mapping_free( session_data->cookies_map, map_id );
 			ump_dd_reference_release(mem);
 			_ump_osk_mem_mapregion_term( descriptor );
@@ -371,12 +388,14 @@ void _ump_ukk_unmap_mem( _ump_uk_unmap_mem_s *args )
 		MSG_ERR(("Session data is NULL in _ump_ukk_map_mem()\n"));
 		return;
 	}
+
 	/* SEC kernel stability 2012-02-17 */
 	if (NULL == session_data->cookies_map)
 	{
 		MSG_ERR(("session_data->cookies_map is NULL in _ump_ukk_map_mem()\n"));
 		return;
 	}
+
 	if (0 != ump_descriptor_mapping_get( session_data->cookies_map, (int)args->cookie, (void**)&descriptor) )
 	{
 		MSG_ERR(("_ump_ukk_map_mem: cookie 0x%X not found for this session\n", args->cookie ));

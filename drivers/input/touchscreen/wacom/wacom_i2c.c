@@ -37,6 +37,11 @@ unsigned char screen_rotate;
 unsigned char user_hand = 1;
 static bool epen_reset_result;
 
+#ifdef WACOM_DEBOUNCEINT_BY_ESD
+static bool pen_insert_state;
+#endif
+static bool firmware_updating_state;
+
 static void wacom_i2c_enable_irq(struct wacom_i2c *wac_i2c, bool enable)
 {
 	static int depth;
@@ -186,10 +191,9 @@ int wacom_i2c_get_ums_data(struct wacom_i2c *wac_i2c, u8 **ums_data)
 	return ret;
 }
 
-int wacom_i2c_fw_update_UMS(struct i2c_client *client)
+int wacom_i2c_fw_update_UMS(struct wacom_i2c *wac_i2c)
 {
 	int ret = 0;
-	struct wacom_i2c *wac_i2c = i2c_get_clientdata(client);
 	u8 *ums_data = NULL;
 
 	printk(KERN_ERR "[E-PEN] Start firmware flashing (UMS).\n");
@@ -226,6 +230,8 @@ int wacom_i2c_firm_update(struct wacom_i2c *wac_i2c)
 	int retry = 3;
 	const struct firmware *firm_data = NULL;
 
+	firmware_updating_state = true;
+
 	while (retry--) {
 		ret =
 		    request_firmware(&firm_data, firmware_name,
@@ -251,6 +257,8 @@ int wacom_i2c_firm_update(struct wacom_i2c *wac_i2c)
 		/* Reset IC */
 		wacom_i2c_reset_hw(wac_i2c->wac_pdata);
 	}
+
+	firmware_updating_state = false;
 
 	if (ret < 0)
 		return -1;
@@ -400,12 +408,43 @@ static void pen_insert_work(struct work_struct *work)
 	struct wacom_i2c *wac_i2c =
 		container_of(work, struct wacom_i2c, pen_insert_dwork.work);
 
-	wac_i2c->pen_insert = !gpio_get_value(wac_i2c->gpio_pen_insert);
+#ifdef WACOM_DEBOUNCEINT_BY_ESD
+	pen_insert_state = !gpio_get_value(wac_i2c->gpio_pen_insert);
 
 #if defined(CONFIG_MACH_T0)
 	if (wac_i2c->invert_pen_insert)
+		pen_insert_state = !pen_insert_state;
+	#endif
+	if (wac_i2c->pen_insert == pen_insert_state) {
+		printk(KERN_DEBUG "[E-PEN] %s INT: (%d) was skipped\n",
+			__func__, wac_i2c->pen_insert);
+
+		#ifdef BATTERY_SAVING_MODE
+		if (wac_i2c->pen_insert) {
+			if (wac_i2c->battery_saving_mode)
+				wacom_i2c_disable(wac_i2c);
+		} else {
+			if (firmware_updating_state == true)
+				return;
+			printk(KERN_DEBUG "[E-PEN] %s call WACOM Reset\n",
+				__func__);
+			wac_i2c->wac_pdata->suspend_platform_hw();
+			msleep(200);
+			wacom_i2c_enable(wac_i2c);
+		}
+		#endif
+		return;
+	}
+	wac_i2c->pen_insert = pen_insert_state;
+
+#else
+	wac_i2c->pen_insert = !gpio_get_value(wac_i2c->gpio_pen_insert);
+	#if defined(CONFIG_MACH_T0)
+	if (wac_i2c->invert_pen_insert)
 		wac_i2c->pen_insert = !wac_i2c->pen_insert;
+	#endif
 #endif
+
 
 	printk(KERN_DEBUG "[E-PEN] %s : %d\n",
 		__func__, wac_i2c->pen_insert);
@@ -521,6 +560,9 @@ static void wacom_i2c_early_suspend(struct early_suspend *h)
 	struct wacom_i2c *wac_i2c =
 	    container_of(h, struct wacom_i2c, early_suspend);
 	printk(KERN_DEBUG "[E-PEN] %s.\n", __func__);
+#ifdef WACOM_STATE_CHECK
+	cancel_delayed_work_sync(&wac_i2c->wac_statecheck_work);
+#endif
 	wacom_i2c_disable(wac_i2c);
 }
 
@@ -539,8 +581,62 @@ static void wacom_i2c_resume_work(struct work_struct *work)
 
 	wac_i2c->power_enable = true;
 	wacom_i2c_enable_irq(wac_i2c, true);
+#ifdef WACOM_STATE_CHECK
+	schedule_delayed_work(&wac_i2c->wac_statecheck_work, HZ * 30);
+#endif
 	printk(KERN_DEBUG "[E-PEN] %s\n", __func__);
 }
+
+
+#ifdef WACOM_STATE_CHECK
+static void wac_statecheck_work(struct work_struct *work)
+{
+	int ret, i;
+	char buf, test[10];
+	struct wacom_i2c *wac_i2c =
+	    container_of(work, struct wacom_i2c, wac_statecheck_work.work);
+	buf = COM_QUERY;
+	printk(KERN_DEBUG "[E-PEN] %s\n", __func__);
+
+	if (firmware_updating_state == true)
+		return;
+
+#ifdef BATTERY_SAVING_MODE
+	if (wac_i2c->battery_saving_mode
+		&& wac_i2c->pen_insert) {
+		printk(KERN_DEBUG "[E-PEN] escaped from wacom check mode\n");
+		printk(KERN_DEBUG "        becase pen has inserted at lpm\n");
+		return;
+	}
+#endif
+
+#if defined(CONFIG_TARGET_LOCALE_KOR)
+#if defined(CONFIG_MACH_T0) && defined(CONFIG_TDMB_ANT_DET)
+	ret = gpio_get_value(wac_i2c->wac_pdata->gpio_esd_check);
+	if (ret == 0) {
+		printk(KERN_DEBUG "[E-PEN] skip wacom state checking\n");
+		printk(KERN_DEBUG "        becase ANT has closed\n");
+		schedule_delayed_work(&wac_i2c->wac_statecheck_work, HZ * 30);
+		return;
+	}
+#endif
+#endif
+
+	ret = wacom_i2c_send(wac_i2c, &buf, sizeof(buf), false);
+	if (ret > 0)
+		printk(KERN_INFO "[E-PEN] buf:%d, sent:%d\n", buf, ret);
+	else {
+		printk(KERN_ERR "[E-PEN] Digitizer is not active\n");
+		wac_i2c->wac_pdata->suspend_platform_hw();
+		msleep(200);
+		wacom_i2c_enable(wac_i2c);
+		printk(KERN_ERR "[E-PEN] wacom reset done\n");
+	}
+
+	schedule_delayed_work(&wac_i2c->wac_statecheck_work, HZ * 30);
+}
+#endif
+
 
 static void wacom_i2c_late_resume(struct early_suspend *h)
 {
@@ -609,7 +705,8 @@ static ssize_t epen_tuning_version_show(struct device *dev,
 	printk(KERN_DEBUG "[E-PEN] %s: %s\n", __func__,
 			tuning_version);
 
-	return sprintf(buf, "%s\n",
+	return sprintf(buf, "%s_%s\n",
+			tuning_model,
 			tuning_version);
 }
 #endif
@@ -620,9 +717,7 @@ static bool check_update_condition(struct wacom_i2c *wac_i2c, const char buf)
 	bool bUpdate = false;
 
 	switch (buf) {
-	case 'F':
 	case 'I':
-	case 'B':
 	case 'K':
 		bUpdate = true;
 		break;
@@ -674,12 +769,10 @@ static ssize_t epen_firmware_update_store(struct device *dev,
 
 	switch (*buf) {
 	/*ums*/
-	case 'F':
-	case 'U':
-		ret = wacom_i2c_fw_update_UMS(wac_i2c->client);
+	case 'I':
+		ret = wacom_i2c_fw_update_UMS(wac_i2c);
 		break;
 	/*kernel*/
-	case 'B':
 	case 'K':
 		printk(KERN_ERR
 			"[E-PEN] Start firmware flashing (kernel image).\n");
@@ -885,27 +978,29 @@ static ssize_t epen_reset_result_show(struct device *dev,
 	}
 }
 
-#ifdef WACOM_USE_BOXFILTER
-static ssize_t epen_box_store(struct device *dev,
+#ifdef WACOM_USE_AVE_TRANSITION
+static ssize_t epen_ave_store(struct device *dev,
 struct device_attribute *attr,
 	const char *buf, size_t count)
 {
 	struct wacom_i2c *wac_i2c = dev_get_drvdata(dev);
 	bool check_version = false;
-	int v1, v2, v3, v4;
+	int v1, v2, v3, v4, v5;
 	int height;
 
-	sscanf(buf, "%d%d%d%d%d", &height, &v1, &v2, &v3, &v4);
+	sscanf(buf, "%d%d%d%d%d%d", &height, &v1, &v2, &v3, &v4, &v5);
 
 	if (height < 0 || height > 2) {
 		printk(KERN_DEBUG"[E-PEN] Height err %d\n", height);
 		return count;
 	}
 
-	g_boxThreshold_C[height] = v1;
-	g_boxThreshold_X[height] = v2;
-	g_boxThreshold_Y[height] = v3;
-	g_boxThreshold_Trs[height] = v4;
+	g_aveLevel_C[height] = v1;
+	g_aveLevel_X[height] = v2;
+	g_aveLevel_Y[height] = v3;
+	g_aveLevel_Trs[height] = v4;
+	g_aveLevel_Cor[height] = v5;
+	g_aveShift;
 
 	printk(KERN_DEBUG "[E-PEN] %s, v1 %d v2 %d v3 %d v4 %d\n", __func__,
 		v1, v2, v3, v4);
@@ -913,7 +1008,7 @@ struct device_attribute *attr,
 	return count;
 }
 
-static ssize_t epen_box_result_show(struct device *dev,
+static ssize_t epen_ave_result_show(struct device *dev,
 struct device_attribute *attr,
 	char *buf)
 {
@@ -922,19 +1017,19 @@ struct device_attribute *attr,
 	printk(KERN_DEBUG "[E-PEN] %s\n%d %d %d %d\n"
 		"%d %d %d %d\n%d %d %d %d\n",
 		__func__,
-		g_boxThreshold_C[0], g_boxThreshold_X[0],
-		g_boxThreshold_Y[0], g_boxThreshold_Trs[0],
-		g_boxThreshold_C[1], g_boxThreshold_X[1],
-		g_boxThreshold_Y[1], g_boxThreshold_Trs[1],
-		g_boxThreshold_C[2], g_boxThreshold_X[2],
-		g_boxThreshold_Y[2], g_boxThreshold_Trs[2]);
+		g_aveLevel_C[0], g_aveLevel_X[0],
+		g_aveLevel_Y[0], g_aveLevel_Trs[0],
+		g_aveLevel_C[1], g_aveLevel_X[1],
+		g_aveLevel_Y[1], g_aveLevel_Trs[1],
+		g_aveLevel_C[2], g_aveLevel_X[2],
+		g_aveLevel_Y[2], g_aveLevel_Trs[2]);
 	return sprintf(buf, "%d %d %d %d\n%d %d %d %d\n%d %d %d %d\n",
-		g_boxThreshold_C[0], g_boxThreshold_X[0],
-		g_boxThreshold_Y[0], g_boxThreshold_Trs[0],
-		g_boxThreshold_C[1], g_boxThreshold_X[1],
-		g_boxThreshold_Y[1], g_boxThreshold_Trs[1],
-		g_boxThreshold_C[2], g_boxThreshold_X[2],
-		g_boxThreshold_Y[2], g_boxThreshold_Trs[2]);
+		g_aveLevel_C[0], g_aveLevel_X[0],
+		g_aveLevel_Y[0], g_aveLevel_Trs[0],
+		g_aveLevel_C[1], g_aveLevel_X[1],
+		g_aveLevel_Y[1], g_aveLevel_Trs[1],
+		g_aveLevel_C[2], g_aveLevel_X[2],
+		g_aveLevel_Y[2], g_aveLevel_Trs[2]);
 }
 #endif
 
@@ -1088,10 +1183,10 @@ static DEVICE_ATTR(epen_checksum, S_IWUSR | S_IWGRP, NULL, epen_checksum_store);
 static DEVICE_ATTR(epen_checksum_result, S_IRUSR | S_IRGRP,
 		   epen_checksum_result_show, NULL);
 
-#ifdef WACOM_USE_BOXFILTER
-static DEVICE_ATTR(epen_box, S_IWUSR | S_IWGRP, NULL, epen_box_store);
-static DEVICE_ATTR(epen_box_result, S_IRUSR | S_IRGRP,
-	epen_box_result_show, NULL);
+#ifdef WACOM_USE_AVE_TRANSITION
+static DEVICE_ATTR(epen_ave, S_IWUSR | S_IWGRP, NULL, epen_ave_store);
+static DEVICE_ATTR(epen_ave_result, S_IRUSR | S_IRGRP,
+	epen_ave_result_show, NULL);
 #endif
 
 #ifdef WACOM_CONNECTION_CHECK
@@ -1122,9 +1217,9 @@ static struct attribute *epen_attributes[] = {
 	&dev_attr_epen_reset_result.attr,
 	&dev_attr_epen_checksum.attr,
 	&dev_attr_epen_checksum_result.attr,
-#ifdef WACOM_USE_BOXFILTER
-	&dev_attr_epen_box.attr,
-	&dev_attr_epen_box_result.attr,
+#ifdef WACOM_USE_AVE_TRANSITION
+	&dev_attr_epen_ave.attr,
+	&dev_attr_epen_ave_result.attr,
 #endif
 #ifdef WACOM_CONNECTION_CHECK
 	&dev_attr_epen_connection.attr,
@@ -1149,6 +1244,8 @@ static int wacom_i2c_probe(struct i2c_client *client,
 #if defined(CONFIG_MACH_T0)
 	int digitizer_type = 0;
 #endif
+
+	firmware_updating_state = false;
 
 	if (pdata == NULL) {
 		printk(KERN_ERR "%s: no pdata\n", __func__);
@@ -1211,7 +1308,7 @@ static int wacom_i2c_probe(struct i2c_client *client,
 	wacom_i2c_init_firm_data();
 #ifdef WACOM_IMPORT_FW_ALGO
 	wac_i2c->use_offset_table = true;
-	wac_i2c->use_box_filter = false;
+	wac_i2c->use_aveTransition = false;
 #endif
 
 #if defined(CONFIG_MACH_Q1_BD)
@@ -1231,7 +1328,7 @@ static int wacom_i2c_probe(struct i2c_client *client,
 
 	if (digitizer_type == EPEN_DTYPE_B746) {
 		printk(KERN_DEBUG"[E-PEN] Use Box filter\n");
-		wac_i2c->use_box_filter = true;
+		wac_i2c->use_aveTransition = true;
 	} else if (digitizer_type == EPEN_DTYPE_B713) {
 		printk(KERN_DEBUG"[E-PEN] Reset tilt for B713\n");
 
@@ -1252,9 +1349,9 @@ static int wacom_i2c_probe(struct i2c_client *client,
 
 	/*Set switch type*/
 	wac_i2c->invert_pen_insert = wacom_i2c_invert_by_switch_type();
+#endif
 #ifdef WACOM_PDCT_WORK_AROUND
 	wac_i2c->pen_pdct = PDCT_NOSIGNAL;
-#endif
 #endif
 
 #if defined(CONFIG_MACH_P4NOTE)
@@ -1282,8 +1379,13 @@ static int wacom_i2c_probe(struct i2c_client *client,
 			     pdata->max_x, 4, 0);
 	input_set_abs_params(wac_i2c->input_dev, ABS_Y, pdata->min_y,
 			     pdata->max_y, 4, 0);
+#ifdef CONFIG_MACH_T0
+	input_set_abs_params(wac_i2c->input_dev, ABS_PRESSURE,
+			0, wac_i2c->wac_feature->pressure_max, 0, 0);
+#else
 	input_set_abs_params(wac_i2c->input_dev, ABS_PRESSURE,
 			     pdata->min_pressure, pdata->max_pressure, 0, 0);
+#endif
 #endif
 	input_set_drvdata(input, wac_i2c);
 
@@ -1308,6 +1410,10 @@ static int wacom_i2c_probe(struct i2c_client *client,
 #if defined(WACOM_IRQ_WORK_AROUND)
 	INIT_DELAYED_WORK(&wac_i2c->pendct_dwork, wacom_i2c_pendct_work);
 #endif
+#ifdef WACOM_STATE_CHECK
+	INIT_DELAYED_WORK(&wac_i2c->wac_statecheck_work, wac_statecheck_work);
+#endif
+
 
 #ifdef CONFIG_HAS_EARLYSUSPEND
 	wac_i2c->early_suspend.level = EARLY_SUSPEND_LEVEL_BLANK_SCREEN + 1;
@@ -1375,6 +1481,19 @@ static int wacom_i2c_probe(struct i2c_client *client,
 		}
 #endif
 	}
+
+#ifdef WACOM_DEBOUNCEINT_BY_ESD
+	/*Invert gpio value for  first irq.
+	    schedule_delayed_work in wacom_i2c_input_open*/
+	pen_insert_state = gpio_get_value(wac_i2c->gpio_pen_insert);
+	wac_i2c->pen_insert = pen_insert_state;
+#if defined(CONFIG_MACH_T0)
+	if (wac_i2c->invert_pen_insert) {
+		wac_i2c->pen_insert = !wac_i2c->pen_insert;
+		pen_insert_state = wac_i2c->pen_insert;
+	}
+#endif
+#endif
 
 	return 0;
 

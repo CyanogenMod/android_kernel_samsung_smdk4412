@@ -1433,6 +1433,25 @@ static void melfas_register_callback(void *cb)
 	pr_debug("[TSP] melfas_register_callback\n");
 }
 
+#ifdef CONFIG_LCD_FREQ_SWITCH
+struct tsp_lcd_callbacks *lcd_callbacks;
+struct tsp_lcd_callbacks {
+	void (*inform_lcd)(struct tsp_lcd_callbacks *, bool);
+};
+
+void tsp_lcd_infom(bool en)
+{
+	if (lcd_callbacks && lcd_callbacks->inform_lcd)
+		lcd_callbacks->inform_lcd(lcd_callbacks, en);
+}
+
+static void melfas_register_lcd_callback(void *cb)
+{
+	lcd_callbacks = cb;
+	pr_debug("[TSP] melfas_register_lcd_callback\n");
+}
+#endif
+
 static struct melfas_tsi_platform_data mms_ts_pdata = {
 	.max_x = 720,
 	.max_y = 1280,
@@ -1449,11 +1468,14 @@ static struct melfas_tsi_platform_data mms_ts_pdata = {
 	.power = melfas_power,
 	.mux_fw_flash = melfas_mux_fw_flash,
 	.is_vdd_on = is_melfas_vdd_on,
-	.config_fw_version = "N7100_Me_0813",
+	.config_fw_version = "N7100_Me_0910",
 /*	.set_touch_i2c		= melfas_set_touch_i2c, */
 /*	.set_touch_i2c_to_gpio	= melfas_set_touch_i2c_to_gpio, */
 	.lcd_type = melfas_get_lcdtype,
 	.register_cb = melfas_register_callback,
+#ifdef CONFIG_LCD_FREQ_SWITCH
+	.register_lcd_cb = melfas_register_lcd_callback,
+#endif
 };
 
 static struct i2c_board_info i2c_devs3[] = {
@@ -2276,3 +2298,4 @@ void midas_tsp_request_qos(void *data)
 	schedule_delayed_work_on(0, &busqos_work, HZ / 5);
 }
 #endif
+
