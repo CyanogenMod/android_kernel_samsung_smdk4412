@@ -14,7 +14,7 @@
  */
 #include "ssp.h"
 
-#define SSP_FIRMWARE_REVISION		90100
+#define SSP_FIRMWARE_REVISION		92600
 
 /* Bootload mode cmd */
 #define BL_FW_NAME			"ssp.fw"
@@ -256,6 +256,8 @@ int update_mcu_bin(struct ssp_data *data)
 
 	if (iRet < 0)
 		data->bBinaryChashed = true;
+	else
+		data->bBinaryChashed = false;
 
 	return iRet;
 }
@@ -289,7 +291,7 @@ void check_fwbl(struct ssp_data *data)
 	} else {
 		data->client->addr = APP_SLAVE_ADDR;
 		data->uCurFirmRev = get_firmware_rev(data);
-		if (data->uCurFirmRev != SSP_FIRMWARE_REVISION) {
+		if (data->uCurFirmRev < SSP_FIRMWARE_REVISION) {
 			pr_info("[SSP] MPU Firm Rev. : Old = %8u, New = %8u\n",
 				data->uCurFirmRev, SSP_FIRMWARE_REVISION);
 			update_mcu_bin(data);

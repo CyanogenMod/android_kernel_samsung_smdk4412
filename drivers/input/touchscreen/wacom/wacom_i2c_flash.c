@@ -283,6 +283,18 @@ int wacom_i2c_flash_write(struct wacom_i2c *wac_i2c, unsigned long startAddr,
 		buf[2] = (u8) ((ulAddr & 0xff00) >> 8);
 		buf[3] = size;
 		buf[4] = bank;
+#ifdef CONFIG_MACH_T0
+		/*Pass Garbage*/
+		for (i = 0; i < BLOCK_SIZE_W; i++) {
+			if (Binary[ulAddr+i] != 0xff)
+				break;
+		}
+		if (i == BLOCK_SIZE_W) {
+			printk(KERN_DEBUG"[E-PEN] Pass ulAddr %u\n",
+				(unsigned int)ulAddr);
+			continue;
+		}
+#endif
 
 		for (i = 0; i < 5; i++)
 			sum += buf[i];

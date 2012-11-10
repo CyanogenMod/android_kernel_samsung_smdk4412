@@ -30,6 +30,7 @@ static irqreturn_t sensordata_irq_thread_fn(int iIrq, void *dev_id)
 
 	data_dbg("%s\n", __func__);
 	select_irq_msg(data);
+	data->uIrqCnt++;
 
 	return IRQ_HANDLED;
 }
@@ -63,6 +64,7 @@ static void initialize_variable(struct ssp_data *data)
 	data->uTimeOutCnt = 0;
 	data->uSsdFailCnt = 0;
 	data->uBusyCnt = 0;
+	data->uIrqCnt = 0;
 
 	data->bCheckSuspend = false;
 	data->bDebugEnabled = false;
@@ -312,6 +314,10 @@ static void ssp_shutdown(struct i2c_client *client)
 
 	func_dbg();
 
+#ifdef CONFIG_HAS_EARLYSUSPEND
+	unregister_early_suspend(&data->early_suspend);
+#endif
+
 	disable_debug_timer(data);
 
 	disable_irq_wake(data->iIrq);
@@ -336,6 +342,7 @@ static void ssp_shutdown(struct i2c_client *client)
 
 	wake_lock_destroy(&data->ssp_wake_lock);
 	kfree(data);
+	data = NULL;
 }
 
 #ifdef CONFIG_HAS_EARLYSUSPEND

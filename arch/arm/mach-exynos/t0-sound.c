@@ -458,6 +458,21 @@ void __init midas_sound_init(void)
 #if defined(CONFIG_MACH_T0_EUR_LTE)
 	t0_sound_pdata.dcs_offset_l = -11;
 	t0_sound_pdata.dcs_offset_r = -8;
+#elif defined(CONFIG_MACH_T0_USA_VZW)
+	t0_sound_pdata.dcs_offset_l = -12;
+	t0_sound_pdata.dcs_offset_r = -9;
+#elif defined(CONFIG_MACH_T0_USA_ATT)
+	t0_sound_pdata.dcs_offset_l = -13;
+	t0_sound_pdata.dcs_offset_r = -9;
+#elif defined(CONFIG_MACH_T0_USA_TMO)
+	t0_sound_pdata.dcs_offset_l = -11;
+	t0_sound_pdata.dcs_offset_r = -9;
+#elif defined(CONFIG_MACH_T0_USA_SPR)
+	t0_sound_pdata.dcs_offset_l = -12;
+	t0_sound_pdata.dcs_offset_r = -9;
+#elif defined(CONFIG_MACH_T0_USA_USCC)
+	t0_sound_pdata.dcs_offset_l = -11;
+	t0_sound_pdata.dcs_offset_r = -8;
 #endif
 
 	t0_gpio_init();

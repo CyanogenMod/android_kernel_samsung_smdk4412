@@ -498,71 +498,182 @@ void wacom_i2c_coord_offset(u16 *coordX, u16 *coordY)
 #endif
 
 #ifdef WACOM_USE_AVERAGING
-void wacom_i2c_coord_average(unsigned short *CoordX, unsigned short *CoordY,
-			     int bFirstLscan)
+#define STEP 32
+void wacom_i2c_coord_average(short *CoordX, short *CoordY,
+			     int bFirstLscan, int aveStrength)
 {
 	unsigned char i;
 	unsigned int work;
 	unsigned char ave_step = 4, ave_shift = 2;
-	static unsigned short Sum_X, Sum_Y;
-	static unsigned short AveBuffX[4], AveBuffY[4];
+	static int Sum_X, Sum_Y;
+	static int AveBuffX[STEP], AveBuffY[STEP];
 	static unsigned char AvePtr;
 	static unsigned char bResetted;
-
-	if (bFirstLscan == 0)
+#ifdef WACOM_USE_AVE_TRANSITION
+	static int tmpBuffX[STEP], tmpBuffY[STEP];
+	static unsigned char last_step, last_shift;
+	static bool transition;
+	static int tras_counter;
+#endif
+	if (bFirstLscan == 0) {
 		bResetted = 0;
-	else {
-		if (bFirstLscan && (bResetted == 0)) {
-			AvePtr = 0;
+#ifdef WACOM_USE_AVE_TRANSITION
+		transition = false;
+		tras_counter = 0;
+		last_step = 4;
+		last_shift = 2;
+#endif
+		return ;
+	}
+#ifdef WACOM_USE_AVE_TRANSITION
+	if (bResetted) {
+		if (transition) {
+			ave_step = last_step;
+			ave_shift = last_shift;
+		} else {
+			ave_step = 2 << (aveStrength-1);
+			ave_shift = aveStrength;
+		}
 
-			ave_step = 4;
-			ave_shift = 2;
+		if (!transition && ave_step != 0 && last_step != 0) {
+			if (ave_step > last_step) {
+				transition = true;
+				tras_counter = ave_step;
+				/*printk(KERN_DEBUG
+					"[E-PEN] Trans %d to %d\n",
+					last_step, ave_step);*/
 
-			for (i = 0; i < ave_step; i++) {
-				AveBuffX[i] = *CoordX;
-				AveBuffY[i] = *CoordY;
-			}
-			Sum_X = (unsigned short)*CoordX << ave_shift;
-			Sum_Y = (unsigned short)*CoordY << ave_shift;
-			bResetted = 1;
-		} else if (bFirstLscan) {
-			Sum_X = Sum_X - AveBuffX[AvePtr] + (*CoordX);
-			AveBuffX[AvePtr] = *CoordX;
-			work = Sum_X >> ave_shift;
-			*CoordX = (unsigned int)work;
-
-			Sum_Y = Sum_Y - AveBuffY[AvePtr] + (*CoordY);
-			AveBuffY[AvePtr] = (*CoordY);
-			work = Sum_Y >> ave_shift;
-			*CoordY = (unsigned int)work;
-
-			if (++AvePtr >= ave_step)
+				memcpy(tmpBuffX, AveBuffX,
+					sizeof(unsigned int) * last_step);
+				memcpy(tmpBuffY, AveBuffY,
+					sizeof(unsigned int) * last_step);
+				for (i = 0 ; i < last_step; ++i) {
+					AveBuffX[i] = tmpBuffX[AvePtr];
+					AveBuffY[i] = tmpBuffY[AvePtr];
+					if (++AvePtr >= last_step)
+						AvePtr = 0;
+				}
+				for ( ; i < ave_step; ++i) {
+					AveBuffX[i] = *CoordX;
+					AveBuffY[i] = *CoordY;
+					Sum_X += *CoordX;
+					Sum_Y += *CoordY;
+				}
 				AvePtr = 0;
+
+				*CoordX = Sum_X >> ave_shift;
+				*CoordY = Sum_Y >> ave_shift;
+
+				bResetted = 1;
+
+				last_step = ave_step;
+				last_shift = ave_shift;
+				return ;
+			} else if (ave_step < last_step) {
+				transition = true;
+				tras_counter = ave_step;
+				/*printk(KERN_DEBUG
+					"[E-PEN] Trans %d to %d\n",
+					last_step, ave_step);*/
+
+				memcpy(tmpBuffX, AveBuffX,
+					sizeof(unsigned int) * last_step);
+				memcpy(tmpBuffY, AveBuffY,
+					sizeof(unsigned int) * last_step);
+				Sum_X = 0;
+				Sum_Y = 0;
+				for (i = 1 ; i <= ave_step; ++i) {
+					if (AvePtr == 0)
+						AvePtr = last_step - 1;
+					else
+						--AvePtr;
+					AveBuffX[ave_step-i] = tmpBuffX[AvePtr];
+					Sum_X = Sum_X + tmpBuffX[AvePtr];
+
+					AveBuffY[ave_step-i] = tmpBuffY[AvePtr];
+					Sum_Y = Sum_Y + tmpBuffY[AvePtr];
+
+				}
+				AvePtr = 0;
+				bResetted = 1;
+				*CoordX = Sum_X >> ave_shift;
+				*CoordY = Sum_Y >> ave_shift;
+
+				bResetted = 1;
+
+				last_step = ave_step;
+				last_shift = ave_shift;
+				return ;
+			}
+		}
+
+		if (!transition && (last_step != ave_step)) {
+			last_step = ave_step;
+			last_shift = ave_shift;
 		}
 	}
+#endif
+	if (bFirstLscan && (bResetted == 0)) {
+		AvePtr = 0;
+		ave_step = 4;
+		ave_shift = 2;
+#if defined(WACOM_USE_AVE_TRANSITION)
+		tras_counter = ave_step;
+#endif
+		for (i = 0; i < ave_step; i++) {
+			AveBuffX[i] = *CoordX;
+			AveBuffY[i] = *CoordY;
+		}
+		Sum_X = (unsigned int)*CoordX << ave_shift;
+		Sum_Y = (unsigned int)*CoordY << ave_shift;
+		bResetted = 1;
+	} else if (bFirstLscan) {
+		Sum_X = Sum_X - AveBuffX[AvePtr] + (*CoordX);
+		AveBuffX[AvePtr] = *CoordX;
+		work = Sum_X >> ave_shift;
+		*CoordX = (unsigned int)work;
 
+		Sum_Y = Sum_Y - AveBuffY[AvePtr] + (*CoordY);
+		AveBuffY[AvePtr] = (*CoordY);
+		work = Sum_Y >> ave_shift;
+		*CoordY = (unsigned int)work;
+
+		if (++AvePtr >= ave_step)
+			AvePtr = 0;
+	}
+#ifdef WACOM_USE_AVE_TRANSITION
+	if (transition) {
+		--tras_counter;
+		if (tras_counter < 0)
+			transition = false;
+	}
+#endif
 }
 #endif
 
-#if defined(WACOM_USE_BOXFILTER)
-/*Center*/
-int g_boxThreshold_C[] = {0, 0, 0, };
-int g_boxThreshold_X[] = {30, 20, 20, };
-int g_boxThreshold_Y[] = {50, 20, 20, };
-/*Transition*/
-int g_boxThreshold_Trs[] = {130, 20, 20, };
+#if defined(WACOM_USE_HEIGHT)
+u8 wacom_i2c_coord_level(u16 gain)
+{
+	if (gain >= 0 && gain <= 14)
+		return 0;
+	else if (gain > 14 && gain <= 24)
+		return 1;
+	else
+		return 2;
+}
+#endif
 
-void boxfilt(unsigned short *CoordX, unsigned short *CoordY,
+#ifdef WACOM_USE_BOX_FILTER
+void boxfilt(short *CoordX, short *CoordY,
 			int height, int bFirstLscan)
 {
 	bool isMoved = false;
 	static bool bFirst = true;
-	static unsigned short lastX_loc, lastY_loc;
+	static short lastX_loc, lastY_loc;
 	static unsigned char bResetted;
 	int threshold = 0;
 	int distance = 0;
-	bool transition = false;
-	bool isXMoved = false;
+	static short bounce;
 
 	/*Reset filter*/
 	if (bFirstLscan == 0) {
@@ -583,48 +694,14 @@ void boxfilt(unsigned short *CoordX, unsigned short *CoordY,
 	}
 
 	/*Start Filtering*/
-	threshold = g_boxThreshold_C[height];
-
-	if (*CoordX > X_INC_E1)
-		threshold = g_boxThreshold_X[height];
-	else if (*CoordX < X_INC_S1)
-		threshold = g_boxThreshold_X[height];
-
-	/*Right*/
-	if (*CoordY > Y_INC_E1) {
-		/*Transition*/
-		if (*CoordY < Y_INC_E2 && *CoordY > Y_INC_E3) {
-			transition = true;
-			threshold += g_boxThreshold_Trs[height];
-		} else
-			threshold += g_boxThreshold_Y[height];
-	}
-	/*Left*/
-	else if (*CoordY < Y_INC_S1) {
-		/*Transition*/
-		if (*CoordY > Y_INC_S2 && *CoordY < Y_INC_S3) {
-			transition = true;
-			threshold += g_boxThreshold_Trs[height];
-		} else {
-			threshold += g_boxThreshold_Y[height];
-		}
-	}
-
-	/*Check Stop condition*/
-	if (threshold == 0)
-		return ;
+	threshold = 30;
 
 	/*X*/
 	distance = abs(*CoordX - lastX_loc);
-	if (transition) {
-		if (distance >= 70) {
-			isMoved = true;
-			isXMoved = true;
-		}
-	} else if (distance >= threshold)
+
+	if (distance >= threshold)
 		isMoved = true;
 
-	/*Y*/
 	if (isMoved == false) {
 		distance = abs(*CoordY - lastY_loc);
 		if (distance >= threshold)
@@ -633,28 +710,96 @@ void boxfilt(unsigned short *CoordX, unsigned short *CoordY,
 
 	/*Update position*/
 	if (isMoved) {
-		if (isXMoved)
-			lastX_loc = *CoordX;
-		else {
-			lastX_loc = *CoordX;
-			lastY_loc = *CoordY;
-		}
+		lastX_loc = *CoordX;
+		lastY_loc = *CoordY;
 	} else {
-		*CoordX = lastX_loc;
+		*CoordX = lastX_loc + bounce;
 		*CoordY = lastY_loc;
+		if (bounce)
+			bounce = 0;
+		else
+			bounce += 5;
 	}
 }
 #endif
 
+#if defined(WACOM_USE_AVE_TRANSITION)
+int g_aveLevel_C[] = {2, 2, 4, };
+int g_aveLevel_X[] = {3, 3, 4, };
+int g_aveLevel_Y[] = {3, 3, 4, };
+int g_aveLevel_Trs[] = {3, 4, 4, };
+int g_aveLevel_Cor[] = {4, 4, 4, };
+int g_aveShift;
+
+void ave_level(short CoordX, short CoordY,
+			int height, int *aveStrength)
+{
+	bool transition = false;
+	bool edgeY = false, edgeX = false;
+	bool cY = false, cX = false;
+
+	if (CoordY > (WACOM_MAX_COORD_Y - 800))
+		cY = true;
+	else if (CoordY < 800)
+		cY = true;
+
+	if (CoordX > (WACOM_MAX_COORD_X - 800))
+		cX = true;
+	else if (CoordX < 800)
+		cX = true;
+
+	if (cX && cY) {
+		*aveStrength = g_aveLevel_Cor[height];
+		return ;
+	}
+
+	/*Start Filtering*/
+	if (CoordX > X_INC_E1)
+		edgeX = true;
+	else if (CoordX < X_INC_S1)
+		edgeX = true;
+
+	/*Right*/
+	if (CoordY > Y_INC_E1) {
+		/*Transition*/
+		if (CoordY > Y_INC_E3)
+			transition = true;
+		else
+			edgeY = true;
+	}
+	/*Left*/
+	else if (CoordY < Y_INC_S1) {
+		/*Transition*/
+		if (CoordY > Y_INC_S3)
+			transition = true;
+		else
+			edgeY = true;
+	}
+
+	if (transition)
+		*aveStrength = g_aveLevel_Trs[height];
+	else if (edgeX)
+		*aveStrength = g_aveLevel_X[height];
+	else if (edgeY)
+		*aveStrength = g_aveLevel_Y[height];
+	else
+		*aveStrength = g_aveLevel_C[height];
+}
+#endif
 #endif /*WACOM_IMPORT_FW_ALGO*/
 
-static bool wacom_i2c_coord_range(u16 *x, u16 *y)
+static bool wacom_i2c_coord_range(s16 *x, s16 *y)
 {
 #if defined(CONFIG_MACH_P4NOTE)
 	if ((*x <= WACOM_POSX_OFFSET) || (*y <= WACOM_POSY_OFFSET))
 		return false;
 #endif
+#if defined(CONFIG_MACH_T0)
+	if ((*x >= 0) && (*y >= 0) &&
+		(*x <= WACOM_POSX_MAX) && (*y <= WACOM_POSY_MAX - 50))
+#else
 	if ((*x <= WACOM_POSX_MAX) && (*y <= WACOM_POSY_MAX))
+#endif
 		return true;
 
 	return false;
@@ -666,9 +811,12 @@ int wacom_i2c_coord(struct wacom_i2c *wac_i2c)
 	int ret = 0;
 	u8 *data;
 	int rubber, stylus;
-	static u16 x, y, pressure;
-	static u16 tmp;
+	static s16 x, y, pressure;
+	static s16 tmp;
 	int rdy = 0;
+	u8 gain = 0;
+	u8 height = 0;
+	int aveStrength = 2;
 
 #ifdef WACOM_IRQ_WORK_AROUND
 	cancel_delayed_work(&wac_i2c->pendct_dwork);
@@ -715,30 +863,50 @@ int wacom_i2c_coord(struct wacom_i2c *wac_i2c)
 		x = ((u16) data[1] << 8) + (u16) data[2];
 		y = ((u16) data[3] << 8) + (u16) data[4];
 		pressure = ((u16) data[5] << 8) + (u16) data[6];
-
+#if defined(WACOM_USE_HEIGHT)
+		gain = data[7];
+#endif
 #ifdef WACOM_IMPORT_FW_ALGO
+#if defined(CONFIG_MACH_T0)
+		x = x - origin_offset[0];
+		y = y - origin_offset[1];
+#else /*Q1*/
 		/* Change Position to Active Area */
-		if (x <= origin_offset[0])
+		if (x < origin_offset[0])
 			x = 0;
 		else
 			x = x - origin_offset[0];
-		if (y <= origin_offset[1])
+		if (y < origin_offset[1])
 			y = 0;
 		else
 			y = y - origin_offset[1];
-
+#endif
 #ifdef WACOM_USE_OFFSET_TABLE
-		if (wac_i2c->use_offset_table)
-			wacom_i2c_coord_offset(&x, &y);
+		if (wac_i2c->use_offset_table) {
+			if (x >= 0 && y >= 0)
+				wacom_i2c_coord_offset(&x, &y);
+		}
 #endif
+
+#ifdef CONFIG_MACH_T0
+		if (wac_i2c->use_aveTransition && pressure == 0) {
+#ifdef WACOM_USE_HEIGHT
+			height = wacom_i2c_coord_level(gain);
+#endif
+#ifdef WACOM_USE_AVE_TRANSITION
+			ave_level(x, y, height, &aveStrength);
+#endif
+		}
+#endif
+
 #ifdef WACOM_USE_AVERAGING
-		wacom_i2c_coord_average(&x, &y, rdy);
+		wacom_i2c_coord_average(&x, &y, rdy, aveStrength);
 #endif
-#ifdef WACOM_USE_BOXFILTER
-		if (wac_i2c->use_box_filter && pressure == 0)
-			boxfilt(&x, &y, 0, rdy);
+#ifdef WACOM_USE_BOX_FILTER
+		if (pressure == 0)
+			boxfilt(&x, &y, height, rdy);
 #endif
-#endif
+#endif /*WACOM_IMPORT_FW_ALGO*/
 		if (wac_i2c->wac_pdata->x_invert)
 			x = wac_i2c->wac_feature->x_max - x;
 		if (wac_i2c->wac_pdata->y_invert)
@@ -749,6 +917,7 @@ int wacom_i2c_coord(struct wacom_i2c *wac_i2c)
 			x = y;
 			y = tmp;
 		}
+
 #ifdef WACOM_USE_TILT_OFFSET
 		/* Add offset */
 		x = x + tilt_offsetX[user_hand][screen_rotate];
@@ -808,7 +977,7 @@ int wacom_i2c_coord(struct wacom_i2c *wac_i2c)
 		}
 #if defined(CONFIG_SAMSUNG_KERNEL_DEBUG_USER)
 		else
-			printk(KERN_DEBUG "[E-PEN] raw data x=0x%x, y=0x%x\n",
+			printk(KERN_DEBUG "[E-PEN] raw data x=%d, y=%d\n",
 			x, y);
 #endif
 	} else {
@@ -835,14 +1004,13 @@ int wacom_i2c_coord(struct wacom_i2c *wac_i2c)
 		schedule_delayed_work(&wac_i2c->pendct_dwork, HZ / 10);
 
 		return 0;
-#else				/* WACOM_IRQ_WORK_AROUND */
+#else	/* WACOM_IRQ_WORK_AROUND */
 #ifdef WACOM_USE_AVERAGING
 		/* enable emr device */
-		wacom_i2c_coord_average(0, 0, 0);
+		wacom_i2c_coord_average(0, 0, 0, 0);
 #endif
-#ifdef WACOM_USE_BOXFILTER
-		if (wac_i2c->use_box_filter)
-			boxfilt(0, 0, 0, 0);
+#ifdef WACOM_USE_BOX_FILTER
+		boxfilt(0, 0, 0, 0);
 #endif
 
 #ifdef WACOM_PDCT_WORK_AROUND

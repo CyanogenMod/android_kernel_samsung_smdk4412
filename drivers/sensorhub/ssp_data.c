@@ -163,36 +163,48 @@ static void get_factoty_data(struct ssp_data *data, int iSensorData,
 	char *pchRcvDataFrame, int *iDataIdx)
 {
 	int iIdx, iTotalLenth = 0;
+	unsigned int uTemp = 0;
 
-	if (iSensorData == ACCELEROMETER_FACTORY) {
-		data->uFactorydataReady = (1 << ACCELEROMETER_FACTORY);
+	switch (iSensorData) {
+	case ACCELEROMETER_FACTORY:
+		uTemp = (1 << ACCELEROMETER_FACTORY);
 		iTotalLenth = ACCEL_FACTORY_DATA_LENGTH;
-	} else if (iSensorData == GYROSCOPE_FACTORY) {
-		data->uFactorydataReady = (1 << GYROSCOPE_FACTORY);
+		break;
+	case GYROSCOPE_FACTORY:
+		uTemp = (1 << GYROSCOPE_FACTORY);
 		iTotalLenth = GYRO_FACTORY_DATA_LENGTH;
-	} else if (iSensorData == GEOMAGNETIC_FACTORY) {
-		data->uFactorydataReady = (1 << GEOMAGNETIC_FACTORY);
+		break;
+	case GEOMAGNETIC_FACTORY:
+		uTemp = (1 << GEOMAGNETIC_FACTORY);
 		iTotalLenth = MAGNETIC_FACTORY_DATA_LENGTH;
-	} else if (iSensorData == PRESSURE_FACTORY) {
-		data->uFactorydataReady = (1 << PRESSURE_FACTORY);
+		break;
+	case PRESSURE_FACTORY:
+		uTemp = (1 << PRESSURE_FACTORY);
 		iTotalLenth = PRESSURE_FACTORY_DATA_LENGTH;
-	} else if (iSensorData == MCU_FACTORY) {
-		data->uFactorydataReady = (1 << MCU_FACTORY);
+		break;
+	case MCU_FACTORY:
+		uTemp = (1 << MCU_FACTORY);
 		iTotalLenth = MCU_FACTORY_DATA_LENGTH;
-		ssp_dbg("[SSP]: %s - Mcu test data\n", __func__);
-	} else if (iSensorData == GYROSCOPE_TEMP_FACTORY) {
-		data->uFactorydataReady = (1 << GYROSCOPE_TEMP_FACTORY);
+		break;
+	case GYROSCOPE_TEMP_FACTORY:
+		uTemp = (1 << GYROSCOPE_TEMP_FACTORY);
 		iTotalLenth = GYRO_TEMP_FACTORY_DATA_LENGTH;
-	} else if (iSensorData == GYROSCOPE_DPS_FACTORY) {
-		data->uFactorydataReady = (1 << GYROSCOPE_DPS_FACTORY);
+		break;
+	case GYROSCOPE_DPS_FACTORY:
+		uTemp = (1 << GYROSCOPE_DPS_FACTORY);
 		iTotalLenth = GYRO_DPS_FACTORY_DATA_LENGTH;
-	} else if (iSensorData == MCU_SLEEP_FACTORY) {
-		data->uFactorydataReady = (1 << MCU_SLEEP_FACTORY);
+		break;
+	case MCU_SLEEP_FACTORY:
+		uTemp = (1 << MCU_SLEEP_FACTORY);
 		iTotalLenth = MCU_SLEEP_FACTORY_DATA_LENGTH;
+		break;
 	}
 
+	ssp_dbg("[SSP]: %s - Factory test data %d\n", __func__, iSensorData);
 	for (iIdx = 0; iIdx < iTotalLenth; iIdx++)
 		data->uFactorydata[iIdx] = (u8)pchRcvDataFrame[(*iDataIdx)++];
+
+	data->uFactorydataReady = uTemp;
 }
 
 int parse_dataframe(struct ssp_data *data, char *pchRcvDataFrame, int iLength)
@@ -240,11 +252,8 @@ int parse_dataframe(struct ssp_data *data, char *pchRcvDataFrame, int iLength)
 #ifdef CONFIG_SENSORS_SSP_SENSORHUB
 		} else if (pchRcvDataFrame[iDataIdx] ==
 			MSG2AP_INST_LIBRARY_DATA) {
-			int ret = ssp_handle_sensorhub_data(data,
+			ssp_handle_sensorhub_data(data,
 					pchRcvDataFrame, iDataIdx, iLength);
-			if (ret < 0)
-				pr_err("%s: handle sensorhub data(%d) err(%d)",
-					__func__, iDataIdx, ret);
 			break;
 #endif
 		} else
