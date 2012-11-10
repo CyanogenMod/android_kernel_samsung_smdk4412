@@ -12,7 +12,7 @@
  *  GNU General Public License for more details.
  *
  */
-#include "../ssp.h"
+#include "ssp.h"
 
 /*************************************************************************/
 /* factory Sysfs                                                         */
@@ -249,6 +249,8 @@ static ssize_t accel_reactive_alert_store(struct device *dev,
 				__func__);
 			goto exit;
 		}
+
+		mdelay(5);
 
 		data->bAccelAlert = data->uFactorydata[0];
 		ssp_dbg("[SSP]: %s factory test success!\n", __func__);

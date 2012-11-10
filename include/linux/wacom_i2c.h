@@ -138,7 +138,7 @@
 
 #define WACOM_MAX_COORD_X 12288
 #define WACOM_MAX_COORD_Y 6912
-#define WACOM_MAX_PRESSURE 0xFF
+#define WACOM_MAX_PRESSURE 1023
 
 /* For Android origin */
 #define WACOM_POSX_MAX WACOM_MAX_COORD_Y
@@ -148,8 +148,15 @@
 #define WACOM_IMPORT_FW_ALGO
 #define WACOM_USE_OFFSET_TABLE
 #define WACOM_USE_AVERAGING
-#define WACOM_USE_BOXFILTER
+#define WACOM_USE_AVE_TRANSITION
+#define WACOM_USE_BOX_FILTER
 #define WACOM_USE_TILT_OFFSET
+#define WACOM_USE_HEIGHT
+
+#if defined(CONFIG_TARGET_LOCALE_KOR)
+#define WACOM_STATE_CHECK
+#define WACOM_DEBOUNCEINT_BY_ESD
+#endif
 
 #define MAX_ROTATION	4
 #define MAX_HAND		2
@@ -169,10 +176,10 @@
 #define  Y_INC_S1  1500
 #define  Y_INC_E1  (WACOM_MAX_COORD_Y - 1500)
 
-#define  Y_INC_S2  700
-#define  Y_INC_E2  (WACOM_MAX_COORD_Y - 700)
-#define  Y_INC_S3  900
-#define  Y_INC_E3  (WACOM_MAX_COORD_Y - 900)
+#define  Y_INC_S2  500
+#define  Y_INC_E2  (WACOM_MAX_COORD_Y - 500)
+#define  Y_INC_S3  1100
+#define  Y_INC_E3  (WACOM_MAX_COORD_Y - 1100)
 
 #define CONFIG_SEC_TOUCHSCREEN_DVFS_LOCK
 #define WACOM_DVFS_LOCK_FREQ 800000
@@ -328,6 +335,13 @@ struct wacom_g5_platform_data {
 	int max_pressure;
 	int min_pressure;
 	int gpio_pendct;
+#ifdef WACOM_STATE_CHECK
+#if defined(CONFIG_TARGET_LOCALE_KOR)
+#if defined(CONFIG_MACH_T0) && defined(CONFIG_TDMB_ANT_DET)
+	int gpio_esd_check;
+#endif
+#endif
+#endif
 #ifdef WACOM_PEN_DETECT
 	int gpio_pen_insert;
 #endif
@@ -365,8 +379,11 @@ struct wacom_i2c {
 	int pen_pressed;
 	int side_pressed;
 	int tool;
-	u16 last_x;
-	u16 last_y;
+	s16 last_x;
+	s16 last_y;
+#ifdef WACOM_STATE_CHECK
+	struct delayed_work wac_statecheck_work;
+#endif
 #ifdef WACOM_PEN_DETECT
 	struct delayed_work pen_insert_dwork;
 	bool pen_insert;
@@ -380,7 +397,7 @@ struct wacom_i2c {
 #endif
 #ifdef WACOM_IMPORT_FW_ALGO
 	bool use_offset_table;
-	bool use_box_filter;
+	bool use_aveTransition;
 #endif
 	bool checksum_result;
 	const char name[NAMEBUF];

@@ -39,8 +39,13 @@ struct melfas_tsi_platform_data {
 	void (*input_event) (void *data);
 	int (*lcd_type) (void);
 	void (*register_cb) (void *);
+#ifdef CONFIG_LCD_FREQ_SWITCH
+	void (*register_lcd_cb) (void *);
+#endif
 };
 extern struct class *sec_class;
 void tsp_charger_infom(bool en);
-
+#ifdef CONFIG_LCD_FREQ_SWITCH
+void tsp_lcd_infom(bool en);
+#endif
 #endif /* _LINUX_MMS_TOUCH_H */

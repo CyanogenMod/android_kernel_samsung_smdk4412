@@ -36,6 +36,7 @@
 #include <linux/completion.h>
 #include <linux/kthread.h>
 #include <linux/list.h>
+#include <linux/spinlock.h>
 #endif
 
 #define SSP_DBG		1
@@ -46,7 +47,7 @@
 
 #define CANCELATION_THRESHOLD	9
 #define DEFAULT_THRESHOLD		13
-#define OTHERS_OCTA_DEFAULT_THRESHOLD	11
+#define OTHERS_OCTA_DEFAULT_THRESHOLD	14
 #define WHITE_OCTA_DEFAULT_THRESHOLD	13
 #define GRAY_OCTA_DEFAULT_THRESHOLD	12
 
@@ -78,10 +79,10 @@
 #define data_dbg(dev, format, ...)
 #endif
 
-#define SSP_SW_RESET_TIME		3000
-
+#define SSP_SW_RESET_TIME	3000
 #define DEFUALT_POLLING_DELAY	(200 * NSEC_PER_MSEC)
 #define PROX_AVG_READ_NUM	80
+#define DEFAULT_RETRIES		3
 
 /* Sensor Sampling Time Define */
 enum {
@@ -170,7 +171,9 @@ enum {
 #define SUBCMD_GPIOWAKEUP			0X02
 #define SUBCMD_POWEREUP				0X04
 #define MSG2SSP_STT				0xC8
-#define LIBRARY_MAX_NUM				8
+#define LIBRARY_MAX_NUM				5
+#define LIBRARY_MAX_TRY				32
+#define EVENT_WAIT_COUNT			3
 #endif
 
 /* SSP_INSTRUCTION_CMD */
@@ -239,7 +242,7 @@ struct calibraion_data {
 #ifdef CONFIG_SENSORS_SSP_SENSORHUB
 struct sensorhub_event {
 	char *library_data;
-	int library_length;
+	int length;
 	struct list_head list;
 };
 #endif
@@ -285,6 +288,7 @@ struct ssp_data {
 	unsigned int uResetCnt;
 	unsigned int uI2cFailCnt;
 	unsigned int uTimeOutCnt;
+	unsigned int uIrqCnt;
 	unsigned int uBusyCnt;
 	unsigned int uGyroDps;
 	unsigned int uAliveSensorDebug;
@@ -318,16 +322,19 @@ struct ssp_data {
 	struct task_struct *sensorhub_task;
 	struct sensorhub_event events_head;
 	struct sensorhub_event events[LIBRARY_MAX_NUM];
+	struct sensorhub_event *first_event;
 	int event_number;
+	int transfer_try;
+	int transfer_ready;
 	int large_library_length;
 	char *large_library_data;
 	wait_queue_head_t sensorhub_waitqueue;
+	spinlock_t sensorhub_lock;
 #endif
 };
 
-int waiting_wakeup_mcu(struct ssp_data *data);
-int ssp_i2c_read(struct ssp_data *data, char *pTxData, u16 uTxLength,
-	char *pRxData, u16 uRxLength);
+int waiting_wakeup_mcu(struct ssp_data *);
+int ssp_i2c_read(struct ssp_data *, char *, u16, char *, u16, int);
 void toggle_mcu_reset(struct ssp_data *);
 int initialize_mcu(struct ssp_data *);
 int initialize_input_dev(struct ssp_data *);
