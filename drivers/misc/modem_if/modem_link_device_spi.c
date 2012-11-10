@@ -37,22 +37,23 @@
 static struct spi_link_device *p_spild;
 static struct spi_device *p_spi;
 
-static void spi_send_work(int spi_sigs)
+static void spi_send_work(int spi_sigs, bool spi_work_t)
 {
-	struct spi_work_type *spi_wq = NULL;
-	spi_wq = kmalloc(sizeof(struct spi_work_type), GFP_ATOMIC);
-	spi_wq->signal_code = spi_sigs;
-	INIT_WORK(&spi_wq->work, spi_work);
-	queue_work(p_spild->spi_wq, (struct work_struct *)spi_wq);
-}
+	struct spi_work_type *spi_wq;
 
-static void spi_send_work_front(int spi_sigs)
-{
-	struct spi_work_type *spi_wq = NULL;
 	spi_wq = kmalloc(sizeof(struct spi_work_type), GFP_ATOMIC);
+	if (unlikely(!spi_wq)) {
+		pr_err("[LNK/E] <%s> Failed to kmalloc()\n", __func__);
+		return;
+	}
+
 	spi_wq->signal_code = spi_sigs;
 	INIT_WORK(&spi_wq->work, spi_work);
-	queue_work_front(p_spild->spi_wq, (struct work_struct *)spi_wq);
+
+	if (spi_work_t == SPI_WORK_FRONT)
+		queue_work_front(p_spild->spi_wq, (struct work_struct *)spi_wq);
+	else
+		queue_work(p_spild->spi_wq, (struct work_struct *)spi_wq);
 }
 
 static irqreturn_t spi_srdy_irq_handler(int irq, void *p_ld)
@@ -78,11 +79,8 @@ static irqreturn_t spi_srdy_irq_handler(int irq, void *p_ld)
 	/* SRDY interrupt work on SPI_STATE_IDLE state for receive data */
 	if (spild->spi_state == SPI_STATE_IDLE
 		|| spild->spi_state == SPI_STATE_RX_TERMINATE
-		|| spild->spi_state == SPI_STATE_TX_TERMINATE) {
-		spi_send_work_front(SPI_WORK_RECEIVE);
-
-		return result;
-	}
+		|| spild->spi_state == SPI_STATE_TX_TERMINATE)
+		spi_send_work(SPI_WORK_RECEIVE, SPI_WORK_FRONT);
 
 	return result;
 }
@@ -116,10 +114,10 @@ static int spi_send
 	struct sk_buff_head *txq;
 	enum dev_format fmt = iod->format;
 
-	u32 data;
-	u32 cmd_ready = 0x12341234;
-	u32 cmd_start = 0x45674567;
+	const u32 cmd_ready = 0x12341234;
+	const u32 cmd_start = 0x45674567;
 	int ret;
+	u32 data;
 
 	switch (fmt) {
 	case IPC_FMT:
@@ -165,7 +163,7 @@ static int spi_send
 		return 0;
 	}
 
-	spi_send_work(SPI_WORK_SEND);
+	spi_send_work(SPI_WORK_SEND, SPI_WORK);
 
 	return ret;
 }
@@ -186,17 +184,21 @@ static int spi_register_isr
 	if (ret) {
 		pr_err("[LNK/E] <%s> request_irq fail (%d)\n",
 			__func__, ret);
-		return ret;
+		goto err;
 	}
 
 	ret = enable_irq_wake(irq);
-	if (ret)
+	if (ret) {
 		pr_err("[LNK/E] <%s> enable_irq_wake fail (%d)\n",
 			__func__, ret);
+		free_irq(irq, ld);
+		goto err;
+	}
 
 	pr_debug("[LNK] <%s> IRQ#%d handler is registered.\n", __func__, irq);
 
-	return 0;
+err:
+	return ret;
 }
 
 void spi_unregister_isr(unsigned irq, void *data)
@@ -300,56 +302,39 @@ static int spi_buff_write
 }
 
 
-int spi_prepare_tx_packet(void)
+static void spi_prepare_tx_packet(void)
 {
 	struct link_device *ld;
-	struct spi_link_device *spild;
 	struct sk_buff *skb;
 	int ret;
 	int i;
 
-	spild = p_spild;
-	ld = &spild->ld;
+	ld = &p_spild->ld;
 
-	for (i = 0; i < spild->max_ipc_dev; i++) {
+	for (i = 0; i < p_spild->max_ipc_dev; i++) {
 		while ((skb = skb_dequeue(ld->skb_txq[i]))) {
-			if (ld->mode == LINK_MODE_IPC) {
-				ret = spi_buff_write(spild, i,
-					skb->data, skb->len);
-				if (!ret) {
-					skb_queue_head(ld->skb_txq[i], skb);
-					break;
-				}
-			} else {
-				pr_err("[LNK/E] <%s:%s> "
-				       "ld->mode != LINK_MODE_IPC\n",
-					__func__, ld->name);
+			ret = spi_buff_write(p_spild, i, skb->data, skb->len);
+			if (!ret) {
+				skb_queue_head(ld->skb_txq[i], skb);
+				break;
 			}
 			dev_kfree_skb_any(skb);
 		}
 	}
-
-	return 1;
 }
 
 
-static int spi_start_data_send(void)
+static void spi_start_data_send(void)
 {
 	struct link_device *ld;
-	struct spi_link_device *spild;
 	int i;
 
-	spild = p_spild;
-	ld = &spild->ld;
+	ld = &p_spild->ld;
 
-	for (i = 0; i < spild->max_ipc_dev; i++) {
-		if (skb_queue_len(ld->skb_txq[i]) > 0) {
-			spi_send_work(SPI_WORK_SEND);
-			return 1;
-		}
+	for (i = 0; i < p_spild->max_ipc_dev; i++) {
+		if (skb_queue_len(ld->skb_txq[i]) > 0)
+			spi_send_work(SPI_WORK_SEND, SPI_WORK);
 	}
-
-	return 0;
 }
 
 static void spi_tx_work(void)
@@ -361,15 +346,10 @@ static void spi_tx_work(void)
 
 	spild = p_spild;
 
-	/* check SUB SRDY state */
+	/* check SUB SRDY, SRDY state */
 	if (gpio_get_value(spild->gpio_ipc_sub_srdy) ==
-		SPI_GPIOLEVEL_HIGH) {
-		spi_start_data_send();
-		return;
-	}
-
-	/* check SRDY state */
-	if (gpio_get_value(spild->gpio_ipc_srdy) ==
+		SPI_GPIOLEVEL_HIGH ||
+		gpio_get_value(spild->gpio_ipc_srdy) ==
 		SPI_GPIOLEVEL_HIGH) {
 		spi_start_data_send();
 		return;
@@ -407,7 +387,7 @@ static void spi_tx_work(void)
 			/* change state SPI_STATE_TX_WAIT */
 			/* to SPI_STATE_IDLE */
 			spild->spi_state = SPI_STATE_IDLE;
-			spi_send_work(SPI_WORK_SEND);
+			spi_send_work(SPI_WORK_SEND, SPI_WORK);
 
 			return;
 		}
@@ -433,9 +413,8 @@ static void spi_tx_work(void)
 
 		spi_prepare_tx_packet();
 
-		if (spi_tx_rx_sync((void *)spi_packet_buf,
-			(void *)spi_sync_buf,
-			SPI_MAX_PACKET_SIZE) != 0) {
+		if (spi_tx_rx_sync((void *)spi_packet_buf, (void *)spi_sync_buf,
+			SPI_MAX_PACKET_SIZE)) {
 			/* TODO: save failed packet */
 			/* back data to each queue */
 			pr_err("[SPI] spi_dev_send fail\n");
@@ -537,11 +516,11 @@ int spi_buff_read(struct spi_link_device *spild)
 
 		/* enqueue spi data */
 		skb = alloc_skb(data_length, GFP_ATOMIC);
-		if (!skb) {
+		if (unlikely(!skb)) {
 			pr_err("%s %s\n",
 				"[SPI] ERROR : spi_buff_read:",
 				"Can't allocate memory for SPI");
-			return 0;
+			return -ENOMEM;
 		}
 
 		dst = skb_put(skb, data_length);
@@ -550,11 +529,7 @@ int spi_buff_read(struct spi_link_device *spild)
 			spi_packet_cur_pos + SPI_DATA_BOF_OFFSET,
 			data_length);
 
-		if (skb)
-			skb_queue_tail(&spild->skb_rxq[dev_id], skb);
-		else
-			pr_err("[LNK/E] <%s:%s> read[%d] fail\n",
-				__func__, ld->name, dev_id);
+		skb_queue_tail(&spild->skb_rxq[dev_id], skb);
 
 		/* move spi packet current posision */
 		spi_packet_cur_pos += spi_data_length;
@@ -578,16 +553,10 @@ static void spi_rx_work(void)
 	if (!spild)
 		pr_err("[LNK/E] <%s> dpld == NULL\n", __func__);
 
-	if (!wake_lock_active(&spild->spi_wake_lock))
-		return;
-
-	if (gpio_get_value(spild->gpio_ipc_srdy) == SPI_GPIOLEVEL_LOW)
-		return;
-
-	if (get_console_suspended())
-		return;
-
-	if (spild->spi_state == SPI_STATE_END)
+	if (!wake_lock_active(&spild->spi_wake_lock) ||
+		gpio_get_value(spild->gpio_ipc_srdy) == SPI_GPIOLEVEL_LOW ||
+		get_console_suspended() ||
+		spild->spi_state == SPI_STATE_END)
 		return;
 
 	spild->spi_state = SPI_STATE_RX_WAIT;
@@ -643,7 +612,7 @@ static void spi_rx_work(void)
 					 != NULL) {
 					if (iod->recv(iod, ld, skb->data,
 						skb->len) < 0)
-							pr_err("[LNK/E] <%s:%s> recv fail\n",
+						pr_err("[LNK/E] <%s:%s> recv fail\n",
 							__func__, ld->name);
 					dev_kfree_skb_any(skb);
 				}
@@ -1328,7 +1297,6 @@ err:
 static inline int _request_mem(struct ipc_spi *od)
 {
 	if (!p_spild->p_virtual_buff) {
-		pr_err("what\n");
 		od->mmio = vmalloc(od->size);
 		if (!od->mmio) {
 			pr_err("(%d) Failed to vmalloc size : %lu\n", __LINE__,
@@ -1408,7 +1376,7 @@ static void spi_work(struct work_struct *work)
 	kfree(spi_wq);
 	if (wake_lock_active(&p_spild->spi_wake_lock)) {
 		wake_unlock(&p_spild->spi_wake_lock);
-		pr_err("[SPI] [%s](%d) spi_wakelock unlocked .\n",
+		pr_debug("[SPI] [%s](%d) spi_wakelock unlocked .\n",
 			__func__, __LINE__);
 	}
 }

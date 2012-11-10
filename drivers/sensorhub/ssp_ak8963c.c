@@ -62,7 +62,13 @@ static long akmd_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 
 	switch (cmd) {
 	case ECS_IOCTL_GET_MAGDATA:
-		akmdbuf.uMagData[0] = 1;
+		if ((data->buf[GEOMAGNETIC_SENSOR].x == 0)
+			&& (data->buf[GEOMAGNETIC_SENSOR].y == 0)
+			&& (data->buf[GEOMAGNETIC_SENSOR].z == 0))
+			akmdbuf.uMagData[0] = 0;
+		else
+			akmdbuf.uMagData[0] = 1;
+
 		akmdbuf.uMagData[1] = data->buf[GEOMAGNETIC_SENSOR].x & 0xff;
 		akmdbuf.uMagData[2] = data->buf[GEOMAGNETIC_SENSOR].x >> 8;
 		akmdbuf.uMagData[3] = data->buf[GEOMAGNETIC_SENSOR].y & 0xff;
