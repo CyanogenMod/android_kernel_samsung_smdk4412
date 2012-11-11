@@ -58,7 +58,7 @@ struct device *bus_dev;
 
 /*#define S5C73M3_FROM_BOOTING*/
 #define S5C73M3_CORE_VDD	"/data/ISP_CV"
-#define S5C73M3_FW_PATH		"/sdcard/SlimISP.bin"
+#define S5C73M3_FW_PATH		"/storage/sdcard0/SlimISP.bin"
 #define S5C73M3_FW_VER_LEN		6
 #define S5C73M3_FW_VER_FILE_CUR	0x60
 
@@ -592,22 +592,22 @@ static int s5c73m3_get_sensor_fw_binary(struct v4l2_subdev *sd)
 
 #ifdef CONFIG_MACH_T0
 	if (state->sensor_fw[1] == 'D') {
-		sprintf(fw_path, "/data/cfw/SlimISP_%cK.bin",
+		sprintf(fw_path, "/system/vendor/firmware/SlimISP_%cK.bin",
 			state->sensor_fw[0]);
 	} else {
-		sprintf(fw_path, "/data/cfw/SlimISP_%c%c.bin",
+		sprintf(fw_path, "/system/vendor/firmware/SlimISP_%c%c.bin",
 			state->sensor_fw[0],
 			state->sensor_fw[1]);
 	}
 #else
 	if (state->sensor_fw[0] == 'O') {
-		sprintf(fw_path, "/data/cfw/SlimISP_G%c.bin",
+		sprintf(fw_path, "/system/vendor/firmware/SlimISP_G%c.bin",
 			state->sensor_fw[1]);
 	} else if (state->sensor_fw[0] == 'S') {
-		sprintf(fw_path, "/data/cfw/SlimISP_Z%c.bin",
+		sprintf(fw_path, "/system/vendor/firmware/SlimISP_Z%c.bin",
 			state->sensor_fw[1]);
 	} else {
-	sprintf(fw_path, "/data/cfw/SlimISP_%c%c.bin",
+	sprintf(fw_path, "/system/vendor/firmware/SlimISP_%c%c.bin",
 		state->sensor_fw[0],
 		state->sensor_fw[1]);
 	}
@@ -993,7 +993,7 @@ static int s5c73m3_get_phone_fw_version(struct v4l2_subdev *sd)
 	}
 #endif
 
-	sprintf(fw_path_in_data, "/data/cfw/%s",
+	sprintf(fw_path_in_data, "/system/vendor/firmware/%s",
 		fw_path);
 
 	buf = vmalloc(S5C73M3_FW_VER_LEN+1);
@@ -2708,7 +2708,7 @@ static int s5c73m3_load_fw(struct v4l2_subdev *sd)
 	}
 #endif
 
-	sprintf(fw_path_in_data, "/data/cfw/%s",
+	sprintf(fw_path_in_data, "/system/vendor/firmware/%s",
 		fw_path);
 
 	old_fs = get_fs();
