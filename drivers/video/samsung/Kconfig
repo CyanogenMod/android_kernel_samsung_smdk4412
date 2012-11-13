@@ -109,6 +109,14 @@ config FB_S5P_MDNIE
 	---help---
 	This enables support for Samsung MDNIE feature
 
+config FB_S5P_MDNIE_CONTROL
+	bool "Samsung MDNIE PWM Control"
+	depends on FB_S5P
+	depends on FB_S5P_MDNIE
+	default "0"
+	---help---
+	This enables control support for Samsung MDNIE feature
+
 config FB_MDNIE_PWM
 	bool "Samsung MDNIE PWM"
 	depends on FB_S5P

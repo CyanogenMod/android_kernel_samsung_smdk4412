@@ -84,12 +84,12 @@ enum NEGATIVE {
 
 struct mdnie_tunning_info {
 	char *name;
-	const unsigned short *seq;
+	unsigned short *seq;
 };
 
 struct mdnie_tunning_info_cabc {
 	char *name;
-	const unsigned short *seq;
+	unsigned short *seq;
 	unsigned int idx_lut;
 };
 
