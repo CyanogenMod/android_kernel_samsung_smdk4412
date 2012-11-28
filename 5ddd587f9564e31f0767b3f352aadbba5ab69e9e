@@ -1,0 +1,8 @@
+Change-Id: I5ddd587f9564e31f0767b3f352aadbba5ab69e9e
+Code-Review+2: Andrew Dodd <atd7@cornell.edu>
+Verified+1: Andrew Dodd <atd7@cornell.edu>
+Submitted-by: Andrew Dodd <atd7@cornell.edu>
+Submitted-at: Wed, 28 Nov 2012 14:59:56 -0800
+Reviewed-on: http://review.cyanogenmod.org/27238
+Project: CyanogenMod/android_kernel_samsung_smdk4412
+Branch: refs/heads/jellybean
