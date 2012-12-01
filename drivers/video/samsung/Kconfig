@@ -38,6 +38,24 @@ config FB_S5P_VSYNC_THREAD
 	bool "S5P Framebuffer vsync thread"
 	depends on FB_S5P
 
+config FB_S5P_VSYNC_SEND_UEVENTS
+	bool "S5P Framebuffer vsync uevents"
+	depends on FB_S5P_VSYNC_THREAD
+	default n
+	help
+	  Some hwcomposer implementations support vsync hinting via uevents to userspace
+	  However this also wakes up many other parts of Android, draining battery.
+	  ICS hwcomposer does not support any form of sync, so these uevents should be
+	  optional and only sent to HWC implementations that expect uevents to be sent
+
+config FB_S5P_VSYNC_SYSFS
+    bool "S5P Framebuffer vsync via sysfs"
+    depends on FB_S5P_VSYNC_THREAD
+    default n
+    help
+    A more efficient method of passing vsync to userspace that doesn't
+    broadcast uevents.
+
 config FB_S5P_TRACE_UNDERRUN
 	bool "S5P Framebuffer FIFO underrun trace"
 	depends on FB_S5P
