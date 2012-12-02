@@ -28,6 +28,7 @@
 	#define MALI_PANIC(fmt, args...) 
 #endif
 
+
 /* The file include several useful macros for error checking, debugging and printing.
  * - MALI_PRINTF(...)           Do not use this function: Will be included in Release builds.
  * - MALI_DEBUG_PRINT(nr, (X) ) Prints the second argument if nr<=MALI_DEBUG_LEVEL.
@@ -128,9 +129,7 @@
 	} while (0)
 
 #ifdef DEBUG
-#ifndef mali_debug_level
 extern int mali_debug_level;
-#endif
 
 #define MALI_DEBUG_CODE(code) code
 #define MALI_DEBUG_PRINT(level, args)  do { \

@@ -65,19 +65,19 @@ mali_physical_memory_allocator * mali_os_allocator_create(u32 max_allocation, u3
 			info->num_pages_allocated = 0;
 			info->cpu_usage_adjust = cpu_usage_adjust;
 
-			info->mutex = _mali_osk_lock_init( _MALI_OSK_LOCKFLAG_NONINTERRUPTABLE | _MALI_OSK_LOCKFLAG_ORDERED, 0, _MALI_OSK_LOCK_ORDER_MEM_INFO);
-            if (NULL != info->mutex)
-            {
-			    allocator->allocate = os_allocator_allocate;
-			    allocator->allocate_page_table_block = os_allocator_allocate_page_table_block;
-			    allocator->destroy = os_allocator_destroy;
+			info->mutex = _mali_osk_lock_init( _MALI_OSK_LOCKFLAG_NONINTERRUPTABLE | _MALI_OSK_LOCKFLAG_ORDERED, 0, 106);
+			if (NULL != info->mutex)
+			{
+				allocator->allocate = os_allocator_allocate;
+				allocator->allocate_page_table_block = os_allocator_allocate_page_table_block;
+				allocator->destroy = os_allocator_destroy;
 				allocator->stat = os_allocator_stat;
-			    allocator->ctx = info;
+				allocator->ctx = info;
 				allocator->name = name;
 
-			    return allocator;
-            }
-            _mali_osk_free(info);
+				return allocator;
+			}
+			_mali_osk_free(info);
 		}
 		_mali_osk_free(allocator);
 	}

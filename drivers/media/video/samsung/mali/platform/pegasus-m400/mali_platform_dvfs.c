@@ -164,7 +164,7 @@ mali_dvfs_threshold_table mali_dvfs_threshold[MALI_DVFS_STEPS]={
 #if (MALI_DVFS_STEPS > 2)
 	{85  , 90},
 #if (MALI_DVFS_STEPS > 3)
-	{85  ,90},
+	{85  , 90},
 #if (MALI_DVFS_STEPS > 4)
 	{95  ,100}
 #endif
@@ -175,21 +175,9 @@ mali_dvfs_threshold_table mali_dvfs_threshold[MALI_DVFS_STEPS]={
 
 #ifdef EXYNOS4_ASV_ENABLED
 #define ASV_LEVEL     12	/* ASV0, 1, 11 is reserved */
+#define ASV_LEVEL_PRIME     13	/* ASV0, 1, 12 is reserved */
 
-static unsigned int asv_3d_volt_9_table_1ghz_type[MALI_DVFS_STEPS-1][ASV_LEVEL] = {
-	{  975000,  950000,  950000,  950000,  925000,  925000,  925000,  900000,  900000,  900000,  900000,  875000},  /* L3(160Mhz) */
-#if (MALI_DVFS_STEPS > 1)
-	{ 1000000,  975000,  975000,  975000,  950000,  950000,  950000,  900000,  900000,  900000,  900000,  875000},  /* L2(266Mhz) */
-#if (MALI_DVFS_STEPS > 2)
-	{ 1075000, 1050000, 1050000, 1050000, 1000000, 1000000, 1000000,  975000,  975000,  975000,  975000,  925000},  /* L1(350Mhz) */
-#if (MALI_DVFS_STEPS > 3)
-	{ 1125000, 1100000, 1100000, 1100000, 1075000, 1075000, 1075000, 1025000, 1025000, 1025000, 1025000,  975000},  /* L0(440Mhz) */
-#endif
-#endif
-#endif
-};
-
-static unsigned int asv_3d_volt_9_table[MALI_DVFS_STEPS-1][ASV_LEVEL] = {
+static unsigned int asv_3d_volt_4412_9_table[MALI_DVFS_STEPS][ASV_LEVEL] = {
 	{  950000,  925000,  900000,  900000,  875000,  875000,  875000,  875000,  850000,  850000,  850000,  850000},  /* L3(160Mhz) */
 #if (MALI_DVFS_STEPS > 1)
 	{  975000,  950000,  925000,  925000,  925000,  900000,  900000,  875000,  875000,  875000,  875000,  850000},  /* L2(266Mhz) */
@@ -202,22 +190,35 @@ static unsigned int asv_3d_volt_9_table[MALI_DVFS_STEPS-1][ASV_LEVEL] = {
 #endif
 };
 
-static unsigned int asv_3d_volt_9_table_for_prime[MALI_DVFS_STEPS][ASV_LEVEL] = {
-	{  950000,  937500,  925000,  912500,  900000,  887500,  875000,  862500,  875000,  862500,  850000,  850000},  /* L4(160Mhz) */
+static unsigned int asv_3d_volt_9_table_for_prime[MALI_DVFS_STEPS][ASV_LEVEL_PRIME] = {
+	{  950000,  937500,  925000,  912500,  900000,  887500,  875000,  862500,  875000,  862500,  850000,  850000,  850000},	/* L4(160Mhz) */
 #if (MALI_DVFS_STEPS > 1)
-	{  975000,  962500,  950000,  937500,  925000,  912500,  900000,  887500,  900000,  887500,  875000,  862500},	/* L3(266Mhz) */
+	{  975000,  962500,  950000,  937500,  925000,  912500,  900000,  887500,  900000,  887500,  875000,  875000,  875000},	/* L3(266Mhz) */
 #if (MALI_DVFS_STEPS > 2)
-	{ 1025000, 1012500, 1000000,  987500,  975000,  962500,  950000,  937500,  950000,  937500,  925000,  912500},	/* L2(350Mhz) */
+	{ 1025000, 1012500, 1000000,  987500,  975000,  962500,  950000,  937500,  950000,  937500,  912500,  900000,  887500},	/* L2(350Mhz) */
 #if (MALI_DVFS_STEPS > 3)
-	{ 1087500, 1075000, 1062500, 1050000, 1037500, 1025000, 1012500, 1000000, 1012500, 1000000,  987500,  975000},	/* L1(440Mhz) */
+	{ 1087500, 1075000, 1062500, 1050000, 1037500, 1025000, 1012500, 1000000, 1012500, 1000000,  975000,  962500,  950000},	/* L1(440Mhz) */
 #if (MALI_DVFS_STEPS > 4)
-	{ 1150000, 1137500, 1125000, 1112500, 1100000, 1087500, 1075000, 1062500, 1087500, 1075000, 1062500, 1050000},	/* L0(533Mhz) */
+	{ 1150000, 1137500, 1125000, 1112500, 1100000, 1087500, 1075000, 1062500, 1075000, 1062500, 1037500, 1025000, 1012500},	/* L0(533Mhz) */
 #endif
 #endif
 #endif
 #endif
 };
-#endif /* ASV_LEVEL */
+
+static unsigned int asv_3d_volt_4212_9_table[MALI_DVFS_STEPS][ASV_LEVEL] = {
+	{  912500,  900000,  900000,  900000,  900000,  900000,  900000,  900000,  875000,  850000,  850000,  850000},	/* L3(160Mhz) */
+#if (MALI_DVFS_STEPS > 1)
+	{  937500,  925000,  925000,  900000,  925000,  925000,  925000,  900000,  900000,  900000,  875000,  862500},	/* L2(266Mhz) */
+#if (MALI_DVFS_STEPS > 2)
+	{  987500,  975000,  975000,  950000,  975000,  950000,  950000,  925000,  925000,  925000,  925000,  912500},	/* L1(350Mhz) */
+#if (MALI_DVFS_STEPS > 3)
+	{ 1062500, 1050000, 1050000, 1025000, 1050000, 1050000, 1025000, 1000000, 1000000,  975000,  975000,  962500},	/* L0(440Mhz) */
+#endif
+#endif
+#endif
+};
+#endif
 
 /*dvfs status*/
 mali_dvfs_currentstatus maliDvfsStatus;
@@ -343,13 +344,11 @@ static mali_bool set_mali_dvfs_status(u32 step,mali_bool boostup)
 	/*for future use*/
 	maliDvfsStatus.pCurrentDvfs = &mali_dvfs[validatedStep];
 
-#if CPUFREQ_LOCK_DURING_440
 	/* lock/unlock CPU freq by Mali */
 	if (mali_dvfs[step].clock == 440)
 		err = cpufreq_lock_by_mali(1200);
 	else
 		cpufreq_unlock_by_mali();
-#endif
 
 	return MALI_TRUE;
 }
@@ -393,26 +392,37 @@ static mali_bool mali_dvfs_table_update(void)
 	unsigned int step_num = MALI_DVFS_STEPS;
 
 	if(soc_is_exynos4412()) {
-		if (exynos_armclk_max == 1000000) {
-			step_num = MALI_DVFS_STEPS - 1;
+		/*check it's pega-prime or pega-Q*/
+		if(samsung_rev() < EXYNOS4412_REV_2_0) {
+			step_num = MALI_DVFS_STEPS-1;
 			for (i = 0; i < step_num; i++) {
 				MALI_PRINT((":::exynos_result_of_asv : %d\n", exynos_result_of_asv));
-				mali_dvfs[i].vol = asv_3d_volt_9_table_1ghz_type[i][exynos_result_of_asv];
-				MALI_PRINT(("mali_dvfs[%d].vol = %d 1ghz_type\n", i, mali_dvfs[i].vol));
+				mali_dvfs[i].vol = asv_3d_volt_4412_9_table[i][exynos_result_of_asv];
+				MALI_PRINT(("mali_dvfs[%d].vol = %d\n", i, mali_dvfs[i].vol));
 			}
-		} else if (samsung_rev() >= EXYNOS4412_REV_2_0) {
+		}
+		/* For Pega-Prime e-fuse, add 25mV from default ASV table*/
+		else if((is_special_flag() >> G3D_LOCK_FLAG) & 0x1) {
+			for (i = 0; i < step_num; i++) {
+				MALI_PRINT((":::exynos_result_of_asv : %d\n", exynos_result_of_asv));
+				mali_dvfs[i].vol = asv_3d_volt_9_table_for_prime[i][exynos_result_of_asv] + 25000;
+				MALI_PRINT(("mali_dvfs[%d].vol = %d\n", i, mali_dvfs[i].vol));
+			}
+		}
+		/* pega-prime default ASV table */
+		else {
 			for (i = 0; i < step_num; i++) {
 				MALI_PRINT((":::exynos_result_of_asv : %d\n", exynos_result_of_asv));
 				mali_dvfs[i].vol = asv_3d_volt_9_table_for_prime[i][exynos_result_of_asv];
-				MALI_PRINT(("mali_dvfs[%d].vol = %d 1.6ghz_type\n", i, mali_dvfs[i].vol));
-			}
-		} else {
-			step_num = MALI_DVFS_STEPS - 1;
-			for (i = 0; i < step_num; i++) {
-				MALI_PRINT((":::exynos_result_of_asv : %d\n", exynos_result_of_asv));
-				mali_dvfs[i].vol = asv_3d_volt_9_table[i][exynos_result_of_asv];
-				MALI_PRINT(("mali_dvfs[%d].vol = %d 1.4ghz_type\n", i, mali_dvfs[i].vol));
-			}
+				MALI_PRINT(("mali_dvfs[%d].vol = %d\n", i, mali_dvfs[i].vol));
+			} 
+		}
+	}
+	else if(soc_is_exynos4212()) {
+		for (i = 0; i < step_num; i++) {
+			MALI_PRINT((":::exynos_result_of_asv : %d\n", exynos_result_of_asv));
+			mali_dvfs[i].vol = asv_3d_volt_4212_9_table[i][exynos_result_of_asv];
+			MALI_PRINT(("mali_dvfs[%d].vol = %d\n", i, mali_dvfs[i].vol));
 		}
 	}
 
@@ -505,7 +515,7 @@ static unsigned int decideNextStatus(unsigned int utilization)
 		} else if (mali_dvfs_control < mali_dvfs_all[4].clock && mali_dvfs_control >= mali_dvfs_all[3].clock) {
 			int i = 0;
 			for (i = 0; i < MALI_DVFS_STEPS; i++) {
-				step[i].clk  = mali_dvfs_all[3].clock;
+				step[i].clk = mali_dvfs_all[3].clock;
 			}
 			maliDvfsStatus.currentStep = 3;
 		} else {
@@ -764,13 +774,11 @@ int change_dvfs_tableset(int change_clk, int change_step)
 		/*change the clock*/
 		mali_clk_set_rate(mali_dvfs[change_step].clock, mali_dvfs[change_step].freq);
 
-#if CPUFREQ_LOCK_DURING_440
 		/* lock/unlock CPU freq by Mali */
 		if (mali_dvfs[change_step].clock == 440)
 			err = cpufreq_lock_by_mali(1200);
 		else
 			cpufreq_unlock_by_mali();
-#endif
 	}
 
 	return mali_dvfs[change_step].clock;
@@ -800,6 +808,7 @@ int mali_dvfs_bottom_lock_push(int lock_step)
 			set_mali_dvfs_current_step(lock_step);
 		}
 	}
+
 	return _mali_osk_atomic_inc_return(&bottomlock_status);
 }
 
