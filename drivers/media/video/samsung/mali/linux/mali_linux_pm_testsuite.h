@@ -10,7 +10,9 @@
 #ifndef __MALI_LINUX_PM_TESTSUITE_H__
 #define __MALI_LINUX_PM_TESTSUITE_H__
 
-#if MALI_POWER_MGMT_TEST_SUITE && defined(CONFIG_PM)
+#if USING_MALI_PMM
+#if MALI_POWER_MGMT_TEST_SUITE
+#ifdef CONFIG_PM
 
 typedef enum
 {
@@ -27,6 +29,9 @@ extern unsigned int pwr_mgmt_status_reg;
 extern unsigned int is_mali_pmm_testsuite_enabled;
 extern unsigned int is_mali_pmu_present;
 
-#endif /* MALI_POWER_MGMT_TEST_SUITE && defined(CONFIG_PM) */
-
+#endif /* CONFIG_PM */
+#endif /* MALI_POWER_MGMT_TEST_SUITE */
+#endif /* USING_MALI_PMM */
 #endif /* __MALI_LINUX_PM_TESTSUITE_H__ */
+
+

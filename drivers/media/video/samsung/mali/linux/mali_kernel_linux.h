@@ -28,10 +28,8 @@ struct mali_dev
 #endif
 };
 
-#if MALI_LICENSE_IS_GPL
-/* Defined in mali_osk_irq.h */
-extern struct workqueue_struct * mali_wq;
-#endif
+_mali_osk_errcode_t initialize_kernel_device(void);
+void terminate_kernel_device(void);
 
 void mali_osk_low_level_mem_init(void);
 void mali_osk_low_level_mem_term(void);

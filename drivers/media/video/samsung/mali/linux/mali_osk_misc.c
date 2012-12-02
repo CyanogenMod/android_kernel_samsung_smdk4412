@@ -33,7 +33,7 @@ u32 _mali_osk_snprintf( char *buf, u32 size, const char *fmt, ... )
 	va_list args;
 	va_start(args, fmt);
 
-	res = vscnprintf(buf, (size_t)size, fmt, args);
+	res = vsnprintf(buf, (size_t)size, fmt, args);
 
 	va_end(args);
 	return res;
@@ -42,7 +42,6 @@ u32 _mali_osk_snprintf( char *buf, u32 size, const char *fmt, ... )
 void _mali_osk_abort(void)
 {
 	/* make a simple fault by dereferencing a NULL pointer */
-	dump_stack();
 	*(int *)0 = 0;
 }
 
