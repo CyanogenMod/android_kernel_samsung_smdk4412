@@ -1,0 +1,8 @@
+Change-Id: Ia55162cd07f4be2a3f66a5d85900e2253732094c
+Code-Review+2: Daniel Hillenbrand <codeworkx@cyanogenmod.org>
+Verified+1: Daniel Hillenbrand <codeworkx@cyanogenmod.org>
+Submitted-by: Daniel Hillenbrand <codeworkx@cyanogenmod.org>
+Submitted-at: Mon, 03 Dec 2012 07:42:49 -0800
+Reviewed-on: http://review.cyanogenmod.org/27526
+Project: CyanogenMod/android_kernel_samsung_smdk4412
+Branch: refs/heads/mr1-staging
