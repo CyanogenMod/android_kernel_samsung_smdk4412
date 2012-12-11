@@ -42,6 +42,11 @@
 #ifdef CONFIG_BATTERY_SEC_PX
 #include <linux/power/sec_battery_px.h>
 #endif
+
+#ifdef CONFIG_BT_BCM4334
+#include <mach/board-bluetooth-bcm.h>
+#endif
+
 #include <linux/power_supply.h>
 #ifdef CONFIG_STMPE811_ADC
 #include <linux/stmpe811-adc.h>
@@ -194,6 +199,9 @@ static struct s3c2410_uartcfg smdk4212_uartcfgs[] __initdata = {
 		.ucon		= SMDK4212_UCON_DEFAULT,
 		.ulcon		= SMDK4212_ULCON_DEFAULT,
 		.ufcon		= SMDK4212_UFCON_DEFAULT,
+#ifdef CONFIG_BT_BCM4334
+		.wake_peer = bcm_bt_lpm_exit_lpm_locked,
+#endif
 	},
 	[1] = {
 		.hwport		= 1,

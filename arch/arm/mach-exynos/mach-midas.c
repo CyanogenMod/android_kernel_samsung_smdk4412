@@ -43,6 +43,11 @@
 #if defined(CONFIG_CHARGER_MAX8922_U1)
 #include <linux/power/max8922_charger_u1.h>
 #endif
+
+#ifdef CONFIG_BT_BCM4334
+#include <mach/board-bluetooth-bcm.h>
+#endif
+
 #ifdef CONFIG_STMPE811_ADC
 #include <linux/stmpe811-adc.h>
 #endif
@@ -188,6 +193,9 @@ static struct s3c2410_uartcfg smdk4212_uartcfgs[] __initdata = {
 		.ucon		= SMDK4212_UCON_DEFAULT,
 		.ulcon		= SMDK4212_ULCON_DEFAULT,
 		.ufcon		= SMDK4212_UFCON_DEFAULT,
+#ifdef CONFIG_BT_BCM4334
+		.wake_peer = bcm_bt_lpm_exit_lpm_locked,
+#endif
 	},
 	[1] = {
 		.hwport		= 1,

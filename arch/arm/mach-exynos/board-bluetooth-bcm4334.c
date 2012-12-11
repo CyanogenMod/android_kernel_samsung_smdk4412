@@ -29,10 +29,8 @@
 #include <linux/module.h>
 #include <linux/platform_device.h>
 #include <linux/rfkill.h>
+#include <linux/serial_core.h>
 #include <linux/wakelock.h>
-
-#include <net/bluetooth/bluetooth.h>
-#include <net/bluetooth/hci_core.h>
 
 #include <asm/mach-types.h>
 
@@ -50,10 +48,9 @@ struct bcm_bt_lpm {
 	struct hrtimer enter_lpm_timer;
 	ktime_t enter_lpm_delay;
 
-	struct hci_dev *hdev;
+	struct uart_port *uport;
 
-	struct wake_lock host_wake_lock;
-	struct wake_lock bt_wake_lock;
+	struct wake_lock wake_lock;
 	char wake_lock_name[100];
 } bt_lpm;
 
@@ -116,7 +113,6 @@ static int bcm4334_bt_rfkill_set_power(void *data, bool blocked)
 					bt_uart_on_table);
 #endif
 		gpio_set_value(GPIO_BT_EN, 1);
-		bt_is_running = 1;
 		msleep(50);
 	} else {
 		pr_info("[BT] Bluetooth Power Off.\n");
@@ -133,35 +129,36 @@ static const struct rfkill_ops bcm4334_bt_rfkill_ops = {
 #ifdef BT_LPM_ENABLE
 static void set_wake_locked(int wake)
 {
-	if (wake)
-		wake_lock(&bt_lpm.bt_wake_lock);
+
+	if (!wake)
+		wake_unlock(&bt_lpm.wake_lock);
 
 	gpio_set_value(GPIO_BT_WAKE, wake);
 }
 
 static enum hrtimer_restart enter_lpm(struct hrtimer *timer)
 {
-	if (bt_lpm.hdev != NULL)
-		set_wake_locked(0);
-
+	unsigned long flags;
+	spin_lock_irqsave(&bt_lpm.uport->lock, flags);
 	bt_is_running = 0;
-	wake_lock_timeout(&bt_lpm.bt_wake_lock, HZ/2);
+	set_wake_locked(0);
+	spin_unlock_irqrestore(&bt_lpm.uport->lock, flags);
 
 	return HRTIMER_NORESTART;
 }
 
-static void bcm_bt_lpm_exit_lpm_locked(struct hci_dev *hdev)
+void bcm_bt_lpm_exit_lpm_locked(struct uart_port *uport)
 {
-	bt_lpm.hdev = hdev;
+	bt_lpm.uport = uport;
 
 	hrtimer_try_to_cancel(&bt_lpm.enter_lpm_timer);
 	bt_is_running = 1;
 	set_wake_locked(1);
 
-	pr_debug("[BT] bcm_bt_lpm_exit_lpm_locked\n");
 	hrtimer_start(&bt_lpm.enter_lpm_timer, bt_lpm.enter_lpm_delay,
 		HRTIMER_MODE_REL);
 }
+EXPORT_SYMBOL(bcm_bt_lpm_exit_lpm_locked);
 
 static void update_host_wake_locked(int host_wake)
 {
@@ -171,31 +168,33 @@ static void update_host_wake_locked(int host_wake)
 	bt_lpm.host_wake = host_wake;
 
 	bt_is_running = 1;
-
 	if (host_wake) {
-		wake_lock(&bt_lpm.host_wake_lock);
+		wake_lock(&bt_lpm.wake_lock);
 	} else  {
 		/* Take a timed wakelock, so that upper layers can take it.
 		 * The chipset deasserts the hostwake lock, when there is no
 		 * more data to send.
 		 */
-		wake_lock_timeout(&bt_lpm.host_wake_lock, HZ/2);
+		wake_lock_timeout(&bt_lpm.wake_lock, HZ/2);
 	}
 }
 
 static irqreturn_t host_wake_isr(int irq, void *dev)
 {
 	int host_wake;
+	unsigned long flags;
 
 	host_wake = gpio_get_value(GPIO_BT_HOST_WAKE);
 	irq_set_irq_type(irq, host_wake ? IRQF_TRIGGER_LOW : IRQF_TRIGGER_HIGH);
 
-	if (!bt_lpm.hdev) {
+	if (!bt_lpm.uport) {
 		bt_lpm.host_wake = host_wake;
 		return IRQ_HANDLED;
 	}
 
+	spin_lock_irqsave(&bt_lpm.uport->lock, flags);
 	update_host_wake_locked(host_wake);
+	spin_unlock_irqrestore(&bt_lpm.uport->lock, flags);
 
 	return IRQ_HANDLED;
 }
@@ -207,20 +206,15 @@ static int bcm_bt_lpm_init(struct platform_device *pdev)
 
 	hrtimer_init(&bt_lpm.enter_lpm_timer, CLOCK_MONOTONIC,
 			HRTIMER_MODE_REL);
-	bt_lpm.enter_lpm_delay = ktime_set(4, 0);  /* 1 sec */ /*1->3*//*3->4*/
+	bt_lpm.enter_lpm_delay = ktime_set(1, 0);  /* 1 sec */
 	bt_lpm.enter_lpm_timer.function = enter_lpm;
 
 	bt_lpm.host_wake = 0;
 	bt_is_running = 0;
 
 	snprintf(bt_lpm.wake_lock_name, sizeof(bt_lpm.wake_lock_name),
-			"BT_host_wake");
-	wake_lock_init(&bt_lpm.host_wake_lock, WAKE_LOCK_SUSPEND,
-			 bt_lpm.wake_lock_name);
-
-	snprintf(bt_lpm.wake_lock_name, sizeof(bt_lpm.wake_lock_name),
-			"BT_bt_wake");
-	wake_lock_init(&bt_lpm.bt_wake_lock, WAKE_LOCK_SUSPEND,
+			"BTLowPower");
+	wake_lock_init(&bt_lpm.wake_lock, WAKE_LOCK_SUSPEND,
 			 bt_lpm.wake_lock_name);
 
 	irq = IRQ_BT_HOST_WAKE;
@@ -239,30 +233,6 @@ static int bcm_bt_lpm_init(struct platform_device *pdev)
 
 	return 0;
 }
-
-static int bcm_hci_wake_peer(struct notifier_block *this, unsigned long event, void *ptr)
-{
-	struct hci_dev *hdev = (struct hci_dev *) ptr;
-
-	if (event == HCI_DEV_REG) {
-		if (hdev != NULL) {
-			hdev->wake_peer = bcm_bt_lpm_exit_lpm_locked;
-			pr_info("[BT] wake_peer is registered.\n");
-		}
-	} else if (event == HCI_DEV_UNREG) {
-		pr_info("[BT] %s: handle HCI_DEV_UNREG noti\n", __func__);
-		if (hdev != NULL && bt_lpm.hdev == hdev) {
-			bt_lpm.hdev = NULL;
-			pr_info("[BT] bt_lpm.hdev set to NULL\n");
-		}
-	}
-
-	return NOTIFY_DONE;
-}
-
-static struct notifier_block bcm_bt_nblock = {
-	.notifier_call = bcm_hci_wake_peer
-};
 #endif
 
 static int bcm4334_bluetooth_probe(struct platform_device *pdev)
@@ -329,8 +299,6 @@ static int bcm4334_bluetooth_probe(struct platform_device *pdev)
 		gpio_free(GPIO_BT_WAKE);
 		gpio_free(GPIO_BT_EN);
 	}
-
-	hci_register_notifier(&bcm_bt_nblock);
 #endif
 	return rc;
 }
@@ -344,12 +312,7 @@ static int bcm4334_bluetooth_remove(struct platform_device *pdev)
 	gpio_free(GPIO_BT_WAKE);
 	gpio_free(GPIO_BT_HOST_WAKE);
 
-	wake_lock_destroy(&bt_lpm.host_wake_lock);
-	wake_lock_destroy(&bt_lpm.bt_wake_lock);
-
-#ifdef BT_LPM_ENABLE
-	hci_unregister_notifier(&bcm_bt_nblock);
-#endif
+	wake_lock_destroy(&bt_lpm.wake_lock);
 	return 0;
 }
 
