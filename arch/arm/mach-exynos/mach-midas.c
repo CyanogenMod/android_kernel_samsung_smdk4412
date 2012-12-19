@@ -58,6 +58,7 @@
 
 #ifdef CONFIG_DMA_CMA
 #include <linux/dma-contiguous.h>
+#include <linux/exynos_mem.h>
 #endif
 
 #include <asm/mach/arch.h>
@@ -3423,6 +3424,8 @@ static void __init exynos4_reserve(void)
 		CONFIG_VIDEO_SAMSUNG_MEMSIZE_FIMC1 * SZ_1K, 0x65800000, 0);
 	if (ret != 0)
 		panic("alloc failed for FIMC1\n");
+    cma_region_descriptor_add(s3c_device_fimc1.name, 0x65800000,
+                CONFIG_VIDEO_SAMSUNG_MEMSIZE_FIMC1 * SZ_1K);
 #endif
 
 #if defined(CONFIG_USE_MFC_CMA) && defined(CONFIG_MACH_M0)

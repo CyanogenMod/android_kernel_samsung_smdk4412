@@ -241,13 +241,46 @@ static struct vm_operations_struct exynos_mem_ops = {
 	.close	= exynos_mem_mmap_close,
 };
 
+static struct simple_cma_descriptor cmad_container[CMA_REGION_COUNT];
+static int cmad_container_stored = 0;
+
+void cma_region_descriptor_add(const char *name, int start, int size)
+{
+	int i;
+
+	pr_info("[%s] adding [%s] (0x%08x)-(0x%08x)\n", 
+		__func__, name, start, size);
+
+	if(cmad_container_stored == CMA_REGION_COUNT - 1)
+		return;
+
+	i = cmad_container_stored;
+
+	cmad_container[i].name = name;
+	cmad_container[i].start = start;
+	cmad_container[i].size = size;
+
+	cmad_container_stored++;
+
+}
+
 int exynos_mem_mmap(struct file *filp, struct vm_area_struct *vma)
 {
+
+/* Devices not having DMA CMA acess shouldn't be using this in any case at all */
+#ifndef CONFIG_DMA_CMA
+	return -EINVAL;
+#endif
+
 	struct exynos_mem *mem = (struct exynos_mem *)filp->private_data;
 	bool cacheable = mem->cacheable;
 	dma_addr_t start = 0;
 	u32 pfn = 0;
 	u32 size = vma->vm_end - vma->vm_start;
+
+	int i, allowed;
+	struct simple_cma_descriptor *b;
+	allowed = false;
 
 	if (vma->vm_pgoff) {
 		start = vma->vm_pgoff << PAGE_SHIFT;
@@ -256,6 +289,46 @@ int exynos_mem_mmap(struct file *filp, struct vm_area_struct *vma)
 		start = mem->phybase << PAGE_SHIFT;
 		pfn = mem->phybase;
 	}
+
+	pr_info("[%s] requesting access to (0x%08x)-(0x%08x)\n", 
+		__func__, start, (start + size));
+
+	b = (struct simple_cma_descriptor*)&cmad_container;
+
+	/* Go over all of the defined CMA blocks */
+	for(i = 0; i < cmad_container_stored; i++) {
+
+		pr_info("[%s] Checking space paddr(0x%08x)-(0x%08x) from '%s'\n",
+			__func__, b->start, (b->start + b->size), b->name);
+
+		/* Check if the requested space is within this current CMA block */
+		if(start >= b->start && (start + size) <= (b->start + b->size)){
+
+			/* Further only conditionally whitelist spaces that we know 
+			 * break device functionality if we don't allow access.
+			 *
+			 * Add exceptions as we go.			
+			 */
+			
+			if(strcmp(b->name, "s3c-fimc") == 0) {
+				allowed = true;
+				pr_info("[%s] Accessing space 0x%08x/0x%08x for '%s'\n",
+					__func__, b->start, b->size, b->name);
+			}
+
+		}
+
+		b++;
+	}
+
+	if (!allowed) {
+		/* The requested memory space isn't in any CMA block, deny access */
+		pr_err("[%s] invalid paddr(0x%08x)-(0x%08x), accessing outside of DMA spaces\n",
+			__func__, start, (start + size));
+		return -EINVAL;
+	}
+	
+	/* The check below doesn't matter anymore */
 
 	/* TODO: currently lowmem is only avaiable */
 	if ((phys_to_virt(start) < (void *)PAGE_OFFSET) ||
