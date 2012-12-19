@@ -22,6 +22,7 @@
 
 #ifdef CONFIG_CMA
 #include <linux/cma.h>
+#include <linux/exynos_mem.h>
 void __init s5p_cma_region_reserve(struct cma_region *regions_normal,
 				      struct cma_region *regions_secure,
 				      size_t align_secure, const char *map)
@@ -69,6 +70,9 @@ void __init s5p_cma_region_reserve(struct cma_region *regions_normal,
 			pr_debug("S5P/CMA: "
 				 "Reserved 0x%08x/0x%08x for '%s'\n",
 				 reg->start, reg->size, reg->name);
+			
+			cma_region_descriptor_add(reg->name, reg->start, reg->size);
+
 			paddr = reg->start;
 		} else {
 			paddr = memblock_find_in_range(0,
@@ -88,6 +92,8 @@ void __init s5p_cma_region_reserve(struct cma_region *regions_normal,
 
 			pr_info("S5P/CMA: Reserved 0x%08x/0x%08x for '%s'\n",
 						reg->start, reg->size, reg->name);
+			
+			cma_region_descriptor_add(reg->name, reg->start, reg->size);
 		} else {
 			pr_err("S5P/CMA: No free space in memory for '%s'\n",
 								reg->name);
@@ -155,6 +161,9 @@ void __init s5p_cma_region_reserve(struct cma_region *regions_normal,
 		}
 
 		if (paddr_last) {
+			pr_info("S5P/CMA: "
+				"Reserved 0x%08x/0x%08x for 'secure_region'\n",
+				paddr_last, size_secure);
 #ifndef CONFIG_DMA_CMA
 			while (memblock_reserve(paddr_last, size_secure))
 				paddr_last -= align_secure;
@@ -165,7 +174,6 @@ void __init s5p_cma_region_reserve(struct cma_region *regions_normal,
 					paddr_last -= align_secure;
 			}
 #endif
-
 			do {
 #ifndef CONFIG_DMA_CMA
 				reg->start = paddr_last;
@@ -191,6 +199,7 @@ void __init s5p_cma_region_reserve(struct cma_region *regions_normal,
 					if (memblock_reserve(reg->start,
 								reg->size))
 						panic("memblock\n");
+
 #endif
 				} else {
 					reg->start = paddr_last;
@@ -201,6 +210,9 @@ void __init s5p_cma_region_reserve(struct cma_region *regions_normal,
 				pr_info("S5P/CMA: "
 					"Reserved 0x%08x/0x%08x for '%s'\n",
 					reg->start, reg->size, reg->name);
+
+				cma_region_descriptor_add(reg->name, reg->start, reg->size);
+
 				if (cma_early_region_register(reg)) {
 					memblock_free(reg->start, reg->size);
 					pr_err("S5P/CMA: "
