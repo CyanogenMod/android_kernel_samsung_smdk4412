@@ -266,12 +266,6 @@ void cma_region_descriptor_add(const char *name, int start, int size)
 
 int exynos_mem_mmap(struct file *filp, struct vm_area_struct *vma)
 {
-
-/* Devices not having DMA CMA acess shouldn't be using this in any case at all */
-#ifndef CONFIG_DMA_CMA
-	return -EINVAL;
-#endif
-
 	struct exynos_mem *mem = (struct exynos_mem *)filp->private_data;
 	bool cacheable = mem->cacheable;
 	dma_addr_t start = 0;
@@ -310,7 +304,8 @@ int exynos_mem_mmap(struct file *filp, struct vm_area_struct *vma)
 			 * Add exceptions as we go.			
 			 */
 			
-			if(strcmp(b->name, "s3c-fimc") == 0) {
+			if(strcmp(b->name, "s3c-fimc") == 0 ||
+			   strcmp(b->name, "fimc1") == 0) {
 				allowed = true;
 				pr_info("[%s] Accessing space 0x%08x/0x%08x for '%s'\n",
 					__func__, b->start, b->size, b->name);
