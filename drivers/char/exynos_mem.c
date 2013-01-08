@@ -304,10 +304,15 @@ int exynos_mem_mmap(struct file *filp, struct vm_area_struct *vma)
 			 * Add exceptions as we go.
 			 */
 			if(strcmp(b->name, "s3c-fimc") == 0 ||
+			   strcmp(b->name, "ion") == 0 ||
 			   strcmp(b->name, "fimc1") == 0) {
 				allowed = true;
 				pr_info("[%s] Accessing space 0x%08x/0x%08x for '%s'\n",
 					__func__, b->start, b->size, b->name);
+			}
+			else{
+				pr_info("[%s] No love for '%s' wanting (0x%08x)-(0x%08x) in (0x%08x)-(0x%08x)\n",
+					__func__, b->name, start, (start + size), b->start, (b->start + b->size));
 			}
 
 		}
