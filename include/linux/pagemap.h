@@ -205,11 +205,7 @@ extern struct page *__page_cache_alloc(gfp_t gfp);
 #else
 static inline struct page *__page_cache_alloc(gfp_t gfp)
 {
-#ifndef CONFIG_DMA_CMA
 	return alloc_pages(gfp, 0);
-#else
-	return alloc_pages(gfp & ~__GFP_MOVABLE, 0);
-#endif
 }
 #endif
 

@@ -3423,11 +3423,36 @@ static void __init exynos4_reserve(void)
 		CONFIG_VIDEO_SAMSUNG_MEMSIZE_FIMC1 * SZ_1K, 0x65800000, 0);
 	if (ret != 0)
 		panic("alloc failed for FIMC1\n");
+	else {
+		static struct cma_region fimc_reg = {
+			.name = "fimc1",
+			.size = CONFIG_VIDEO_SAMSUNG_MEMSIZE_FIMC1 * SZ_1K,
+			.start = 0x65800000,
+			.reserved = 1,
+		};
+		
+		if (cma_early_region_register(&fimc_reg))
+			pr_err("S5P/CMA: Failed to register '%s'\n",
+				fimc_reg.name);
+	}
 #endif
 
 #if defined(CONFIG_USE_MFC_CMA) && defined(CONFIG_MACH_M0)
 	ret = dma_declare_contiguous(&s5p_device_mfc.dev,
 			0x02800000, 0x5C800000, 0);
+
+	if (ret == 0) {
+		static struct cma_region mfc_reg = {
+			.name = "mfc",
+			.size = 0x02800000,
+			.start = 0x5C800000,
+			.reserved = 1,
+		};
+
+		if (cma_early_region_register(&mfc_reg))
+			pr_err("S5P/CMA: Failed to register '%s'\n",
+				mfc_reg.name);
+	}
 #endif
 	if (ret != 0)
 		printk(KERN_ERR "%s Fail\n", __func__);

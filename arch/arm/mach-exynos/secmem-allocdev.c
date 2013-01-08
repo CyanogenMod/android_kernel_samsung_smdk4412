@@ -34,6 +34,8 @@
 
 struct miscdevice secmem;
 struct secmem_crypto_driver_ftn *crypto_driver;
+struct secmem_fd_list g_fd_head;
+
 #if defined(CONFIG_ION)
 extern struct ion_device *ion_exynos;
 #endif
@@ -63,15 +65,112 @@ static bool drm_onoff = false;
 
 #define SECMEM_IS_PAGE_ALIGNED(addr) (!((addr) & (~PAGE_MASK)))
 
+
+static void secmem_fd_list_init(struct secmem_fd_list *list)
+{
+	list->next = list;
+	list->prev = list;
+	list->fdinfo.phys_addr = 0;
+	list->fdinfo.size = 0;
+}
+
+static void secmem_fd_list_clear(struct secmem_fd_list *head)
+{
+	head->next = head;
+	head->prev = head;
+}
+
+static void secmem_fd_list_add(struct secmem_fd_list *new, struct secmem_fd_list *head)
+{
+	head->next->prev = new;
+	new->next = head->next;
+	new->prev = head;
+	head->next = new;
+}
+
+static void secmem_fd_list_del(struct secmem_fd_list *list)
+{
+	list->prev->next = list->next;
+	list->next->prev = list->prev;
+}
+
+static void init_secmem_fd_list(void)
+{
+	secmem_fd_list_init(&g_fd_head);
+}
+
+static void clear_secmem_fd_list(void)
+{
+	secmem_fd_list_clear(&g_fd_head);
+}
+
+static struct secmem_fd_list *secmem_fd_list_find(struct secmem_fd_list *head, uint32_t phys_addr, size_t size)
+{
+	struct secmem_fd_list *pos;
+
+	for (pos = head->next; pos != head; pos = pos->next) {
+		if ((pos->fdinfo.phys_addr == phys_addr) &&
+		    (pos->fdinfo.size >= size))
+			return pos;
+	}
+
+	return NULL;
+}
+
+static int find_secmem_fd_list(struct secmem_fd_list *head, uint32_t phys_addr, size_t size)
+{
+	struct secmem_fd_list *fd_ent = NULL;
+
+	fd_ent = secmem_fd_list_find(head, phys_addr, size);
+	if (fd_ent == NULL)
+		return -1;
+
+	return 0;
+}
+
+static void put_secmem_fd_list(struct secmem_fd_info *secmem_fd)
+{
+	struct secmem_fd_list *new = NULL;
+
+	new = (struct secmem_fd_list *)kzalloc(sizeof(struct secmem_fd_list), GFP_KERNEL);
+
+	new->fdinfo.phys_addr = secmem_fd->phys_addr;
+	new->fdinfo.size = secmem_fd->size;
+
+	secmem_fd_list_add(new, &g_fd_head);
+}
+
+static int del_secmem_fd_list(struct secmem_region *region)
+{
+	struct secmem_fd_list *fd_ent = NULL;
+
+	fd_ent = secmem_fd_list_find(&g_fd_head, region->phys_addr, region->len);
+	if (fd_ent == NULL)
+		return -1;
+
+	secmem_fd_list_del(fd_ent);
+	kfree(fd_ent);
+
+	return 0;
+}
+
 static int secmem_mmap(struct file *file, struct vm_area_struct *vma)
 {
+	int ret;
 	unsigned long size = vma->vm_end - vma->vm_start;
+	uint32_t phys_addr = vma->vm_pgoff << 12;
 
 	BUG_ON(!SECMEM_IS_PAGE_ALIGNED(vma->vm_start));
 	BUG_ON(!SECMEM_IS_PAGE_ALIGNED(vma->vm_end));
 
 	vma->vm_flags |= VM_RESERVED;
 	vma->vm_page_prot = pgprot_noncached(vma->vm_page_prot);
+
+	ret = find_secmem_fd_list(&g_fd_head, phys_addr, size);
+	if (ret < 0) {
+		printk(KERN_ERR "%s : Fail mmap due to Invalid address\n", __func__);
+		return -EAGAIN;
+	}
 
 	if (remap_pfn_range(vma, vma->vm_start, vma->vm_pgoff,
 				size, vma->vm_page_prot)) {
@@ -213,6 +312,7 @@ static long secmem_ioctl(struct file *filp, unsigned int cmd, unsigned long arg)
 	case SECMEM_IOC_GET_ADDR:
 	{
 		struct secmem_region region;
+		struct secmem_fd_info secmem_fd;
 
 		if (copy_from_user(&region, (void __user *)arg,
 					sizeof(struct secmem_region)))
@@ -224,12 +324,29 @@ static long secmem_ioctl(struct file *filp, unsigned int cmd, unsigned long arg)
 		}
 
 		pr_info("SECMEM_IOC_GET_ADDR: size:%lu\n", region.len);
-
+#ifndef CONFIG_DMA_CMA
+		region.virt_addr = kmalloc(region.len, GFP_KERNEL | GFP_DMA);
+#else
 		region.virt_addr = dma_alloc_coherent(NULL, region.len,
 						&region.phys_addr, GFP_KERNEL);
-		if (!region.virt_addr)
-			panic("SECMEM_IOC_GET_ADDR: dma_alloc_coherent failed! "
-			      "size=%lu\n", region.len);
+#endif
+		if (!region.virt_addr) {
+			printk(KERN_ERR "%s: Get memory address failed. "
+				" [size : %ld]\n", __func__, region.len);
+			return -EFAULT;
+		}
+
+#ifndef CONFIG_DMA_CMA
+		region.phys_addr = virt_to_phys(region.virt_addr);
+
+		dma_map_single(secmem.this_device, region.virt_addr,
+						region.len, DMA_TO_DEVICE);
+#endif
+
+		secmem_fd.phys_addr = region.phys_addr;
+		secmem_fd.size = region.len;
+
+		put_secmem_fd_list(&secmem_fd);
 
 		if (copy_to_user((void __user *)arg, &region,
 					sizeof(struct secmem_region)))
@@ -250,8 +367,17 @@ static long secmem_ioctl(struct file *filp, unsigned int cmd, unsigned long arg)
 
 		pr_info("SECMEM_IOC_RELEASE_ADDR: size:%lu\n", region.len);
 
+		if (del_secmem_fd_list(&region) < 0) {
+			printk(KERN_ERR "%s: Release memory failed.\n", __func__);
+			return -EFAULT;
+		}
+
+#ifndef CONFIG_DMA_CMA
+		kfree(region.virt_addr);
+#else
 		dma_free_coherent(NULL, region.len, region.virt_addr,
 					region.phys_addr);
+#endif
 		break;
 	}
 
@@ -291,9 +417,6 @@ static long secmem_ioctl(struct file *filp, unsigned int cmd, unsigned long arg)
 
 		minfo.base = info.lower_bound;
 		minfo.size = info.total_size;
-
-		printk("[minfo base] : 0x%x", minfo.base);
-		printk("[minfo size] : 0x%x", minfo.size);
 
 		if (copy_to_user((void __user *)arg, &minfo, sizeof(minfo)))
 			return -EFAULT;
@@ -337,6 +460,8 @@ static int __init secmem_init(void)
 
 	crypto_driver = NULL;
 
+	init_secmem_fd_list();
+
 	pm_runtime_enable(secmem.this_device);
 
 	return 0;
@@ -345,6 +470,7 @@ static int __init secmem_init(void)
 static void __exit secmem_exit(void)
 {
 	__pm_runtime_disable(secmem.this_device, false);
+	clear_secmem_fd_list();
 	misc_deregister(&secmem);
 }
 

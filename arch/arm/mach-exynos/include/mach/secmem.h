@@ -24,6 +24,17 @@ struct secchunk_info {
 	size_t		size;
 };
 
+struct secmem_fd_info {
+	uint32_t phys_addr;
+	size_t size;
+};
+
+struct secmem_fd_list {
+	struct secmem_fd_list *next;
+	struct secmem_fd_list *prev;
+	struct secmem_fd_info fdinfo;
+};
+
 extern struct miscdevice secmem;
 #if defined(CONFIG_ION)
 struct secfd_info {
