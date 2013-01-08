@@ -22,13 +22,4 @@ struct exynos_mem_flush_range {
 	size_t		length;
 };
 
-#define CMA_REGION_COUNT (12)
-struct simple_cma_descriptor {
-	const char 	*name;
-	int		start;
-	int		size;
-};
-
-extern void cma_region_descriptor_add(const char *name, int start, int size);
-
 #endif /* __INCLUDE_EXYNOS_MEM_H */
