@@ -18,6 +18,7 @@
 #include <linux/uaccess.h>
 #include <linux/highmem.h>
 #include <linux/dma-mapping.h>
+#include <linux/cma.h>
 #include <asm/cacheflush.h>
 
 #include <plat/cpu.h>
@@ -82,6 +83,12 @@ static void cache_maint_phys(phys_addr_t start, size_t length, enum cacheop op)
 {
 	size_t left = length;
 	phys_addr_t begin = start;
+
+	if (!cma_is_registered_region(start, length)) {
+		pr_err("[%s] handling non-cma region (%#x@%#x)is prohibited\n",
+					__func__, length, start);
+		return;
+	}
 
 	if (!soc_is_exynos5250() && !soc_is_exynos5210()) {
 		if (length > (size_t) L1_FLUSH_ALL) {
@@ -257,10 +264,9 @@ int exynos_mem_mmap(struct file *filp, struct vm_area_struct *vma)
 		pfn = mem->phybase;
 	}
 
-	/* TODO: currently lowmem is only avaiable */
-	if ((phys_to_virt(start) < (void *)PAGE_OFFSET) ||
-	    (phys_to_virt(start) >= high_memory)) {
-		pr_err("[%s] invalid paddr(0x%08x)\n", __func__, start);
+	if (!cma_is_registered_region(start, size)) {
+		pr_err("[%s] handling non-cma region (%#x@%#x)is prohibited\n",
+						__func__, size, start);
 		return -EINVAL;
 	}
 

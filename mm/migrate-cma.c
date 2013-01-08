@@ -1136,6 +1136,76 @@ out:
 	return nr_failed + retry;
 }
 
+static struct page *
+__migrate_replace_alloc(struct page *page, unsigned long private,
+			int **resultp)
+{
+	struct page **newpage = (struct page **)private;
+	*newpage = alloc_page(GFP_USER);
+
+	return *newpage;
+}
+
+/*
+ * migrate_replace_single_page
+ *
+ * The function takes one single page (oldpage) and a target page
+ * (newpage) and tries to migrate data to the target page. The caller
+ * must ensure that the source page is locked with one additional
+ * get_page() call, which will be freed during the migration.
+ *
+ * Return: error code or 0 on success.
+ */
+int migrate_replace_cma_page(struct page *oldpage, struct page **newpage)
+{
+	/* This function is based on compact_zone() from compaction.c. */
+	unsigned long pfn = page_to_pfn(oldpage);
+	int ret;
+	struct compact_control cc = {
+		.nr_migratepages = 0,
+		.order = 0,
+		.zone = page_zone(oldpage),
+		.sync = true,
+	};
+	INIT_LIST_HEAD(&cc.migratepages);
+
+	migrate_prep_local();
+
+	pfn = isolate_migratepages_range(cc.zone, &cc, pfn, pfn+1);
+	if (!pfn || list_empty(&cc.migratepages))
+		goto putback;
+
+	/*
+	 * Put the additional reference to the old page, now migration code
+	 * owns it
+	 */
+	put_page(oldpage);
+
+	ret = migrate_pages(&cc.migratepages, __migrate_replace_alloc,
+			    (unsigned long)newpage, false, true, 0);
+
+	if (ret == 0) {
+		/*
+		 * Do the same as follow_page() did with oldpage and
+		 * return
+		 */
+		get_page_foll(*newpage);
+		return 0;
+	}
+
+	if (is_failed_page(oldpage, 0, 0))
+		dump_page(oldpage);
+
+	/*
+	 * Restore additional reference to the old page before giving it back
+	 * to lru
+	 */
+	get_page(oldpage);
+putback:
+	putback_lru_pages(&cc.migratepages);
+	return -EBUSY;
+}
+
 #ifdef CONFIG_NUMA
 /*
  * Move a list of individual pages

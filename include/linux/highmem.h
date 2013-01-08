@@ -185,6 +185,13 @@ alloc_zeroed_user_highpage_movable(struct vm_area_struct *vma,
 
 #ifdef CONFIG_DMA_CMA
 static inline struct page *
+alloc_zeroed_user_highpage(struct vm_area_struct *vma,
+					unsigned long vaddr)
+{
+	return __alloc_zeroed_user_highpage(0, vma, vaddr);
+}
+
+static inline struct page *
 alloc_zeroed_user_highpage_movable_cma(struct vm_area_struct *vma,
 						unsigned long vaddr)
 {
