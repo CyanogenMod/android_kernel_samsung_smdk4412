@@ -1,0 +1,8 @@
+Change-Id: Ida8461692362317a8ffce4d4646953985fcf4e1d
+Code-Review+2: Andrew Dodd <atd7@cornell.edu>
+Verified+1: Andrew Dodd <atd7@cornell.edu>
+Submitted-by: Andrew Dodd <atd7@cornell.edu>
+Submitted-at: Tue, 08 Jan 2013 20:32:19 -0800
+Reviewed-on: http://review.cyanogenmod.org/29932
+Project: CyanogenMod/android_kernel_samsung_smdk4412
+Branch: refs/heads/cm-10.1
