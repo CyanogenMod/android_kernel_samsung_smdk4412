@@ -15,6 +15,8 @@ void set_host_stat(const char *name, enum pwr_stat status);
 int wait_dev_pwr_stat(const char *name, enum pwr_stat status);
 int check_udev_suspend_allowed(const char *name);
 bool check_request_blocked(const char *name);
+int pm_dev_runtime_get_enabled(struct usb_device *udev);
+int pm_dev_wait_lpa_wake(void);
 
 /*add wakelock interface for fast dormancy*/
 #ifdef CONFIG_HAS_WAKELOCK
