@@ -679,7 +679,8 @@ static int max77693_get_cable_type(struct max77693_charger_data *chg_data)
 	u8 mu_st2, chgdetrun, vbvolt, chgtyp, dxovp;
 	int muic_cb_typ;
 	bool wc_state;
-	bool retry_det, chg_det_erred;
+	bool retry_det;
+	bool chg_det_erred = false; /* TEMP: set as true for logging */
 	bool otg_detected = false;
 	int retry_cnt = 0;
 	pr_debug("%s\n", __func__);
@@ -736,7 +737,6 @@ static int max77693_get_cable_type(struct max77693_charger_data *chg_data)
 		goto chg_det_finish;
 	}
 
-	chg_det_erred = false;	/* TEMP: set as true for logging */
 	do {
 		retry_det = false;
 
