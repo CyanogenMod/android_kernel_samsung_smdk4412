@@ -39,7 +39,9 @@
 #include <linux/kernel.h>
 #include <linux/netdevice.h>
 #include <mach/mdm2.h>
+#ifdef CONFIG_USB_ANDROID_SAMSUNG_COMPOSITE
 #include <linux/usb/android_composite.h>
+#endif
 
 #define EXTERNAL_MODEM "external_modem"
 #define EHCI_REG_DUMP
@@ -86,7 +88,9 @@ struct mdm_hsic_pm_data {
 	/* control variables */
 	struct notifier_block pm_notifier;
 	struct notifier_block netdev_notifier;
+#ifdef CONFIG_USB_ANDROID_SAMSUNG_COMPOSITE
 	struct notifier_block usb_composite_notifier;
+#endif
 
 	bool block_request;
 	bool state_busy;
@@ -908,6 +912,7 @@ static int link_pm_netdev_event(struct notifier_block *this,
 	return NOTIFY_DONE;
 }
 
+#ifdef CONFIG_USB_ANDROID_SAMSUNG_COMPOSITE
 static int usb_composite_notifier_event(struct notifier_block *this,
 		unsigned long event, void *ptr)
 {
@@ -932,6 +937,7 @@ static int usb_composite_notifier_event(struct notifier_block *this,
 
 	return NOTIFY_DONE;
 }
+#endif
 
 static int mdm_hsic_pm_probe(struct platform_device *pdev)
 {
@@ -995,9 +1001,11 @@ static int mdm_hsic_pm_probe(struct platform_device *pdev)
 	pm_data->netdev_notifier.notifier_call = link_pm_netdev_event;
 	register_netdevice_notifier(&pm_data->netdev_notifier);
 
+#ifdef CONFIG_USB_ANDROID_SAMSUNG_COMPOSITE
 	pm_data->usb_composite_notifier.notifier_call =
 		usb_composite_notifier_event;
 	register_usb_composite_notifier(&pm_data->usb_composite_notifier);
+#endif
 
 	wake_lock_init(&pm_data->l2_wake, WAKE_LOCK_SUSPEND, pm_data->name);
 	wake_lock_init(&pm_data->boot_wake, WAKE_LOCK_SUSPEND, "mdm_boot");
