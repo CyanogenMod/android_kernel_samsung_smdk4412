@@ -312,19 +312,6 @@ long mdm_modem_ioctl(struct file *filp, unsigned int cmd,
 	return ret;
 }
 
-/* temporary implemented, it should be removed at mass production */
-/* simply declare this function as extern at test point, and call it */
-void mdm_force_fatal(void)
-{
-	pr_info("%s: Reseting the mdm due to AP request\n", __func__);
-
-	force_dump = 1;
-
-	notify_modem_fatal();
-	subsystem_restart(EXTERNAL_MODEM);
-}
-EXPORT_SYMBOL(mdm_force_fatal);
-
 static void mdm_fatal_fn(struct work_struct *work)
 {
 	pr_info("%s: Reseting the mdm due to an errfatal\n", __func__);
@@ -350,6 +337,23 @@ static void mdm_status_fn(struct work_struct *work)
 }
 
 static DECLARE_WORK(mdm_status_work, mdm_status_fn);
+
+/* temporary implemented, it should be removed at mass production */
+/* simply declare this function as extern at test point, and call it */
+void mdm_force_fatal(void)
+{
+	pr_info("%s: Reseting the mdm due to AP request\n", __func__);
+
+	force_dump = 1;
+
+	if (in_irq())
+		queue_work(mdm_queue, &mdm_fatal_work);
+	else {
+		notify_modem_fatal();
+		subsystem_restart(EXTERNAL_MODEM);
+	}
+}
+EXPORT_SYMBOL(mdm_force_fatal);
 
 static void mdm_disable_irqs(void)
 {
@@ -500,6 +504,10 @@ static int mdm_subsys_shutdown(const struct subsys_data *crashed_subsys)
 		 */
 		msleep(mdm_drv->pdata->ramdump_delay_ms);
 	}
+
+	/* close silent log */
+	silent_log_panic_handler();
+
 	#if 0
 	if (!mdm_drv->mdm_unexpected_reset_occurred)
 		mdm_drv->ops->reset_mdm_cb(mdm_drv);
