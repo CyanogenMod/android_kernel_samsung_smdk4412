@@ -32,13 +32,6 @@
    #include <linux/usb/hcd.h>
 #endif
 
-#ifdef CONFIG_USB_OHCI_S5P
-   #include <plat/devs.h>
-   #include <linux/usb.h>
-   #include <linux/usb/otg.h>
-   #include <linux/usb/hcd.h>
-#endif
-
 #define ETC6PUD		(S5P_VA_GPIO2 + 0x228)
 #define EXYNOS4_USB_CFG		(S3C_VA_SYS + 0x21C)
 #define EXYNOS5_USB_CFG		(S3C_VA_SYS + 0x230)
