@@ -268,7 +268,8 @@ struct diagchar_dev {
 	struct work_struct diag_usb_read_complete_work;
 	struct diag_request *usb_read_mdm_ptr;
 	struct diag_request *write_ptr_mdm;
-#endif
+	struct pid *silent_log_pid;
+	#endif
 };
 
 extern struct diagchar_dev *driver;
