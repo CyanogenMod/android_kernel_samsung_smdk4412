@@ -1,0 +1,9 @@
+Change-Id: Iab8add2dc0e7d2d164ff54e2b3daec2801615607
+Code-Review+2: Daniel Hillenbrand <codeworkx@cyanogenmod.org>
+Verified+1: Daniel Hillenbrand <codeworkx@cyanogenmod.org>
+Code-Review+1: Humberto Borba <humberos@gmail.com>
+Submitted-by: Daniel Hillenbrand <codeworkx@cyanogenmod.org>
+Submitted-at: Sun, 13 Jan 2013 10:28:32 -0800
+Reviewed-on: http://review.cyanogenmod.org/30180
+Project: CyanogenMod/android_kernel_samsung_smdk4412
+Branch: refs/heads/cm-10.1
