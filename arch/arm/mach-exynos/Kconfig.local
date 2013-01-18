@@ -93,6 +93,7 @@ config MACH_T0_USA_VZW
 
 config MACH_T0_USA_SPR
 	bool "SPR"
+	select MACH_T0_LTE
 
 config MACH_T0_USA_USCC
 	bool "USCC"
