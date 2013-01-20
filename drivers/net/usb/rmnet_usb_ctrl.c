@@ -424,6 +424,23 @@ static void ctrl_write_callback(struct urb *urb)
 		usb_autopm_put_interface_async(dev->intf);
 }
 
+static int usb_anchor_len(struct usb_anchor *anchor)
+{
+	unsigned long flags;
+	struct urb *urb;
+	int len = 0;
+
+	spin_lock_irqsave(&anchor->lock, flags);
+	list_for_each_entry(urb, &anchor->urb_list, anchor_list) {
+		len++;
+	}
+	spin_unlock_irqrestore(&anchor->lock, flags);
+
+	pr_debug("%s:%d", __func__, len);
+
+	return len;
+}
+
 static int rmnet_usb_ctrl_write(struct rmnet_ctrl_dev *dev, char *buf,
 		size_t size)
 {
@@ -889,6 +906,9 @@ int rmnet_usb_ctrl_probe(struct usb_interface *intf,
 	dev->tx_ctrl_in_req_cnt = 0;
 	dev->tx_block = false;
 
+	/* give margin before send DTR high */
+	msleep(20);
+	pr_info("%s: send DTR high to Modem\n", __func__);
 	ret = usb_control_msg(udev, usb_rcvctrlpipe(udev, 0),
 			USB_CDC_REQ_SET_CONTROL_LINE_STATE,
 			(USB_DIR_OUT | USB_TYPE_CLASS | USB_RECIP_INTERFACE),
@@ -941,9 +961,12 @@ int rmnet_usb_ctrl_probe(struct usb_interface *intf,
 
 	ctl_msg_dbg_mask = MSM_USB_CTL_DUMP_BUFFER;
 
-	dev->reset_notifier_block.notifier_call = rmnet_ctrl_reset_notifier;
-	blocking_notifier_chain_register(&mdm_reset_notifier_list,
+	if (!ret) {
+		dev->reset_notifier_block.notifier_call =
+						rmnet_ctrl_reset_notifier;
+		blocking_notifier_chain_register(&mdm_reset_notifier_list,
 						&dev->reset_notifier_block);
+	}
 
 	return ret;
 }
