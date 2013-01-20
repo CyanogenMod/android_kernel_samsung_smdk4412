@@ -15,24 +15,21 @@
 
 #include "ssp.h"
 
-/* sensorhub ioctl command */
-#define SENSORHUB_IOCTL_MAGIC	'S'
-#define IOCTL_READ_CONTEXT_DATA	_IOR(SENSORHUB_IOCTL_MAGIC, 3, char *)
-
+static const struct fast_data {
+	char library_data[3];
+} fast_data_table[] = {
+	{ { 1, 1, 7 } },
+};
 
 static ssize_t ssp_sensorhub_write(struct file *file, const char __user *buf,
 				size_t count, loff_t *pos)
 {
-	struct ssp_data *data = container_of(file->private_data,
-				struct ssp_data, sensorhub_device);
+	struct ssp_sensorhub_data *hub_data
+		= container_of(file->private_data,
+			struct ssp_sensorhub_data, sensorhub_device);
 	int ret = 0;
 	int i;
 	u8 instruction = buf[0];
-
-	if (data == NULL) {
-		pr_err("%s: invalid ssp_data structure", __func__);
-		return -ENOMEM;
-	}
 
 	if (count == 0) {
 		pr_err("%s: library command length err(%d)", __func__, count);
@@ -40,67 +37,81 @@ static ssize_t ssp_sensorhub_write(struct file *file, const char __user *buf,
 	}
 
 	for (i = 0; i < count; i++)
-		pr_info("%s[%d] = %d", __func__, i, buf[i]);
+		pr_info("%s[%d] = 0x%x", __func__, i, buf[i]);
 
 	if (buf[0] == MSG2SSP_INST_LIBRARY_REMOVE)
 		instruction = REMOVE_LIBRARY;
 	else if (buf[0] == MSG2SSP_INST_LIBRARY_ADD)
 		instruction = ADD_LIBRARY;
 
-	ret = send_instruction(data, instruction,
+	if (hub_data->ssp_data->bSspShutdown) {
+		pr_err("%s: stop sending command(no ssp_data)", __func__);
+		return -ENOMEM;
+	}
+
+	ret = send_instruction(hub_data->ssp_data, instruction,
 		(u8)buf[1], (u8 *)(buf+2), count-2);
-	if (ret < 0)
+	if (ret <= 0)
 		pr_err("%s: send library command err(%d)", __func__, ret);
 
-	return ret;
+	/* i2c transfer fail */
+	if (ret == ERROR)
+		return -EIO;
+	/* no ack from MCU */
+	else if (ret == FAIL)
+		return -EAGAIN;
+	/* success */
+	else
+		return count;
 }
 
 static long ssp_sensorhub_ioctl(struct file *file, unsigned int cmd,
 				unsigned long arg)
 {
 	void __user *argp = (void __user *)arg;
-	struct ssp_data *data = container_of(file->private_data,
-				     struct ssp_data, sensorhub_device);
+	struct ssp_sensorhub_data *hub_data
+		= container_of(file->private_data,
+			struct ssp_sensorhub_data, sensorhub_device);
 	int ret = 0;
 	int i = 0;
 
 	switch (cmd) {
 	case IOCTL_READ_CONTEXT_DATA:
 		/* for receive_msg */
-		if (!data->large_library_length &&
-			data->large_library_data == NULL) {
+		if (!hub_data->large_library_length &&
+			hub_data->large_library_data == NULL) {
 
 			ret = copy_to_user(argp,
-				data->first_event->library_data,
-				data->first_event->length);
+				hub_data->first_event->library_data,
+				hub_data->first_event->length);
 			if (ret < 0) {
 				pr_err("%s: send library data err(%d)",
 					__func__, ret);
-				complete(&data->transfer_done);
+				complete(&hub_data->transfer_done);
 				goto exit;
 			}
 
-			for (i = 0; i < data->first_event->length; i++) {
-				pr_info("%s[%d] = %d", __func__, i,
-					data->first_event->library_data[i]);
+			for (i = 0; i < hub_data->first_event->length; i++) {
+				pr_info("%s[%d] = 0x%x", __func__, i,
+					hub_data->first_event->library_data[i]);
 			}
 
-			data->transfer_try = 0;
-			complete(&data->transfer_done);
+			hub_data->transfer_try = 0;
+			complete(&hub_data->transfer_done);
 
 		/* for receive_large_msg */
 		} else {
 			pr_info("%s: receive_large_msg ioctl", __func__);
-			ret = copy_to_user(argp, data->large_library_data,
-				data->large_library_length);
+			ret = copy_to_user(argp, hub_data->large_library_data,
+				hub_data->large_library_length);
 			if (ret < 0) {
 				pr_err("%s: send large library data err(%d)",
 					__func__, ret);
 				goto exit;
 			}
 
-			kfree(data->large_library_data);
-			data->large_library_length = 0;
+			kfree(hub_data->large_library_data);
+			hub_data->large_library_length = 0;
 		}
 		break;
 
@@ -113,17 +124,19 @@ exit:
 	return ret;
 }
 
-static const struct file_operations ssp_sensorhub_fops = {
+static struct file_operations ssp_sensorhub_fops = {
 	.owner = THIS_MODULE,
 	.open = nonseekable_open,
 	.write = ssp_sensorhub_write,
 	.unlocked_ioctl = ssp_sensorhub_ioctl,
 };
 
-void ssp_report_sensorhub_notice(struct ssp_data *data, char notice)
+void ssp_report_sensorhub_notice(struct ssp_data *ssp_data, char notice)
 {
-	input_report_rel(data->sensorhub_input_dev, REL_RY, notice);
-	input_sync(data->sensorhub_input_dev);
+	struct ssp_sensorhub_data *hub_data = ssp_data->hub_data;
+
+	input_report_rel(hub_data->sensorhub_input_dev, REL_RY, notice);
+	input_sync(hub_data->sensorhub_input_dev);
 
 	if (notice == MSG2SSP_AP_STATUS_WAKEUP)
 		pr_info("%s: wake up", __func__);
@@ -131,22 +144,43 @@ void ssp_report_sensorhub_notice(struct ssp_data *data, char notice)
 		pr_info("%s: sleep", __func__);
 	else if (notice == MSG2SSP_AP_STATUS_RESET)
 		pr_info("%s: reset", __func__);
+	else
+		pr_err("%s: invalid notice", __func__);
 }
 
-static void ssp_report_sensorhub_length(struct ssp_data *data,
+static void ssp_report_sensorhub_length(struct ssp_sensorhub_data *hub_data,
 				int length)
 {
-	input_report_rel(data->sensorhub_input_dev, REL_RX, length);
-	input_sync(data->sensorhub_input_dev);
+	input_report_rel(hub_data->sensorhub_input_dev, REL_RX, length);
+	input_sync(hub_data->sensorhub_input_dev);
 	pr_info("%s = %d", __func__, length);
 }
 
-static int ssp_queue_sensorhub_events(struct ssp_data *data,
+static int ssp_sensorhub_is_fast_data(char *data, int start)
+{
+	int i, j;
+
+	for (i = 0; i < ARRAY_SIZE(fast_data_table); i++) {
+		for (j = 0; j < sizeof(fast_data_table[0]); j++) {
+			if (data[start + j] !=
+				fast_data_table[i].library_data[j])
+				break;
+		}
+		if (j == sizeof(fast_data_table[0]))
+			return i;
+	}
+
+	return -EINVAL;
+}
+
+static int ssp_queue_sensorhub_events(struct ssp_sensorhub_data *hub_data,
 				char *dataframe, int start, int end)
 {
 	struct sensorhub_event *event;
 	int length = end - start;
-	int entries = 0;
+	int event_number = hub_data->event_number;
+	int events = 0;
+	int ret = 0;
 	int i = 0;
 
 	if (length <= 0) {
@@ -155,52 +189,67 @@ static int ssp_queue_sensorhub_events(struct ssp_data *data,
 	}
 
 	/* how many events in the list? */
-	list_for_each_entry(event, &data->events_head.list, list)
-		entries++;
+	spin_lock_bh(&hub_data->sensorhub_lock);
+	list_for_each_entry(event, &hub_data->events_head.list, list)
+		events++;
+	spin_unlock_bh(&hub_data->sensorhub_lock);
 
 	/* drop event if queue is full */
-	if (entries >= LIBRARY_MAX_NUM) {
+	if (events >= LIBRARY_MAX_NUM) {
 		pr_info("%s: queue is full", __func__);
-		data->transfer_ready++;
-		return -ENOMEM;
+		hub_data->transfer_ready++;
+		ret = ssp_sensorhub_is_fast_data(dataframe, start);
+		if (ret >= 0)
+			event_number = LIBRARY_MAX_NUM + ret;
+		else
+			return -ENOMEM;
 	}
 
 	/* allocate memory for new event */
-	if (data->events[data->event_number].library_data != NULL)
-		kfree(data->events[data->event_number].library_data);
+	if (hub_data->events[event_number].library_data != NULL)
+		kfree(hub_data->events[event_number].library_data);
 
-	data->events[data->event_number].library_data
+	hub_data->events[event_number].library_data
 		= kzalloc(length * sizeof(char), GFP_KERNEL);
-	if (data->events[data->event_number].library_data == NULL) {
+	if (hub_data->events[event_number].library_data == NULL) {
 		pr_err("%s: allocate memory for library data err", __func__);
 		return -ENOMEM;
 	}
 
 	/* copy sensorhub event into queue */
 	while (start < end) {
-		data->events[data->event_number].library_data[i++]
+		hub_data->events[event_number].library_data[i++]
 			= dataframe[start++];
-		pr_info("%s[%d] = %d", __func__, i-1,
-			data->events[data->event_number].library_data[i-1]);
+		pr_info("%s[%d] = 0x%x", __func__, i-1,
+			hub_data->events[event_number].library_data[i-1]);
 	}
-	data->events[data->event_number].length = length;
+	hub_data->events[event_number].length = length;
 
-	/* add new sensorhug event at the end of queue */
-	spin_lock_bh(&data->sensorhub_lock);
-	list_add_tail(&data->events[data->event_number].list,
-		&data->events_head.list);
-	data->transfer_ready = 0;
-	spin_unlock_bh(&data->sensorhub_lock);
-	pr_info("%s: total %d entries", __func__, entries + 1);
+	if (events <= LIBRARY_MAX_NUM) {
+		/* add new event at the end of queue */
+		spin_lock_bh(&hub_data->sensorhub_lock);
+		list_add_tail(&hub_data->events[event_number].list,
+			&hub_data->events_head.list);
+		if (events++ < LIBRARY_MAX_NUM)
+			hub_data->transfer_ready = 0;
+		spin_unlock_bh(&hub_data->sensorhub_lock);
 
-	/* do not exceed max queue number */
-	if (data->event_number++ >= LIBRARY_MAX_NUM - 1)
-		data->event_number = 0;
+		/* do not exceed max queue number */
+		if (hub_data->event_number++ >= LIBRARY_MAX_NUM - 1)
+			hub_data->event_number = 0;
+	} else {
+		spin_lock_bh(&hub_data->sensorhub_lock);
+		list_replace(hub_data->events_head.list.prev,
+				&hub_data->events[event_number].list);
+		spin_unlock_bh(&hub_data->sensorhub_lock);
+	}
 
-	return length;
+	pr_info("%s: total %d events", __func__, events);
+	return events;
 }
 
-static int ssp_receive_large_msg(struct ssp_data *data, u8 sub_cmd)
+static int ssp_receive_large_msg(struct ssp_sensorhub_data *hub_data,
+				u8 sub_cmd)
 {
 	char send_data[2] = { 0, };
 	char receive_data[2] = { 0, };
@@ -216,7 +265,8 @@ static int ssp_receive_large_msg(struct ssp_data *data, u8 sub_cmd)
 	send_data[1] = sub_cmd;
 
 	/* receive_data(msg length) is two byte because msg is large */
-	ret = ssp_i2c_read(data, send_data, 2, receive_data, 2, 0);
+	ret = ssp_i2c_read(hub_data->ssp_data, send_data, 2,
+			receive_data, 2, 0);
 	if (ret < 0) {
 		pr_err("%s: MSG2SSP_STT i2c err(%d)", __func__, ret);
 		return ret;
@@ -236,8 +286,8 @@ static int ssp_receive_large_msg(struct ssp_data *data, u8 sub_cmd)
 	/* receive the first msg data */
 	send_data[0] = MSG2SSP_SRM;
 	large_msg_data = kzalloc((length  * sizeof(char)), GFP_KERNEL);
-	ret = ssp_i2c_read(data, send_data, 1,
-				large_msg_data, length, 0);
+	ret = ssp_i2c_read(hub_data->ssp_data, send_data, 1,
+			large_msg_data, length, 0);
 	if (ret < 0) {
 		pr_err("%s: receive 1st large msg err(%d)", __func__, ret);
 		kfree(large_msg_data);
@@ -245,21 +295,22 @@ static int ssp_receive_large_msg(struct ssp_data *data, u8 sub_cmd)
 	}
 
 	/* empty the previous large library data */
-	if (data->large_library_length != 0)
-		kfree(data->large_library_data);
+	if (hub_data->large_library_length != 0)
+		kfree(hub_data->large_library_data);
 
 	/* large_msg_data[0] of the first msg: total number of large msg
 	 * large_msg_data[1-2] of the first msg: total msg length
 	 * large_msg_data[3-N] of the first msg: the first msg data itself */
 	total_msg_number = large_msg_data[0];
-	data->large_library_length = (int)((unsigned int)large_msg_data[1] << 8)
+	hub_data->large_library_length
+			= (int)((unsigned int)large_msg_data[1] << 8)
 				+ (unsigned int)large_msg_data[2];
-	data->large_library_data
-		= kzalloc((data->large_library_length * sizeof(char)),
+	hub_data->large_library_data
+		= kzalloc((hub_data->large_library_length * sizeof(char)),
 			GFP_KERNEL);
 
 	/* copy the fist msg data into large_library_data */
-	memcpy(data->large_library_data, &large_msg_data[3],
+	memcpy(hub_data->large_library_data, &large_msg_data[3],
 		(length - 3) * sizeof(char));
 	kfree(large_msg_data);
 
@@ -272,7 +323,8 @@ static int ssp_receive_large_msg(struct ssp_data *data, u8 sub_cmd)
 		send_data[1] = 0x81 + msg_number;
 
 		/* receive_data(msg length) is two byte because msg is large */
-		ret = ssp_i2c_read(data, send_data, 2, receive_data, 2, 0);
+		ret = ssp_i2c_read(hub_data->ssp_data, send_data, 2,
+				receive_data, 2, 0);
 		if (ret < 0) {
 			pr_err("%s: MSG2SSP_STT i2c err(%d)",
 					__func__, ret);
@@ -293,8 +345,8 @@ static int ssp_receive_large_msg(struct ssp_data *data, u8 sub_cmd)
 
 		/* receive Nth msg data */
 		send_data[0] = MSG2SSP_SRM;
-		ret = ssp_i2c_read(data, send_data, 1,
-					large_msg_data, length, 0);
+		ret = ssp_i2c_read(hub_data->ssp_data, send_data, 1,
+				large_msg_data, length, 0);
 		if (ret < 0) {
 			pr_err("%s: recieve %dth large msg err(%d)",
 			       __func__, msg_number + 2, ret);
@@ -303,106 +355,124 @@ static int ssp_receive_large_msg(struct ssp_data *data, u8 sub_cmd)
 		}
 
 		/* copy(append) Nth msg data into large_library_data */
-		memcpy(&data->large_library_data[data_locater],
+		memcpy(&hub_data->large_library_data[data_locater],
 			large_msg_data,	length * sizeof(char));
 		data_locater += length;
 		kfree(large_msg_data);
 	}
 
-	return data->large_library_length;
+	return hub_data->large_library_length;
 }
 
 static int ssp_senosrhub_thread_func(void *arg)
 {
-	struct ssp_data *data = (struct ssp_data *)arg;
+	struct ssp_sensorhub_data *hub_data = (struct ssp_sensorhub_data *)arg;
 	struct sensorhub_event *event;
-	int entries = 0;
+	int events = 0;
 	int ret = 0;
 
 	while (!kthread_should_stop()) {
 		/* run if only event queue is not empty */
-		wait_event_interruptible(data->sensorhub_waitqueue,
+		wait_event_interruptible(hub_data->sensorhub_waitqueue,
 				kthread_should_stop() ||
-				!list_empty(&data->events_head.list));
+				!list_empty(&hub_data->events_head.list));
 
-		/* quit while loop and do not report length anymore
+		/* exit thread if kthread should stop */
+		if (unlikely(kthread_should_stop())) {
+			pr_info("%s: kthread_stop()", __func__);
+			break;
+		}
+
+		/* exit thread
 		 * if user does not get data with consecutive trials
 		 */
-		if (data->transfer_try++ >= LIBRARY_MAX_TRY) {
+		if (unlikely(hub_data->transfer_try++ >= LIBRARY_MAX_TRY)) {
 			pr_err("%s: user does not get data", __func__);
 			break;
 		}
 
-		/* first in first out */
-		data->first_event = list_first_entry(&data->events_head.list,
-			struct sensorhub_event, list);
-		if (IS_ERR(data->first_event)) {
-			pr_err("%s: no sensor event entry", __func__);
-			continue;
-		}
-
 		/* report sensorhub event to user */
-		if (data->transfer_ready == 0) {
-			ssp_report_sensorhub_length(data,
-					data->first_event->length);
-			wake_lock_timeout(&data->sensorhub_wake_lock, 5*HZ);
-			data->transfer_ready++;
+		if (hub_data->transfer_ready == 0) {
+			/* first in first out */
+			hub_data->first_event
+				= list_first_entry(&hub_data->events_head.list,
+						struct sensorhub_event, list);
+			if (IS_ERR(hub_data->first_event)) {
+				pr_err("%s: first event err(%ld)", __func__,
+					PTR_ERR(hub_data->first_event));
+				continue;
+			}
+
+			/* report sensorhub event to user */
+			ssp_report_sensorhub_length(hub_data,
+					hub_data->first_event->length);
+			wake_lock_timeout(&hub_data->sensorhub_wake_lock, 5*HZ);
+			hub_data->transfer_ready++;
 		}
 
 		/* wait until user gets data */
-		ret = wait_for_completion_timeout(&data->transfer_done, 3*HZ);
+		ret = wait_for_completion_timeout(&hub_data->transfer_done,
+			3*HZ);
 		if (ret == 0) {
 			pr_err("%s: wait timed out", __func__);
-			data->transfer_ready = 0;
+			hub_data->transfer_ready = 0;
 		} else if (ret < 0) {
 			pr_err("%s: wait_for_completion_timeout err(%d)",
 				__func__, ret);
 		}
 
-		/* delete first entry only if transfer succeed */
-		if (data->transfer_try == 0) {
-			if (!list_empty(&data->events_head.list)) {
-				spin_lock_bh(&data->sensorhub_lock);
-				list_del(&data->first_event->list);
-				data->transfer_ready = 0;
-				spin_unlock_bh(&data->sensorhub_lock);
-				entries = 0;
-				list_for_each_entry(event,
-					&data->events_head.list, list)
-					entries++;
-				pr_info("%s: %d entries remain",
-					__func__, entries);
-			}
+		/* remove first event only if transfer succeed */
+		if (hub_data->transfer_try == 0) {
+			/* remove first event */
+			spin_lock_bh(&hub_data->sensorhub_lock);
+			if (!list_empty(&hub_data->events_head.list))
+				list_del(&hub_data->first_event->list);
+			hub_data->transfer_ready = 0;
+
+			/* how many events in the list? */
+			events = 0;
+			list_for_each_entry(event,
+				&hub_data->events_head.list, list)
+				events++;
+			spin_unlock_bh(&hub_data->sensorhub_lock);
+
+			pr_info("%s: %d events remain", __func__, events);
 			continue;
 		}
 
 		/* throw away extra events */
-		if (data->transfer_ready > EVENT_WAIT_COUNT)
-			data->transfer_ready = 0;
+		if (hub_data->transfer_ready > EVENT_WAIT_COUNT)
+			hub_data->transfer_ready = 0;
 
 		usleep_range(10000, 10000);
 	}
 
+	pr_info("%s: exit", __func__);
 	return ret;
 }
 
-int ssp_handle_sensorhub_data(struct ssp_data *data, char *dataframe,
+int ssp_handle_sensorhub_data(struct ssp_data *ssp_data, char *dataframe,
 				int start, int end)
 {
+	struct ssp_sensorhub_data *hub_data = ssp_data->hub_data;
+
 	/* add new sensorhub event into queue */
-	int ret = ssp_queue_sensorhub_events(data, dataframe, start, end);
-	wake_up(&data->sensorhub_waitqueue);
+	int ret = ssp_queue_sensorhub_events(hub_data, dataframe, start, end);
+	wake_up(&hub_data->sensorhub_waitqueue);
 
 	return ret;
 }
 
-int ssp_handle_sensorhub_large_data(struct ssp_data *data, u8 sub_cmd)
+int ssp_handle_sensorhub_large_data(struct ssp_data *ssp_data, u8 sub_cmd)
 {
+	struct ssp_sensorhub_data *hub_data = ssp_data->hub_data;
+
 	/* receive large size of library data */
-	int ret = ssp_receive_large_msg(data, sub_cmd);
+	int ret = ssp_receive_large_msg(hub_data, sub_cmd);
 	if (ret >= 0) {
-		ssp_report_sensorhub_length(data, data->large_library_length);
-		wake_lock_timeout(&data->sensorhub_wake_lock, 3*HZ);
+		ssp_report_sensorhub_length(hub_data,
+			hub_data->large_library_length);
+		wake_lock_timeout(&hub_data->sensorhub_wake_lock, 3*HZ);
 	} else {
 		pr_err("%s: ssp_receive_large_msg err(%d)", __func__, ret);
 	}
@@ -410,77 +480,93 @@ int ssp_handle_sensorhub_large_data(struct ssp_data *data, u8 sub_cmd)
 	return ret;
 }
 
-int ssp_initialize_sensorhub(struct ssp_data *data)
+int ssp_initialize_sensorhub(struct ssp_data *ssp_data)
 {
+	struct ssp_sensorhub_data *hub_data;
 	int ret;
 
+	hub_data = kzalloc(sizeof(*hub_data), GFP_KERNEL);
+	if (!hub_data) {
+		pr_err("%s: failed to allocate memory for sensorhub data",
+			__func__);
+		return -ENOMEM;
+	}
+	hub_data->ssp_data = ssp_data;
+	ssp_data->hub_data = hub_data;
+
 	/* allocate sensorhub input devices */
-	data->sensorhub_input_dev = input_allocate_device();
-	if (!data->sensorhub_input_dev) {
+	hub_data->sensorhub_input_dev = input_allocate_device();
+	if (!hub_data->sensorhub_input_dev) {
 		pr_err("%s: allocate sensorhub input devices err", __func__);
 		ret = -ENOMEM;
 		goto err_input_allocate_device_sensorhub;
 	}
 
-	wake_lock_init(&data->sensorhub_wake_lock, WAKE_LOCK_SUSPEND,
+	wake_lock_init(&hub_data->sensorhub_wake_lock, WAKE_LOCK_SUSPEND,
 			"sensorhub_wake_lock");
-	INIT_LIST_HEAD(&data->events_head.list);
-	init_waitqueue_head(&data->sensorhub_waitqueue);
-	init_completion(&data->transfer_done);
-	spin_lock_init(&data->sensorhub_lock);
+	INIT_LIST_HEAD(&hub_data->events_head.list);
+	init_waitqueue_head(&hub_data->sensorhub_waitqueue);
+	init_completion(&hub_data->transfer_done);
+	spin_lock_init(&hub_data->sensorhub_lock);
 
-	ret = input_register_device(data->sensorhub_input_dev);
+	ret = input_register_device(hub_data->sensorhub_input_dev);
 	if (ret < 0) {
 		pr_err("%s: could not register sensorhub input device(%d)",
 			__func__, ret);
-		input_free_device(data->sensorhub_input_dev);
+		input_free_device(hub_data->sensorhub_input_dev);
 		goto err_input_register_device_sensorhub;
 	}
 
-	data->sensorhub_input_dev->name = "ssp_context";
-	input_set_drvdata(data->sensorhub_input_dev, data);
-	input_set_capability(data->sensorhub_input_dev, EV_REL, REL_RX);
-	input_set_capability(data->sensorhub_input_dev, EV_REL, REL_RY);
+	hub_data->sensorhub_input_dev->name = "ssp_context";
+	input_set_drvdata(hub_data->sensorhub_input_dev, hub_data);
+	input_set_capability(hub_data->sensorhub_input_dev, EV_REL, REL_RX);
+	input_set_capability(hub_data->sensorhub_input_dev, EV_REL, REL_RY);
 
 	/* create sensorhub device node */
-	data->sensorhub_device.minor = MISC_DYNAMIC_MINOR;
-	data->sensorhub_device.name = "ssp_sensorhub";
-	data->sensorhub_device.fops = &ssp_sensorhub_fops;
+	hub_data->sensorhub_device.minor = MISC_DYNAMIC_MINOR;
+	hub_data->sensorhub_device.name = "ssp_sensorhub";
+	hub_data->sensorhub_device.fops = &ssp_sensorhub_fops;
 
-	ret = misc_register(&data->sensorhub_device);
+	ret = misc_register(&hub_data->sensorhub_device);
 	if (ret < 0) {
 		pr_err("%s: misc_register() failed", __func__);
 		goto err_misc_register;
 	}
 
-	data->sensorhub_task = kthread_run(ssp_senosrhub_thread_func,
-					(void *)data, "ssp_sensorhub_task");
-	if (IS_ERR(data->sensorhub_task)) {
-		ret = PTR_ERR(data->sensorhub_task);
+	hub_data->sensorhub_task = kthread_run(ssp_senosrhub_thread_func,
+					(void *)hub_data, "ssp_sensorhub_task");
+	if (IS_ERR(hub_data->sensorhub_task)) {
+		ret = PTR_ERR(hub_data->sensorhub_task);
 		goto err_kthread_create;
 	}
 
 	return 0;
 
 err_kthread_create:
-	misc_deregister(&data->sensorhub_device);
+	misc_deregister(&hub_data->sensorhub_device);
 err_misc_register:
-	input_unregister_device(data->sensorhub_input_dev);
+	input_unregister_device(hub_data->sensorhub_input_dev);
 err_input_register_device_sensorhub:
-	complete_all(&data->transfer_done);
-	wake_lock_destroy(&data->sensorhub_wake_lock);
+	complete_all(&hub_data->transfer_done);
+	wake_lock_destroy(&hub_data->sensorhub_wake_lock);
 err_input_allocate_device_sensorhub:
+	kfree(hub_data);
 	return ret;
 }
 
-void ssp_remove_sensorhub(struct ssp_data *data)
+void ssp_remove_sensorhub(struct ssp_data *ssp_data)
 {
-	complete_all(&data->transfer_done);
-	if (data->sensorhub_task)
-		kthread_stop(data->sensorhub_task);
-	misc_deregister(&data->sensorhub_device);
-	input_unregister_device(data->sensorhub_input_dev);
-	wake_lock_destroy(&data->sensorhub_wake_lock);
+	struct ssp_sensorhub_data *hub_data = ssp_data->hub_data;
+
+	ssp_sensorhub_fops.write = NULL;
+	ssp_sensorhub_fops.unlocked_ioctl = NULL;
+	misc_deregister(&hub_data->sensorhub_device);
+	input_unregister_device(hub_data->sensorhub_input_dev);
+	wake_lock_destroy(&hub_data->sensorhub_wake_lock);
+	complete_all(&hub_data->transfer_done);
+	if (hub_data->sensorhub_task)
+		kthread_stop(hub_data->sensorhub_task);
+	kfree(hub_data);
 }
 
 MODULE_DESCRIPTION("Samsung Sensor Platform(SSP) sensorhub driver");

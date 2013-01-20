@@ -16,18 +16,39 @@
 
 #define SSP_DEBUG_TIMER_SEC		(10 * HZ)
 
+#define LIMIT_RESET_CNT			20
+#define LIMIT_SSD_FAIL_CNT		3
+#define LIMIT_INSTRUCTION_FAIL_CNT	1
+#define LIMIT_IRQ_FAIL_CNT		2
+#define LIMIT_TIMEOUT_CNT		5
+
 /*************************************************************************/
 /* SSP Debug timer function                                              */
 /*************************************************************************/
 
+void print_mcu_debug(char *pchRcvDataFrame, int *pDataIdx)
+{
+	int iLength;
+
+	iLength = pchRcvDataFrame[0];
+	pchRcvDataFrame[iLength] = 0;
+	*pDataIdx = *pDataIdx + iLength + 2;
+
+	ssp_dbg("[SSP]: MSG From MCU - %s\n", pchRcvDataFrame + 1);
+}
+
 void reset_mcu(struct ssp_data *data)
 {
+	data->bSspShutdown = true;
 	disable_irq(data->iIrq);
 	disable_irq_wake(data->iIrq);
 
 	toggle_mcu_reset(data);
 	msleep(SSP_SW_RESET_TIME);
-	initialize_mcu(data);
+	data->bSspShutdown = false;
+
+	if (initialize_mcu(data) < 0)
+		data->bSspShutdown = true;
 
 	sync_sensor_state(data);
 
@@ -44,7 +65,7 @@ void sync_sensor_state(struct ssp_data *data)
 	unsigned char uBuf[2] = {0,};
 	unsigned int uSensorCnt;
 
-	set_proximity_threshold(data);
+	proximity_open_calibration(data);
 
 	udelay(10);
 
@@ -57,8 +78,11 @@ void sync_sensor_state(struct ssp_data *data)
 		}
 	}
 
-	data->uTimeOutCnt = 0;
-	data->uBusyCnt = 0;
+	if (data->bProximityRawEnabled == true) {
+		uBuf[0] = 1;
+		uBuf[1] = 20;
+		send_instruction(data, ADD_SENSOR, PROXIMITY_RAW, uBuf, 2);
+	}
 }
 
 static void print_sensordata(struct ssp_data *data, unsigned int uSensor)
@@ -97,41 +121,44 @@ static void print_sensordata(struct ssp_data *data, unsigned int uSensor)
 	}
 }
 
-void print_mcu_debug(char *pchRcvDataFrame, int *pDataIdx)
-{
-	int iLength;
-
-	iLength = pchRcvDataFrame[0];
-	pchRcvDataFrame[iLength] = 0;
-	*pDataIdx = *pDataIdx + iLength + 2;
-
-	ssp_dbg("[SSP] MSG From MCU : %s\n", pchRcvDataFrame + 1);
-}
-
 static void debug_work_func(struct work_struct *work)
 {
 	unsigned int uSensorCnt;
 	struct ssp_data *data = container_of(work, struct ssp_data, work_debug);
 
-	ssp_dbg("[SSP]: %s(%u) - Sensor state: 0x%x, TO: %u, BC: %u, RC: %u\n",
-		__func__, data->uIrqCnt, data->uAliveSensorDebug,
-		data->uTimeOutCnt, data->uBusyCnt, data->uResetCnt);
-
-	data->uIrqCnt = 0;
+	ssp_dbg("[SSP]: %s(%u) - Sensor state: 0x%x, RC: %u, MS: %u\n",
+		__func__, data->uIrqCnt, data->uSensorState, data->uResetCnt,
+		data->uMissSensorCnt);
 
 	for (uSensorCnt = 0; uSensorCnt < (SENSOR_MAX - 1); uSensorCnt++)
 		if (atomic_read(&data->aSensorEnable) & (1 << uSensorCnt))
 			print_sensordata(data, uSensorCnt);
 
-	if ((data->uSsdFailCnt >= 3) || (data->uI2cFailCnt >= 1)) {
-		if (data->uResetCnt < 20) {
+	if ((atomic_read(&data->aSensorEnable) & 0x4f) && (data->uIrqCnt == 0))
+		data->uIrqFailCnt++;
+	else
+		data->uIrqFailCnt = 0;
+
+	if ((data->uSsdFailCnt >= LIMIT_SSD_FAIL_CNT)
+		|| (data->uInstFailCnt >= LIMIT_INSTRUCTION_FAIL_CNT)
+		|| (data->uIrqFailCnt >= LIMIT_IRQ_FAIL_CNT)
+		|| ((data->uTimeOutCnt + data->uBusyCnt) > LIMIT_TIMEOUT_CNT)) {
+
+		if (data->uResetCnt < LIMIT_RESET_CNT) {
 			reset_mcu(data);
 			data->uResetCnt++;
+		} else {
+			data->bSspShutdown = true;
 		}
 
 		data->uSsdFailCnt = 0;
-		data->uI2cFailCnt = 0;
+		data->uInstFailCnt = 0;
+		data->uTimeOutCnt = 0;
+		data->uBusyCnt = 0;
+		data->uIrqFailCnt = 0;
 	}
+
+	data->uIrqCnt = 0;
 }
 
 static void debug_timer_func(unsigned long ptr)

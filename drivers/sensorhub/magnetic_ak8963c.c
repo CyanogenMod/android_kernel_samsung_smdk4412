@@ -21,6 +21,18 @@
 #define VENDOR		"AKM"
 #define CHIP_ID		"AK8963C"
 
+#define GYROSCOPE_DATA_SPEC_MIN		-6500
+#define GYROSCOPE_DATA_SPEC_MAX		6500
+
+#define GYROSCOPE_SELFTEST_X_SPEC_MIN	-200
+#define GYROSCOPE_SELFTEST_X_SPEC_MAX	200
+
+#define GYROSCOPE_SELFTEST_Y_SPEC_MIN	-200
+#define GYROSCOPE_SELFTEST_Y_SPEC_MAX	200
+
+#define GYROSCOPE_SELFTEST_Z_SPEC_MIN	-3200
+#define GYROSCOPE_SELFTEST_Z_SPEC_MAX	-800
+
 static ssize_t magnetic_vendor_show(struct device *dev,
 	struct device_attribute *attr, char *buf)
 {
@@ -50,12 +62,12 @@ static int check_data_spec(struct ssp_data *data)
 		(data->buf[GEOMAGNETIC_SENSOR].y == 0) &&
 		(data->buf[GEOMAGNETIC_SENSOR].z == 0))
 		return FAIL;
-	else if ((data->buf[GEOMAGNETIC_SENSOR].x > 6500) ||
-		(data->buf[GEOMAGNETIC_SENSOR].x < -6500) ||
-		(data->buf[GEOMAGNETIC_SENSOR].y > 6500) ||
-		(data->buf[GEOMAGNETIC_SENSOR].y < -6500) ||
-		(data->buf[GEOMAGNETIC_SENSOR].z > 6500) ||
-		(data->buf[GEOMAGNETIC_SENSOR].z < -6500))
+	else if ((data->buf[GEOMAGNETIC_SENSOR].x > GYROSCOPE_DATA_SPEC_MAX) ||
+		(data->buf[GEOMAGNETIC_SENSOR].x < GYROSCOPE_DATA_SPEC_MIN) ||
+		(data->buf[GEOMAGNETIC_SENSOR].y > GYROSCOPE_DATA_SPEC_MAX) ||
+		(data->buf[GEOMAGNETIC_SENSOR].y < GYROSCOPE_DATA_SPEC_MIN) ||
+		(data->buf[GEOMAGNETIC_SENSOR].z > GYROSCOPE_DATA_SPEC_MAX) ||
+		(data->buf[GEOMAGNETIC_SENSOR].z < GYROSCOPE_DATA_SPEC_MIN))
 		return FAIL;
 	else
 		return SUCCESS;
@@ -67,7 +79,7 @@ static ssize_t adc_data_read(struct device *dev,
 	bool bSuccess = false;
 	u8 chTempbuf[2] = {1, 20};
 	s16 iSensorBuf[3] = {0, };
-	int iRetries = 10;
+	int iRetries = 20;
 	struct ssp_data *data = dev_get_drvdata(dev);
 
 	data->buf[GEOMAGNETIC_SENSOR].x = 0;
@@ -79,7 +91,7 @@ static ssize_t adc_data_read(struct device *dev,
 			chTempbuf, 2);
 
 	do {
-		msleep(60);
+		msleep(50);
 		if (check_data_spec(data) == SUCCESS)
 			break;
 	} while (--iRetries);
@@ -173,22 +185,28 @@ reties:
 
 	pr_info("[SSP] %s: self test x = %d, y = %d, z = %d\n",
 		__func__, iSF_X, iSF_Y, iSF_Z);
-	if ((iSF_X >= -200) && (iSF_X <= 200))
+	if ((iSF_X >= GYROSCOPE_SELFTEST_X_SPEC_MIN)
+		&& (iSF_X <= GYROSCOPE_SELFTEST_X_SPEC_MAX))
 		pr_info("[SSP] x passed self test, expect -200<=x<=200\n");
 	else
 		pr_info("[SSP] x failed self test, expect -200<=x<=200\n");
-	if ((iSF_Y >= -200) && (iSF_Y <= 200))
+	if ((iSF_Y >= GYROSCOPE_SELFTEST_Y_SPEC_MIN)
+		&& (iSF_Y <= GYROSCOPE_SELFTEST_Y_SPEC_MAX))
 		pr_info("[SSP] y passed self test, expect -200<=y<=200\n");
 	else
 		pr_info("[SSP] y failed self test, expect -200<=y<=200\n");
-	if ((iSF_Z >= -3200) && (iSF_Z <= -800))
+	if ((iSF_Z >= GYROSCOPE_SELFTEST_Z_SPEC_MIN)
+		&& (iSF_Z <= GYROSCOPE_SELFTEST_Z_SPEC_MAX))
 		pr_info("[SSP] z passed self test, expect -3200<=z<=-800\n");
 	else
 		pr_info("[SSP] z failed self test, expect -3200<=z<=-800\n");
 
-	if (((iSF_X >= -200) && (iSF_X <= 200)) &&
-		((iSF_Y >= -200) && (iSF_Y <= 200)) &&
-		((iSF_Z >= -3200) && (iSF_Z <= -800)))
+	if ((iSF_X >= GYROSCOPE_SELFTEST_X_SPEC_MIN)
+		&& (iSF_X <= GYROSCOPE_SELFTEST_X_SPEC_MAX)
+		&& (iSF_Y >= GYROSCOPE_SELFTEST_Y_SPEC_MIN)
+		&& (iSF_Y <= GYROSCOPE_SELFTEST_Y_SPEC_MAX)
+		&& (iSF_Z >= GYROSCOPE_SELFTEST_Z_SPEC_MIN)
+		&& (iSF_Z <= GYROSCOPE_SELFTEST_Z_SPEC_MAX))
 		bSelftestPassed = true;
 
 	if ((bSelftestPassed == false) && (iSpecOutReties++ < 5))
@@ -244,7 +262,10 @@ static struct device_attribute *mag_attrs[] = {
 
 void initialize_magnetic_factorytest(struct ssp_data *data)
 {
-	struct device *mag_device = NULL;
+	sensors_register(data->mag_device, data, mag_attrs, "magnetic_sensor");
+}
 
-	sensors_register(mag_device, data, mag_attrs, "magnetic_sensor");
+void remove_magnetic_factorytest(struct ssp_data *data)
+{
+	sensors_unregister(data->mag_device, mag_attrs);
 }

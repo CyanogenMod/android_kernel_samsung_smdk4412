@@ -14,31 +14,38 @@
  */
 #include "ssp.h"
 
+#define LIMIT_DELAY_CNT		200
+
 int waiting_wakeup_mcu(struct ssp_data *data)
 {
 	int iDelaycnt = 0;
 
-	if (data == NULL)
-		return ERROR;
-
-	while (!data->check_mcu_busy() && (iDelaycnt++ < 200))
+	while (!data->check_mcu_busy() && (iDelaycnt++ < LIMIT_DELAY_CNT)
+		&& (data->bSspShutdown == false))
 		mdelay(5);
 
-	if (iDelaycnt >= 200) {
+	if (iDelaycnt >= LIMIT_DELAY_CNT) {
 		pr_err("[SSP]: %s - MCU Irq Timeout!!\n", __func__);
 		data->uBusyCnt++;
+	} else {
+		data->uBusyCnt = 0;
 	}
 
 	iDelaycnt = 0;
 	data->wakeup_mcu();
-	while (data->check_mcu_ready() && (iDelaycnt++ < 50))
-		udelay(50);
+	while (data->check_mcu_ready() && (iDelaycnt++ < LIMIT_DELAY_CNT)
+		&& (data->bSspShutdown == false))
+		mdelay(5);
 
-	if (iDelaycnt >= 50) {
+	if (iDelaycnt >= LIMIT_DELAY_CNT) {
 		pr_err("[SSP]: %s - MCU Wakeup Timeout!!\n", __func__);
 		data->uTimeOutCnt++;
-		return FAIL;
+	} else {
+		data->uTimeOutCnt = 0;
 	}
+
+	if (data->bSspShutdown == true)
+		return FAIL;
 
 	return SUCCESS;
 }
@@ -72,9 +79,9 @@ int ssp_i2c_read(struct ssp_data *data, char *pTxData, u16 uTxLength,
 			do_gettimeofday(&cur_time);
 			iDiffTime = (int)cur_time.tv_sec - iTimeTemp;
 			iTimeTemp = (int)cur_time.tv_sec;
-			if (iTimeTemp >= 4) {
+			if (iDiffTime >= 4) {
 				pr_err("[SSP]: %s - i2c time out %d!\n",
-					__func__, iTimeTemp);
+					__func__, iDiffTime);
 				break;
 			}
 			pr_err("[SSP]: %s - i2c transfer error %d! retry...\n",
@@ -83,7 +90,7 @@ int ssp_i2c_read(struct ssp_data *data, char *pTxData, u16 uTxLength,
 		} else {
 			return SUCCESS;
 		}
-	} while (iRetries--);
+	} while (--iRetries);
 
 	return ERROR;
 }
@@ -92,7 +99,7 @@ int ssp_sleep_mode(struct ssp_data *data)
 {
 	char chRxBuf = 0;
 	char chTxBuf = MSG2SSP_AP_STATUS_SLEEP;
-	int iRet = 0, iRetries = 3;
+	int iRet = 0, iRetries = DEFAULT_RETRIES;
 
 	if (waiting_wakeup_mcu(data) < 0)
 		return ERROR;
@@ -101,7 +108,7 @@ int ssp_sleep_mode(struct ssp_data *data)
 	iRet = ssp_i2c_read(data, &chTxBuf, 1, &chRxBuf, 1, DEFAULT_RETRIES);
 	if (iRet != SUCCESS) {
 		pr_err("[SSP]: %s - MSG2SSP_AP_STATUS_SLEEP CMD fail %d\n",
-				__func__, iRet);
+			__func__, iRet);
 		return ERROR;
 	} else if (chRxBuf != MSG_ACK) {
 		while (iRetries--) {
@@ -115,12 +122,12 @@ int ssp_sleep_mode(struct ssp_data *data)
 		}
 
 		if (iRetries < 0) {
-			data->uI2cFailCnt++;
+			data->uInstFailCnt++;
 			return FAIL;
 		}
 	}
 
-	data->uI2cFailCnt = 0;
+	data->uInstFailCnt = 0;
 	ssp_dbg("[SSP]: %s - MSG2SSP_AP_STATUS_SLEEP CMD\n", __func__);
 
 	return SUCCESS;
@@ -130,7 +137,7 @@ int ssp_resume_mode(struct ssp_data *data)
 {
 	char chRxBuf = 0;
 	char chTxBuf = MSG2SSP_AP_STATUS_WAKEUP;
-	int iRet = 0, iRetries = 3;
+	int iRet = 0, iRetries = DEFAULT_RETRIES;
 
 	if (waiting_wakeup_mcu(data) < 0)
 		return ERROR;
@@ -153,12 +160,12 @@ int ssp_resume_mode(struct ssp_data *data)
 		}
 
 		if (iRetries < 0) {
-			data->uI2cFailCnt++;
+			data->uInstFailCnt++;
 			return FAIL;
 		}
 	}
 
-	data->uI2cFailCnt = 0;
+	data->uInstFailCnt = 0;
 	ssp_dbg("[SSP]: %s - MSG2SSP_AP_STATUS_WAKEUP CMD\n", __func__);
 
 	return SUCCESS;
@@ -169,7 +176,19 @@ int send_instruction(struct ssp_data *data, u8 uInst,
 {
 	char chTxbuf[uLength + 3];
 	char chRxbuf = 0;
-	int iRet = 0, iRetries = 3;
+	int iRet = 0, iRetries = DEFAULT_RETRIES;
+
+	if ((!(data->uSensorState & (1 << uSensorType)))
+		&& (uInst <= CHANGE_DELAY)) {
+		pr_err("[SSP]: %s - Bypass Inst Skip! - %u\n",
+			__func__, uSensorType);
+		return FAIL;
+	} else if ((!((data->uSensorState | 0xf0) & (1 << uSensorType)))
+		&& (uInst == FACTORY_MODE)) {
+		pr_err("[SSP]: %s - Factory Inst Skip! - %u\n",
+			__func__, uSensorType);
+		return FAIL;
+	}
 
 	if (waiting_wakeup_mcu(data) < 0)
 		return ERROR;
@@ -216,6 +235,8 @@ int send_instruction(struct ssp_data *data, u8 uInst,
 			mdelay(10);
 			pr_err("[SSP]: %s - Instruction CMD retry...\n",
 				__func__);
+			if (waiting_wakeup_mcu(data) < 0)
+				return ERROR;
 			iRet = ssp_i2c_read(data, &(chTxbuf[0]),
 				uLength + 3, &chRxbuf, 1, DEFAULT_RETRIES);
 			if ((iRet == SUCCESS) && (chRxbuf == MSG_ACK))
@@ -223,12 +244,12 @@ int send_instruction(struct ssp_data *data, u8 uInst,
 		}
 
 		if (iRetries < 0) {
-			data->uI2cFailCnt++;
+			data->uInstFailCnt++;
 			return FAIL;
 		}
 	}
 
-	data->uI2cFailCnt = 0;
+	data->uInstFailCnt = 0;
 	ssp_dbg("[SSP]: %s - Inst = 0x%x, Sensor Type = 0x%x, "
 		"data = %u, %u\n", __func__, chTxbuf[1], chTxbuf[2],
 		chTxbuf[3], chTxbuf[4]);
@@ -264,23 +285,6 @@ int set_sensor_position(struct ssp_data *data)
 	chTxBuf[3] = CONFIG_SENSORS_SSP_MAGNETOMETER_POSITION;
 	chTxBuf[4] = 0;
 
-#if defined(CONFIG_MACH_T0_EUR_OPEN)
-	if (data->check_ap_rev() == 0x03) {
-		chTxBuf[1] = 7;
-		chTxBuf[2] = 7;
-		chTxBuf[3] = CONFIG_SENSORS_SSP_MAGNETOMETER_POSITION;
-	}
-#endif
-
-#if defined(CONFIG_MACH_T0_USA_SPR) || defined(CONFIG_MACH_T0_USA_USCC)\
-	|| defined(CONFIG_MACH_T0_USA_VZW)
-	if (data->check_ap_rev() <= 0x04) {
-		chTxBuf[1] = 4;
-		chTxBuf[2] = 4;
-		chTxBuf[3] = CONFIG_SENSORS_SSP_MAGNETOMETER_POSITION;
-	}
-#endif
-
 	pr_info("[SSP] Sensor Posision A : %u, G : %u, M: %u, P: %u\n",
 		chTxBuf[1], chTxBuf[2], chTxBuf[3], chTxBuf[4]);
 
@@ -293,18 +297,19 @@ int set_sensor_position(struct ssp_data *data)
 	return iRet;
 }
 
-void set_proximity_threshold(struct ssp_data *data)
+void set_proximity_threshold(struct ssp_data *data,
+	unsigned char uData1, unsigned char uData2)
 {
 	char chTxBuf[3] = { 0, };
 	char chRxBuf = 0;
-	int iRet = 0, iRetries = 3;
+	int iRet = 0, iRetries = DEFAULT_RETRIES;
 
 	if (waiting_wakeup_mcu(data) < 0)
 		return;
 
 	chTxBuf[0] = MSG2SSP_AP_SENSOR_PROXTHRESHOLD;
-	chTxBuf[1] = data->uProxThresh;
-	chTxBuf[2] = data->uProxCanc;
+	chTxBuf[1] = uData1;
+	chTxBuf[2] = uData2;
 
 	iRet = ssp_i2c_read(data, chTxBuf, 3, &chRxBuf, 1, DEFAULT_RETRIES);
 	if (iRet != SUCCESS) {
@@ -323,21 +328,20 @@ void set_proximity_threshold(struct ssp_data *data)
 		}
 
 		if (iRetries < 0) {
-			data->uI2cFailCnt++;
+			data->uInstFailCnt++;
 			return;
 		}
 	}
 
-	data->uI2cFailCnt = 0;
-	pr_info("[SSP] Proximity Threshold : %u, Cancelation : %u\n",
-		data->uProxThresh, data->uProxCanc);
+	data->uInstFailCnt = 0;
+	pr_info("[SSP]: Proximity Threshold - %u, %u\n", uData1, uData2);
 }
 
 void set_proximity_barcode_enable(struct ssp_data *data, bool bEnable)
 {
 	char chTxBuf[2] = { 0, };
 	char chRxBuf = 0;
-	int iRet = 0, iRetries = 3;
+	int iRet = 0, iRetries = DEFAULT_RETRIES;
 
 	if (waiting_wakeup_mcu(data) < 0)
 		return ;
@@ -364,12 +368,12 @@ void set_proximity_barcode_enable(struct ssp_data *data, bool bEnable)
 		}
 
 		if (iRetries < 0) {
-			data->uI2cFailCnt++;
+			data->uInstFailCnt++;
 			return;
 		}
 	}
 
-	data->uI2cFailCnt = 0;
+	data->uInstFailCnt = 0;
 	pr_info("[SSP] Proximity Barcode En : %u\n", bEnable);
 }
 
@@ -446,7 +450,7 @@ int get_fuserom_data(struct ssp_data *data)
 		iRet = ssp_i2c_read(data, chTxBuf, 1, data->pchLibraryBuf,
 			(u16)data->iLibraryLength, DEFAULT_RETRIES);
 		if (iRet != SUCCESS) {
-			pr_err("[SSP]: %s - Fail to recieve SSP data %d\n",
+			pr_err("[SSP]: %s - Fail to receive SSP data %d\n",
 				__func__, iRet);
 			kfree(data->pchLibraryBuf);
 			data->iLibraryLength = 0;
@@ -473,7 +477,7 @@ err_read_fuserom:
 	return FAIL;
 }
 
-static int ssp_recieve_msg(struct ssp_data *data,  u8 uLength)
+static int ssp_receive_msg(struct ssp_data *data,  u8 uLength)
 {
 	char chTxBuf = 0;
 	char *pchRcvDataFrame;	/* SSP-AP Massage data buffer */
@@ -485,7 +489,7 @@ static int ssp_recieve_msg(struct ssp_data *data,  u8 uLength)
 		iRet = ssp_i2c_read(data, &chTxBuf, 1, pchRcvDataFrame,
 				(u16)uLength, 0);
 		if (iRet != SUCCESS) {
-			pr_err("[SSP]: %s - Fail to recieve data %d\n",
+			pr_err("[SSP]: %s - Fail to receive data %d\n",
 				__func__, iRet);
 			kfree(pchRcvDataFrame);
 			return ERROR;
@@ -518,7 +522,7 @@ int select_irq_msg(struct ssp_data *data)
 	} else {
 		if (chRxBuf[0] == MSG2SSP_RTS) {
 			chLength = (u8)chRxBuf[1];
-			ssp_recieve_msg(data, chLength);
+			ssp_receive_msg(data, chLength);
 			data->uSsdFailCnt = 0;
 		}
 #ifdef CONFIG_SENSORS_SSP_SENSORHUB

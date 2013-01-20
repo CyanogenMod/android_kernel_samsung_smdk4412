@@ -53,9 +53,6 @@ static void get_3axis_sensordata(char *pchRcvDataFrame, int *iDataIdx,
 	iTemp <<= 8;
 	iTemp += pchRcvDataFrame[(*iDataIdx)++];
 	sensorsdata->z = iTemp;
-
-	data_dbg("x: %d, y: %d, z: %d\n", sensorsdata->x,
-		sensorsdata->y, sensorsdata->z);
 }
 
 static void get_light_sensordata(char *pchRcvDataFrame, int *iDataIdx,
@@ -82,9 +79,6 @@ static void get_light_sensordata(char *pchRcvDataFrame, int *iDataIdx,
 	iTemp <<= 8;
 	iTemp += pchRcvDataFrame[(*iDataIdx)++];
 	sensorsdata->w = iTemp;
-
-	data_dbg("r: %u, g: %u, b: %u, w: %u\n", sensorsdata->r,
-		sensorsdata->g, sensorsdata->b, sensorsdata->w);
 }
 
 static void get_pressure_sensordata(char *pchRcvDataFrame, int *iDataIdx,
@@ -107,9 +101,6 @@ static void get_pressure_sensordata(char *pchRcvDataFrame, int *iDataIdx,
 	iTemp <<= 8;
 	iTemp += (int)pchRcvDataFrame[(*iDataIdx)++];
 	sensorsdata->pressure[1] = (s16)iTemp;
-
-	data_dbg("p : %d, t: %d\n", sensorsdata->pressure[0],
-		sensorsdata->pressure[1]);
 }
 
 static void get_gesture_sensordata(char *pchRcvDataFrame, int *iDataIdx,
@@ -136,10 +127,6 @@ static void get_gesture_sensordata(char *pchRcvDataFrame, int *iDataIdx,
 	iTemp <<= 8;
 	iTemp += pchRcvDataFrame[(*iDataIdx)++];
 	sensorsdata->data[3] = iTemp;
-
-	data_dbg("A: %d, B: %d, C: %d, D: %d\n",
-		sensorsdata->data[0], sensorsdata->data[1],
-		sensorsdata->data[2], sensorsdata->data[3]);
 }
 
 static void get_proximity_sensordata(char *pchRcvDataFrame, int *iDataIdx,
@@ -147,16 +134,12 @@ static void get_proximity_sensordata(char *pchRcvDataFrame, int *iDataIdx,
 {
 	sensorsdata->prox[0] = (u8)pchRcvDataFrame[(*iDataIdx)++];
 	sensorsdata->prox[1] = (u8)pchRcvDataFrame[(*iDataIdx)++];
-
-	data_dbg("prox : %u, %u\n", sensorsdata->prox[0], sensorsdata->prox[1]);
 }
 
 static void get_proximity_rawdata(char *pchRcvDataFrame, int *iDataIdx,
 	struct sensor_value *sensorsdata)
 {
 	sensorsdata->prox[0] = (u8)pchRcvDataFrame[(*iDataIdx)++];
-
-	data_dbg("proxraw : %u\n", sensorsdata->prox[0]);
 }
 
 static void get_factoty_data(struct ssp_data *data, int iSensorData,

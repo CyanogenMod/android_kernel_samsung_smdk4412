@@ -28,7 +28,6 @@ static irqreturn_t sensordata_irq_thread_fn(int iIrq, void *dev_id)
 {
 	struct ssp_data *data = dev_id;
 
-	data_dbg("%s\n", __func__);
 	select_irq_msg(data);
 	data->uIrqCnt++;
 
@@ -55,23 +54,26 @@ static void initialize_variable(struct ssp_data *data)
 
 	atomic_set(&data->aSensorEnable, 0);
 	data->iLibraryLength = 0;
-	data->uAliveSensorDebug = 0;
+	data->uSensorState = 0;
 	data->uFactorydataReady = 0;
 	data->uFactoryProxAvg[0] = 0;
 
 	data->uResetCnt = 0;
-	data->uI2cFailCnt = 0;
+	data->uInstFailCnt = 0;
 	data->uTimeOutCnt = 0;
 	data->uSsdFailCnt = 0;
 	data->uBusyCnt = 0;
 	data->uIrqCnt = 0;
+	data->uIrqFailCnt = 0;
+	data->uMissSensorCnt = 0;
 
 	data->bCheckSuspend = false;
+	data->bSspShutdown = false;
 	data->bDebugEnabled = false;
 	data->bProximityRawEnabled = false;
 	data->bMcuIRQTestSuccessed = false;
 	data->bBarcodeEnabled = false;
-	data->bBinaryChashed = false;
+	data->bAccelAlert = false;
 
 	data->accelcal.x = 0;
 	data->accelcal.y = 0;
@@ -83,8 +85,17 @@ static void initialize_variable(struct ssp_data *data)
 
 	data->iPressureCal = 0;
 	data->uProxCanc = 0;
-	data->uProxThresh = DEFAULT_THRESHOLD;
+	data->uProxHiThresh = 0;
+	data->uProxLoThresh = 0;
 	data->uGyroDps = GYROSCOPE_DPS500;
+
+	data->mcu_device = NULL;
+	data->acc_device = NULL;
+	data->gyro_device = NULL;
+	data->mag_device = NULL;
+	data->prs_device = NULL;
+	data->prox_device = NULL;
+	data->light_device = NULL;
 
 	initialize_function_pointer(data);
 }
@@ -94,14 +105,14 @@ int initialize_mcu(struct ssp_data *data)
 	int iRet = 0;
 
 	iRet = get_chipid(data);
-	pr_info("[SSP] MPU device ID = %d, reading ID = %d\n", DEVICE_ID, iRet);
+	pr_info("[SSP] MCU device ID = %d, reading ID = %d\n", DEVICE_ID, iRet);
 	if (iRet != DEVICE_ID) {
-		if (iRet < 0)
-			pr_err("[SSP]: %s - i2c for reading chip id failed\n",
-			       __func__);
-		else {
-			pr_err("[SSP]: %s - Device identification failed\n",
-			       __func__);
+		if (iRet < 0) {
+			pr_err("[SSP]: %s - MCU is not working : 0x%x\n",
+				__func__, iRet);
+		} else {
+			pr_err("[SSP]: %s - MCU identification failed\n",
+				__func__);
 			iRet = -ENODEV;
 		}
 		return iRet;
@@ -116,11 +127,11 @@ int initialize_mcu(struct ssp_data *data)
 	iRet = get_fuserom_data(data);
 	if (iRet < 0) {
 		pr_err("[SSP]: %s - get_fuserom_data failed\n", __func__);
-		return iRet;
+		return FAIL;
 	}
 
-	data->uAliveSensorDebug = get_sensor_scanning_info(data);
-	if (data->uAliveSensorDebug == 0) {
+	data->uSensorState = get_sensor_scanning_info(data);
+	if (data->uSensorState == 0) {
 		pr_err("[SSP]: %s - get_sensor_scanning_info failed\n",
 			__func__);
 		return FAIL;
@@ -184,14 +195,13 @@ static int ssp_probe(struct i2c_client *client,
 
 	data = kzalloc(sizeof(*data), GFP_KERNEL);
 	if (data == NULL) {
-		pr_err("[SSP]: %s - failed to allocate memory for module data\n",
+		pr_err("[SSP]: %s - failed to allocate memory for data\n",
 			__func__);
 		iRet = -ENOMEM;
 		goto exit;
 	}
 
 	data->client = client;
-	data->client->adapter->timeout = HZ;
 	i2c_set_clientdata(client, data);
 
 	data->wakeup_mcu = pdata->wakeup_mcu;
@@ -246,7 +256,7 @@ static int ssp_probe(struct i2c_client *client,
 
 	iRet = initialize_irq(data);
 	if (iRet < 0) {
-		pr_err("[SSP]: %s - could not create sysfs\n", __func__);
+		pr_err("[SSP]: %s - could not create irq\n", __func__);
 		goto err_setup_irq;
 	}
 
@@ -279,7 +289,7 @@ static int ssp_probe(struct i2c_client *client,
 
 	enable_irq(data->iIrq);
 	enable_irq_wake(data->iIrq);
-	pr_info("[SSP] probe success!\n");
+	pr_info("[SSP]: %s - probe success!\n", __func__);
 
 	enable_debug_timer(data);
 
@@ -313,6 +323,7 @@ static void ssp_shutdown(struct i2c_client *client)
 	struct ssp_data *data = i2c_get_clientdata(client);
 
 	func_dbg();
+	data->bSspShutdown = true;
 
 #ifdef CONFIG_HAS_EARLYSUSPEND
 	unregister_early_suspend(&data->early_suspend);
@@ -325,24 +336,24 @@ static void ssp_shutdown(struct i2c_client *client)
 	free_irq(data->iIrq, data);
 	gpio_free(data->client->irq);
 
-	toggle_mcu_reset(data);
+	remove_sysfs(data);
+	remove_event_symlink(data);
+	remove_input_dev(data);
 
 #ifdef CONFIG_SENSORS_SSP_SENSORHUB
 	ssp_remove_sensorhub(data);
 #endif
-	remove_event_symlink(data);
-	remove_sysfs(data);
-	remove_input_dev(data);
 
 	misc_deregister(&data->akmd_device);
 
 	del_timer_sync(&data->debug_timer);
 	cancel_work_sync(&data->work_debug);
 	destroy_workqueue(data->debug_wq);
-
 	wake_lock_destroy(&data->ssp_wake_lock);
+
+	toggle_mcu_reset(data);
+
 	kfree(data);
-	data = NULL;
 }
 
 #ifdef CONFIG_HAS_EARLYSUSPEND
@@ -385,7 +396,8 @@ static void ssp_late_resume(struct early_suspend *handler)
 		ssp_resume_mode(data);
 #endif
 }
-#else
+
+#else /* CONFIG_HAS_EARLYSUSPEND */
 
 static int ssp_suspend(struct device *dev)
 {
@@ -393,8 +405,7 @@ static int ssp_suspend(struct device *dev)
 	struct ssp_data *data = i2c_get_clientdata(client);
 
 	func_dbg();
-	if (data->bDebugEnabled)
-		disable_debug_timer(data);
+	disable_debug_timer(data);
 
 	if (atomic_read(&data->aSensorEnable) > 0)
 		ssp_sleep_mode(data);
@@ -409,8 +420,7 @@ static int ssp_resume(struct device *dev)
 	struct ssp_data *data = i2c_get_clientdata(client);
 
 	func_dbg();
-	if (data->bDebugEnabled)
-		enable_debug_timer(data);
+	enable_debug_timer(data);
 
 	data->bCheckSuspend = false;
 
@@ -424,7 +434,8 @@ static const struct dev_pm_ops ssp_pm_ops = {
 	.suspend = ssp_suspend,
 	.resume = ssp_resume
 };
-#endif
+
+#endif /* CONFIG_HAS_EARLYSUSPEND */
 
 static const struct i2c_device_id ssp_id[] = {
 	{"ssp", 0},
@@ -460,5 +471,5 @@ module_init(ssp_init);
 module_exit(ssp_exit);
 
 MODULE_DESCRIPTION("ssp driver");
-MODULE_AUTHOR("Kyusung Kim <gs0816.kim@samsung.com>");
+MODULE_AUTHOR("Samsung Electronics");
 MODULE_LICENSE("GPL");
