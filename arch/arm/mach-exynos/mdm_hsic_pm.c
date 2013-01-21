@@ -35,15 +35,20 @@
 #include <linux/usb.h>
 #include <linux/usb/hcd.h>
 #include <linux/usb/ehci_def.h>
-
-#include <linux/kernel.h>
-#include <linux/netdevice.h>
 #include <mach/mdm2.h>
+#include <linux/kernel.h>
+
+#ifdef CONFIG_CPU_FREQ_TETHERING
+#include <linux/netdevice.h>
+#endif
+
+#ifdef CONFIG_USB_ANDROID_SAMSUNG_COMPOSITE
 #include <linux/usb/android_composite.h>
+#endif
 
 #define EXTERNAL_MODEM "external_modem"
 #define EHCI_REG_DUMP
-#define DEFAULT_RAW_WAKE_TIME (6*HZ)
+#define DEFAULT_RAW_WAKE_TIME (0*HZ)
 
 BLOCKING_NOTIFIER_HEAD(mdm_reset_notifier_list);
 
@@ -85,8 +90,12 @@ struct mdm_hsic_pm_data {
 
 	/* control variables */
 	struct notifier_block pm_notifier;
+#ifdef CONFIG_CPU_FREQ_TETHERING
 	struct notifier_block netdev_notifier;
+#endif
+#ifdef CONFIG_USB_ANDROID_SAMSUNG_COMPOSITE
 	struct notifier_block usb_composite_notifier;
+#endif
 
 	bool block_request;
 	bool state_busy;
@@ -121,6 +130,9 @@ struct mdm_hsic_pm_data {
 
 /* indicate wakeup from lpa state */
 bool lpa_handling;
+
+/* indicate receive hallo_packet_rx */
+int hello_packet_rx;
 
 #ifdef EHCI_REG_DUMP
 struct dump_ehci_regs {
@@ -233,6 +245,49 @@ static struct mdm_hsic_pm_data *get_pm_data_by_dev_name(const char *name)
 	return NULL;
 }
 
+/* do not call in irq context */
+int pm_dev_runtime_get_enabled(struct usb_device *udev)
+{
+	int spin = 50;
+
+	while (spin--) {
+		pr_debug("%s: rpm status: %d\n", __func__,
+						udev->dev.power.runtime_status);
+		if (udev->dev.power.runtime_status == RPM_ACTIVE ||
+			udev->dev.power.runtime_status == RPM_SUSPENDED) {
+			usb_mark_last_busy(udev);
+			break;
+		}
+		msleep(20);
+	}
+	if (spin <= 0) {
+		pr_err("%s: rpm status %d, return -EAGAIN\n", __func__,
+						udev->dev.power.runtime_status);
+		return -EAGAIN;
+	}
+	usb_mark_last_busy(udev);
+
+	return 0;
+}
+
+/* do not call in irq context */
+int pm_dev_wait_lpa_wake(void)
+{
+	int spin = 50;
+
+	while (lpa_handling && spin--) {
+		pr_debug("%s: lpa wake wait loop\n", __func__);
+		msleep(20);
+	}
+
+	if (lpa_handling) {
+		pr_err("%s: in lpa wakeup, return EAGAIN\n", __func__);
+		return -EAGAIN;
+	}
+
+	return 0;
+}
+
 void notify_modem_fatal(void)
 {
 	struct mdm_hsic_pm_data *pm_data =
@@ -253,6 +308,8 @@ void notify_modem_fatal(void)
 
 		pm_runtime_get_noresume(dev);
 		pm_runtime_dont_use_autosuspend(dev);
+		/* if it's in going suspend, give settle time before wake up */
+		msleep(100);
 		wake_up_all(&dev->power.wait_queue);
 		pm_runtime_resume(dev);
 		pm_runtime_get_noresume(dev);
@@ -265,6 +322,7 @@ void request_autopm_lock(int status)
 {
 	struct mdm_hsic_pm_data *pm_data =
 					get_pm_data_by_dev_name("mdm_hsic_pm0");
+	int spin = 5;
 
 	if (!pm_data || !pm_data->udev)
 		return;
@@ -275,6 +333,15 @@ void request_autopm_lock(int status)
 		if (!atomic_read(&pm_data->pmlock_cnt)) {
 			atomic_inc(&pm_data->pmlock_cnt);
 			pr_info("get lock\n");
+
+			do {
+				if (!pm_dev_runtime_get_enabled(pm_data->udev))
+					break;
+			} while (spin--);
+
+			if (spin <= 0)
+				mdm_force_fatal();
+
 			pm_runtime_get(&pm_data->udev->dev);
 			pm_runtime_forbid(&pm_data->udev->dev);
 		} else
@@ -287,6 +354,8 @@ void request_autopm_lock(int status)
 			pm_runtime_allow(&pm_data->udev->dev);
 			pm_runtime_put(&pm_data->udev->dev);
 		}
+		/* initailize hello_packet_rx */
+		hello_packet_rx = 0;
 	}
 }
 
@@ -304,6 +373,7 @@ void request_active_lock_release(const char *name)
 	pr_info("%s\n", __func__);
 	if (pm_data)
 		wake_unlock(&pm_data->l2_wake);
+
 }
 
 void request_boot_lock_set(const char *name)
@@ -486,6 +556,9 @@ int register_udev_to_pm_dev(const char *name, struct usb_device *udev)
 		pm_data->udev = udev;
 		atomic_set(&pm_data->pmlock_cnt, 0);
 		usb_disable_autosuspend(udev);
+#ifdef CONFIG_SIM_DETECT
+		get_sim_state_at_boot();
+#endif
 	} else if (pm_data->udev && pm_data->udev != udev) {
 		pr_err("%s:udev mismatching: pm_data->udev(0x%p), udev(0x%p)\n",
 		__func__, pm_data->udev, udev);
@@ -825,6 +898,11 @@ static int mdm_hsic_pm_gpio_init(struct mdm_hsic_pm_data *pm_data,
 		if (ret < 0)
 			return ret;
 		gpio_direction_output(pm_data->gpio_host_ready, 1);
+		s3c_gpio_cfgpin(pm_data->gpio_host_ready, S3C_GPIO_OUTPUT);
+		s3c_gpio_setpull(pm_data->gpio_host_ready, S3C_GPIO_PULL_NONE);
+		s5p_gpio_set_drvstr(pm_data->gpio_host_ready,
+							S5P_GPIO_DRVSTR_LV4);
+		gpio_set_value(pm_data->gpio_host_ready, 1);
 	} else
 		return -ENXIO;
 
@@ -879,6 +957,7 @@ static void mdm_hsic_pm_gpio_free(struct mdm_hsic_pm_data *pm_data)
 		gpio_free(pm_data->gpio_host_wake);
 }
 
+#ifdef CONFIG_CPU_FREQ_TETHERING
 static int link_pm_netdev_event(struct notifier_block *this,
 				unsigned long event, void *ptr)
 {
@@ -907,7 +986,9 @@ static int link_pm_netdev_event(struct notifier_block *this,
 	}
 	return NOTIFY_DONE;
 }
+#endif
 
+#ifdef CONFIG_USB_ANDROID_SAMSUNG_COMPOSITE
 static int usb_composite_notifier_event(struct notifier_block *this,
 		unsigned long event, void *ptr)
 {
@@ -932,6 +1013,7 @@ static int usb_composite_notifier_event(struct notifier_block *this,
 
 	return NOTIFY_DONE;
 }
+#endif
 
 static int mdm_hsic_pm_probe(struct platform_device *pdev)
 {
@@ -992,12 +1074,16 @@ static int mdm_hsic_pm_probe(struct platform_device *pdev)
 	blocking_notifier_chain_register(&mdm_reset_notifier_list,
 							&mdm_reset_main_block);
 
+#ifdef CONFIG_CPU_FREQ_TETHERING
 	pm_data->netdev_notifier.notifier_call = link_pm_netdev_event;
 	register_netdevice_notifier(&pm_data->netdev_notifier);
+#endif
 
+#ifdef CONFIG_USB_ANDROID_SAMSUNG_COMPOSITE
 	pm_data->usb_composite_notifier.notifier_call =
 		usb_composite_notifier_event;
 	register_usb_composite_notifier(&pm_data->usb_composite_notifier);
+#endif
 
 	wake_lock_init(&pm_data->l2_wake, WAKE_LOCK_SUSPEND, pm_data->name);
 	wake_lock_init(&pm_data->boot_wake, WAKE_LOCK_SUSPEND, "mdm_boot");
