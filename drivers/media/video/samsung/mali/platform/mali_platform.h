@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2010-2012 ARM Limited. All rights reserved.
+ * Copyright (C) 2010 ARM Limited. All rights reserved.
  * 
  * This program is free software and is provided to you under the terms of the GNU General Public License version 2
  * as published by the Free Software Foundation, and any use by you of this program is subject to the terms of such GNU licence.
@@ -24,13 +24,15 @@
 #define MALI_DVFS_STEPS 5
 #endif
 
+#if !USING_MALI_PMM
+/* @brief System power up/down cores that can be passed into mali_platform_powerdown/up() */
+#define MALI_PLATFORM_SYSTEM  0
+#endif
+
 /* @Enable or Disable Mali GPU Bottom Lock feature */
 #define MALI_GPU_BOTTOM_LOCK 1
 
 #define MALI_VOLTAGE_LOCK 1
-
-/* @Enable or Disable the CPU frequency lock when the GPU clock is 440 Mhz */
-#define CPUFREQ_LOCK_DURING_440 0
 
 #ifdef __cplusplus
 extern "C" {
@@ -40,9 +42,9 @@ extern "C" {
  */
 typedef enum mali_power_mode_tag
 {
-	MALI_POWER_MODE_ON,           /**< Power Mali on */
-	MALI_POWER_MODE_LIGHT_SLEEP,  /**< Mali has been idle for a short time, or runtime PM suspend */
-	MALI_POWER_MODE_DEEP_SLEEP,   /**< Mali has been idle for a long time, or OS suspend */
+	MALI_POWER_MODE_ON,
+	MALI_POWER_MODE_LIGHT_SLEEP,
+	MALI_POWER_MODE_DEEP_SLEEP,
 } mali_power_mode;
 
 /** @brief Platform specific setup and initialisation of MALI
@@ -63,8 +65,22 @@ _mali_osk_errcode_t mali_platform_deinit(void);
 
 /** @brief Platform specific powerdown sequence of MALI
  *
- * Notification from the Mali device driver stating the new desired power mode.
- * MALI_POWER_MODE_ON must be obeyed, while the other modes are optional.
+ * Call as part of platform init if there is no PMM support, else the
+ * PMM will call it.
+ * There are three power modes defined:
+ *  1) MALI_POWER_MODE_ON
+ *  2) MALI_POWER_MODE_LIGHT_SLEEP
+ *  3) MALI_POWER_MODE_DEEP_SLEEP
+ * MALI power management module transitions to MALI_POWER_MODE_LIGHT_SLEEP mode when MALI is idle
+ * for idle timer (software timer defined in mali_pmm_policy_jobcontrol.h) duration, MALI transitions
+ * to MALI_POWER_MODE_LIGHT_SLEEP mode during timeout if there are no more jobs queued.
+ * MALI power management module transitions to MALI_POWER_MODE_DEEP_SLEEP mode when OS does system power
+ * off.
+ * Customer has to add power down code when MALI transitions to MALI_POWER_MODE_LIGHT_SLEEP or MALI_POWER_MODE_DEEP_SLEEP
+ * mode.
+ * MALI_POWER_MODE_ON mode is entered when the MALI is to powered up. Some customers want to control voltage regulators during
+ * the whole system powers on/off. Customer can track in this function whether the MALI is powered up from
+ * MALI_POWER_MODE_LIGHT_SLEEP or MALI_POWER_MODE_DEEP_SLEEP mode and manage the voltage regulators as well.
  * @param power_mode defines the power modes
  * @return _MALI_OSK_ERR_OK on success otherwise, a suitable _mali_osk_errcode_t error.
  */
@@ -137,6 +153,8 @@ int mali_dvfs_bottom_lock_push(int lock_step);
 int mali_dvfs_bottom_lock_pop(void);
 #endif
 #endif
+
+int mali_dvfs_get_vol(int step);
 
 #if MALI_VOLTAGE_LOCK
 int mali_voltage_lock_push(int lock_vol);
