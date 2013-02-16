@@ -1,32 +1,65 @@
+config BCM4330
+	tristate "Broadcom 4330 wireless cards support"
+	depends on WLAN
+	---help---
+	  This module adds support for wireless adapters based on
+	  Broadcom 4330 chipset.
 
 config BCM4334
-	tristate "---Broadcom WiFi Driver for 4334"
+	tristate "Broadcom 4334 wireless cards support"
 	depends on WLAN
 	---help---
-		Select this option to build Broadcom wlan driver
-
-config BCM4330
-	tristate "---Broadcom WiFi Driver for 4330"
-	depends on WLAN
-	---help---
-		Select this option to build Broadcom wlan driver
+	  This module adds support for wireless adapters based on
+	  Broadcom 4334 chipset.
 
 config BCM43241
-	tristate "---Broadcom WiFi Driver for 43241"
+	tristate "Broadcom 43241 wireless cards support"
 	depends on WLAN
 	---help---
-		Select this option to build Broadcom wlan driver
+	  This module adds support for wireless adapters based on
+	  Broadcom 43241 chipset.
+
+config BCMDHD_FW_PATH
+	depends on WLAN
+	string "Firmware path"
+	default "/system/etc/firmware/fw_bcmdhd.bin"
+	---help---
+	  Path to the firmware file.
+
+config BCMDHD_NVRAM_PATH
+	depends on WLAN
+	string "NVRAM path"
+	default "/system/etc/wifi/bcmdhd.cal"
+	---help---
+	  Path to the calibration file.
+
+config BCMDHD_WEXT
+	bool "Enable WEXT support"
+	depends on BCMDHD && CFG80211 = n
+	select WIRELESS_EXT
+	select WEXT_PRIV
+	help
+	  Enables WEXT support
+
+config DHD_USE_STATIC_BUF
+	bool "Enable memory preallocation"
+	depends on BCMDHD
+	default n
+	---help---
+	  Use memory preallocated in platform
+
+config DHD_USE_SCHED_SCAN
+	bool "Use CFG80211 sched scan"
+	depends on BCMDHD && CFG80211
+	default n
+	---help---
+	  Use CFG80211 sched scan
 
 config BROADCOM_WIFI_RESERVED_MEM
 	bool "BROADCOM Reserved memory for wifi device"
-    depends on (BCM4330 || BCM4334 || BCM43241)
+	depends on (BCM4330 || BCM4334 || BCM43241)
 	---help---
-		This is a configuration for broadcom WLAN driver.
-
-config WLAN_COUNTRY_CODE
-	tristate "---Broadcom WiFi Driver for 5GH channel setting"
-   	depends on WLAN
-   	default	n
+	  This is a configuration for broadcom WLAN driver.
 
 config WLAN_REGION_CODE
 	int "---Region codes for Broadcom WiFi Driver"
