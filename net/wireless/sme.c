@@ -10,6 +10,7 @@
 #include <linux/slab.h>
 #include <linux/workqueue.h>
 #include <linux/wireless.h>
+#include <linux/export.h>
 #include <net/iw_handler.h>
 #include <net/cfg80211.h>
 #include <net/rtnetlink.h>
@@ -110,15 +111,22 @@ static int cfg80211_conn_scan(struct wireless_dev *wdev)
 	else {
 		int i = 0, j;
 		enum ieee80211_band band;
+		struct ieee80211_supported_band *bands;
+		struct ieee80211_channel *channel;
 
 		for (band = 0; band < IEEE80211_NUM_BANDS; band++) {
-			if (!wdev->wiphy->bands[band])
+			bands = wdev->wiphy->bands[band];
+			if (!bands)
 				continue;
-			for (j = 0; j < wdev->wiphy->bands[band]->n_channels;
-			     i++, j++)
-				request->channels[i] =
-					&wdev->wiphy->bands[band]->channels[j];
+			for (j = 0; j < bands->n_channels; j++) {
+				channel = &bands->channels[j];
+				if (channel->flags & IEEE80211_CHAN_DISABLED)
+					continue;
+				request->channels[i++] = channel;
+			}
+			request->rates[band] = (1 << bands->n_bitrates) - 1;
 		}
+		n_channels = i;
 	}
 	request->n_channels = n_channels;
 	request->ssids = (void *)&request->channels[n_channels];
@@ -171,7 +179,7 @@ static int cfg80211_conn_do_work(struct wireless_dev *wdev)
 					    params->ssid, params->ssid_len,
 					    NULL, 0,
 					    params->key, params->key_len,
-					    params->key_idx, false);
+					    params->key_idx);
 	case CFG80211_CONN_ASSOCIATE_NEXT:
 		BUG_ON(!rdev->ops->assoc);
 		wdev->conn->state = CFG80211_CONN_ASSOCIATING;
@@ -182,7 +190,9 @@ static int cfg80211_conn_do_work(struct wireless_dev *wdev)
 					    prev_bssid,
 					    params->ssid, params->ssid_len,
 					    params->ie, params->ie_len,
-					    false, &params->crypto);
+					    false, &params->crypto,
+					    params->flags, &params->ht_capa,
+					    &params->ht_capa_mask);
 		if (err)
 			__cfg80211_mlme_deauth(rdev, wdev->netdev, params->bssid,
 					       NULL, 0,
@@ -467,6 +477,7 @@ void __cfg80211_connect_result(struct net_device *dev, const u8 *bssid,
 		kfree(wdev->connect_keys);
 		wdev->connect_keys = NULL;
 		wdev->ssid_len = 0;
+		cfg80211_put_bss(bss);
 		return;
 	}
 
@@ -550,7 +561,6 @@ void __cfg80211_roamed(struct wireless_dev *wdev,
 #ifdef CONFIG_CFG80211_WEXT
 	union iwreq_data wrqu;
 #endif
-
 	ASSERT_WDEV_LOCK(wdev);
 
 	if (WARN_ON(wdev->iftype != NL80211_IFTYPE_STATION &&
@@ -694,31 +704,10 @@ void __cfg80211_disconnected(struct net_device *dev, const u8 *ie,
 	wdev->ssid_len = 0;
 
 	if (wdev->conn) {
-		const u8 *bssid;
-		int ret;
-
 		kfree(wdev->conn->ie);
 		wdev->conn->ie = NULL;
 		kfree(wdev->conn);
 		wdev->conn = NULL;
-
-		/*
-		 * If this disconnect was due to a disassoc, we
-		 * we might still have an auth BSS around. For
-		 * the userspace SME that's currently expected,
-		 * but for the kernel SME (nl80211 CONNECT or
-		 * wireless extensions) we want to clear up all
-		 * state.
-		 */
-		for (i = 0; i < MAX_AUTH_BSSES; i++) {
-			if (!wdev->auth_bsses[i])
-				continue;
-			bssid = wdev->auth_bsses[i]->pub.bssid;
-			ret = __cfg80211_mlme_deauth(rdev, dev, bssid, NULL, 0,
-						WLAN_REASON_DEAUTH_LEAVING,
-						false);
-			WARN(ret, "deauth failed: %d\n", ret);
-		}
 	}
 
 	nl80211_send_disconnected(rdev, dev, reason, ie, ie_len, from_ap);
@@ -791,6 +780,9 @@ int __cfg80211_connect(struct cfg80211_registered_device *rdev,
 		kfree(wdev->connect_keys);
 		wdev->connect_keys = NULL;
 	}
+
+	cfg80211_oper_and_ht_capa(&connect->ht_capa_mask,
+				  rdev->wiphy.ht_capa_mod_mask);
 
 	if (connkeys && connkeys->def >= 0) {
 		int idx;
@@ -1006,7 +998,8 @@ int cfg80211_disconnect(struct cfg80211_registered_device *rdev,
 	return err;
 }
 
-void cfg80211_sme_disassoc(struct net_device *dev, int idx)
+void cfg80211_sme_disassoc(struct net_device *dev,
+			   struct cfg80211_internal_bss *bss)
 {
 	struct wireless_dev *wdev = dev->ieee80211_ptr;
 	struct cfg80211_registered_device *rdev = wiphy_to_dev(wdev->wiphy);
@@ -1025,16 +1018,8 @@ void cfg80211_sme_disassoc(struct net_device *dev, int idx)
 	 * want it any more so deauthenticate too.
 	 */
 
-	if (!wdev->auth_bsses[idx])
-		return;
+	memcpy(bssid, bss->pub.bssid, ETH_ALEN);
 
-	memcpy(bssid, wdev->auth_bsses[idx]->pub.bssid, ETH_ALEN);
-	if (__cfg80211_mlme_deauth(rdev, dev, bssid,
-				   NULL, 0, WLAN_REASON_DEAUTH_LEAVING,
-				   false)) {
-		/* whatever -- assume gone anyway */
-		cfg80211_unhold_bss(wdev->auth_bsses[idx]);
-		cfg80211_put_bss(&wdev->auth_bsses[idx]->pub);
-		wdev->auth_bsses[idx] = NULL;
-	}
+	__cfg80211_mlme_deauth(rdev, dev, bssid, NULL, 0,
+			       WLAN_REASON_DEAUTH_LEAVING, false);
 }
