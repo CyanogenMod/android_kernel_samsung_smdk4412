@@ -21,7 +21,7 @@
  * software in any way with any other Broadcom software provided under a license
  * other than the GPL, without Broadcom's express prior written consent.
  *
- * $Id: dhd_sdio.c 357912 2012-09-20 09:42:47Z $
+ * $Id: dhd_sdio.c 357859 2012-09-20 06:34:26Z $
  */
 
 #include <typedefs.h>
@@ -399,14 +399,13 @@ static bool sd1idle;
 static bool retrydata;
 #define RETRYCHAN(chan) (((chan) == SDPCM_EVENT_CHANNEL) || retrydata)
 
-#ifdef BCMSPI
-/* At a watermark around 8 the spid hits underflow error. */
-static const uint watermark = 32;
-static const uint mesbusyctrl = 0;
+#if defined(SDIO_CRC_ERROR_FIX)
+static uint watermark = 48;
+static uint mesbusyctrl = 80;
 #else
 static const uint watermark = 8;
 static const uint mesbusyctrl = 0;
-#endif /* BCMSPI */
+#endif
 static const uint firstread = DHD_FIRSTREAD;
 
 #define HDATLEN (firstread - (SDPCM_HDRLEN))
@@ -416,7 +415,6 @@ static const uint retry_limit = 2;
 
 /* Force even SD lengths (some host controllers mess up on odd bytes) */
 static bool forcealign;
-
 
 #define ALIGNMENT  4
 
@@ -1111,11 +1109,12 @@ dhdsdio_htclk(dhd_bus_t *bus, bool on, bool pendok)
 				DHD_ERROR(("%s: HT Avail request error: %d\n", __FUNCTION__, err));
 			}
 
-		else {
-			if (ht_avail_error == HT_AVAIL_ERROR_MAX)
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(2, 6, 27)
+			else if (ht_avail_error == HT_AVAIL_ERROR_MAX) {
 				dhd_os_send_hang_message(bus->dhd);
-		}
-return BCME_ERROR;
+			}
+#endif /* LINUX_VERSION_CODE >= KERNEL_VERSION(2, 6, 27) */
+			return BCME_ERROR;
 		} else {
 			ht_avail_error = 0;
 		}
@@ -2411,6 +2410,10 @@ enum {
 	IOV_SDALIGN,
 	IOV_DEVRESET,
 	IOV_CPU,
+#if defined(SDIO_CRC_ERROR_FIX)
+	IOV_WATERMARK,
+	IOV_MESBUSYCTRL,
+#endif /* SDIO_CRC_ERROR_FIX */
 #ifdef SDTEST
 	IOV_PKTGEN,
 	IOV_EXTLOOP,
@@ -2471,6 +2474,10 @@ const bcm_iovar_t dhdsdio_iovars[] = {
 	{"extloop",	IOV_EXTLOOP,	0,	IOVT_BOOL,	0 },
 	{"pktgen",	IOV_PKTGEN,	0,	IOVT_BUFFER,	sizeof(dhd_pktgen_t) },
 #endif /* SDTEST */
+#if defined(SDIO_CRC_ERROR_FIX)
+	{"watermark",	IOV_WATERMARK,	0,	IOVT_UINT32,	0 },
+	{"mesbusyctrl",	IOV_MESBUSYCTRL,	0,	IOVT_UINT32,	0 },
+#endif /* SDIO_CRC_ERROR_FIX */
 	{"devcap", IOV_DEVCAP,	0,	IOVT_UINT32,	0 },
 	{"dngl_isolation", IOV_DONGLEISOLATION,	0,	IOVT_UINT32,	0 },
 	{"kso",	IOV_KSO,	0,	IOVT_UINT32,	0 },
@@ -3105,7 +3112,8 @@ dhd_serialconsole(dhd_bus_t *bus, bool set, bool enable, int *bcmerror)
 	if (bus->sih->chip == BCM4330_CHIP_ID) {
 		uart_enab = CC_PLL_CHIPCTRL_SERIAL_ENAB;
 	}
-	else if (bus->sih->chip == BCM4334_CHIP_ID) {
+	else if (bus->sih->chip == BCM4334_CHIP_ID ||
+		bus->sih->chip == BCM43341_CHIP_ID) {
 		if (enable) {
 			/* Moved to PMU chipcontrol 1 from 4330 */
 			int_val &= ~gpio_sel;
@@ -3575,6 +3583,33 @@ dhdsdio_doiovar(dhd_bus_t *bus, const bcm_iovar_t *vi, uint32 actionid, const ch
 		break;
 #endif /* SDTEST */
 
+#if defined(SDIO_CRC_ERROR_FIX)
+	case IOV_GVAL(IOV_WATERMARK):
+		int_val = (int32)watermark;
+		bcopy(&int_val, arg, val_size);
+		break;
+
+	case IOV_SVAL(IOV_WATERMARK):
+		watermark = (uint)int_val;
+		watermark = (watermark > SBSDIO_WATERMARK_MASK) ? SBSDIO_WATERMARK_MASK : watermark;
+		DHD_ERROR(("Setting watermark as 0x%x.\n", watermark));
+		bcmsdh_cfg_write(bus->sdh, SDIO_FUNC_1, SBSDIO_WATERMARK, (uint8)watermark, NULL);
+		break;
+
+	case IOV_GVAL(IOV_MESBUSYCTRL):
+		int_val = (int32)mesbusyctrl;
+		bcopy(&int_val, arg, val_size);
+		break;
+
+	case IOV_SVAL(IOV_MESBUSYCTRL):
+		mesbusyctrl = (uint)int_val;
+		mesbusyctrl = (mesbusyctrl > SBSDIO_MESBUSYCTRL_MASK)
+						? SBSDIO_MESBUSYCTRL_MASK : mesbusyctrl;
+		DHD_ERROR(("Setting mesbusyctrl as 0x%x.\n", mesbusyctrl));
+		bcmsdh_cfg_write(bus->sdh, SDIO_FUNC_1, SBSDIO_FUNC1_MESBUSYCTRL,
+			((uint8)mesbusyctrl | 0x80), NULL);
+		break;
+#endif /* SDIO_CRC_ERROR_FIX */
 
 	case IOV_GVAL(IOV_DONGLEISOLATION):
 		int_val = bus->dhd->dongle_isolation;
@@ -4078,51 +4113,57 @@ dhd_bus_stop(struct dhd_bus *bus, bool enforce_mutex)
 	if (enforce_mutex)
 		dhd_os_sdlock(bus->dhd);
 
-	BUS_WAKE(bus);
+	if ((bus->dhd->busstate == DHD_BUS_DOWN) || bus->dhd->hang_was_sent) {
+		bus->dhd->busstate = DHD_BUS_DOWN;
+		bus->hostintmask = 0;
+		bcmsdh_intr_disable(bus->sdh);
+	} else {
+		BUS_WAKE(bus);
 
-	if (KSO_ENAB(bus)) {
-		/* Mask the interrupt */
-		dat = bcmsdh_cfg_read(bus->sdh, SDIO_FUNC_0, SDIOD_CCCR_INTEN, NULL);
-		dat &= ~(INTR_CTL_FUNC1_EN | INTR_CTL_FUNC2_EN);
-		bcmsdh_cfg_write(bus->sdh, SDIO_FUNC_0, SDIOD_CCCR_INTEN, dat, NULL);
-	}
+		if (KSO_ENAB(bus)) {
+			/* Mask the interrupt */
+			dat = bcmsdh_cfg_read(bus->sdh, SDIO_FUNC_0, SDIOD_CCCR_INTEN, NULL);
+			dat &= ~(INTR_CTL_FUNC1_EN | INTR_CTL_FUNC2_EN);
+			bcmsdh_cfg_write(bus->sdh, SDIO_FUNC_0, SDIOD_CCCR_INTEN, dat, NULL);
+		}
 
-	/* Change our idea of bus state */
-	bus->dhd->busstate = DHD_BUS_DOWN;
+		/* Change our idea of bus state */
+		bus->dhd->busstate = DHD_BUS_DOWN;
 
-	if (KSO_ENAB(bus)) {
+		if (KSO_ENAB(bus)) {
 
-	/* Enable clock for device interrupts */
-	dhdsdio_clkctl(bus, CLK_AVAIL, FALSE);
+			/* Enable clock for device interrupts */
+			dhdsdio_clkctl(bus, CLK_AVAIL, FALSE);
 
-	/* Disable and clear interrupts at the chip level also */
-	W_SDREG(0, &bus->regs->hostintmask, retries);
-	local_hostintmask = bus->hostintmask;
-	bus->hostintmask = 0;
+			/* Disable and clear interrupts at the chip level also */
+			W_SDREG(0, &bus->regs->hostintmask, retries);
+			local_hostintmask = bus->hostintmask;
+			bus->hostintmask = 0;
 
-	/* Force clocks on backplane to be sure F2 interrupt propagates */
-	saveclk = bcmsdh_cfg_read(bus->sdh, SDIO_FUNC_1, SBSDIO_FUNC1_CHIPCLKCSR, &err);
-	if (!err) {
-		bcmsdh_cfg_write(bus->sdh, SDIO_FUNC_1, SBSDIO_FUNC1_CHIPCLKCSR,
-		                 (saveclk | SBSDIO_FORCE_HT), &err);
-	}
-	if (err) {
-		DHD_ERROR(("%s: Failed to force clock for F2: err %d\n", __FUNCTION__, err));
-	}
+			/* Force clocks on backplane to be sure F2 interrupt propagates */
+			saveclk = bcmsdh_cfg_read(bus->sdh, SDIO_FUNC_1, SBSDIO_FUNC1_CHIPCLKCSR, &err);
+			if (!err) {
+				bcmsdh_cfg_write(bus->sdh, SDIO_FUNC_1, SBSDIO_FUNC1_CHIPCLKCSR,
+						 (saveclk | SBSDIO_FORCE_HT), &err);
+			}
+			if (err) {
+				DHD_ERROR(("%s: Failed to force clock for F2: err %d\n", __FUNCTION__, err));
+			}
 
-	/* Turn off the bus (F2), free any pending packets */
-	DHD_INTR(("%s: disable SDIO interrupts\n", __FUNCTION__));
-	bcmsdh_intr_disable(bus->sdh);
+			/* Turn off the bus (F2), free any pending packets */
+			DHD_INTR(("%s: disable SDIO interrupts\n", __FUNCTION__));
+			bcmsdh_intr_disable(bus->sdh);
 #ifndef BCMSPI
-	bcmsdh_cfg_write(bus->sdh, SDIO_FUNC_0, SDIOD_CCCR_IOEN, SDIO_FUNC_ENABLE_1, NULL);
-#endif /* !BCMSPI */
+			bcmsdh_cfg_write(bus->sdh, SDIO_FUNC_0, SDIOD_CCCR_IOEN, SDIO_FUNC_ENABLE_1, NULL);
+#endif
 
-	/* Clear any pending interrupts now that F2 is disabled */
-	W_SDREG(local_hostintmask, &bus->regs->intstatus, retries);
+			/* Clear any pending interrupts now that F2 is disabled */
+			W_SDREG(local_hostintmask, &bus->regs->intstatus, retries);
+		}
+
+		/* Turn off the backplane clock (only) */
+		dhdsdio_clkctl(bus, CLK_SDONLY, FALSE);
 	}
-
-	/* Turn off the backplane clock (only) */
-	dhdsdio_clkctl(bus, CLK_SDONLY, FALSE);
 
 	/* Clear the data packet queues */
 	pktq_flush(osh, &bus->txq, TRUE, NULL, 0);
@@ -4281,8 +4322,19 @@ dhd_bus_init(dhd_pub_t *dhdp, bool enforce_mutex)
 		}
 #endif /* BCMSPI */
 		W_SDREG(bus->hostintmask, &bus->regs->hostintmask, retries);
+#ifdef SDIO_CRC_ERROR_FIX
+		if (bus->blocksize < 512) {
+			mesbusyctrl = watermark = bus->blocksize / 4;
+		}
+#endif /* SDIO_CRC_ERROR_FIX */
 
 		bcmsdh_cfg_write(bus->sdh, SDIO_FUNC_1, SBSDIO_WATERMARK, (uint8)watermark, &err);
+#ifdef SDIO_CRC_ERROR_FIX
+		bcmsdh_cfg_write(bus->sdh, SDIO_FUNC_1, SBSDIO_FUNC1_MESBUSYCTRL,
+			(uint8)mesbusyctrl|0x80, &err);
+		bcmsdh_cfg_write(bus->sdh, SDIO_FUNC_1, SBSDIO_DEVICE_CTL,
+			SBSDIO_DEVCTL_EN_F2_BLK_WATERMARK, NULL);
+#endif /* SDIO_CRC_ERROR_FIX */
 
 		/* Set bus state according to enable result */
 		dhdp->busstate = DHD_BUS_DATA;
@@ -4843,18 +4895,12 @@ dhdsdio_rxglom(dhd_bus_t *bus, uint8 rxseq)
 				free_ptr = pfirst;
 #endif
 				PKTFREE(bus->dhd->osh, pfirst, FALSE);
-				if (plast) {
-					PKTSETNEXT(osh, plast, pnext);
-				}
 				continue;
 			} else if (dhd_prot_hdrpull(bus->dhd, &ifidx, pfirst, reorder_info_buf,
 				&reorder_info_len) != 0) {
 				DHD_ERROR(("%s: rx protocol error\n", __FUNCTION__));
 				bus->dhd->rx_errors++;
 				PKTFREE(osh, pfirst, FALSE);
-				if (plast) {
-					PKTSETNEXT(osh, plast, pnext);
-				}
 				continue;
 			}
 			if (reorder_info_len) {
@@ -4867,9 +4913,6 @@ dhdsdio_rxglom(dhd_bus_t *bus, uint8 rxseq)
 					reorder_info_len, &ppfirst, &free_buf_count);
 
 				if (free_buf_count == 0) {
-					if (plast) {
-						PKTSETNEXT(osh, plast, pnext);
-					}
 					continue;
 				}
 				else {
@@ -4889,14 +4932,12 @@ dhdsdio_rxglom(dhd_bus_t *bus, uint8 rxseq)
 						PKTSETNEXT(osh, list_tail[ifidx], ppfirst);
 						list_tail[ifidx] = pfirst;
 					}
-					plast = pfirst;
 				}
 
 				num += (uint8)free_buf_count;
 			}
 			else {
 				/* this packet will go up, link back into chain and count it */
-				plast = pfirst;
 
 				if (list_tail[ifidx] == NULL) {
 					list_head[ifidx] = list_tail[ifidx] = pfirst;
@@ -5764,6 +5805,7 @@ dhdsdio_hostmail(dhd_bus_t *bus)
 	if (hmb_data & HMB_DATA_FWHALT) {
 		DHD_ERROR(("INTERNAL ERROR: FIRMWARE HALTED\n"));
 		dhdsdio_checkdied(bus, NULL, 0);
+		bus->dhd->busstate = DHD_BUS_DOWN;
 	}
 #endif /* DHD_DEBUG */
 
@@ -6041,7 +6083,7 @@ clkwait:
 	/* Resched the DPC if ctrl cmd is pending on bus credit */
 	if (bus->ctrl_frame_stat) {
 		DHD_TRACE_HW4(("%s : tx_max : %d, tx_seq : %d, clkstate : %d \n",
-			__FUNCTION__, bus->tx_max, bus->tx_seq, bus->clkstate));  
+			__FUNCTION__, bus->tx_max, bus->tx_seq, bus->clkstate));
 		resched = TRUE;
 	}
 
@@ -6667,6 +6709,8 @@ dhdsdio_chipmatch(uint16 chipid)
 	if (chipid == BCM4314_CHIP_ID)
 		return TRUE;
 	if (chipid == BCM4334_CHIP_ID)
+		return TRUE;
+	if (chipid == BCM43341_CHIP_ID)
 		return TRUE;
 	if (chipid == BCM43239_CHIP_ID)
 		return TRUE;

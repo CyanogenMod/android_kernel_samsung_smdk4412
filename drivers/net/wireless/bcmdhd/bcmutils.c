@@ -336,13 +336,6 @@ pktq_pdeq_tail(struct pktq *pq, int prec)
 	if ((p = q->head) == NULL)
 		return NULL;
 
-#if defined(CONFIG_MACH_M3_JPN_DCM)
-	if (!q || !(q->tail)) {
-		printk(" %s : tail is NULL \n", __func__);
-		return NULL;
-	}
-#endif
-
 	for (prev = NULL; p != q->tail; p = PKTLINK(p))
 		prev = p;
 

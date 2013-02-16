@@ -21,7 +21,7 @@
  * software in any way with any other Broadcom software provided under a license
  * other than the GPL, without Broadcom's express prior written consent.
  *
- * $Id: wl_android.c 354184 2012-08-30 08:08:08Z $
+ * $Id: wl_android.c 358186 2012-09-21 14:36:14Z $
  */
 
 #include <linux/module.h>
@@ -141,8 +141,6 @@ typedef struct cmd_tlv {
 #define CMD_COUNTRYREV_GET "GETCOUNTRYREV"
 #endif /* ROAM_API */
 
-#define CMD_SETROAMMODE "SETROAMMODE"
-
 #if defined(CUSTOMER_HW4) && defined(WES_SUPPORT)
 #define CMD_GETROAMSCANCONTROL "GETROAMSCANCONTROL"
 #define CMD_SETROAMSCANCONTROL "SETROAMSCANCONTROL"
@@ -227,6 +225,10 @@ int wl_cfg80211_set_p2p_ps(struct net_device *net, char* buf, int len)
 #endif /* WL_CFG80211 */
 extern int dhd_os_check_if_up(void *dhdp);
 extern void *bcmsdh_get_drvdata(void);
+#if defined(PROP_TXSTATUS) && !defined(PROP_TXSTATUS_VSDB)
+extern int dhd_wlfc_init(dhd_pub_t *dhd);
+extern void dhd_wlfc_deinit(dhd_pub_t *dhd);
+#endif
 
 #if defined(CUSTOMER_HW4) && defined(WES_SUPPORT)
 /* wl_roam.c */
@@ -242,9 +244,7 @@ extern bool ap_fw_loaded;
 extern char iface_name[IFNAMSIZ];
 #endif
 
-#ifndef WIFI_TURNOFF_DELAY
 #define WIFI_TURNOFF_DELAY	0
-#endif
 /**
  * Local (static) functions and variables
  */
@@ -1241,6 +1241,9 @@ int wl_android_wifi_on(struct net_device *dev)
 			if (dhd_dev_init_ioctl(dev) < 0)
 				ret = -EFAULT;
 		}
+#if defined(PROP_TXSTATUS) && !defined(PROP_TXSTATUS_VSDB)
+		dhd_wlfc_init(bcmsdh_get_drvdata());
+#endif
 		g_wifi_on = TRUE;
 	}
 
@@ -1262,6 +1265,9 @@ int wl_android_wifi_off(struct net_device *dev)
 
 	dhd_net_if_lock(dev);
 	if (g_wifi_on) {
+#if defined(PROP_TXSTATUS) && !defined(PROP_TXSTATUS_VSDB)
+		dhd_wlfc_deinit(bcmsdh_get_drvdata());
+#endif
 		ret = dhd_dev_reset(dev, TRUE);
 		sdioh_stop(NULL);
 		dhd_customer_gpio_wlan_ctrl(WLAN_RESET_OFF);
@@ -1413,7 +1419,7 @@ wl_android_sta_diassoc(struct net_device *dev, const char* straddr)
 	bcm_ether_atoe(straddr, &scbval.ea);
 
 	DHD_INFO(("%s: deauth STA: "MACDBG "\n", __FUNCTION__,
-		STR_TO_MACD(scbval.ea.octet)));
+		MAC2STRDBG(scbval.ea.octet)));
 
 	wldev_ioctl(dev, WLC_SCB_DEAUTHENTICATE_FOR_REASON, &scbval,
 		sizeof(scb_val_t), true);
@@ -1517,29 +1523,6 @@ wl_android_set_ampdu_mpdu(struct net_device *dev, const char* string_num)
 }
 #endif /* SUPPORT_AMPDU_MPDU_CMD */
 
-int wl_android_set_roam_mode(struct net_device *dev,
-char *command, int total_len)
-{
-	int error = 0;
-	int mode = 0;
-
-	if (sscanf(command, "%*s %d", &mode) != 1) {
-		DHD_ERROR(("wl_android_set_roam_mode:"\
-		"Failed to get Parameter\n"));
-		return -1;
-	}
-
-	error = wldev_iovar_setint(dev, "roam_off", mode);
-	if (error) {
-		DHD_ERROR(("wl_android_set_roam_mode:"\
-		"Failed to set roaming Mode %d, error = %d\n", mode, error));
-		return -1;
-	} else {
-		DHD_ERROR(("wl_android_set_roam_mode:"\
-		"succeeded to set roaming Mode %d, error = %d\n", mode, error));
-	}
-	return error;
-}
 int wl_android_priv_cmd(struct net_device *net, struct ifreq *ifr, int cmd)
 {
 #define PRIVATE_COMMAND_MAX_LEN	8192
@@ -1658,7 +1641,16 @@ int wl_android_priv_cmd(struct net_device *net, struct ifreq *ifr, int cmd)
 	}
 	else if (strnicmp(command, CMD_SETBAND, strlen(CMD_SETBAND)) == 0) {
 		uint band = *(command + strlen(CMD_SETBAND) + 1) - '0';
+#ifdef WL_HOST_BAND_MGMT
+		if (wl_cfg80211_set_band(net, band) < 0) {
+			bytes_written = -1;
+			goto exit;
+		}
+		if (band == WLC_BAND_AUTO)
+			bytes_written = wldev_set_band(net, band);
+#else
 		bytes_written = wldev_set_band(net, band);
+#endif /* WL_HOST_BAND_MGMT */
 	}
 	else if (strnicmp(command, CMD_GETBAND, strlen(CMD_GETBAND)) == 0) {
 		bytes_written = wl_android_get_band(net, command, priv_cmd.total_len);
@@ -1874,10 +1866,6 @@ int wl_android_priv_cmd(struct net_device *net, struct ifreq *ifr, int cmd)
 	else if (strnicmp(command, CMD_RESTORE_RL, strlen(CMD_RESTORE_RL)) == 0)
 		bytes_written = wl_android_ch_res_rl(net, false);
 #endif /* CUSTOMER_HW4 */
-	else if (strnicmp(command, CMD_SETROAMMODE,
-		strlen(CMD_SETROAMMODE)) == 0)
-		bytes_written = wl_android_set_roam_mode(net,
-		command, priv_cmd.total_len);
 	else {
 		DHD_ERROR(("Unknown PRIVATE command %s - ignored\n", command));
 		snprintf(command, 3, "OK");
