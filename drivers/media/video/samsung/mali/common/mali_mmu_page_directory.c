@@ -297,9 +297,25 @@ void mali_mmu_pagedir_free(struct mali_page_directory *pagedir)
 }
 
 
-void mali_mmu_pagedir_update(struct mali_page_directory *pagedir, u32 mali_address, u32 phys_address, u32 size)
+void mali_mmu_pagedir_update(struct mali_page_directory *pagedir, u32 mali_address, u32 phys_address, u32 size, mali_memory_cache_settings cache_settings)
 {
 	u32 end_address = mali_address + size;
+	u32 permission_bits;
+
+	switch ( cache_settings )
+	{
+		case MALI_CACHE_GP_READ_ALLOCATE:
+		MALI_DEBUG_PRINT(3, ("Map L2 GP_Read_allocate\n"));
+		permission_bits = MALI_MMU_FLAGS_FORCE_GP_READ_ALLOCATE;
+		break;
+
+		case MALI_CACHE_STANDARD:
+		MALI_DEBUG_PRINT(3, ("Map L2 Standard\n"));
+		/*falltrough */
+		default:
+		if ( MALI_CACHE_STANDARD != cache_settings) MALI_PRINT_ERROR(("Wrong cache settings\n"));
+		permission_bits = MALI_MMU_FLAGS_WRITE_PERMISSION | MALI_MMU_FLAGS_READ_PERMISSION | MALI_MMU_FLAGS_PRESENT;
+	}
 
 	/* Map physical pages into MMU page tables */
 	for ( ; mali_address < end_address; mali_address += MALI_MMU_PAGE_SIZE, phys_address += MALI_MMU_PAGE_SIZE)
@@ -307,7 +323,7 @@ void mali_mmu_pagedir_update(struct mali_page_directory *pagedir, u32 mali_addre
 		MALI_DEBUG_ASSERT_POINTER(pagedir->page_entries_mapped[MALI_MMU_PDE_ENTRY(mali_address)]);
 		_mali_osk_mem_iowrite32_relaxed(pagedir->page_entries_mapped[MALI_MMU_PDE_ENTRY(mali_address)],
 		                MALI_MMU_PTE_ENTRY(mali_address) * sizeof(u32),
-			        phys_address | MALI_MMU_FLAGS_WRITE_PERMISSION | MALI_MMU_FLAGS_READ_PERMISSION | MALI_MMU_FLAGS_PRESENT);
+			        phys_address | permission_bits);
 	}
 	_mali_osk_write_mem_barrier();
 }

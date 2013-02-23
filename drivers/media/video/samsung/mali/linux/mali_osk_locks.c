@@ -13,19 +13,12 @@
  * Implemenation of the OS abstraction layer for the kernel device driver
  */
 
-/* needed to detect kernel version specific code */
-#include <linux/version.h>
-
 #include <linux/spinlock.h>
 #include <linux/rwsem.h>
-
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,26)
-#include <linux/semaphore.h>
-#else /* pre 2.6.26 the file was in the arch specific location */
-#include <asm/semaphore.h>
-#endif
+#include <linux/mutex.h>
 
 #include <linux/slab.h>
+
 #include "mali_osk.h"
 #include "mali_kernel_common.h"
 
@@ -34,9 +27,9 @@ typedef enum
 {
 	_MALI_OSK_INTERNAL_LOCKTYPE_SPIN,            /* Mutex, implicitly non-interruptable, use spin_lock/spin_unlock */
 	_MALI_OSK_INTERNAL_LOCKTYPE_SPIN_IRQ,        /* Mutex, IRQ version of spinlock, use spin_lock_irqsave/spin_unlock_irqrestore */
-	_MALI_OSK_INTERNAL_LOCKTYPE_MUTEX,           /* Interruptable, use up()/down_interruptable() */
-	_MALI_OSK_INTERNAL_LOCKTYPE_MUTEX_NONINT,    /* Non-Interruptable, use up()/down() */
-	_MALI_OSK_INTERNAL_LOCKTYPE_MUTEX_NONINT_RW, /* Non-interruptable, Reader/Writer, use {up,down}{read,write}() */
+	_MALI_OSK_INTERNAL_LOCKTYPE_MUTEX,           /* Interruptable, use mutex_unlock()/down_interruptable() */
+	_MALI_OSK_INTERNAL_LOCKTYPE_MUTEX_NONINT,    /* Non-Interruptable, use mutex_unlock()/down() */
+	_MALI_OSK_INTERNAL_LOCKTYPE_MUTEX_NONINT_RW, /* Non-interruptable, Reader/Writer, use {mutex_unlock,down}{read,write}() */
 
 	/* Linux supports, but we do not support:
 	 * Non-Interruptable Reader/Writer spinlock mutexes - RW optimization will be switched off
@@ -55,7 +48,7 @@ struct _mali_osk_lock_t_struct
     union
     {
         spinlock_t spinlock;
-        struct semaphore sema;
+	struct mutex mutex;
         struct rw_semaphore rw_sema;
     } obj;
 	MALI_DEBUG_CODE(
@@ -132,7 +125,7 @@ _mali_osk_lock_t *_mali_osk_lock_init( _mali_osk_lock_flags_t flags, u32 initial
 		}
 
 		/* Initially unlocked */
-		sema_init( &lock->obj.sema, 1 );
+		mutex_init(&lock->obj.mutex);
 	}
 
 #ifdef DEBUG
@@ -186,11 +179,15 @@ _mali_osk_errcode_t _mali_osk_lock_wait( _mali_osk_lock_t *lock, _mali_osk_lock_
 		spin_lock(&lock->obj.spinlock);
 		break;
 	case _MALI_OSK_INTERNAL_LOCKTYPE_SPIN_IRQ:
-		spin_lock_irqsave(&lock->obj.spinlock, lock->flags);
+		{
+			unsigned long tmp_flags;
+			spin_lock_irqsave(&lock->obj.spinlock, tmp_flags);
+			lock->flags = tmp_flags;
+		}
 		break;
 
 	case _MALI_OSK_INTERNAL_LOCKTYPE_MUTEX:
-		if ( down_interruptible(&lock->obj.sema) )
+		if (mutex_lock_interruptible(&lock->obj.mutex))
 		{
 			MALI_PRINT_ERROR(("Can not lock mutex\n"));
 			err = _MALI_OSK_ERR_RESTARTSYSCALL;
@@ -198,7 +195,7 @@ _mali_osk_errcode_t _mali_osk_lock_wait( _mali_osk_lock_t *lock, _mali_osk_lock_
 		break;
 
 	case _MALI_OSK_INTERNAL_LOCKTYPE_MUTEX_NONINT:
-		down(&lock->obj.sema);
+		mutex_lock(&lock->obj.mutex);
 		break;
 
 	case _MALI_OSK_INTERNAL_LOCKTYPE_MUTEX_NONINT_RW:
@@ -304,7 +301,7 @@ void _mali_osk_lock_signal( _mali_osk_lock_t *lock, _mali_osk_lock_mode_t mode )
 	case _MALI_OSK_INTERNAL_LOCKTYPE_MUTEX:
 		/* FALLTHROUGH */
 	case _MALI_OSK_INTERNAL_LOCKTYPE_MUTEX_NONINT:
-		up(&lock->obj.sema);
+		mutex_unlock(&lock->obj.mutex);
 		break;
 
 	case _MALI_OSK_INTERNAL_LOCKTYPE_MUTEX_NONINT_RW:

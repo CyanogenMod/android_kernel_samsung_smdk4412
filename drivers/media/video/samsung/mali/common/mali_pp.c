@@ -12,6 +12,7 @@
 #include "mali_hw_core.h"
 #include "mali_group.h"
 #include "mali_osk.h"
+#include "mali_pp_scheduler.h"
 #include "regs/mali_200_regs.h"
 #include "mali_kernel_common.h"
 #include "mali_kernel_core.h"
@@ -194,6 +195,55 @@ _mali_osk_errcode_t mali_pp_stop_bus_wait(struct mali_pp_core *core)
 	return _MALI_OSK_ERR_OK;
 }
 
+/* Frame register reset values.
+ * Taken from the Mali400 TRM, 3.6. Pixel processor control register summary */
+static const u32 mali_frame_registers_reset_values[_MALI_PP_MAX_FRAME_REGISTERS] =
+{
+	0x0, /* Renderer List Address Register */
+	0x0, /* Renderer State Word Base Address Register */
+	0x0, /* Renderer Vertex Base Register */
+	0x2, /* Feature Enable Register */
+	0x0, /* Z Clear Value Register */
+	0x0, /* Stencil Clear Value Register */
+	0x0, /* ABGR Clear Value 0 Register */
+	0x0, /* ABGR Clear Value 1 Register */
+	0x0, /* ABGR Clear Value 2 Register */
+	0x0, /* ABGR Clear Value 3 Register */
+	0x0, /* Bounding Box Left Right Register */
+	0x0, /* Bounding Box Bottom Register */
+	0x0, /* FS Stack Address Register */
+	0x0, /* FS Stack Size and Initial Value Register */
+	0x0, /* Reserved */
+	0x0, /* Reserved */
+	0x0, /* Origin Offset X Register */
+	0x0, /* Origin Offset Y Register */
+	0x75, /* Subpixel Specifier Register */
+	0x0, /* Tiebreak mode Register */
+	0x0, /* Polygon List Format Register */
+	0x0, /* Scaling Register */
+	0x0 /* Tilebuffer configuration Register */
+};
+
+/* WBx register reset values */
+static const u32 mali_wb_registers_reset_values[_MALI_PP_MAX_WB_REGISTERS] =
+{
+	0x0, /* WBx Source Select Register */
+	0x0, /* WBx Target Address Register */
+	0x0, /* WBx Target Pixel Format Register */
+	0x0, /* WBx Target AA Format Register */
+	0x0, /* WBx Target Layout */
+	0x0, /* WBx Target Scanline Length */
+	0x0, /* WBx Target Flags Register */
+	0x0, /* WBx MRT Enable Register */
+	0x0, /* WBx MRT Offset Register */
+	0x0, /* WBx Global Test Enable Register */
+	0x0, /* WBx Global Test Reference Value Register */
+	0x0  /* WBx Global Test Compare Function Register */
+};
+
+/* Performance Counter 0 Enable Register reset value */
+static const u32 mali_perf_cnt_enable_reset_value = 0;
+
 _mali_osk_errcode_t mali_pp_hard_reset(struct mali_pp_core *core)
 {
 	/* Bus must be stopped before calling this function */
@@ -206,7 +256,7 @@ _mali_osk_errcode_t mali_pp_hard_reset(struct mali_pp_core *core)
 	MALI_DEBUG_PRINT(2, ("Mali PP: Hard reset of core %s\n", core->hw_core.description));
 	MALI_ASSERT_GROUP_LOCKED(core->group);
 
-	mali_pp_post_process_job(core); /* @@@@Â is there some cases where it is unsafe to post process the job here? */
+	mali_pp_post_process_job(core); /* @@@@ is there some cases where it is unsafe to post process the job here? */
 
 	/* Set register to a bogus value. The register will be used to detect when reset is complete */
 	mali_hw_core_register_write(&core->hw_core, MALI200_REG_ADDR_MGMT_WRITE_BOUNDARY_LOW, reset_invalid_value);
@@ -247,9 +297,10 @@ _mali_osk_errcode_t mali_pp_reset(struct mali_pp_core *core)
 	MALI_DEBUG_PRINT(4, ("Mali PP: Reset of core %s\n", core->hw_core.description));
 	MALI_ASSERT_GROUP_LOCKED(core->group);
 
-	mali_pp_post_process_job(core); /* @@@@Â is there some cases where it is unsafe to post process the job here? */
+	mali_pp_post_process_job(core); /* @@@@ is there some cases where it is unsafe to post process the job here? */
 
 	mali_hw_core_register_write(&core->hw_core, MALI200_REG_ADDR_MGMT_INT_MASK, 0); /* disable the IRQs */
+
 
 #if defined(USING_MALI200)
 
@@ -319,7 +370,10 @@ void mali_pp_job_start(struct mali_pp_core *core, struct mali_pp_job *job, u32 s
 	MALI_DEBUG_ASSERT_POINTER(core);
 	MALI_ASSERT_GROUP_LOCKED(core->group);
 
-	mali_hw_core_register_write_array_relaxed(&core->hw_core, MALI200_REG_ADDR_FRAME, frame_registers, MALI200_NUM_REGS_FRAME);
+	mali_hw_core_register_write_array_relaxed_conditional(&core->hw_core, MALI200_REG_ADDR_FRAME, frame_registers, MALI200_NUM_REGS_FRAME, mali_frame_registers_reset_values);
+
+	_mali_osk_mem_barrier();
+
 	if (0 != sub_job)
 	{
 		/*
@@ -328,22 +382,34 @@ void mali_pp_job_start(struct mali_pp_core *core, struct mali_pp_job *job, u32 s
 		 * but we need to patch these for all other sub jobs
 		 */
 		mali_hw_core_register_write_relaxed(&core->hw_core, MALI200_REG_ADDR_FRAME, mali_pp_job_get_addr_frame(job, sub_job));
-		mali_hw_core_register_write_relaxed(&core->hw_core, MALI200_REG_ADDR_STACK, mali_pp_job_get_addr_stack(job, sub_job));
+		mali_hw_core_register_write_relaxed_conditional(&core->hw_core, MALI200_REG_ADDR_STACK, mali_pp_job_get_addr_stack(job, sub_job), mali_frame_registers_reset_values[MALI200_REG_ADDR_STACK/4]);
 	}
 
 	if (wb0_registers[0]) /* M200_WB0_REG_SOURCE_SELECT register */
 	{
-		mali_hw_core_register_write_array_relaxed(&core->hw_core, MALI200_REG_ADDR_WB0, wb0_registers, MALI200_NUM_REGS_WBx);
+		mali_hw_core_register_write_array_relaxed_conditional(&core->hw_core, MALI200_REG_ADDR_WB0, wb0_registers, MALI200_NUM_REGS_WBx, mali_wb_registers_reset_values);
+	}
+	else
+	{
+		mali_hw_core_register_write_relaxed_conditional(&core->hw_core, MALI200_REG_ADDR_WB0, 0, mali_wb_registers_reset_values[0] );
 	}
 
 	if (wb1_registers[0]) /* M200_WB1_REG_SOURCE_SELECT register */
 	{
-		mali_hw_core_register_write_array_relaxed(&core->hw_core, MALI200_REG_ADDR_WB1, wb1_registers, MALI200_NUM_REGS_WBx);
+		mali_hw_core_register_write_array_relaxed_conditional(&core->hw_core, MALI200_REG_ADDR_WB1, wb1_registers, MALI200_NUM_REGS_WBx, mali_wb_registers_reset_values);
+	}
+	else
+	{
+		mali_hw_core_register_write_relaxed_conditional(&core->hw_core, MALI200_REG_ADDR_WB1, 0, mali_wb_registers_reset_values[0] );
 	}
 
 	if (wb2_registers[0]) /* M200_WB2_REG_SOURCE_SELECT register */
 	{
-		mali_hw_core_register_write_array_relaxed(&core->hw_core, MALI200_REG_ADDR_WB2, wb2_registers, MALI200_NUM_REGS_WBx);
+		mali_hw_core_register_write_array_relaxed_conditional(&core->hw_core, MALI200_REG_ADDR_WB2, wb2_registers, MALI200_NUM_REGS_WBx, mali_wb_registers_reset_values);
+	}
+	else
+	{
+		mali_hw_core_register_write_relaxed_conditional(&core->hw_core, MALI200_REG_ADDR_WB2, 0, mali_wb_registers_reset_values[0] );
 	}
 
 	/* This selects which performance counters we are reading */
@@ -352,13 +418,14 @@ void mali_pp_job_start(struct mali_pp_core *core, struct mali_pp_job *job, u32 s
 		/* global_config has enabled HW counters, this will override anything specified by user space */
 		if (MALI_HW_CORE_NO_COUNTER != core->counter_src0_used)
 		{
-			mali_hw_core_register_write(&core->hw_core, MALI200_REG_ADDR_MGMT_PERF_CNT_0_SRC, core->counter_src0_used);
-			mali_hw_core_register_write(&core->hw_core, MALI200_REG_ADDR_MGMT_PERF_CNT_0_ENABLE, MALI200_REG_VAL_PERF_CNT_ENABLE);
+			mali_hw_core_register_write_relaxed(&core->hw_core, MALI200_REG_ADDR_MGMT_PERF_CNT_0_SRC, core->counter_src0_used);
+			mali_hw_core_register_write_relaxed_conditional(&core->hw_core, MALI200_REG_ADDR_MGMT_PERF_CNT_0_ENABLE, MALI200_REG_VAL_PERF_CNT_ENABLE, mali_perf_cnt_enable_reset_value);
+
 		}
 		if (MALI_HW_CORE_NO_COUNTER != core->counter_src1_used)
 		{
-			mali_hw_core_register_write(&core->hw_core, MALI200_REG_ADDR_MGMT_PERF_CNT_1_SRC, core->counter_src1_used);
-			mali_hw_core_register_write(&core->hw_core, MALI200_REG_ADDR_MGMT_PERF_CNT_1_ENABLE, MALI200_REG_VAL_PERF_CNT_ENABLE);
+			mali_hw_core_register_write_relaxed(&core->hw_core, MALI200_REG_ADDR_MGMT_PERF_CNT_1_SRC, core->counter_src1_used);
+			mali_hw_core_register_write_relaxed_conditional(&core->hw_core, MALI200_REG_ADDR_MGMT_PERF_CNT_1_ENABLE, MALI200_REG_VAL_PERF_CNT_ENABLE, mali_perf_cnt_enable_reset_value);
 		}
 	}
 	else
@@ -370,15 +437,15 @@ void mali_pp_job_start(struct mali_pp_core *core, struct mali_pp_job *job, u32 s
 			if (perf_counter_flag & _MALI_PERFORMANCE_COUNTER_FLAG_SRC0_ENABLE)
 			{
 				core->counter_src0_used = mali_pp_job_get_perf_counter_src0(job);
-				mali_hw_core_register_write(&core->hw_core, MALI200_REG_ADDR_MGMT_PERF_CNT_0_SRC, core->counter_src0_used);
-				mali_hw_core_register_write(&core->hw_core, MALI200_REG_ADDR_MGMT_PERF_CNT_0_ENABLE, MALI200_REG_VAL_PERF_CNT_ENABLE);
+				mali_hw_core_register_write_relaxed(&core->hw_core, MALI200_REG_ADDR_MGMT_PERF_CNT_0_SRC, core->counter_src0_used);
+				mali_hw_core_register_write_relaxed_conditional(&core->hw_core, MALI200_REG_ADDR_MGMT_PERF_CNT_0_ENABLE, MALI200_REG_VAL_PERF_CNT_ENABLE, mali_perf_cnt_enable_reset_value);
 			}
 
 			if (perf_counter_flag & _MALI_PERFORMANCE_COUNTER_FLAG_SRC1_ENABLE)
 			{
 				core->counter_src1_used = mali_pp_job_get_perf_counter_src1(job);
-				mali_hw_core_register_write(&core->hw_core, MALI200_REG_ADDR_MGMT_PERF_CNT_1_SRC, core->counter_src1_used);
-				mali_hw_core_register_write(&core->hw_core, MALI200_REG_ADDR_MGMT_PERF_CNT_1_ENABLE, MALI200_REG_VAL_PERF_CNT_ENABLE);
+				mali_hw_core_register_write_relaxed(&core->hw_core, MALI200_REG_ADDR_MGMT_PERF_CNT_1_SRC, core->counter_src1_used);
+				mali_hw_core_register_write_relaxed_conditional(&core->hw_core, MALI200_REG_ADDR_MGMT_PERF_CNT_1_ENABLE, MALI200_REG_VAL_PERF_CNT_ENABLE, mali_perf_cnt_enable_reset_value);
 			}
 		}
 	}
@@ -399,8 +466,8 @@ void mali_pp_job_start(struct mali_pp_core *core, struct mali_pp_job *job, u32 s
 	core->timeout_job_id = mali_pp_job_get_id(job);
 
 #if MALI_TIMELINE_PROFILING_ENABLED
-	_mali_osk_profiling_add_event(MALI_PROFILING_EVENT_TYPE_SINGLE | MALI_PROFILING_MAKE_EVENT_CHANNEL_PP(core->core_id) | MALI_PROFILING_EVENT_REASON_SINGLE_HW_FLUSH, job->frame_builder_id, job->flush_id, 0, 0, 0);
-	_mali_osk_profiling_add_event(MALI_PROFILING_EVENT_TYPE_START|MALI_PROFILING_MAKE_EVENT_CHANNEL_PP(core->core_id), job->pid, job->tid, 0, 0, 0);
+	_mali_osk_profiling_add_event(MALI_PROFILING_EVENT_TYPE_SINGLE | MALI_PROFILING_MAKE_EVENT_CHANNEL_PP(core->core_id) | MALI_PROFILING_EVENT_REASON_SINGLE_HW_FLUSH, mali_pp_job_get_frame_builder_id(job), mali_pp_job_get_flush_id(job), 0, 0, 0);
+	_mali_osk_profiling_add_event(MALI_PROFILING_EVENT_TYPE_START|MALI_PROFILING_MAKE_EVENT_CHANNEL_PP(core->core_id), mali_pp_job_get_pid(job), mali_pp_job_get_tid(job), 0, 0, 0);
 #endif
 
 	core->running_job = job;
@@ -498,9 +565,7 @@ static void mali_pp_bottom_half(void *data)
 	u32 irq_errors;
 
 #if MALI_TIMELINE_PROFILING_ENABLED
-#if 0  /* Bottom half TLP logging is currently not supported */
-	_mali_osk_profiling_add_event( MALI_PROFILING_EVENT_TYPE_START| MALI_PROFILING_EVENT_CHANNEL_SOFTWARE ,  _mali_osk_get_pid(), _mali_osk_get_tid(), 0, 0, 0);
-#endif
+	_mali_osk_profiling_add_event(MALI_PROFILING_EVENT_TYPE_START|MALI_PROFILING_EVENT_CHANNEL_SOFTWARE|MALI_PROFILING_EVENT_REASON_START_STOP_BOTTOM_HALF, 0, _mali_osk_get_tid(), MALI_PROFILING_MAKE_EVENT_DATA_CORE_PP(core->core_id), 0, 0);
 #endif
 
 	mali_group_lock(core->group); /* Group lock grabbed in core handlers, but released in common group handler */
@@ -509,6 +574,9 @@ static void mali_pp_bottom_half(void *data)
 	{
 		MALI_PRINT_ERROR(("Interrupt bottom half of %s when core is OFF.", core->hw_core.description));
 		mali_group_unlock(core->group);
+#if MALI_TIMELINE_PROFILING_ENABLED
+		_mali_osk_profiling_add_event(MALI_PROFILING_EVENT_TYPE_STOP|MALI_PROFILING_EVENT_CHANNEL_SOFTWARE|MALI_PROFILING_EVENT_REASON_START_STOP_BOTTOM_HALF, 0, _mali_osk_get_tid(), 0, 0, 0);
+#endif
 		return;
 	}
 
@@ -521,6 +589,9 @@ static void mali_pp_bottom_half(void *data)
 		mali_pp_post_process_job(core);
 		MALI_DEBUG_PRINT(3, ("Mali PP: Job completed, calling group handler\n"));
 		mali_group_bottom_half(core->group, GROUP_EVENT_PP_JOB_COMPLETED); /* Will release group lock */
+#if MALI_TIMELINE_PROFILING_ENABLED
+		_mali_osk_profiling_add_event(MALI_PROFILING_EVENT_TYPE_STOP|MALI_PROFILING_EVENT_CHANNEL_SOFTWARE|MALI_PROFILING_EVENT_REASON_START_STOP_BOTTOM_HALF, 0, _mali_osk_get_tid(), 0, 0, 0);
+#endif
 		return;
 	}
 
@@ -535,6 +606,9 @@ static void mali_pp_bottom_half(void *data)
 		MALI_PRINT_ERROR(("Mali PP: Unknown interrupt 0x%08X from core %s, aborting job\n",
 		                  irq_readout, core->hw_core.description));
 		mali_group_bottom_half(core->group, GROUP_EVENT_PP_JOB_FAILED); /* Will release group lock */
+#if MALI_TIMELINE_PROFILING_ENABLED
+		_mali_osk_profiling_add_event(MALI_PROFILING_EVENT_TYPE_STOP|MALI_PROFILING_EVENT_CHANNEL_SOFTWARE|MALI_PROFILING_EVENT_REASON_START_STOP_BOTTOM_HALF, 0, _mali_osk_get_tid(), 0, 0, 0);
+#endif
 		return;
 	}
 	else if (MALI_TRUE == core->core_timed_out) /* SW timeout */
@@ -551,6 +625,9 @@ static void mali_pp_bottom_half(void *data)
 			mali_group_unlock(core->group);
 		}
 		core->core_timed_out = MALI_FALSE;
+#if MALI_TIMELINE_PROFILING_ENABLED
+		_mali_osk_profiling_add_event(MALI_PROFILING_EVENT_TYPE_STOP|MALI_PROFILING_EVENT_CHANNEL_SOFTWARE|MALI_PROFILING_EVENT_REASON_START_STOP_BOTTOM_HALF, 0, _mali_osk_get_tid(), 0, 0, 0);
+#endif
 		return;
 	}
 	else if (irq_readout & MALI200_REG_VAL_IRQ_HANG)
@@ -567,9 +644,7 @@ static void mali_pp_bottom_half(void *data)
 	mali_group_unlock(core->group);
 
 #if MALI_TIMELINE_PROFILING_ENABLED
-#if 0   /* Bottom half TLP logging is currently not supported */
-	_mali_osk_profiling_add_event( MALI_PROFILING_EVENT_TYPE_STOP| MALI_PROFILING_EVENT_CHANNEL_SOFTWARE ,  _mali_osk_get_pid(), _mali_osk_get_tid(), 0, 0, 0);
-#endif
+	_mali_osk_profiling_add_event(MALI_PROFILING_EVENT_TYPE_STOP|MALI_PROFILING_EVENT_CHANNEL_SOFTWARE|MALI_PROFILING_EVENT_REASON_START_STOP_BOTTOM_HALF, 0, _mali_osk_get_tid(), 0, 0, 0);
 #endif
 }
 

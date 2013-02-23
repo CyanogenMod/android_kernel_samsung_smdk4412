@@ -1,9 +1,9 @@
 /*
  * Copyright (C) 2010-2012 ARM Limited. All rights reserved.
- *
+ * 
  * This program is free software and is provided to you under the terms of the GNU General Public License version 2
  * as published by the Free Software Foundation, and any use by you of this program is subject to the terms of such GNU licence.
- *
+ * 
  * A copy of the licence is included with the program, and can also be obtained from Free Software
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
  */
@@ -228,17 +228,12 @@ _mali_osk_errcode_t _ump_ukk_map_mem( _ump_uk_map_mem_s *args )
 	int map_id;
 
 	session_data = (ump_session_data *)args->ctx;
-	if(NULL == session_data)
+	if( NULL == session_data )
 	{
 		MSG_ERR(("Session data is NULL in _ump_ukk_map_mem()\n"));
 		return _MALI_OSK_ERR_INVALID_ARGS;
 	}
-	/* SEC kernel stability 2012-02-17 */
-	if (NULL == session_data->cookies_map)
-	{
-		MSG_ERR(("session_data->cookies_map is NULL in _ump_ukk_map_mem()\n"));
-		return _MALI_OSK_ERR_INVALID_ARGS;
-	}
+
 	descriptor = (ump_memory_allocation*) _mali_osk_calloc( 1, sizeof(ump_memory_allocation));
 	if (NULL == descriptor)
 	{
@@ -287,12 +282,6 @@ _mali_osk_errcode_t _ump_ukk_map_mem( _ump_uk_map_mem_s *args )
 		descriptor->is_cached = 1;
 		args->is_cached       = 1;
 		DBG_MSG(3, ("Mapping UMP secure_id: %d as cached.\n", args->secure_id));
-	}
-	else if ( args->is_cached)
-	{
-		mem->is_cached = 1;
-		descriptor->is_cached = 1;
-		DBG_MSG(3, ("Warning mapping UMP secure_id: %d. As cached, while it was allocated uncached.\n", args->secure_id));
 	}
 	else
 	{
@@ -366,17 +355,12 @@ void _ump_ukk_unmap_mem( _ump_uk_unmap_mem_s *args )
 
 	session_data = (ump_session_data *)args->ctx;
 
-	if (NULL == session_data)
+	if( NULL == session_data )
 	{
 		MSG_ERR(("Session data is NULL in _ump_ukk_map_mem()\n"));
 		return;
 	}
-	/* SEC kernel stability 2012-02-17 */
-	if (NULL == session_data->cookies_map)
-	{
-		MSG_ERR(("session_data->cookies_map is NULL in _ump_ukk_map_mem()\n"));
-		return;
-	}
+
 	if (0 != ump_descriptor_mapping_get( session_data->cookies_map, (int)args->cookie, (void**)&descriptor) )
 	{
 		MSG_ERR(("_ump_ukk_map_mem: cookie 0x%X not found for this session\n", args->cookie ));

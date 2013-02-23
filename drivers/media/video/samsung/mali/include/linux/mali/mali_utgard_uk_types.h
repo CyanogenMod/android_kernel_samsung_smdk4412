@@ -63,8 +63,6 @@ typedef enum
 
     _MALI_UK_OPEN                    = 0, /**< _mali_ukk_open() */
     _MALI_UK_CLOSE,                       /**< _mali_ukk_close() */
-    _MALI_UK_GET_SYSTEM_INFO_SIZE,        /**< _mali_ukk_get_system_info_size() */
-    _MALI_UK_GET_SYSTEM_INFO,             /**< _mali_ukk_get_system_info() */
     _MALI_UK_WAIT_FOR_NOTIFICATION,       /**< _mali_ukk_wait_for_notification() */
     _MALI_UK_GET_API_VERSION,             /**< _mali_ukk_get_api_version() */
     _MALI_UK_POST_NOTIFICATION,           /**< _mali_ukk_post_notification() */
@@ -73,19 +71,22 @@ typedef enum
 
 	/** Memory functions */
 
-    _MALI_UK_INIT_MEM                = 0, /**< _mali_ukk_init_mem() */
-    _MALI_UK_TERM_MEM,                    /**< _mali_ukk_term_mem() */
-    _MALI_UK_GET_BIG_BLOCK,               /**< _mali_ukk_get_big_block() */
-    _MALI_UK_FREE_BIG_BLOCK,              /**< _mali_ukk_free_big_block() */
-    _MALI_UK_MAP_MEM,                     /**< _mali_ukk_mem_mmap() */
-    _MALI_UK_UNMAP_MEM,                   /**< _mali_ukk_mem_munmap() */
+    _MALI_UK_INIT_MEM                = 0,    /**< _mali_ukk_init_mem() */
+    _MALI_UK_TERM_MEM,                       /**< _mali_ukk_term_mem() */
+    _MALI_UK_GET_BIG_BLOCK,                  /**< _mali_ukk_get_big_block() */
+    _MALI_UK_FREE_BIG_BLOCK,                 /**< _mali_ukk_free_big_block() */
+    _MALI_UK_MAP_MEM,                        /**< _mali_ukk_mem_mmap() */
+    _MALI_UK_UNMAP_MEM,                      /**< _mali_ukk_mem_munmap() */
     _MALI_UK_QUERY_MMU_PAGE_TABLE_DUMP_SIZE, /**< _mali_ukk_mem_get_mmu_page_table_dump_size() */
-    _MALI_UK_DUMP_MMU_PAGE_TABLE,         /**< _mali_ukk_mem_dump_mmu_page_table() */
-    _MALI_UK_ATTACH_UMP_MEM,             /**< _mali_ukk_attach_ump_mem() */
-    _MALI_UK_RELEASE_UMP_MEM,           /**< _mali_ukk_release_ump_mem() */
-    _MALI_UK_MAP_EXT_MEM,                 /**< _mali_uku_map_external_mem() */
-    _MALI_UK_UNMAP_EXT_MEM,               /**< _mali_uku_unmap_external_mem() */
-    _MALI_UK_VA_TO_MALI_PA,               /**< _mali_uku_va_to_mali_pa() */
+    _MALI_UK_DUMP_MMU_PAGE_TABLE,            /**< _mali_ukk_mem_dump_mmu_page_table() */
+    _MALI_UK_ATTACH_DMA_BUF,                 /**< _mali_ukk_attach_dma_buf() */
+    _MALI_UK_RELEASE_DMA_BUF,                /**< _mali_ukk_release_dma_buf() */
+    _MALI_UK_DMA_BUF_GET_SIZE,               /**< _mali_ukk_dma_buf_get_size() */
+    _MALI_UK_ATTACH_UMP_MEM,                 /**< _mali_ukk_attach_ump_mem() */
+    _MALI_UK_RELEASE_UMP_MEM,                /**< _mali_ukk_release_ump_mem() */
+    _MALI_UK_MAP_EXT_MEM,                    /**< _mali_uku_map_external_mem() */
+    _MALI_UK_UNMAP_EXT_MEM,                  /**< _mali_uku_unmap_external_mem() */
+    _MALI_UK_VA_TO_MALI_PA,                  /**< _mali_uku_va_to_mali_pa() */
 
     /** Common functions for each core */
 
@@ -172,33 +173,6 @@ typedef enum _mali_core_type
 	/* insert new core here, do NOT alter the existing values */
 } _mali_core_type;
 
-/** @brief Information about each Mali Core
- *
- * Information is stored in a linked list, which is stored entirely in the
- * buffer pointed to by the system_info member of the
- * _mali_uk_get_system_info_s arguments provided to _mali_ukk_get_system_info()
- *
- * Both Fragment Processor (PP) and Vertex Processor (GP) cores are represented
- * by this struct.
- *
- * The type is reported by the type field, _mali_core_info::_mali_core_type.
- *
- * Each core is given a unique Sequence number identifying it, the core_nr
- * member.
- *
- * Flags are taken directly from the resource's flags, and are currently unused.
- *
- * Multiple mali_core_info structs are linked in a single linked list using the next field
- */
-typedef struct _mali_core_info
-{
-	_mali_core_type type;            /**< Type of core */
-	_mali_core_version version;      /**< Core Version, as reported by the Core's Version Register */
-	u32 reg_address;                 /**< Address of Registers */
-	u32 core_nr;                     /**< Sequence number */
-	u32 flags;                       /**< Flags. Currently Unused. */
-	struct _mali_core_info * next;   /**< Next core in Linked List */
-} _mali_core_info;
 
 /** @brief Capabilities of Memory Banks
  *
@@ -221,9 +195,17 @@ typedef enum _mali_bus_usage
 	_MALI_GP_WRITEABLE  = (1<<3),  /** Writeable by the Vertex Processor */
 	_MALI_CPU_READABLE  = (1<<4),  /** Readable by the CPU */
 	_MALI_CPU_WRITEABLE = (1<<5),  /** Writeable by the CPU */
+	_MALI_GP_L2_ALLOC   = (1<<6),  /** GP allocate mali L2 cache lines*/
 	_MALI_MMU_READABLE  = _MALI_PP_READABLE | _MALI_GP_READABLE,   /** Readable by the MMU (including all cores behind it) */
 	_MALI_MMU_WRITEABLE = _MALI_PP_WRITEABLE | _MALI_GP_WRITEABLE, /** Writeable by the MMU (including all cores behind it) */
 } _mali_bus_usage;
+
+typedef enum mali_memory_cache_settings
+{
+	MALI_CACHE_STANDARD 			= 0,
+	MALI_CACHE_GP_READ_ALLOCATE     = 1,
+} mali_memory_cache_settings ;
+
 
 /** @brief Information about the Mali Memory system
  *
@@ -234,11 +216,6 @@ typedef enum _mali_bus_usage
  * Each element of the linked list describes a single Mali Memory bank.
  * Each allocation can only come from one bank, and will not cross multiple
  * banks.
- *
- * Each bank is uniquely identified by its identifier member. On Mali-nonMMU
- * systems, to allocate from this bank, the value of identifier must be passed
- * as the type_id member of the  _mali_uk_get_big_block_s arguments to
- * _mali_ukk_get_big_block.
  *
  * On Mali-MMU systems, there is only one bank, which describes the maximum
  * possible address range that could be allocated (which may be much less than
@@ -260,54 +237,11 @@ typedef struct _mali_mem_info
 	u32 size;                     /**< Size of the memory bank in bytes */
 	_mali_bus_usage flags;        /**< Capabilitiy flags of the memory */
 	u32 maximum_order_supported;  /**< log2 supported size */
-	u32 identifier;               /**< Unique identifier, to be used in allocate calls */
+	u32 identifier;               /* mali_memory_cache_settings cache_settings; */
 	struct _mali_mem_info * next; /**< Next List Link */
 } _mali_mem_info;
 
-/** @brief Info about the whole Mali system.
- *
- * This Contains a linked list of the cores and memory banks available. Each
- * list pointer will remain inside the system_info buffer supplied in the
- * _mali_uk_get_system_info_s arguments to a _mali_ukk_get_system_info call.
- *
- * The has_mmu member must be inspected to ensure the correct group of
- * Memory function calls is obtained - that is, those for either Mali-MMU
- * or Mali-nonMMU. @see _mali_uk_memory
- */
-typedef struct _mali_system_info
-{
-	_mali_core_info * core_info;  /**< List of _mali_core_info structures */
-	_mali_mem_info * mem_info;    /**< List of _mali_mem_info structures */
-	u32 has_mmu;                  /**< Non-zero if Mali-MMU present. Zero otherwise. */
-	_mali_driver_mode drivermode; /**< Reserved. Must always be _MALI_DRIVER_MODE_NORMAL */
-} _mali_system_info;
 
-/** @brief Arguments to _mali_ukk_get_system_info()
- *
- * A buffer of the size returned by _mali_ukk_get_system_info_size() must be
- * allocated, and the pointer to this buffer must be written into the
- * system_info member. The buffer must be suitably aligned for storage of
- * the _mali_system_info structure - for example, one returned by
- * _mali_osk_malloc(), which will be suitably aligned for any structure.
- *
- * The ukk_private member must be set to zero by the user-side. Under an OS
- * implementation, the U/K interface must write in the user-side base address
- * into the ukk_private member, so that the common code in
- * _mali_ukk_get_system_info() can determine how to adjust the pointers such
- * that they are sensible from user space. Leaving ukk_private as NULL implies
- * that no pointer adjustment is necessary - which will be the case on a
- * bare-metal/RTOS system.
- *
- * @see _mali_system_info
- */
-typedef struct
-{
-    void *ctx;                              /**< [in,out] user-kernel context (trashed on output) */
-	u32 size;                               /**< [in] size of buffer provided to store system information data */
-	_mali_system_info * system_info;        /**< [in,out] pointer to buffer to store system information data. No initialisation of buffer required on input. */
-	u32 ukk_private;                        /**< [in] Kernel-side private word inserted by certain U/K interface implementations. Caller must set to Zero. */
-} _mali_uk_get_system_info_s;
-/** @} */ /* end group _mali_uk_getsysteminfo */
 
 /** @} */ /* end group _mali_uk_core */
 
@@ -483,6 +417,10 @@ typedef struct
 
 #define _MALI_PP_MAX_WB_REGISTERS ((0x02C/4)+1)
 
+/** Flag for _mali_uk_pp_start_job_s */
+#define _MALI_PP_JOB_FLAG_NO_NOTIFICATION (1<<0)
+#define _MALI_PP_JOB_FLAG_BARRIER         (1<<1)
+
 /** @defgroup _mali_uk_ppstartjob_s Fragment Processor Start Job
  * @{ */
 
@@ -544,6 +482,7 @@ typedef struct
     u32 perf_counter_src1;              /**< [in] source id for performance counter 1 (see ARM DDI0415A, Table 3-60) */
 	u32 frame_builder_id;               /**< [in] id of the originating frame builder */
 	u32 flush_id;                       /**< [in] flush id within the originating frame builder */
+	u32 flags;                          /**< [in] See _MALI_PP_JOB_FLAG_* for a list of avaiable flags */
 } _mali_uk_pp_start_job_s;
 /** @} */ /* end group _mali_uk_ppstartjob_s */
 
@@ -761,7 +700,7 @@ typedef struct
  * The 16bit integer is stored twice in a 32bit integer
  * For example, for version 1 the value would be 0x00010001
  */
-#define _MALI_API_VERSION 14
+#define _MALI_API_VERSION 17
 #define _MALI_UK_API_VERSION _MAKE_VERSION_ID(_MALI_API_VERSION)
 
 /**
@@ -838,7 +777,9 @@ typedef struct
     void *ctx;                      /**< [in,out] user-kernel context (trashed on output) */
 } _mali_uk_term_mem_s;
 
-/** @note Mali-MMU only */
+/** Flag for _mali_uk_map_external_mem_s, _mali_uk_attach_ump_mem_s and _mali_uk_attach_dma_buf_s */
+#define _MALI_MAP_EXTERNAL_MAP_GUARD_PAGE (1<<0)
+
 typedef struct
 {
     void *ctx;                      /**< [in,out] user-kernel context (trashed on output) */
@@ -850,15 +791,36 @@ typedef struct
 	u32 cookie;                     /**< [out] identifier for mapped memory object in kernel space  */
 } _mali_uk_map_external_mem_s;
 
-/** Flag for _mali_uk_map_external_mem_s and _mali_uk_attach_ump_mem_s */
-#define _MALI_MAP_EXTERNAL_MAP_GUARD_PAGE (1<<0)
-
-/** @note Mali-MMU only */
 typedef struct
 {
     void *ctx;                      /**< [in,out] user-kernel context (trashed on output) */
 	u32 cookie;                     /**< [out] identifier for mapped memory object in kernel space  */
 } _mali_uk_unmap_external_mem_s;
+
+/** @note This is identical to _mali_uk_map_external_mem_s above, however phys_addr is replaced by memory descriptor */
+typedef struct
+{
+    void *ctx;                      /**< [in,out] user-kernel context (trashed on output) */
+	u32 mem_fd;                     /**< [in] Memory descriptor */
+	u32 size;                       /**< [in] size */
+	u32 mali_address;               /**< [in] mali address to map the physical memory to */
+	u32 rights;                     /**< [in] rights necessary for accessing memory */
+	u32 flags;                      /**< [in] flags, see \ref _MALI_MAP_EXTERNAL_MAP_GUARD_PAGE */
+	u32 cookie;                     /**< [out] identifier for mapped memory object in kernel space  */
+} _mali_uk_attach_dma_buf_s;
+
+typedef struct
+{
+	void *ctx;                      /**< [in,out] user-kernel context (trashed on output) */
+	u32 mem_fd;                     /**< [in] Memory descriptor */
+	u32 size;                       /**< [out] size */
+} _mali_uk_dma_buf_get_size_s;
+
+typedef struct
+{
+    void *ctx;                      /**< [in,out] user-kernel context (trashed on output) */
+	u32 cookie;                     /**< [in] identifier for mapped memory object in kernel space  */
+} _mali_uk_release_dma_buf_s;
 
 /** @note This is identical to _mali_uk_map_external_mem_s above, however phys_addr is replaced by secure_id */
 typedef struct
@@ -872,7 +834,6 @@ typedef struct
 	u32 cookie;                     /**< [out] identifier for mapped memory object in kernel space  */
 } _mali_uk_attach_ump_mem_s;
 
-/** @note Mali-MMU only; will be supported in future version */
 typedef struct
 {
     void *ctx;                      /**< [in,out] user-kernel context (trashed on output) */
@@ -1060,6 +1021,7 @@ typedef struct
 	u32 cookie;                     /**< [out] Returns a cookie for use in munmap calls */
 	void *uku_private;              /**< [in] User-side Private word used by U/K interface */
 	void *ukk_private;              /**< [in] Kernel-side Private word used by U/K interface */
+	mali_memory_cache_settings cache_settings; /**< [in] Option to set special cache flags, tuning L2 efficency */
 } _mali_uk_mem_mmap_s;
 
 /** @brief Arguments to _mali_ukk_mem_munmap()

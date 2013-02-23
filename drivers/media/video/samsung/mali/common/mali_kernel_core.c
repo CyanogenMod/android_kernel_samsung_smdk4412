@@ -35,6 +35,10 @@
 #if MALI_TIMELINE_PROFILING_ENABLED
 #include "mali_osk_profiling.h"
 #endif
+#if MALI_INTERNAL_TIMELINE_PROFILING_ENABLED
+#include "mali_profiling_internal.h"
+#endif
+
 
 /** Pointer to table of resource definitions available to the Mali driver.
  *  _mali_osk_resources_init() sets up the pointer to this table.
@@ -52,21 +56,12 @@ static u32 global_gpu_base_address = 0;
 static u32 global_gpu_major_version = 0;
 static u32 global_gpu_minor_version = 0;
 
-static _mali_osk_errcode_t build_system_info(void);
-static void cleanup_system_info(_mali_system_info *cleanup);
-
-/* system info variables */
-static _mali_osk_lock_t *system_info_lock = NULL;
-static _mali_system_info *system_info = NULL;
-static u32 system_info_size = 0;
 static u32 first_pp_offset = 0;
 
-#define HANG_CHECK_MSECS_DEFAULT 500 /* 500 ms */
 #define WATCHDOG_MSECS_DEFAULT 4000 /* 4 s */
 
 /* timer related */
 int mali_max_job_runtime = WATCHDOG_MSECS_DEFAULT;
-int mali_hang_check_interval = HANG_CHECK_MSECS_DEFAULT;
 
 static _mali_osk_resource_t *mali_find_resource(_mali_osk_resource_type_t type, u32 offset)
 {
@@ -606,9 +601,6 @@ _mali_osk_errcode_t mali_initialize_subsystems(void)
 	_mali_osk_errcode_t err;
 	mali_bool is_pmu_enabled;
 
-	MALI_CHECK_NON_NULL(system_info_lock = _mali_osk_lock_init( (_mali_osk_lock_flags_t)(_MALI_OSK_LOCKFLAG_SPINLOCK
-	                                           | _MALI_OSK_LOCKFLAG_NONINTERRUPTABLE), 0, 0 ), _MALI_OSK_ERR_FAULT);
-
 	err = mali_session_initialize();
 	if (_MALI_OSK_ERR_OK != err) goto session_init_failed;
 
@@ -620,10 +612,6 @@ _mali_osk_errcode_t mali_initialize_subsystems(void)
 		MALI_PRINT_ERROR(("Failed to initialize profiling, feature will be unavailable\n"));
 	}
 #endif
-
-	/* Build dummy system info. Will be removed in the future. */
-	err = build_system_info();
-	if (_MALI_OSK_ERR_OK != err) goto build_system_info_failed;
 
 	/* Get data from config.h */
 	err = _mali_osk_resources_init(&arch_configuration, &num_resources);
@@ -729,8 +717,6 @@ parse_memory_config_failed:
 memory_init_failed:
 	_mali_osk_resources_term(&arch_configuration, num_resources);
 osk_resources_init_failed:
-	cleanup_system_info(system_info);
-build_system_info_failed:
 #if MALI_TIMELINE_PROFILING_ENABLED
 	_mali_osk_profiling_term();
 #endif
@@ -742,6 +728,7 @@ session_init_failed:
 void mali_terminate_subsystems(void)
 {
 	struct mali_pmu_core *pmu;
+
 	MALI_DEBUG_PRINT(2, ("terminate_subsystems() called\n"));
 
 	/* shut down subsystems in reverse order from startup */
@@ -777,18 +764,11 @@ void mali_terminate_subsystems(void)
 
 	_mali_osk_resources_term(&arch_configuration, num_resources);
 
-	cleanup_system_info(system_info);
-
 #if MALI_TIMELINE_PROFILING_ENABLED
 	_mali_osk_profiling_term();
 #endif
 
 	mali_session_terminate();
-
-	if (NULL != system_info_lock)
-	{
-		_mali_osk_lock_term( system_info_lock );
-	}
 }
 
 _mali_product_id_t mali_kernel_core_get_product_id(void)
@@ -807,94 +787,6 @@ void mali_kernel_core_wakeup(void)
 		cluster = mali_cluster_get_global_cluster(i);
 		mali_cluster_reset(cluster);
 	}
-}
-
-static void cleanup_system_info(_mali_system_info *cleanup)
-{
-	_mali_core_info * current_core;
-	_mali_mem_info * current_mem;
-
-	/* delete all the core info structs */
-	while (NULL != cleanup->core_info)
-	{
-		current_core = cleanup->core_info;
-		cleanup->core_info = cleanup->core_info->next;
-		_mali_osk_free(current_core);
-	}
-
-	/* delete all the mem info struct */
-	while (NULL != cleanup->mem_info)
-	{
-		current_mem = cleanup->mem_info;
-		cleanup->mem_info = cleanup->mem_info->next;
-		_mali_osk_free(current_mem);
-	}
-
-	/* delete the system info struct itself */
-	_mali_osk_free(cleanup);
-}
-
-/* Build a dummy system info struct. User space still need this. */
-static _mali_osk_errcode_t build_system_info(void)
-{
-	_mali_system_info * new_info;
-	_mali_core_info * current_core;
-	_mali_mem_info * current_mem;
-	u32 new_size = 0;
-
-	/* create a new system info struct */
-	MALI_CHECK_NON_NULL(new_info = (_mali_system_info *)_mali_osk_malloc(sizeof(_mali_system_info)), _MALI_OSK_ERR_NOMEM);
-
-	_mali_osk_memset(new_info, 0, sizeof(_mali_system_info));
-
-	/* fill in the info */
-	new_info->has_mmu = 1;
-	new_info->drivermode = _MALI_DRIVER_MODE_NORMAL;
-
-	new_info->core_info = NULL; /* Not used by user space */
-
-	new_info->mem_info = _mali_osk_calloc(1, sizeof(_mali_mem_info));
-	if(NULL == new_info->mem_info)
-	{
-		_mali_osk_free(new_info);
-		return _MALI_OSK_ERR_NOMEM;
-	}
-
-	new_info->mem_info->size = 1024 * 1024 * 1024; /* 1GiB */
-	new_info->mem_info->flags = _MALI_CPU_WRITEABLE | _MALI_CPU_READABLE | _MALI_PP_READABLE | _MALI_PP_WRITEABLE |_MALI_GP_READABLE | _MALI_GP_WRITEABLE | _MALI_MMU_READABLE | _MALI_MMU_WRITEABLE;
-	new_info->mem_info->maximum_order_supported = 30;
-	new_info->mem_info->identifier = 0;
-	new_info->mem_info->next = NULL;
-
-	/* building succeeded, calculate the size */
-
-	/* size needed of the system info struct itself */
-	new_size = sizeof(_mali_system_info);
-
-	/* size needed for the cores */
-	for (current_core = new_info->core_info; NULL != current_core; current_core = current_core->next)
-	{
-		new_size += sizeof(_mali_core_info);
-	}
-
-	/* size needed for the memory banks */
-	for (current_mem = new_info->mem_info; NULL != current_mem; current_mem = current_mem->next)
-	{
-		new_size += sizeof(_mali_mem_info);
-	}
-
-	/* lock system info access so a user wont't get a corrupted version */
-	_mali_osk_lock_wait( system_info_lock, _MALI_OSK_LOCKMODE_RW );
-
-	/* set new info */
-	system_info = new_info;
-	system_info_size = new_size;
-
-	/* we're safe */
-	_mali_osk_lock_signal( system_info_lock, _MALI_OSK_LOCKMODE_RW );
-
-	/* ok result */
-	return _MALI_OSK_ERR_OK;
 }
 
 _mali_osk_errcode_t _mali_ukk_get_api_version( _mali_uk_get_api_version_s *args )
@@ -916,102 +808,6 @@ _mali_osk_errcode_t _mali_ukk_get_api_version( _mali_uk_get_api_version_s *args 
 
 	/* success regardless of being compatible or not */
 	MALI_SUCCESS;
-}
-
-_mali_osk_errcode_t _mali_ukk_get_system_info_size(_mali_uk_get_system_info_size_s *args)
-{
-	MALI_DEBUG_ASSERT_POINTER(args);
-	args->size = system_info_size;
-	MALI_SUCCESS;
-}
-
-_mali_osk_errcode_t _mali_ukk_get_system_info( _mali_uk_get_system_info_s *args )
-{
-	_mali_core_info * current_core;
-	_mali_mem_info * current_mem;
-	_mali_osk_errcode_t err = _MALI_OSK_ERR_FAULT;
-	void * current_write_pos, ** current_patch_pos;
-	u32 adjust_ptr_base;
-
-	/* check input */
-	MALI_DEBUG_ASSERT_POINTER(args);
-	MALI_CHECK_NON_NULL(args->ctx, _MALI_OSK_ERR_INVALID_ARGS);
-	MALI_CHECK_NON_NULL(args->system_info, _MALI_OSK_ERR_INVALID_ARGS);
-
-	/* lock the system info */
-	_mali_osk_lock_wait( system_info_lock, _MALI_OSK_LOCKMODE_RW );
-
-	/* first check size */
-	if (args->size < system_info_size) goto exit_when_locked;
-
-	/* we build a copy of system_info in the user space buffer specified by the user and
-	 * patch up the pointers. The ukk_private members of _mali_uk_get_system_info_s may
-	 * indicate a different base address for patching the pointers (normally the
-	 * address of the provided system_info buffer would be used). This is helpful when
-	 * the system_info buffer needs to get copied to user space and the pointers need
-	 * to be in user space.
-	 */
-	if (0 == args->ukk_private)
-	{
-		adjust_ptr_base = (u32)args->system_info;
-	}
-	else
-	{
-		adjust_ptr_base = args->ukk_private;
-	}
-
-	/* copy each struct into the buffer, and update its pointers */
-	current_write_pos = (void *)args->system_info;
-
-	/* first, the master struct */
-	_mali_osk_memcpy(current_write_pos, system_info, sizeof(_mali_system_info));
-
-	/* advance write pointer */
-	current_write_pos = (void *)((u32)current_write_pos + sizeof(_mali_system_info));
-
-	/* first we write the core info structs, patch starts at master's core_info pointer */
-	current_patch_pos = (void **)((u32)args->system_info + offsetof(_mali_system_info, core_info));
-
-	for (current_core = system_info->core_info; NULL != current_core; current_core = current_core->next)
-	{
-
-		/* patch the pointer pointing to this core */
-		*current_patch_pos = (void*)(adjust_ptr_base + ((u32)current_write_pos - (u32)args->system_info));
-
-		/* copy the core info */
-		_mali_osk_memcpy(current_write_pos, current_core, sizeof(_mali_core_info));
-
-		/* update patch pos */
-		current_patch_pos = (void **)((u32)current_write_pos + offsetof(_mali_core_info, next));
-
-		/* advance write pos in memory */
-		current_write_pos = (void *)((u32)current_write_pos + sizeof(_mali_core_info));
-	}
-	/* patching of last patch pos is not needed, since we wrote NULL there in the first place */
-
-	/* then we write the mem info structs, patch starts at master's mem_info pointer */
-	current_patch_pos = (void **)((u32)args->system_info + offsetof(_mali_system_info, mem_info));
-
-	for (current_mem = system_info->mem_info; NULL != current_mem; current_mem = current_mem->next)
-	{
-		/* patch the pointer pointing to this core */
-		*current_patch_pos = (void*)(adjust_ptr_base + ((u32)current_write_pos - (u32)args->system_info));
-
-		/* copy the core info */
-		_mali_osk_memcpy(current_write_pos, current_mem, sizeof(_mali_mem_info));
-
-		/* update patch pos */
-		current_patch_pos = (void **)((u32)current_write_pos + offsetof(_mali_mem_info, next));
-
-		/* advance write pos in memory */
-		current_write_pos = (void *)((u32)current_write_pos + sizeof(_mali_mem_info));
-	}
-	/* patching of last patch pos is not needed, since we wrote NULL there in the first place */
-
-	err = _MALI_OSK_ERR_OK;
-exit_when_locked:
-	_mali_osk_lock_signal( system_info_lock, _MALI_OSK_LOCKMODE_RW );
-	MALI_ERROR(err);
 }
 
 _mali_osk_errcode_t _mali_ukk_wait_for_notification( _mali_uk_wait_for_notification_s *args )
@@ -1117,7 +913,7 @@ _mali_osk_errcode_t _mali_ukk_open(void **context)
 
 	if (0 != mali_dlbu_phys_addr)
 	{
-		mali_mmu_pagedir_update(session_data->page_directory, MALI_DLB_VIRT_ADDR, mali_dlbu_phys_addr, _MALI_OSK_MALI_PAGE_SIZE);
+		mali_mmu_pagedir_update(session_data->page_directory, MALI_DLB_VIRT_ADDR, mali_dlbu_phys_addr, _MALI_OSK_MALI_PAGE_SIZE, MALI_CACHE_STANDARD);
 	}
 
 	if (_MALI_OSK_ERR_OK != mali_memory_session_begin(session_data))

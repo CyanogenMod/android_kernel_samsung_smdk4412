@@ -126,7 +126,7 @@ _mali_osk_errcode_t _mali_ukk_sw_counters_report(_mali_uk_sw_counters_report_s *
 int _mali_profiling_set_event(u32 counter_id, s32 event_id)
 {
 
-	if (counter_id == COUNTER_VP_C0)
+	if (COUNTER_VP_C0 == counter_id)
 	{
 		struct mali_gp_core* gp_core = mali_gp_get_global_gp_core();
 		if (NULL != gp_core)
@@ -137,7 +137,7 @@ int _mali_profiling_set_event(u32 counter_id, s32 event_id)
 			}
 		}
 	}
-	else if (counter_id == COUNTER_VP_C1)
+	if (COUNTER_VP_C1 == counter_id)
 	{
 		struct mali_gp_core* gp_core = mali_gp_get_global_gp_core();
 		if (NULL != gp_core)
@@ -148,7 +148,7 @@ int _mali_profiling_set_event(u32 counter_id, s32 event_id)
 			}
 		}
 	}
-	else if (counter_id >= COUNTER_FP0_C0 && counter_id <= COUNTER_FP3_C1)
+	if (COUNTER_FP0_C0 <= counter_id && COUNTER_FP3_C1 >= counter_id)
 	{
 		u32 core_id = (counter_id - COUNTER_FP0_C0) >> 1;
 		struct mali_pp_core* pp_core = mali_pp_get_global_pp_core(core_id);
@@ -171,7 +171,7 @@ int _mali_profiling_set_event(u32 counter_id, s32 event_id)
 			}
 		}
 	}
-	else if (counter_id >= COUNTER_L2_C0 && counter_id <= COUNTER_L2_C1)
+	if (COUNTER_L2_C0 <= counter_id && COUNTER_L2_C1 >= counter_id)
 	{
 		u32 core_id = (counter_id - COUNTER_L2_C0) >> 1;
 		struct mali_l2_cache_core* l2_cache_core = mali_l2_cache_core_get_glob_l2_core(core_id);
@@ -210,14 +210,13 @@ int _mali_profiling_set_event(u32 counter_id, s32 event_id)
  */
 void _mali_profiling_get_counters(u32 *src0, u32 *val0, u32 *src1, u32 *val1)
 {
-	 struct mali_l2_cache_core *l2_cache = mali_l2_cache_core_get_glob_l2_core(0); /* @@@@ TODO: Fix hardcoded limit of maximum 1 L2 cache */
+	 struct mali_l2_cache_core *l2_cache = mali_l2_cache_core_get_glob_l2_core(0);
 	 if (NULL != l2_cache)
 	 {
 		if (MALI_TRUE == mali_l2_cache_lock_power_state(l2_cache))
 		{
 			/* It is now safe to access the L2 cache core in order to retrieve the counters */
 			mali_l2_cache_core_get_counter_values(l2_cache, src0, val0, src1, val1);
-			/* @@@@ TODO: add error checking, if needed; src == MALI_HW_CORE_NO_COUNTER if not able to get value */
 		}
 		mali_l2_cache_unlock_power_state(l2_cache);
 	 }

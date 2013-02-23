@@ -12,6 +12,7 @@
 #define MALI_LINUX_TRACE_H
 
 #include <linux/types.h>
+
 #include <linux/stringify.h>
 #include <linux/tracepoint.h>
 

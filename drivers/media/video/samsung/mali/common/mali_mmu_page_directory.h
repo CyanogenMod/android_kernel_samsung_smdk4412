@@ -50,8 +50,25 @@ typedef enum mali_mmu_entry_flags
 	MALI_MMU_FLAGS_PRESENT = 0x01,
 	MALI_MMU_FLAGS_READ_PERMISSION = 0x02,
 	MALI_MMU_FLAGS_WRITE_PERMISSION = 0x04,
-	MALI_MMU_FLAGS_MASK = 0x07
+	MALI_MMU_FLAGS_OVERRIDE_CACHE  = 0x8,
+	MALI_MMU_FLAGS_WRITE_CACHEABLE  = 0x10,
+	MALI_MMU_FLAGS_WRITE_ALLOCATE  = 0x20,
+	MALI_MMU_FLAGS_WRITE_BUFFERABLE  = 0x40,
+	MALI_MMU_FLAGS_READ_CACHEABLE  = 0x80,
+	MALI_MMU_FLAGS_READ_ALLOCATE  = 0x100,
+	MALI_MMU_FLAGS_MASK = 0x1FF,
 } mali_mmu_entry_flags;
+
+
+#define MALI_MMU_FLAGS_FORCE_GP_READ_ALLOCATE ( \
+MALI_MMU_FLAGS_PRESENT | \
+	MALI_MMU_FLAGS_READ_PERMISSION |  \
+	MALI_MMU_FLAGS_WRITE_PERMISSION | \
+	MALI_MMU_FLAGS_OVERRIDE_CACHE | \
+	MALI_MMU_FLAGS_WRITE_CACHEABLE | \
+	MALI_MMU_FLAGS_WRITE_BUFFERABLE | \
+	MALI_MMU_FLAGS_READ_CACHEABLE | \
+	MALI_MMU_FLAGS_READ_ALLOCATE )
 
 
 struct mali_page_directory
@@ -68,7 +85,7 @@ _mali_osk_errcode_t mali_mmu_pagedir_map(struct mali_page_directory *pagedir, u3
 _mali_osk_errcode_t mali_mmu_pagedir_unmap(struct mali_page_directory *pagedir, u32 mali_address, u32 size);
 
 /* Back virtual address space with actual pages. Assumes input is contiguous and 4k aligned. */
-void mali_mmu_pagedir_update(struct mali_page_directory *pagedir, u32 mali_address, u32 phys_address, u32 size);
+void mali_mmu_pagedir_update(struct mali_page_directory *pagedir, u32 mali_address, u32 phys_address, u32 size, u32 cache_settings);
 
 u32 mali_page_directory_get_phys_address(struct mali_page_directory *pagedir, u32 index);
 

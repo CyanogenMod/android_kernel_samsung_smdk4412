@@ -95,7 +95,7 @@ static u32 os_allocator_stat(mali_physical_memory_allocator * allocator)
 static void os_allocator_destroy(mali_physical_memory_allocator * allocator)
 {
 	os_allocator * info;
-	MALI_DEBUG_ASSERT_POINTER(allocator);
+        MALI_DEBUG_ASSERT_POINTER(allocator);
 	MALI_DEBUG_ASSERT_POINTER(allocator->ctx);
 	info = (os_allocator*)allocator->ctx;
 	_mali_osk_lock_term(info->mutex);
@@ -132,7 +132,7 @@ static mali_physical_memory_allocation_result os_allocator_allocate(void* ctx, m
 		allocation->num_pages = ((left + _MALI_OSK_CPU_PAGE_SIZE - 1) & ~(_MALI_OSK_CPU_PAGE_SIZE - 1)) >> _MALI_OSK_CPU_PAGE_ORDER;
 		MALI_DEBUG_PRINT(6, ("Allocating page array of size %d bytes\n", allocation->num_pages * sizeof(struct page*)));
 
-		while (left > 0)
+		while (left > 0 && ((info->num_pages_allocated + pages_allocated) < info->num_pages_max) && _mali_osk_mem_check_allocated(os_mem_max_usage))
 		{
 			err = mali_allocation_engine_map_physical(engine, descriptor, *offset, MALI_MEMORY_ALLOCATION_OS_ALLOCATED_PHYSADDR_MAGIC, info->cpu_usage_adjust, _MALI_OSK_CPU_PAGE_SIZE);
 			if ( _MALI_OSK_ERR_OK != err)
@@ -243,7 +243,7 @@ static void os_allocator_release(void * ctx, void * handle)
 
 static mali_physical_memory_allocation_result os_allocator_allocate_page_table_block(void * ctx, mali_page_table_block * block)
 {
-	int allocation_order = 11; /* _MALI_OSK_CPU_PAGE_SIZE << 11 */
+	int allocation_order = 6; /* _MALI_OSK_CPU_PAGE_SIZE << 6 */
 	void *virt = NULL;
 	u32 size = _MALI_OSK_CPU_PAGE_SIZE << allocation_order;
 	os_allocator * info;

@@ -56,13 +56,12 @@ _mali_osk_errcode_t mali_gp_scheduler_initialize(void)
 	_MALI_OSK_INIT_LIST_HEAD(&job_queue);
 
 	gp_scheduler_lock = _mali_osk_lock_init(_MALI_OSK_LOCKFLAG_ORDERED | _MALI_OSK_LOCKFLAG_NONINTERRUPTABLE, 0, _MALI_OSK_LOCK_ORDER_SCHEDULER);
-	gp_scheduler_working_wait_queue = _mali_osk_wait_queue_init();
-
 	if (NULL == gp_scheduler_lock)
 	{
 		return _MALI_OSK_ERR_NOMEM;
 	}
 
+	gp_scheduler_working_wait_queue = _mali_osk_wait_queue_init();
 	if (NULL == gp_scheduler_working_wait_queue)
 	{
 		_mali_osk_lock_term(gp_scheduler_lock);
@@ -275,29 +274,27 @@ void mali_gp_scheduler_resume(void)
 	mali_gp_scheduler_unlock();
 }
 
-_mali_osk_errcode_t _mali_ukk_gp_start_job(_mali_uk_gp_start_job_s *args)
+_mali_osk_errcode_t _mali_ukk_gp_start_job(void *ctx, _mali_uk_gp_start_job_s *uargs)
 {
 	struct mali_session_data *session;
 	struct mali_gp_job *job;
 
-	MALI_DEBUG_ASSERT_POINTER(args);
+	MALI_DEBUG_ASSERT_POINTER(uargs);
+	MALI_DEBUG_ASSERT_POINTER(ctx);
 
-	if (NULL == args->ctx)
-	{
-		return _MALI_OSK_ERR_INVALID_ARGS;
-	}
+	session = (struct mali_session_data*)ctx;
 
-	session = (struct mali_session_data*)args->ctx;
-	if (NULL == session)
-	{
-		return _MALI_OSK_ERR_FAULT;
-	}
-
-	job = mali_gp_job_create(session, args, mali_scheduler_get_new_id());
+	job = mali_gp_job_create(session, uargs, mali_scheduler_get_new_id());
 	if (NULL == job)
 	{
 		return _MALI_OSK_ERR_NOMEM;
 	}
+
+#if PROFILING_SKIP_PP_AND_GP_JOBS
+#warning GP jobs will not be executed
+	mali_gp_scheduler_return_job_to_user(job, MALI_TRUE);
+	return _MALI_OSK_ERR_OK;
+#endif
 
 	mali_gp_scheduler_lock();
 

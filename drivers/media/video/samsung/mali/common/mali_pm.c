@@ -150,16 +150,13 @@ inline void mali_pm_execute_state_change_unlock(void)
 
 static void mali_pm_powerup(void)
 {
+#if !MALI_PMM_RUNTIME_JOB_CONTROL_ON
 	MALI_DEBUG_PRINT(3, ("Mali PM: Setting GPU power mode to MALI_POWER_MODE_ON\n"));
 	mali_platform_power_mode_change(MALI_POWER_MODE_ON);
-
-#if MALI_PMM_RUNTIME_JOB_CONTROL_ON
-
+#else
 	/* Aquire our reference */
-	MALI_DEBUG_PRINT(4, ("Mali PM: Getting device PM reference (=> requesting MALI_POWER_MODE_ON)\n"));
 	_mali_osk_pm_dev_activate();
 #endif
-
 	mali_group_power_on();
 }
 
@@ -169,10 +166,16 @@ static void mali_pm_powerdown(mali_power_mode power_mode)
 	{
 		mali_group_power_off();
 	}
-	mali_platform_power_mode_change(power_mode);
 
-#if MALI_PMM_RUNTIME_JOB_CONTROL_ON
+#if !MALI_PMM_RUNTIME_JOB_CONTROL_ON
+	mali_platform_power_mode_change(power_mode);
+#else
 	_mali_osk_pm_dev_idle();
+
+	if (MALI_POWER_MODE_DEEP_SLEEP == power_mode)
+	{
+		mali_platform_power_mode_change(power_mode);
+	}
 #endif
 }
 
@@ -539,9 +542,11 @@ void mali_pm_os_resume(void)
 void mali_pm_runtime_suspend(void)
 {
 	MALI_DEBUG_PRINT(2, ("Mali PM: OS runtime suspended\n"));
+	mali_platform_power_mode_change(MALI_POWER_MODE_LIGHT_SLEEP);
 }
 
 void mali_pm_runtime_resume(void)
 {
-	MALI_DEBUG_PRINT(3, ("Mali PM: OS runtime resumed\n"));
+	MALI_DEBUG_PRINT(2, ("Mali PM: OS runtime resumed\n"));
+	mali_platform_power_mode_change(MALI_POWER_MODE_ON);
 }

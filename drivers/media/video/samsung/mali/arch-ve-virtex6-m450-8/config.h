@@ -17,6 +17,12 @@
 
 static _mali_osk_resource_t arch_configuration [] =
 {
+	/* PMU */
+	{
+                .type = PMU,
+                .base = MALI_BASE_ADDRESS + 0x02000,
+                .description = "MALI PMU"
+        },
 	/* GP cluster */
 	{
 		.type = MALI400L2,

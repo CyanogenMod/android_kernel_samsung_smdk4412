@@ -48,7 +48,6 @@ void _mali_osk_pm_dev_enable(void)
 _mali_osk_errcode_t _mali_osk_pm_dev_idle(void)
 {
 #ifdef CONFIG_PM_RUNTIME
-
 	if (MALI_TRUE == have_runtime_reference)
 	{
 		int err;

@@ -77,4 +77,6 @@ _mali_osk_errcode_t mali_memory_core_resource_os_memory(_mali_osk_resource_t * r
  */
 _mali_osk_errcode_t mali_memory_core_resource_dedicated_memory(_mali_osk_resource_t * resource);
 
+mali_allocation_engine mali_mem_get_memory_engine(void);
+
 #endif /* __MALI_MEMORY_H__ */

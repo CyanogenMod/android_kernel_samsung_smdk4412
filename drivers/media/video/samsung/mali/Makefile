@@ -1,5 +1,5 @@
 #
-# Copyright (C) 2010 ARM Limited. All rights reserved.
+# Copyright (C) 2010-2012 ARM Limited. All rights reserved.
 # 
 # This program is free software and is provided to you under the terms of the GNU General Public License version 2
 # as published by the Free Software Foundation, and any use by you of this program is subject to the terms of such GNU licence.
@@ -38,11 +38,10 @@ USING_OS_MEMORY=1
 endif
 
 ifeq ($(CONFIG_PM),y)
-USING_PMM=1
+	USING_PMM = 1
+ifeq ($(CONFIG_PM_RUNTIME),y)
+	KERNEL_RUNTIME_PM_ENABLED = 1
 endif
-
-ifeq ($(CONFIG_PM_RUNTIME),y)  
-USING_MALI_RUN_TIME_PM=1
 endif
 
 ifeq ($(CONFIG_VIDEO_MALI400MP_DVFS),y)
@@ -75,15 +74,17 @@ USING_INTERNAL_PROFILING ?= 0
 USING_TRACEPOINTS ?= 0
 USING_MALI_MAJOR_PREDEFINE = 1
 USING_MALI_DVFS_ENABLED ?= 1
-TIMESTAMP ?= default
-BUILD ?= release 
 USING_MALI_PMM_EARLYSUSPEND ?= 0
 #USING_KERNEL_WITH_DMA_ALLOC_PHYS_PAGE ?= 0
-CONFIG_MALI_MEM_SIZE ?= 512
+#CONFIG_MALI_MEM_SIZE ?= 512
 DISABLE_PP0 ?= 0
 DISABLE_PP1 ?= 0
 DISABLE_PP2 ?= 0
 DISABLE_PP3 ?= 0
+TIMESTAMP ?= default
+BUILD ?= release 
+TARGET_PLATFORM ?= default
+KERNEL_RUNTIME_PM_ENABLED ?= 0
 MALI_PP_SCHEDULER_FORCE_NO_JOB_OVERLAP ?= 0
 MALI_PP_SCHEDULER_KEEP_SUB_JOB_STARTS_ALIGNED ?= 0
 MALI_PP_SCHEDULER_FORCE_NO_JOB_OVERLAP_BETWEEN_APPS ?= 0
@@ -93,14 +94,15 @@ ifeq ($(USING_PROFILING),1)
 ifeq ($(USING_INTERNAL_PROFILING),0)
 ifndef CONFIG_TRACEPOINTS
 # Should default to gator profiling, but we dont have the kernel feature required, so disable profiling
-USING_PROFILING = 0
+override USING_PROFILING = 0
+$(warning "CONFIG_TRACEPOINTS required for USING_PROFILING")
 endif
 endif
 endif
 
 ifeq ($(USING_PROFILING),0)
 # make sure user hasnt selected incompatible flags
-USING_INTERNAL_PROFILING = 0
+override USING_INTERNAL_PROFILING = 0
 endif
 
 USING_MALI_SLP_GLOBAL_LOCK ?= 0
@@ -119,22 +121,20 @@ endif
 -include ../../../arm_internal.mak
 
 # Set up our defines, which will be passed to gcc
+DEFINES += -DONLY_ZBT=$(ONLY_ZBT)
 DEFINES += -DUSING_ZBT=$(USING_ZBT)
-DEFINES += -DUSING_OS_MEMORY=$(USING_OS_MEMORY)
 DEFINES += -DUSING_MMU=$(USING_MMU)
+DEFINES += -DUSING_OS_MEMORY=$(USING_OS_MEMORY)
 DEFINES += -DUSING_DED=$(USING_DED)
 DEFINES += -DUSING_UMP=$(USING_UMP)
-DEFINES += -DONLY_ZBT=$(ONLY_ZBT)
 DEFINES += -D_MALI_OSK_SPECIFIC_INDIRECT_MMAP
 DEFINES += -DUSING_MALI_PMU=$(USING_MALI_PMU)
-DEFINES += -DMALI_PMM_RUNTIME_JOB_CONTROL_ON=$(USING_MALI_RUN_TIME_PM)
+DEFINES += -DMALI_PMM_RUNTIME_JOB_CONTROL_ON=$(KERNEL_RUNTIME_PM_ENABLED)
 DEFINES += -DUSING_MALI_PMM=$(USING_PMM)
 DEFINES += -DMALI_GPU_UTILIZATION=$(USING_GPU_UTILIZATION)
 DEFINES += -DCONFIG_MALI_MEM_SIZE=$(CONFIG_MALI_MEM_SIZE)
 DEFINES += -D_MALI_OSK_SPECIFIC_INDIRECT_MMAP
-DEFINES += -DMALI_TIMELINE_PROFILING_ENABLED=$(USING_PROFILING)
 DEFINES += -DMALI_INTERNAL_TIMELINE_PROFILING_ENABLED=$(USING_INTERNAL_PROFILING)
-DEFINES += -DMALI_POWER_MGMT_TEST_SUITE=$(USING_MALI_PMM_TESTSUITE)
 DEFINES += -DMALI_MAJOR_PREDEFINE=$(USING_MALI_MAJOR_PREDEFINE)
 DEFINES += -DMALI_DVFS_ENABLED=$(USING_MALI_DVFS_ENABLED)
 DEFINES += -DUSING_MALI_PMM_EARLYSUSPEND=$(USING_MALI_PMM_EARLYSUSPEND)
@@ -148,6 +148,9 @@ DEFINES += -DDISABLE_PP3=$(DISABLE_PP3)
 DEFINES += -DMALI_PP_SCHEDULER_FORCE_NO_JOB_OVERLAP=$(MALI_PP_SCHEDULER_FORCE_NO_JOB_OVERLAP)
 DEFINES += -DMALI_PP_SCHEDULER_KEEP_SUB_JOB_STARTS_ALIGNED=$(MALI_PP_SCHEDULER_KEEP_SUB_JOB_STARTS_ALIGNED)
 DEFINES += -DMALI_PP_SCHEDULER_FORCE_NO_JOB_OVERLAP_BETWEEN_APPS=$(MALI_PP_SCHEDULER_FORCE_NO_JOB_OVERLAP_BETWEEN_APPS)
+DEFINES += -DMALI_TIMELINE_PROFILING_ENABLED=$(USING_PROFILING)
+DEFINES += -DMALI_POWER_MGMT_TEST_SUITE=$(USING_MALI_PMM_TESTSUITE)
+DEFINES += -DMALI_OS_MEMORY_KERNEL_BUFFER_SIZE_IN_MB=$(OS_MEMORY_KERNEL_BUFFER_SIZE_IN_MB)
 
 ifeq ($(BUILD),debug)
 DEFINES += -DDEBUG
@@ -158,7 +161,7 @@ DEFINES += -DMALI_UKK_HAS_IMPLICIT_MMAP_CLEANUP
 
 # UMP
 ifeq ($(CONFIG_VIDEO_UMP),y)
-	DEFINES += -DMALI_USE_UNIFIED_MEMORY_PROVIDER=1 -DHAVE_UNLOCKED_IOCTL
+	DEFINES += -DMALI_USE_UNIFIED_MEMORY_PROVIDER=1
 	EXTRA_CFLAGS += -I$(MALI_INCLUDE_PREFIX)../ump/include
 else
 	DEFINES += -DMALI_USE_UNIFIED_MEMORY_PROVIDER=0
@@ -172,15 +175,11 @@ obj-$(CONFIG_VIDEO_MALI400MP)		+= mali.o
 INCLUDES = \
 		-I$(MALI_INCLUDE_PREFIX)\
 		-I$(MALI_INCLUDE_PREFIX)include \
-		-I$(MALI_INCLUDE_PREFIX)platform\
 		-I$(MALI_INCLUDE_PREFIX)common \
 		-I$(MALI_INCLUDE_PREFIX)linux \
+		-I$(MALI_INCLUDE_PREFIX)platform\
 		-I$(MALI_INCLUDE_PREFIX)regs
     
-ifeq ($(USING_PROFILING),1)
-INCLUDES += \
-		-I$(MALI_INCLUDE_PREFIX)include
-endif
 
 EXTRA_CFLAGS += $(INCLUDES)\
 		$(DEFINES) 
@@ -192,6 +191,7 @@ EXTRA_CFLAGS += -I$(MALI_INCLUDE_PREFIX)common/pmm
 ifeq ($(CONFIG_VIDEO_UMP),y)
 OSKFILES=\
         $(FILES_PREFIX)$(OSKOS)/mali_osk_irq.o \
+        $(FILES_PREFIX)$(OSKOS)/mali_osk_wait_queue.o \
         $(FILES_PREFIX)$(OSKOS)/mali_osk_low_level_mem.o \
         $(FILES_PREFIX)$(OSKOS)/mali_osk_mali.o \
         $(FILES_PREFIX)$(OSKOS)/mali_osk_notification.o \
@@ -202,6 +202,7 @@ OSKFILES=\
         $(FILES_PREFIX)$(OSKOS)/mali_osk_atomics.o \
         $(FILES_PREFIX)$(OSKOS)/mali_osk_irq.o \
         $(FILES_PREFIX)$(OSKOS)/mali_osk_locks.o \
+        $(FILES_PREFIX)$(OSKOS)/mali_osk_wait_queue.o \
         $(FILES_PREFIX)$(OSKOS)/mali_osk_low_level_mem.o \
         $(FILES_PREFIX)$(OSKOS)/mali_osk_math.o \
         $(FILES_PREFIX)$(OSKOS)/mali_osk_memory.o \
@@ -223,8 +224,7 @@ UKKFILES=\
         $(FILES_PREFIX)$(OSKOS)/mali_ukk_mem.o \
         $(FILES_PREFIX)$(OSKOS)/mali_ukk_gp.o \
         $(FILES_PREFIX)$(OSKOS)/mali_ukk_pp.o \
-        $(FILES_PREFIX)$(OSKOS)/mali_ukk_core.o \
-        $(FILES_PREFIX)$(OSKOS)/mali_ukk_vsync.o
+        $(FILES_PREFIX)$(OSKOS)/mali_ukk_core.o
 
 ifeq ($(USING_PROFILING),1)
 UKKFILES += \
@@ -234,7 +234,6 @@ endif
 mali-y := \
 	common/mali_kernel_core.o \
 	linux/mali_kernel_linux.o \
-	$(OSKOS)/mali_osk_indir_mmap.o \
 	common/mali_kernel_descriptor_mapping.o \
 	common/mali_session.o \
 	common/mali_device_pause_resume.o \
@@ -264,7 +263,7 @@ mali-y := \
 	common/mali_user_settings_db.o \
 	$(OSKOS)/mali_osk_pm.o \
 	linux/mali_kernel_pm.o \
-	$(OSKOS)/mali_osk_wait_queue.o \
+	linux/mali_pmu_power_up_down.o \
 	$(MALI_PLATFORM_FILE) \
 	$(OSKFILES) \
 	$(UKKFILES) 
@@ -280,7 +279,7 @@ EXTRA_CFLAGS += -I$(MALI_INCLUDE_PREFIX)timestamp-$(TIMESTAMP)
 else
 ifeq ($(USING_PROFILING),1)
 PROFILING_BACKEND_SOURCES = \
-	linux/mali_osk_profiling_gator.o
+	linux/mali_osk_profiling.o
 endif
 endif
 
@@ -308,6 +307,7 @@ EXTRA_CFLAGS += -DUSING_MALI400
 # Mali Level2 cache in use
 EXTRA_CFLAGS += -DUSING_MALI400_L2_CACHE
 mali-y += common/mali_l2_cache.o
+
 # Mali SLP Global lock feature
 ifeq ($(USING_MALI_SLP_GLOBAL_LOCK),1)
 mali-y += \

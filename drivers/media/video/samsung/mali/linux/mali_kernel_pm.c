@@ -65,7 +65,6 @@ static const struct dev_pm_ops mali_dev_pm_ops =
 	.suspend = mali_os_suspend,
 	.resume = mali_os_resume,
 #endif
-
 	.freeze = mali_os_suspend,
 	.poweroff = mali_os_suspend,
 	.thaw = mali_os_resume,
@@ -266,3 +265,4 @@ void _mali_dev_platform_unregister(void)
 	platform_device_unregister(&mali_gpu_device);
 #endif
 }
+

@@ -21,6 +21,14 @@ ARCH ?= arm
 OSKOS=linux
 FILES_PREFIX=
 
+check_cc2 = \
+	$(shell if $(1) -S -o /dev/null -xc /dev/null > /dev/null 2>&1; \
+	then \
+		echo "$(2)"; \
+	else \
+		echo "$(3)"; \
+	fi ;)
+
 # This conditional makefile exports the global definition ARM_INTERNAL_BUILD. Customer releases will not include arm_internal.mak
 -include ../../../arm_internal.mak
 
@@ -49,8 +57,8 @@ endif
 KDIR-$(shell uname -m):=/lib/modules/$(shell uname -r)/build
 
 ifeq ($(ARCH), arm)
-	# when compiling for ARM we're cross compiling
-	export CROSS_COMPILE ?= arm-none-linux-gnueabi-
+# when compiling for ARM we're cross compiling
+export CROSS_COMPILE ?= $(call check_cc2, arm-linux-gnueabi-gcc, arm-linux-gnueabi-, arm-none-linux-gnueabi-)
 endif
 
 # look up KDIR based om CPU selection

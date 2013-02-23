@@ -82,7 +82,7 @@ _mali_osk_errcode_t _mali_ukk_get_user_settings(_mali_uk_get_user_settings_s *ar
 {
 	MALI_DEBUG_ASSERT_POINTER(args);
 
-	_mali_osk_memcpy(args->settings, mali_user_settings, (sizeof(u32) * _MALI_UK_USER_SETTING_MAX));
+	_mali_osk_memcpy(args->settings, mali_user_settings, sizeof(mali_user_settings));
 
 	return _MALI_OSK_ERR_OK;
 }

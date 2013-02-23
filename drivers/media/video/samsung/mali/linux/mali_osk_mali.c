@@ -18,7 +18,6 @@
 #include "mali_kernel_common.h" /* MALI_xxx macros */
 #include "mali_osk.h"           /* kernel side OS functions */
 #include "mali_uk_types.h"
-#include "mali_kernel_linux.h"
 #include <mach/irqs.h>
 #include "arch/config.h"        /* contains the configuration of the arch we are compiling for */
 

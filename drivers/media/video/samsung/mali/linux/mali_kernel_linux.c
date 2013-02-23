@@ -15,7 +15,7 @@
 #include <linux/module.h>   /* kernel module definitions */
 #include <linux/fs.h>       /* file system operations */
 #include <linux/cdev.h>     /* character device definitions */
-#include <linux/mm.h>       /* memory mananger definitions */
+#include <linux/mm.h>       /* memory manager definitions */
 #include <linux/mali/mali_utgard_ioctl.h>
 #include "mali_kernel_common.h"
 #include "mali_session.h"
@@ -28,6 +28,10 @@
 #include "mali_kernel_sysfs.h"
 #include "mali_platform.h"
 #include "mali_kernel_license.h"
+#include "mali_dma_buf.h"
+#if MALI_INTERNAL_TIMELINE_PROFILING_ENABLED
+#include "mali_profiling_internal.h"
+#endif
 
 /* Streamline support for the Mali driver */
 #if defined(CONFIG_TRACEPOINTS) && MALI_TIMELINE_PROFILING_ENABLED
@@ -50,16 +54,9 @@ module_param(mali_debug_level, int, S_IRUSR | S_IWUSR | S_IWGRP | S_IRGRP | S_IR
 MODULE_PARM_DESC(mali_debug_level, "Higher number, more dmesg output");
 
 /* By default the module uses any available major, but it's possible to set it at load time to a specific number */
-#if MALI_MAJOR_PREDEFINE
-int mali_major = 244;
-#else
 int mali_major = 0;
-#endif
 module_param(mali_major, int, S_IRUGO); /* r--r--r-- */
 MODULE_PARM_DESC(mali_major, "Device major number");
-
-module_param(mali_hang_check_interval, int, S_IRUSR | S_IWUSR | S_IWGRP | S_IRGRP | S_IROTH);
-MODULE_PARM_DESC(mali_hang_check_interval, "Interval at which to check for progress after the hw watchdog has been triggered");
 
 module_param(mali_max_job_runtime, int, S_IRUSR | S_IWUSR | S_IWGRP | S_IRGRP | S_IROTH);
 MODULE_PARM_DESC(mali_max_job_runtime, "Maximum allowed job runtime in msecs.\nJobs will be killed after this no matter what");
@@ -78,92 +75,6 @@ MODULE_PARM_DESC(mali_boot_profiling, "Start profiling as a part of Mali driver 
 #include "mali_user_settings_db.h"
 EXPORT_SYMBOL(mali_set_user_setting);
 EXPORT_SYMBOL(mali_get_user_setting);
-#if MALI_DVFS_ENABLED
-extern int mali_dvfs_control;
-module_param(mali_dvfs_control, int, S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP| S_IROTH); /* rw-rw-r-- */
-MODULE_PARM_DESC(mali_dvfs_control, "Mali Current DVFS");
-#if defined(CONFIG_CPU_EXYNOS4210)
-#else
-extern int step0_clk;
-module_param(step0_clk, int, S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP| S_IROTH); /* rw-rw-r-- */
-MODULE_PARM_DESC(step0_clk, "Mali Current step0_clk");
-#ifdef DEBUG
-extern int step0_vol;
-module_param(step0_vol, int, S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP| S_IROTH); /* rw-rw-r-- */
-MODULE_PARM_DESC(step0_vol, "Mali Current step0_vol");
-#endif
-
-#if (MALI_DVFS_STEPS > 1)
-extern int step1_clk;
-module_param(step1_clk, int, S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP| S_IROTH); /* rw-rw-r-- */
-MODULE_PARM_DESC(step1_clk, "Mali Current step1_clk");
-
-extern int step0_up;
-module_param(step0_up, int, S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP| S_IROTH); /* rw-rw-r-- */
-MODULE_PARM_DESC(step0_up, "Mali Current step0_up");
-
-extern int step1_down;
-module_param(step1_down, int, S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP| S_IROTH); /* rw-rw-r-- */
-MODULE_PARM_DESC(step1_down, "Mali Current step1_down");
-#ifdef DEBUG
-extern int step1_vol;
-module_param(step1_vol, int, S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP| S_IROTH); /* rw-rw-r-- */
-MODULE_PARM_DESC(step1_vol, "Mali Current step1_vol");
-#endif
-
-#if (MALI_DVFS_STEPS > 2)
-extern int step2_clk;
-module_param(step2_clk, int, S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP| S_IROTH); /* rw-rw-r-- */
-MODULE_PARM_DESC(step2_clk, "Mali Current step2_clk");
-
-extern int step1_up;
-module_param(step1_up, int, S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP| S_IROTH); /* rw-rw-r-- */
-MODULE_PARM_DESC(step1_up, "Mali Current step1_up");
-
-extern int step2_down;
-module_param(step2_down, int, S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP| S_IROTH); /* rw-rw-r-- */
-MODULE_PARM_DESC(step2_down, "Mali Current step2_down");
-#ifdef DEBUG
-extern int step2_vol;
-module_param(step2_vol, int, S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP| S_IROTH); /* rw-rw-r-- */
-MODULE_PARM_DESC(step2_vol, "Mali Current step2_vol");
-#endif
-
-#if (MALI_DVFS_STEPS > 3)
-extern int step3_clk;
-module_param(step3_clk, int, S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP| S_IROTH); /* rw-rw-r-- */
-MODULE_PARM_DESC(step3_clk, "Mali Current step3_clk");
-
-extern int step2_up;
-module_param(step2_up, int, S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP| S_IROTH); /* rw-rw-r-- */
-MODULE_PARM_DESC(step2_up, "Mali Current step2_up");
-
-extern int step3_down;
-module_param(step3_down, int, S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP| S_IROTH); /* rw-rw-r-- */
-MODULE_PARM_DESC(step3_down, "Mali Current step3_down");
-#ifdef DEBUG
-extern int step3_vol;
-module_param(step3_vol, int, S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP| S_IROTH); /* rw-rw-r-- */
-MODULE_PARM_DESC(step3_vol, "Mali Current step3_vol");
-#endif
-#endif
-#endif
-#endif
-#endif
-
-extern int mali_gpu_clk;
-module_param(mali_gpu_clk, int, S_IRUSR | S_IRGRP | S_IROTH); /* r--r--r-- */
-MODULE_PARM_DESC(mali_gpu_clk, "Mali Current Clock");
-
-extern int mali_gpu_vol;
-module_param(mali_gpu_vol, int, S_IRUSR | S_IRGRP | S_IROTH); /* r--r--r-- */
-MODULE_PARM_DESC(mali_gpu_vol, "Mali Current Voltage");
-
-extern int gpu_power_state;
-module_param(gpu_power_state, int, S_IRUSR | S_IRGRP | S_IROTH); /* r--r--r-- */
-MODULE_PARM_DESC(gpu_power_state, "Mali Power State");
-#endif
-
 
 static char mali_dev_name[] = "mali"; /* should be const, but the functions we call requires non-cost */
 
@@ -218,6 +129,15 @@ int mali_driver_init(void)
 	ret = map_errcode(mali_initialize_subsystems());
 	if (0 != ret) goto initialize_subsystems_failed;
 
+#if MALI_INTERNAL_TIMELINE_PROFILING_ENABLED
+        ret = _mali_internal_profiling_init(mali_boot_profiling ? MALI_TRUE : MALI_FALSE);
+        if (0 != ret)
+        {
+                /* No biggie if we wheren't able to initialize the profiling */
+                MALI_PRINT_ERROR(("Failed to initialize profiling, feature will be unavailable\n"));
+        }
+#endif
+
 	ret = initialize_sysfs();
 	if (0 != ret) goto initialize_sysfs_failed;
 
@@ -227,6 +147,9 @@ int mali_driver_init(void)
 
 	/* Error handling */
 initialize_sysfs_failed:
+#if MALI_INTERNAL_TIMELINE_PROFILING_ENABLED
+        _mali_internal_profiling_term();
+#endif
 	mali_terminate_subsystems();
 initialize_subsystems_failed:
 	mali_osk_low_level_mem_term();
@@ -245,6 +168,10 @@ void mali_driver_exit(void)
 	MALI_DEBUG_PRINT(2, ("Unloading Mali v%d device driver.\n",_MALI_API_VERSION));
 
 	/* No need to terminate sysfs, this will be done automatically along with device termination */
+
+#if MALI_INTERNAL_TIMELINE_PROFILING_ENABLED
+        _mali_internal_profiling_term();
+#endif
 
 	mali_terminate_subsystems();
 
@@ -342,13 +269,26 @@ static int mali_mmap(struct file * filp, struct vm_area_struct * vma)
 		return -EFAULT;
 	}
 
-	MALI_DEBUG_PRINT(3, ("MMap() handler: start=0x%08X, phys=0x%08X, size=0x%08X\n", (unsigned int)vma->vm_start, (unsigned int)(vma->vm_pgoff << PAGE_SHIFT), (unsigned int)(vma->vm_end - vma->vm_start)) );
+	MALI_DEBUG_PRINT(4, ("MMap() handler: start=0x%08X, phys=0x%08X, size=0x%08X vma->flags 0x%08x\n", (unsigned int)vma->vm_start, (unsigned int)(vma->vm_pgoff << PAGE_SHIFT), (unsigned int)(vma->vm_end - vma->vm_start), vma->vm_flags));
 
 	/* Re-pack the arguments that mmap() packed for us */
 	args.ctx = session_data;
 	args.phys_addr = vma->vm_pgoff << PAGE_SHIFT;
 	args.size = vma->vm_end - vma->vm_start;
 	args.ukk_private = vma;
+
+	if ( VM_SHARED== (VM_SHARED  & vma->vm_flags))
+	{
+		args.cache_settings = MALI_CACHE_STANDARD ;
+		MALI_DEBUG_PRINT(3,("Allocate - Standard - Size: %d kb\n", args.size/1024));
+	}
+	else
+	{
+		args.cache_settings = MALI_CACHE_GP_READ_ALLOCATE;
+		MALI_DEBUG_PRINT(3,("Allocate - GP Cached - Size: %d kb\n", args.size/1024));
+	}
+	/* Setting it equal to VM_SHARED and not Private, which would have made the later io_remap fail for MALI_CACHE_GP_READ_ALLOCATE */
+	vma->vm_flags = 0x000000fb;
 
 	/* Call the common mmap handler */
 	MALI_CHECK(_MALI_OSK_ERR_OK ==_mali_ukk_mem_mmap( &args ), -EFAULT);
@@ -437,14 +377,6 @@ static int mali_ioctl(struct inode *inode, struct file *filp, unsigned int cmd, 
 
 	switch(cmd)
 	{
-		case MALI_IOC_GET_SYSTEM_INFO_SIZE:
-			err = get_system_info_size_wrapper(session_data, (_mali_uk_get_system_info_size_s __user *)arg);
-			break;
-
-		case MALI_IOC_GET_SYSTEM_INFO:
-			err = get_system_info_wrapper(session_data, (_mali_uk_get_system_info_s __user *)arg);
-			break;
-
 		case MALI_IOC_WAIT_FOR_NOTIFICATION:
 			err = wait_for_notification_wrapper(session_data, (_mali_uk_wait_for_notification_s __user *)arg);
 			break;
@@ -490,6 +422,7 @@ static int mali_ioctl(struct inode *inode, struct file *filp, unsigned int cmd, 
 		case MALI_IOC_PROFILING_REPORT_SW_COUNTERS:
 			err = profiling_report_sw_counters_wrapper(session_data, (_mali_uk_sw_counters_report_s __user *)arg);
 			break;
+
 #else
 
 		case MALI_IOC_PROFILING_START:              /* FALL-THROUGH */
@@ -544,6 +477,26 @@ static int mali_ioctl(struct inode *inode, struct file *filp, unsigned int cmd, 
 		case MALI_IOC_MEM_ATTACH_UMP:
 		case MALI_IOC_MEM_RELEASE_UMP: /* FALL-THROUGH */
 			MALI_DEBUG_PRINT(2, ("UMP not supported\n"));
+			err = -ENOTTY;
+			break;
+#endif
+
+#ifdef CONFIG_DMA_SHARED_BUFFER
+		case MALI_IOC_MEM_ATTACH_DMA_BUF:
+			err = mali_attach_dma_buf(session_data, (_mali_uk_attach_dma_buf_s __user *)arg);
+			break;
+
+		case MALI_IOC_MEM_RELEASE_DMA_BUF:
+			err = mali_release_dma_buf(session_data, (_mali_uk_release_dma_buf_s __user *)arg);
+			break;
+
+		case MALI_IOC_MEM_DMA_BUF_GET_SIZE:
+			err = mali_dma_buf_get_size(session_data, (_mali_uk_dma_buf_get_size_s __user *)arg);
+			break;
+#else
+
+		case MALI_IOC_MEM_DMA_BUF_GET_SIZE: /* FALL-THROUGH */
+			MALI_DEBUG_PRINT(2, ("DMA-BUF not supported\n"));
 			err = -ENOTTY;
 			break;
 #endif

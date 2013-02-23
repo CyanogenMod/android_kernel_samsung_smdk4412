@@ -1,9 +1,9 @@
 /*
  * Copyright (C) 2010-2012 ARM Limited. All rights reserved.
- *
+ * 
  * This program is free software and is provided to you under the terms of the GNU General Public License version 2
  * as published by the Free Software Foundation, and any use by you of this program is subject to the terms of such GNU licence.
- *
+ * 
  * A copy of the licence is included with the program, and can also be obtained from Free Software
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
  */
@@ -92,7 +92,7 @@ static int ump_file_ioctl(struct inode *inode, struct file *filp, unsigned int c
 #endif
 static int ump_file_mmap(struct file * filp, struct vm_area_struct * vma);
 
-#if defined(CONFIG_VIDEO_MALI400MP) || defined(CONFIG_VIDEO_MALI400MP_R3P0) || defined(CONFIG_VIDEO_MALI400MP_R2P3)
+#if defined(CONFIG_VIDEO_MALI400MP)
 extern int map_errcode( _mali_osk_errcode_t err );
 #endif
 
@@ -399,9 +399,8 @@ static int ump_file_ioctl(struct inode *inode, struct file *filp, unsigned int c
 
 	return err;
 }
-#ifndef CONFIG_VIDEO_MALI400MP_R2P3
+
 #ifndef CONFIG_VIDEO_MALI400MP
-#ifndef CONFIG_VIDEO_MALI400MP_R3P0
 int map_errcode( _mali_osk_errcode_t err )
 {
     switch(err)
@@ -418,8 +417,7 @@ int map_errcode( _mali_osk_errcode_t err )
     }
 }
 #endif
-#endif
-#endif
+
 /*
  * Handle from OS to map specified virtual memory to specified UMP memory.
  */
@@ -431,7 +429,7 @@ static int ump_file_mmap(struct file * filp, struct vm_area_struct * vma)
 
 	/* Validate the session data */
 	session_data = (struct ump_session_data *)filp->private_data;
-	if (NULL == session_data || NULL == session_data->cookies_map->table->mappings)
+	if (NULL == session_data)
 	{
 		MSG_ERR(("mmap() called without any session data available\n"));
 		return -EFAULT;
@@ -476,9 +474,6 @@ EXPORT_SYMBOL(ump_dd_phys_blocks_get);
 EXPORT_SYMBOL(ump_dd_size_get);
 EXPORT_SYMBOL(ump_dd_reference_add);
 EXPORT_SYMBOL(ump_dd_reference_release);
-EXPORT_SYMBOL(ump_dd_meminfo_get);
-EXPORT_SYMBOL(ump_dd_meminfo_set);
-EXPORT_SYMBOL(ump_dd_handle_get_from_vaddr);
 
 /* Export our own extended kernel space allocator */
 EXPORT_SYMBOL(ump_dd_handle_create_from_phys_blocks);

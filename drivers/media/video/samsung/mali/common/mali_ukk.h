@@ -17,7 +17,7 @@
 #define __MALI_UKK_H__
 
 #include "mali_osk.h"
-#include "../linux/mali_uk_types.h"
+#include "mali_uk_types.h"
 
 #ifdef __cplusplus
 extern "C"
@@ -217,55 +217,6 @@ _mali_osk_errcode_t _mali_ukk_close( void **context );
  * - wait for the result of jobs started on a core
  *
  * @{ */
-
-/** @brief Returns the size of the buffer needed for a _mali_ukk_get_system_info call
- *
- * This function must be called before a call is made to
- * _mali_ukk_get_system_info, so that memory of the correct size can be
- * allocated, and a pointer to this memory written into the system_info member
- * of _mali_uk_get_system_info_s.
- *
- * @param args see _mali_uk_get_system_info_size_s in "mali_utgard_uk_types.h"
- * @return _MALI_OSK_ERR_OK on success, otherwise a suitable _mali_osk_errcode_t on failure.
- */
-_mali_osk_errcode_t _mali_ukk_get_system_info_size( _mali_uk_get_system_info_size_s *args );
-
-/** @brief Returns information about the system (cores and memory banks)
- *
- * A buffer for this needs to be allocated by the caller. The size of the buffer required is returned by
- * _mali_ukk_get_system_info_size(). The user is responsible for freeing the buffer.
- *
- * The _mali_system_info structure will be written to the start of this buffer,
- * and the core_info and mem_info lists will be written to locations inside
- * the buffer, and will be suitably aligned.
- *
- * Under OS implementations of the U/K interface we need to pack/unpack
- * pointers across the user/kernel boundary. This has required that we malloc()
- * an intermediate buffer inside the kernel-side U/K interface, and free it
- * before returning to user-side. To avoid modifying common code, we do the
- * following pseudo-code, which we shall call 'pointer switching':
- *
- * @code
- * {
- *     Copy_From_User(kargs, args, ... );
- *     void __user * local_ptr = kargs->system_info;
- *     kargs->system_info = _mali_osk_malloc( ... );
- *     _mali_ukk_get_system_info( kargs );
- *     Copy_To_User( local_ptr, kargs->system_info, ... );
- *     _mali_osk_free( kargs->system_info );
- * }
- * @endcode
- * @note The user-side's args->system_info members was unmodified here.
- *
- * However, the current implementation requires an extra ukk_private word so that the common code can work out
- * how to patch pointers to user-mode for an OS's U/K implementation, this should be set to the user-space
- * destination address for pointer-patching to occur. When NULL, it is unused, an no pointer-patching occurs in the
- * common code.
- *
- * @param args see _mali_uk_get_system_info_s in "mali_utgard_uk_types.h"
- * @return _MALI_OSK_ERR_OK on success, otherwise a suitable _mali_osk_errcode_t on failure.
- */
-_mali_osk_errcode_t _mali_ukk_get_system_info( _mali_uk_get_system_info_s *args );
 
 /** @brief Waits for a job notification.
  *
@@ -498,10 +449,11 @@ _mali_osk_errcode_t _mali_ukk_va_to_mali_pa( _mali_uk_va_to_mali_pa_s * args );
  *
  * Job completion can be awaited with _mali_ukk_wait_for_notification().
  *
- * @param args see _mali_uk_pp_start_job_s in "mali_utgard_uk_types.h"
+ * @oaram ctx user-kernel context (mali_session)
+ * @param uargs see _mali_uk_pp_start_job_s in "mali_utgard_uk_types.h". Use _mali_osk_copy_from_user to retrieve data!
  * @return _MALI_OSK_ERR_OK on success, otherwise a suitable _mali_osk_errcode_t on failure.
  */
-_mali_osk_errcode_t _mali_ukk_pp_start_job( _mali_uk_pp_start_job_s *args );
+_mali_osk_errcode_t _mali_ukk_pp_start_job( void *ctx, _mali_uk_pp_start_job_s *uargs );
 
 /** @brief Returns the number of Fragment Processors in the system
  *
@@ -551,10 +503,11 @@ void _mali_ukk_pp_job_disable_wb(_mali_uk_pp_disable_wb_s *args);
  *
  * Job completion can be awaited with _mali_ukk_wait_for_notification().
  *
- * @param args see _mali_uk_gp_start_job_s in "mali_utgard_uk_types.h"
+ * @oaram ctx user-kernel context (mali_session)
+ * @param uargs see _mali_uk_gp_start_job_s in "mali_utgard_uk_types.h". Use _mali_osk_copy_from_user to retrieve data!
  * @return _MALI_OSK_ERR_OK on success, otherwise a suitable _mali_osk_errcode_t on failure.
  */
-_mali_osk_errcode_t _mali_ukk_gp_start_job( _mali_uk_gp_start_job_s *args );
+_mali_osk_errcode_t _mali_ukk_gp_start_job( void *ctx, _mali_uk_gp_start_job_s *uargs );
 
 /** @brief Returns the number of Vertex Processors in the system.
  *

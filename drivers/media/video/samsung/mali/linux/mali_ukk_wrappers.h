@@ -24,8 +24,6 @@ extern "C"
 {
 #endif
 
-int get_system_info_size_wrapper(struct mali_session_data *session_data, _mali_uk_get_system_info_size_s __user *uargs);
-int get_system_info_wrapper(struct mali_session_data *session_data, _mali_uk_get_system_info_s __user *uargs);
 int wait_for_notification_wrapper(struct mali_session_data *session_data, _mali_uk_wait_for_notification_s __user *uargs);
 int get_api_version_wrapper(struct mali_session_data *session_data, _mali_uk_get_api_version_s __user *uargs);
 int get_user_settings_wrapper(struct mali_session_data *session_data, _mali_uk_get_user_settings_s __user *uargs);
@@ -59,6 +57,7 @@ int profiling_clear_wrapper(struct mali_session_data *session_data, _mali_uk_pro
 int profiling_report_sw_counters_wrapper(struct mali_session_data *session_data, _mali_uk_sw_counters_report_s __user *uargs);
 
 int vsync_event_report_wrapper(struct mali_session_data *session_data, _mali_uk_vsync_event_report_s __user *uargs);
+
 
 int map_errcode( _mali_osk_errcode_t err );
 

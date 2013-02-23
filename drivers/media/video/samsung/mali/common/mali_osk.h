@@ -1422,17 +1422,6 @@ void _mali_osk_notification_queue_term( _mali_osk_notification_queue_t *queue );
  */
 void _mali_osk_notification_queue_send( _mali_osk_notification_queue_t *queue, _mali_osk_notification_t *object );
 
-#if MALI_STATE_TRACKING
-/** @brief Receive a notification from a queue
- *
- * Check if a notification queue is empty.
- *
- * @param queue The queue to check.
- * @return MALI_TRUE if queue is empty, otherwise MALI_FALSE.
- */
-mali_bool _mali_osk_notification_queue_is_empty( _mali_osk_notification_queue_t *queue );
-#endif
-
 /** @brief Receive a notification from a queue
  *
  * Receives a single notification from the given queue.

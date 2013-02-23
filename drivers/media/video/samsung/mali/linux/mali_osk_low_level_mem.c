@@ -21,6 +21,10 @@
 #include <linux/slab.h>
 #include <linux/mm.h>
 #include <linux/dma-mapping.h>
+#include <linux/spinlock.h>
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(3,1,0)
+#include <linux/shrinker.h>
+#endif
 
 #include "mali_osk.h"
 #include "mali_ukk.h" /* required to hook in _mali_ukk_mem_mmap handling */
@@ -64,6 +68,7 @@ struct MappingInfo
 {
 	struct vm_area_struct *vma;
 	struct AllocationList *list;
+	struct AllocationList *tail;
 };
 
 typedef struct MappingInfo MappingInfo;
@@ -82,7 +87,7 @@ static int pre_allocated_memory_size_current  = 0;
 #ifdef MALI_OS_MEMORY_KERNEL_BUFFER_SIZE_IN_MB
 	static int pre_allocated_memory_size_max      = MALI_OS_MEMORY_KERNEL_BUFFER_SIZE_IN_MB * 1024 * 1024;
 #else
-	static int pre_allocated_memory_size_max      = 6 * 1024 * 1024; /* 6 MiB */
+	static int pre_allocated_memory_size_max      = 16 * 1024 * 1024; /* 6 MiB */
 #endif
 
 static struct vm_operations_struct mali_kernel_vm_ops =
@@ -96,14 +101,73 @@ static struct vm_operations_struct mali_kernel_vm_ops =
 #endif
 };
 
+#if LINUX_VERSION_CODE < KERNEL_VERSION(3,0,0)
+	#if LINUX_VERSION_CODE < KERNEL_VERSION(2,6,35)
+static int mali_mem_shrink(int nr_to_scan, gfp_t gfp_mask)
+	#else
+static int mali_mem_shrink(struct shrinker *shrinker, int nr_to_scan, gfp_t gfp_mask)
+	#endif
+#else
+static int mali_mem_shrink(struct shrinker *shrinker, struct shrink_control *sc)
+#endif
+{
+	unsigned long flags;
+	AllocationList *item;
+#if LINUX_VERSION_CODE < KERNEL_VERSION(3,0,0)
+	int nr = nr_to_scan;
+#else
+	int nr = sc->nr_to_scan;
+#endif
+
+	if (0 == nr)
+	{
+		return pre_allocated_memory_size_current / PAGE_SIZE;
+	}
+
+	if (0 == pre_allocated_memory_size_current)
+	{
+		/* No pages availble */
+		return 0;
+	}
+
+	if (0 == spin_trylock_irqsave(&allocation_list_spinlock, flags))
+	{
+		/* Not able to lock. */
+		return -1;
+	}
+
+	while (pre_allocated_memory && nr > 0)
+	{
+		item = pre_allocated_memory;
+		pre_allocated_memory = item->next;
+
+		_kernel_page_release(item->physaddr);
+		_mali_osk_free(item);
+
+		pre_allocated_memory_size_current -= PAGE_SIZE;
+		--nr;
+	}
+	spin_unlock_irqrestore(&allocation_list_spinlock,flags);
+
+	return pre_allocated_memory_size_current / PAGE_SIZE;
+}
+
+struct shrinker mali_mem_shrinker = {
+	.shrink = mali_mem_shrink,
+	.seeks = DEFAULT_SEEKS,
+};
 
 void mali_osk_low_level_mem_init(void)
 {
 	pre_allocated_memory = (AllocationList*) NULL ;
+
+	register_shrinker(&mali_mem_shrinker);
 }
 
 void mali_osk_low_level_mem_term(void)
 {
+	unregister_shrinker(&mali_mem_shrinker);
+
 	while ( NULL != pre_allocated_memory )
 	{
 		AllocationList *item;
@@ -500,16 +564,24 @@ _mali_osk_errcode_t _mali_osk_mem_mapregion_map( mali_memory_allocation * descri
 
 		if ( ret != _MALI_OSK_ERR_OK)
 		{
+			MALI_PRINT_ERROR(("%s %d could not remap_pfn_range()\n", __FUNCTION__, __LINE__));
 			_allocation_list_item_release(alloc_item);
 			return ret;
 		}
 
 		/* Put our alloc_item into the list of allocations on success */
-		alloc_item->next = mappingInfo->list;
-		alloc_item->offset = offset;
+		if (NULL == mappingInfo->list)
+		{
+			mappingInfo->list = alloc_item;
+		}
+		else
+		{
+			mappingInfo->tail->next = alloc_item;
+		}
 
-		/*alloc_item->physaddr = linux_phys_addr;*/
-		mappingInfo->list = alloc_item;
+		mappingInfo->tail = alloc_item;
+		alloc_item->next = NULL;
+		alloc_item->offset = offset;
 
 		/* Write out new physical address on success */
 		*phys_addr = alloc_item->physaddr;
@@ -560,6 +632,7 @@ void _mali_osk_mem_mapregion_unmap( mali_memory_allocation * descriptor, u32 off
 			/* First find the allocation in the list of allocations */
 			AllocationList *alloc = mappingInfo->list;
 			AllocationList **prev = &(mappingInfo->list);
+
 			while (NULL != alloc && alloc->offset != offset)
 			{
 				prev = &(alloc->next);
@@ -572,11 +645,8 @@ void _mali_osk_mem_mapregion_unmap( mali_memory_allocation * descriptor, u32 off
 				continue;
 			}
 
-			_kernel_page_release(alloc->physaddr);
-
-			/* Remove the allocation from the list */
 			*prev = alloc->next;
-			_mali_osk_free( alloc );
+			_allocation_list_item_release(alloc);
 
 			/* Move onto the next allocation */
 			size -= _MALI_OSK_CPU_PAGE_SIZE;

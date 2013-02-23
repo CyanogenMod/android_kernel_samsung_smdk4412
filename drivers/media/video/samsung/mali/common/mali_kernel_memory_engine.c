@@ -252,6 +252,7 @@ _mali_osk_errcode_t mali_allocation_engine_map_physical(mali_allocation_engine m
 
 		if ( _MALI_OSK_ERR_OK != err )
 		{
+			MALI_DEBUG_PRINT(2, ("Map failed: %s %d\n", __FUNCTION__, __LINE__));
 			MALI_ERROR( err );
 		}
 	}
@@ -271,7 +272,7 @@ _mali_osk_errcode_t mali_allocation_engine_map_physical(mali_allocation_engine m
 			MALI_DEBUG_PRINT( 2, ("Process address manager succeeded, but Mali Address manager failed for phys=0x%08X size=0x%08X, offset=0x%08X. Will unmap.\n", phys, size, offset));
 			engine->process_address->unmap_physical(descriptor, offset, size, unmap_flags);
 		}
-
+		MALI_DEBUG_PRINT(2, ("Map mali failed: %s %d\n", __FUNCTION__, __LINE__));
 		MALI_ERROR( err );
 	}
 
