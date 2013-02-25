@@ -144,10 +144,9 @@ extern int s3c_gpio_slp_setpull_updown(unsigned int pin, unsigned int config);
 #define GPIO_MHL_WAKE_UP	EXYNOS4212_GPJ1(4)
 #define MHL_INT_IRQ		gpio_to_irq(GPIO_MHL_INT)
 #define MHL_WAKEUP_IRQ		gpio_to_irq(GPIO_MHL_WAKE_UP)
-#endif
-
 #define GPIO_HDMI_EN		EXYNOS4_GPL0(4)
 #define GPIO_HDMI_HPD		EXYNOS4_GPX3(7)
+#endif
 
 /* Touch key */
 #define GPIO_3_TOUCH_SCL	EXYNOS4_GPL0(1)
@@ -192,9 +191,6 @@ extern int s3c_gpio_slp_setpull_updown(unsigned int pin, unsigned int config);
 #endif
 
 /* Others */
-#define GPIO_LCD_18V_EN		EXYNOS4_GPC0(1)
-#define GPIO_LCD_22V_EN_00	EXYNOS4_GPC0(1) /* obsoleted */
-
 #define GPIO_OTG_EN		EXYNOS4_GPF0(7)
 
 #define GPIO_OLED_ID		EXYNOS4_GPF1(0)
@@ -227,7 +223,6 @@ extern int s3c_gpio_slp_setpull_updown(unsigned int pin, unsigned int config);
 /* rev0.0 */
 #define GPIO_TSP_LDO_EN		EXYNOS4212_GPJ0(6)
 /* GPIO_MHL_SEL			EXYNOS4212_GPJ0(5)	*/
-/* GPIO_LCD_22V_EN		EXYNOS4_GPC0(1)		*/
 
 
 #if !defined(CONFIG_MACH_T0_CHN_CTC)
@@ -343,13 +338,13 @@ extern int s3c_gpio_slp_setpull_updown(unsigned int pin, unsigned int config);
 #define GPIO_USB_BOOT_EN_REV06	EXYNOS4_GPF2(2)
 #define GPIO_BOOT_SW_SEL_REV06	EXYNOS4_GPF3(4)
 
-#define GPIO_IPC_SLAVE_WAKEUP	EXYNOS4_GPC0(3)
+#define GPIO_IPC_SLAVE_WAKEUP	EXYNOS4_GPC0(0)
 #define GPIO_IPC_HOST_WAKEUP	EXYNOS4_GPC0(0)
 #define GPIO_CP_DUMP_INT		EXYNOS4_GPX1(2)
 
 #define GPIO_CP_MSM_PWRON		EXYNOS4_GPL2(5)
 #define GPIO_CP_MSM_RST			EXYNOS4_GPL2(1)
-#define GPIO_CP_MSM_PMU_RST		EXYNOS4_GPC0(0)
+#define GPIO_CP_MSM_PMU_RST		EXYNOS4_GPC0(3)
 #define GPIO_CP_MSM_DUMP		EXYNOS4_GPX1(2)
 
 #define GPIO_MSM_PHONE_ACTIVE	EXYNOS4_GPX1(6)

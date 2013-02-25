@@ -185,9 +185,6 @@ extern int s3c_gpio_slp_setpull_updown(unsigned int pin, unsigned int config);
 #endif
 
 /* Others */
-#define GPIO_LCD_18V_EN		EXYNOS4_GPC0(1)
-#define GPIO_LCD_22V_EN_00	EXYNOS4_GPC0(1) /* obsoleted */
-
 #define GPIO_OTG_EN		EXYNOS4_GPF0(7)
 
 #define GPIO_OLED_ID		EXYNOS4_GPF1(0)
@@ -227,7 +224,6 @@ extern int s3c_gpio_slp_setpull_updown(unsigned int pin, unsigned int config);
 /* rev0.0 */
 #define GPIO_TSP_LDO_EN		EXYNOS4212_GPJ0(6)
 /* GPIO_MHL_SEL			EXYNOS4212_GPJ0(5)	*/
-/* GPIO_LCD_22V_EN		EXYNOS4_GPC0(1)		*/
 
 
 /* Modem Interface GPIOs - M0 HSIC */

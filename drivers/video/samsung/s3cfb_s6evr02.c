@@ -446,7 +446,7 @@ static int s6evr02_set_acl(struct lcd_info *lcd, u8 force)
 		break;
 	}
 
-	if ((!lcd->acl_enable) || (lcd->auto_brightness >= 5))
+	if (!lcd->acl_enable)
 		level = ACL_STATUS_0P;
 
 	if (force || lcd->current_acl != ACL_CUTOFF_TABLE[level][1]) {
@@ -735,6 +735,9 @@ static int update_brightness(struct lcd_info *lcd, u8 force)
 	mutex_lock(&lcd->bl_lock);
 
 	brightness = lcd->bd->props.brightness;
+
+	if (unlikely(!lcd->auto_brightness && brightness > 250))
+		brightness = 250;
 
 	lcd->bl = get_backlight_level_from_brightness(brightness);
 
@@ -1109,10 +1112,12 @@ void s6evr02_late_resume(void)
 	s3c_gpio_setpull(GPIO_ERR_FG, S3C_GPIO_PULL_NONE);
 	enable_irq(lcd->irq);
 #endif
-#if defined(GPIO_OLED_DET)
-	s3c_gpio_cfgpin(GPIO_OLED_DET, S3C_GPIO_SFN(0xf));
-	s3c_gpio_setpull(GPIO_OLED_DET, S3C_GPIO_PULL_NONE);
-	enable_irq(gpio_to_irq(GPIO_OLED_DET));
+#if defined(GPIO_OLED_DET) && defined(GPIO_OLED_ID)
+	if (gpio_get_value(GPIO_OLED_ID)) {
+		s3c_gpio_cfgpin(GPIO_OLED_DET, S3C_GPIO_SFN(0xf));
+		s3c_gpio_setpull(GPIO_OLED_DET, S3C_GPIO_PULL_NONE);
+		enable_irq(gpio_to_irq(GPIO_OLED_DET));
+	}
 #endif
 
 	dev_info(&lcd->ld->dev, "-%s\n", __func__);
