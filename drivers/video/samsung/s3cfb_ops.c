@@ -196,8 +196,14 @@ int s3cfb_enable_window(struct s3cfb_global *fbdev, int id)
 	if (CONFIG_FB_S5P_DEFAULT_WINDOW == 3 &&
 		id == CONFIG_FB_S5P_DEFAULT_WINDOW-1)
 		dev_lock(fbdev->bus_dev, fbdev->dev, 267160);
-	else if (id != CONFIG_FB_S5P_DEFAULT_WINDOW)
-		dev_lock(fbdev->bus_dev, fbdev->dev, 133133);
+	else if (id != CONFIG_FB_S5P_DEFAULT_WINDOW) {
+		if (id == CONFIG_FB_S5P_DEFAULT_WINDOW-1)
+			dev_lock(fbdev->bus_dev, fbdev->dev, 267160);
+		else if (id == 3)
+			dev_lock(fbdev->bus_dev, fbdev->dev, 267160);
+		else
+			dev_lock(fbdev->bus_dev, fbdev->dev, 133133);
+	}
 #endif
 #endif
 
@@ -1299,6 +1305,7 @@ static u32 s3c_fb_padding(int format)
 
 	case S3C_FB_PIXEL_FORMAT_RGB_565:
 	case S3C_FB_PIXEL_FORMAT_RGBA_8888:
+	case S3C_FB_PIXEL_FORMAT_BGRA_8888:
 	case S3C_FB_PIXEL_FORMAT_RGBA_5551:
 	case S3C_FB_PIXEL_FORMAT_RGBA_4444:
 		return 0;
