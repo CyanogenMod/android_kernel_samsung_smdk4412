@@ -20,6 +20,7 @@ obj-$(CONFIG_FB_S5P_MDNIE)      += s3cfb_mdnie_kona.o s3cfb_ielcd_kona.o mdnie_k
 else
 obj-$(CONFIG_FB_S5P_MDNIE)      += s3cfb_mdnie.o s3cfb_ielcd.o mdnie.o mdnie_tunning.o
 endif
+obj-$(CONFIG_FB_S5P_MDNIE_CONTROL)      += mdnie_control.o
 obj-$(CONFIG_FB_S5P_LMS501KF03)	+= s3cfb_lms501kf03.o
 obj-$(CONFIG_FB_S5P_LMS501XX)	+= s3cfb_lms501xx.o
 obj-$(CONFIG_FB_S5P_DUMMY_MIPI_LCD)	+= s3cfb_dummymipilcd.o
