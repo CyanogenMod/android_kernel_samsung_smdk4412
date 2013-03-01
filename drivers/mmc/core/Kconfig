@@ -57,3 +57,7 @@ config MMC_POLLING_WAIT_CMD23
 	help
 	  If you say Y here, cmd23 dose not use interrupt.
 
+config MMC_RAMDEV
+    bool "Expose mmcram device node"
+	help
+	  If you say Y here, mmcram device node will be exposed.
