@@ -209,6 +209,8 @@ struct mmc_card {
 #define MMC_QUIRK_BLK_NO_CMD23	(1<<7)		/* Avoid CMD23 for regular multiblock */
 /* MoviNAND secure issue */
 #define MMC_QUIRK_MOVINAND_SECURE (1<<8)
+/* MoviNAND "sudden death" issue */
+#define MMC_QUIRK_MOVINAND_SDS	(1<<9)
 
 	unsigned int    poweroff_notify_state;	/* eMMC4.5 notify feature */
 #define MMC_NO_POWER_NOTIFICATION	0
@@ -243,7 +245,6 @@ struct mmc_card {
 	unsigned int		sd_bus_speed;	/* Bus Speed Mode set for the card */
 
 	struct dentry		*debugfs_root;
-	unsigned int		movi_ops;
 };
 
 /*
@@ -436,5 +437,9 @@ extern void mmc_unregister_driver(struct mmc_driver *);
 
 extern void mmc_fixup_device(struct mmc_card *card,
 			     const struct mmc_fixup *table);
+
+extern int mmc_movi_sds_fixup(struct mmc_card *card);
+extern void mmc_movi_sds_add_quirk(struct mmc_card *card, int data);
+extern int mmc_movi_read_ram_page(struct mmc_card *card, u8 *buffer, u32 addr);
 
 #endif
