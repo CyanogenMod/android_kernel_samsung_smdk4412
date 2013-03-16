@@ -21,7 +21,7 @@
  * software in any way with any other Broadcom software provided under a license
  * other than the GPL, without Broadcom's express prior written consent.
  *
- * $Id: dhd_cdc.c 357848 2012-09-20 05:38:41Z $
+ * $Id: dhd_cdc.c 355825 2012-09-10 03:22:40Z $
  *
  * BDC is like CDC, except it includes a header for data packets to convey
  * packet priority over the bus, and flags (e.g. to indicate checksum status
@@ -892,7 +892,7 @@ _dhd_wlfc_pullheader(athost_wl_status_info_t* ctx, void* pktbuf)
 
 	if (PKTLEN(ctx->osh, pktbuf) < (h->dataOffset << 2)) {
 		WLFC_DBGMESG(("%s: rx data too short (%d < %d)\n", __FUNCTION__,
-			PKTLEN(ctx->osh, pktbuf), (h->dataOffset << 2)));
+		           PKTLEN(ctx->osh, pktbuf), (h->dataOffset << 2)));
 		return BCME_ERROR;
 	}
 	/* pull wl-header */
@@ -958,7 +958,7 @@ _dhd_wlfc_rollback_packet_toq(athost_wl_status_info_t* ctx,
 		else {
 			/* remove header first */
 			rc = _dhd_wlfc_pullheader(ctx, p);
-			if (rc != BCME_OK)          {
+			if (rc != BCME_OK) {
 				WLFC_DBGMESG(("Error: %s():%d\n", __FUNCTION__, __LINE__));
 				/* free the hanger slot */
 				dhd_wlfc_hanger_poppkt(ctx->hanger, hslot, &pktout, 1);
@@ -1794,6 +1794,7 @@ dhd_wlfc_txcomplete(dhd_pub_t *dhd, void *txp, bool success)
 	void* p;
 	int fifo_id;
 
+	dhd_os_wlfc_block(dhd);
 	if (DHD_PKTTAG_SIGNALONLY(PKTTAG(txp))) {
 #ifdef PROP_TXSTATUS_DEBUG
 		wlfc->stats.signal_only_pkts_freed++;
@@ -1801,6 +1802,7 @@ dhd_wlfc_txcomplete(dhd_pub_t *dhd, void *txp, bool success)
 		if (success)
 			/* is this a signal-only packet? */
 			PKTFREE(wlfc->osh, txp, TRUE);
+		dhd_os_wlfc_unblock(dhd);
 		return;
 	}
 	if (!success) {
@@ -1835,6 +1837,7 @@ dhd_wlfc_txcomplete(dhd_pub_t *dhd, void *txp, bool success)
 
 		PKTFREE(wlfc->osh, txp, TRUE);
 	}
+	dhd_os_wlfc_unblock(dhd);
 	return;
 }
 
@@ -2466,6 +2469,8 @@ dhd_wlfc_cleanup(dhd_pub_t *dhd)
 					if (h->items[i].state == WLFC_HANGER_ITEM_STATE_INUSE) {
 						PKTFREE(wlfc->osh, h->items[i].pkt, TRUE);
 						h->items[i].state = WLFC_HANGER_ITEM_STATE_FREE;
+						h->items[i].pkt = NULL;
+						h->items[i].identifier = 0;
 					} else if (h->items[i].state ==
 						WLFC_HANGER_ITEM_STATE_INUSE_SUPPRESSED) {
 						/* These are already freed from the psq */
@@ -2480,8 +2485,14 @@ dhd_wlfc_cleanup(dhd_pub_t *dhd)
 	/* flush remained pkt in hanger queue, not in bus->txq */
 	for (i = 0; i < h->max_items; i++) {
 		if (h->items[i].state == WLFC_HANGER_ITEM_STATE_INUSE) {
-			PKTFREE(wlfc->osh, h->items[i].pkt, TRUE);
+			if (!dhd->hang_was_sent) {
+				PKTFREE(wlfc->osh, h->items[i].pkt, TRUE);
+			} else {
+				printk("%s: Skip freeing skb %p\n", __func__, h->items[i].pkt);
+			}
 			h->items[i].state = WLFC_HANGER_ITEM_STATE_FREE;
+			h->items[i].pkt = NULL;
+			h->items[i].identifier = 0;
 		} else if (h->items[i].state == WLFC_HANGER_ITEM_STATE_INUSE_SUPPRESSED) {
 			/* These are freed from the psq so no need to free again */
 			h->items[i].state = WLFC_HANGER_ITEM_STATE_FREE;
@@ -2497,9 +2508,11 @@ dhd_wlfc_deinit(dhd_pub_t *dhd)
 	athost_wl_status_info_t* wlfc = (athost_wl_status_info_t*)
 		dhd->wlfc_state;
 
-	if (dhd->wlfc_state == NULL)
+	dhd_os_wlfc_block(dhd);
+	if (dhd->wlfc_state == NULL) {
+		dhd_os_wlfc_unblock(dhd);
 		return;
-
+	}
 #ifdef PROP_TXSTATUS_DEBUG
 	{
 		int i;
@@ -2522,6 +2535,7 @@ dhd_wlfc_deinit(dhd_pub_t *dhd)
 #if defined(CUSTOMER_HW4) && defined(DYNAMIC_F2_BLKSIZE_OF_PROPTXSTATUS)
 	dhdsdio_func_blocksize(dhd, 2, sd_f2_blocksize);
 #endif /* CUSTOMER_HW4 && DYNAMIC_F2_BLKSIZE_OF_PROPTXSTATUS */
+	dhd_os_wlfc_unblock(dhd);
 	return;
 }
 #endif /* PROP_TXSTATUS */
@@ -2531,8 +2545,10 @@ dhd_prot_dump(dhd_pub_t *dhdp, struct bcmstrbuf *strbuf)
 {
 	bcm_bprintf(strbuf, "Protocol CDC: reqid %d\n", dhdp->prot->reqid);
 #ifdef PROP_TXSTATUS
+	dhd_os_wlfc_block(dhdp);
 	if (dhdp->wlfc_state)
 		dhd_wlfc_dump(dhdp, strbuf);
+	dhd_os_wlfc_unblock(dhdp);
 #endif
 }
 
