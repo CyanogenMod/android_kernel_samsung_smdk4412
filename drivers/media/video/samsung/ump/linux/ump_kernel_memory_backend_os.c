@@ -77,6 +77,8 @@ ump_memory_backend * ump_os_memory_backend_create(const int max_allocation)
 	backend->stat = os_stat;
 	backend->pre_allocate_physical_check = NULL;
 	backend->adjust_to_mali_phys = NULL;
+	backend->get = NULL;
+	backend->set = NULL;
 
 	return backend;
 }
@@ -134,19 +136,20 @@ static int os_allocate(void* ctx, ump_dd_mem * descriptor)
 		return 0; /* failure */
 	}
 
-	while (left > 0 && ((info->num_pages_allocated + pages_allocated) < info->num_pages_max))
+	while (left > 0)
 	{
 		struct page * new_page;
 
 		if (is_cached)
 		{
-			new_page = alloc_page(GFP_HIGHUSER | __GFP_ZERO | __GFP_REPEAT | __GFP_NOWARN);
+			new_page = alloc_page(GFP_KERNEL | __GFP_ZERO | __GFP_NORETRY | __GFP_NOWARN );
 		} else
 		{
-			new_page = alloc_page(GFP_HIGHUSER | __GFP_ZERO | __GFP_REPEAT | __GFP_NOWARN | __GFP_COLD);
+			new_page = alloc_page(GFP_KERNEL | __GFP_ZERO | __GFP_NORETRY | __GFP_NOWARN | __GFP_COLD);
 		}
 		if (NULL == new_page)
 		{
+			MSG_ERR(("UMP memory allocated: Out of Memory !!\n"));
 			break;
 		}
 
@@ -180,6 +183,8 @@ static int os_allocate(void* ctx, ump_dd_mem * descriptor)
 	if (left)
 	{
 		DBG_MSG(1, ("Failed to allocate needed pages\n"));
+		DBG_MSG(1, ("UMP memory allocated: %d kB  Configured maximum OS memory usage: %d kB\n",
+				 (pages_allocated * _MALI_OSK_CPU_PAGE_SIZE)/1024, (info->num_pages_max* _MALI_OSK_CPU_PAGE_SIZE)/1024));
 
 		while(pages_allocated)
 		{
