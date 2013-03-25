@@ -195,3 +195,66 @@ _mali_osk_errcode_t _ump_ukk_allocate( _ump_uk_allocate_s *user_interaction )
 
 	return _MALI_OSK_ERR_OK;
 }
+
+
+UMP_KERNEL_API_EXPORT ump_dd_status_code ump_dd_meminfo_set(ump_dd_handle memh, void* args)
+{
+	ump_dd_mem * mem;
+	ump_secure_id secure_id;
+
+	DEBUG_ASSERT_POINTER(memh);
+
+	secure_id = ump_dd_secure_id_get(memh);
+
+	_mali_osk_lock_wait(device.secure_id_map_lock, _MALI_OSK_LOCKMODE_RW);
+	if (0 == ump_descriptor_mapping_get(device.secure_id_map, (int)secure_id, (void**)&mem))
+	{
+		device.backend->set(mem, args);
+	}
+	else
+	{
+		_mali_osk_lock_signal(device.secure_id_map_lock, _MALI_OSK_LOCKMODE_RW);
+		DBG_MSG(1, ("Failed to look up mapping in ump_meminfo_set(). ID: %u\n", (ump_secure_id)secure_id));
+		return UMP_DD_INVALID;
+	}
+
+	_mali_osk_lock_signal(device.secure_id_map_lock, _MALI_OSK_LOCKMODE_RW);
+
+	return UMP_DD_SUCCESS;
+}
+
+UMP_KERNEL_API_EXPORT void *ump_dd_meminfo_get(ump_secure_id secure_id, void* args)
+{
+	ump_dd_mem * mem;
+	void *result;
+
+	_mali_osk_lock_wait(device.secure_id_map_lock, _MALI_OSK_LOCKMODE_RW);
+	if (0 == ump_descriptor_mapping_get(device.secure_id_map, (int)secure_id, (void**)&mem))
+	{
+		result = device.backend->get(mem, args);
+	}
+	else
+	{
+		_mali_osk_lock_signal(device.secure_id_map_lock, _MALI_OSK_LOCKMODE_RW);
+		DBG_MSG(1, ("Failed to look up mapping in ump_meminfo_get(). ID: %u\n", (ump_secure_id)secure_id));
+		return UMP_DD_HANDLE_INVALID;
+	}
+
+	_mali_osk_lock_signal(device.secure_id_map_lock, _MALI_OSK_LOCKMODE_RW);
+
+	return result;
+}
+
+UMP_KERNEL_API_EXPORT ump_dd_handle ump_dd_handle_get_from_vaddr(unsigned long vaddr)
+{
+	ump_dd_mem * mem;
+
+	DBG_MSG(5, ("Getting handle from Virtual address. vaddr: %u\n", vaddr));
+
+	_ump_osk_mem_mapregion_get(&mem, vaddr);
+
+	DBG_MSG(1, ("Getting handle's Handle : 0x%8lx\n", mem));
+
+	return (ump_dd_handle)mem;
+}
+

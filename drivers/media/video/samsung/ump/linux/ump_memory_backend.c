@@ -56,6 +56,13 @@ ump_memory_backend* ump_memory_backend_create ( void )
 		DBG_MSG(2, ("Using OS memory backend, allocation limit: %d\n", ump_memory_size));
 		backend = ump_os_memory_backend_create(ump_memory_size);
 	}
+#ifdef CONFIG_UMP_VCM_ALLOC
+	else if (2 == ump_backend)
+	{
+		DBG_MSG(2, ("Using VCM memory backend, allocation limit: %d\n", ump_memory_size));
+		backend = ump_vcm_memory_backend_create(ump_memory_size);
+	}
+#endif
 
 	return backend;
 }

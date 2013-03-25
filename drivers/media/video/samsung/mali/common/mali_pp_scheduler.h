@@ -33,7 +33,6 @@ void mali_pp_scheduler_resume(void);
  */
 void mali_pp_scheduler_abort_session(struct mali_session_data *session);
 
-int mali_pp_scheduler_get_queue_depth(void);
 u32 mali_pp_scheduler_dump_state(char *buf, u32 size);
 
 #endif /* __MALI_PP_SCHEDULER_H__ */

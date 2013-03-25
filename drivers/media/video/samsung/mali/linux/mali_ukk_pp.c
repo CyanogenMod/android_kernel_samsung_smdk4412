@@ -18,15 +18,24 @@
 
 int pp_start_job_wrapper(struct mali_session_data *session_data, _mali_uk_pp_start_job_s __user *uargs)
 {
+	_mali_uk_pp_start_job_s kargs;
 	_mali_osk_errcode_t err;
 
 	MALI_CHECK_NON_NULL(uargs, -EINVAL);
 	MALI_CHECK_NON_NULL(session_data, -EINVAL);
 
-	err = _mali_ukk_pp_start_job(session_data, uargs);
+	if (!access_ok(VERIFY_WRITE, uargs, sizeof(_mali_uk_pp_start_job_s)))
+	{
+		return -EFAULT;
+	}
+
+	if (0 != copy_from_user(&kargs, uargs, sizeof(_mali_uk_pp_start_job_s))) return -EFAULT;
+
+	kargs.ctx = session_data;
+	err = _mali_ukk_pp_start_job(&kargs);
 	if (_MALI_OSK_ERR_OK != err) return map_errcode(err);
 
-	return 0;
+    return 0;
 }
 
 int pp_get_number_of_cores_wrapper(struct mali_session_data *session_data, _mali_uk_get_pp_number_of_cores_s __user *uargs)
