@@ -35,10 +35,6 @@
 #if MALI_TIMELINE_PROFILING_ENABLED
 #include "mali_osk_profiling.h"
 #endif
-#if MALI_INTERNAL_TIMELINE_PROFILING_ENABLED
-#include "mali_profiling_internal.h"
-#endif
-
 
 /** Pointer to table of resource definitions available to the Mali driver.
  *  _mali_osk_resources_init() sets up the pointer to this table.
@@ -58,10 +54,12 @@ static u32 global_gpu_minor_version = 0;
 
 static u32 first_pp_offset = 0;
 
+#define HANG_CHECK_MSECS_DEFAULT 500 /* 500 ms */
 #define WATCHDOG_MSECS_DEFAULT 4000 /* 4 s */
 
 /* timer related */
 int mali_max_job_runtime = WATCHDOG_MSECS_DEFAULT;
+int mali_hang_check_interval = HANG_CHECK_MSECS_DEFAULT;
 
 static _mali_osk_resource_t *mali_find_resource(_mali_osk_resource_type_t type, u32 offset)
 {

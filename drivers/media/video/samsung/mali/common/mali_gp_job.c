@@ -13,27 +13,29 @@
 #include "mali_osk_list.h"
 #include "mali_uk_types.h"
 
-struct mali_gp_job *mali_gp_job_create(struct mali_session_data *session, _mali_uk_gp_start_job_s *uargs, u32 id)
+struct mali_gp_job *mali_gp_job_create(struct mali_session_data *session, _mali_uk_gp_start_job_s *args, u32 id)
 {
 	struct mali_gp_job *job;
 
 	job = _mali_osk_malloc(sizeof(struct mali_gp_job));
 	if (NULL != job)
 	{
-		if (0 != copy_from_user(&job->uargs, uargs, sizeof(_mali_uk_gp_start_job_s)))
-		{
-			_mali_osk_free(job);
-			return NULL;
-		}
-
 		_mali_osk_list_init(&job->list);
 		job->session = session;
 		job->id = id;
-		job->heap_current_addr = job->uargs.frame_registers[4];
+		job->user_id = args->user_job_ptr;
+		_mali_osk_memcpy(job->frame_registers, args->frame_registers, sizeof(job->frame_registers));
+		job->heap_current_addr = args->frame_registers[4];
+		job->perf_counter_flag = args->perf_counter_flag;
+		job->perf_counter_src0 = args->perf_counter_src0;
+		job->perf_counter_src1 = args->perf_counter_src1;
 		job->perf_counter_value0 = 0;
 		job->perf_counter_value1 = 0;
+
 		job->pid = _mali_osk_get_pid();
 		job->tid = _mali_osk_get_tid();
+		job->frame_builder_id = args->frame_builder_id;
+		job->flush_id = args->flush_id;
 
 		return job;
 	}

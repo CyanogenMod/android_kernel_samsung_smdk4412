@@ -361,8 +361,8 @@ void mali_gp_job_start(struct mali_gp_core *core, struct mali_gp_job *job)
 
 #if MALI_TIMELINE_PROFILING_ENABLED
 	_mali_osk_profiling_add_event(MALI_PROFILING_EVENT_TYPE_SINGLE | MALI_PROFILING_MAKE_EVENT_CHANNEL_GP(0) | MALI_PROFILING_EVENT_REASON_SINGLE_HW_FLUSH,
-	                              mali_gp_job_get_frame_builder_id(job), mali_gp_job_get_flush_id(job), 0, 0, 0);
-	_mali_osk_profiling_add_event(MALI_PROFILING_EVENT_TYPE_START|MALI_PROFILING_MAKE_EVENT_CHANNEL_GP(0), mali_gp_job_get_pid(job), mali_gp_job_get_tid(job), 0, 0, 0);
+	                          job->frame_builder_id, job->flush_id, 0, 0, 0);
+	_mali_osk_profiling_add_event(MALI_PROFILING_EVENT_TYPE_START|MALI_PROFILING_MAKE_EVENT_CHANNEL_GP(0), job->pid, job->tid, 0, 0, 0);
 #endif
 
 	core->running_job = job;
@@ -480,7 +480,9 @@ static void mali_gp_bottom_half(void *data)
 	u32 irq_errors;
 
 #if MALI_TIMELINE_PROFILING_ENABLED
-	_mali_osk_profiling_add_event(MALI_PROFILING_EVENT_TYPE_START|MALI_PROFILING_EVENT_CHANNEL_SOFTWARE|MALI_PROFILING_EVENT_REASON_START_STOP_BOTTOM_HALF, 0, _mali_osk_get_tid(), MALI_PROFILING_MAKE_EVENT_DATA_CORE_GP(0), 0, 0);
+#if 0  /* Bottom half TLP logging is currently not supported */
+	_mali_osk_profiling_add_event( MALI_PROFILING_EVENT_TYPE_START| MALI_PROFILING_EVENT_CHANNEL_SOFTWARE ,  _mali_osk_get_pid(), _mali_osk_get_tid()+11000, 0, 0, 0);
+#endif
 #endif
 
 	mali_group_lock(core->group); /* Group lock grabbed in core handlers, but released in common group handler */
@@ -489,9 +491,6 @@ static void mali_gp_bottom_half(void *data)
 	{
 		MALI_PRINT_ERROR(("Interrupt bottom half of %s when core is OFF.", core->hw_core.description));
 		mali_group_unlock(core->group);
-#if MALI_TIMELINE_PROFILING_ENABLED
-		_mali_osk_profiling_add_event(MALI_PROFILING_EVENT_TYPE_STOP|MALI_PROFILING_EVENT_CHANNEL_SOFTWARE|MALI_PROFILING_EVENT_REASON_START_STOP_BOTTOM_HALF, 0, _mali_osk_get_tid(), 0, 0, 0);
-#endif
 		return;
 	}
 
@@ -506,9 +505,6 @@ static void mali_gp_bottom_half(void *data)
 			mali_gp_post_process_job(core, MALI_FALSE);
 			MALI_DEBUG_PRINT(4, ("Mali GP: Job completed, calling group handler\n"));
 			mali_group_bottom_half(core->group, GROUP_EVENT_GP_JOB_COMPLETED); /* Will release group lock */
-#if MALI_TIMELINE_PROFILING_ENABLED
-		_mali_osk_profiling_add_event(MALI_PROFILING_EVENT_TYPE_STOP|MALI_PROFILING_EVENT_CHANNEL_SOFTWARE|MALI_PROFILING_EVENT_REASON_START_STOP_BOTTOM_HALF, 0, _mali_osk_get_tid(), 0, 0, 0);
-#endif
 			return;
 		}
 	}
@@ -523,9 +519,6 @@ static void mali_gp_bottom_half(void *data)
 		mali_gp_post_process_job(core, MALI_FALSE);
 		MALI_PRINT_ERROR(("Mali GP: Unknown interrupt 0x%08X from core %s, aborting job\n", irq_readout, core->hw_core.description));
 		mali_group_bottom_half(core->group, GROUP_EVENT_GP_JOB_FAILED); /* Will release group lock */
-#if MALI_TIMELINE_PROFILING_ENABLED
-		_mali_osk_profiling_add_event(MALI_PROFILING_EVENT_TYPE_STOP|MALI_PROFILING_EVENT_CHANNEL_SOFTWARE|MALI_PROFILING_EVENT_REASON_START_STOP_BOTTOM_HALF, 0, _mali_osk_get_tid(), 0, 0, 0);
-#endif
 		return;
 	}
 	else if (MALI_TRUE == core->core_timed_out) /* SW timeout */
@@ -537,9 +530,6 @@ static void mali_gp_bottom_half(void *data)
 			mali_group_bottom_half(core->group, GROUP_EVENT_GP_JOB_TIMED_OUT);
 		}
 		core->core_timed_out = MALI_FALSE;
-#if MALI_TIMELINE_PROFILING_ENABLED
-		_mali_osk_profiling_add_event(MALI_PROFILING_EVENT_TYPE_STOP|MALI_PROFILING_EVENT_CHANNEL_SOFTWARE|MALI_PROFILING_EVENT_REASON_START_STOP_BOTTOM_HALF, 0, _mali_osk_get_tid(), 0, 0, 0);
-#endif
 		return;
 	}
 	else if (irq_readout & MALIGP2_REG_VAL_IRQ_PLBU_OUT_OF_MEM)
@@ -556,30 +546,25 @@ static void mali_gp_bottom_half(void *data)
 		mali_gp_post_process_job(core, MALI_TRUE);
 		MALI_DEBUG_PRINT(3, ("Mali GP: PLBU needs more heap memory\n"));
 		mali_group_bottom_half(core->group, GROUP_EVENT_GP_OOM); /* Will release group lock */
-#if MALI_TIMELINE_PROFILING_ENABLED
-		_mali_osk_profiling_add_event(MALI_PROFILING_EVENT_TYPE_STOP|MALI_PROFILING_EVENT_CHANNEL_SOFTWARE|MALI_PROFILING_EVENT_REASON_START_STOP_BOTTOM_HALF, 0, _mali_osk_get_tid(), 0, 0, 0);
-#endif
 		return;
 	}
 	else if (irq_readout & MALIGP2_REG_VAL_IRQ_HANG)
 	{
-		/* we mask hang interrupts, so this should never happen... */
-		MALI_DEBUG_ASSERT( 0 );
+		/* Just ignore hang interrupts, the job timer will detect hanging jobs anyways */
+		mali_hw_core_register_write(&core->hw_core, MALIGP2_REG_ADDR_MGMT_INT_CLEAR, MALIGP2_REG_VAL_IRQ_HANG);
 	}
 
-	/* The only way to get here is if we only got one of two needed END_CMD_LST
-	 * interrupts. Disable the interrupt that has been received and continue to
-	 * run. */
-	mali_hw_core_register_write(&core->hw_core, MALIGP2_REG_ADDR_MGMT_INT_MASK,
-			MALIGP2_REG_VAL_IRQ_MASK_USED &
-			((irq_readout & MALIGP2_REG_VAL_IRQ_PLBU_END_CMD_LST)
-			? ~MALIGP2_REG_VAL_IRQ_PLBU_END_CMD_LST
-			: ~MALIGP2_REG_VAL_IRQ_VS_END_CMD_LST
-			));
+	/*
+	 * The only way to get here is if we got a HANG interrupt, which we ignore, or only one of two needed END_CMD_LST interrupts.
+	 * Re-enable interrupts and let core continue to run.
+	 */
+	mali_hw_core_register_write(&core->hw_core, MALIGP2_REG_ADDR_MGMT_INT_MASK, MALIGP2_REG_VAL_IRQ_MASK_USED);
 	mali_group_unlock(core->group);
 
 #if MALI_TIMELINE_PROFILING_ENABLED
-	_mali_osk_profiling_add_event(MALI_PROFILING_EVENT_TYPE_STOP|MALI_PROFILING_EVENT_CHANNEL_SOFTWARE|MALI_PROFILING_EVENT_REASON_START_STOP_BOTTOM_HALF, 0, _mali_osk_get_tid(), 0, 0, 0);
+#if 0  /* Bottom half TLP logging is currently not supported */
+	_mali_osk_profiling_add_event( MALI_PROFILING_EVENT_TYPE_STOP| MALI_PROFILING_EVENT_CHANNEL_SOFTWARE ,  _mali_osk_get_pid(), _mali_osk_get_tid()+11000, 0, 0, 0);
+#endif
 #endif
 }
 
