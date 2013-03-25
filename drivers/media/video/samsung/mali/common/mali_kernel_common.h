@@ -18,6 +18,16 @@
 	#endif
 #endif
 
+/* Macro for generating a kernel panic.
+ * Turned on off by compile-time Makefile settings
+ */
+#if defined(USING_KERNEL_PANIC)
+#include <linux/kernel.h>
+	#define MALI_PANIC(fmt, args...) panic( fmt, ## args );
+#else
+	#define MALI_PANIC(fmt, args...) 
+#endif
+
 /* The file include several useful macros for error checking, debugging and printing.
  * - MALI_PRINTF(...)           Do not use this function: Will be included in Release builds.
  * - MALI_DEBUG_PRINT(nr, (X) ) Prints the second argument if nr<=MALI_DEBUG_LEVEL.

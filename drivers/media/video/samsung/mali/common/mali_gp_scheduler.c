@@ -274,17 +274,25 @@ void mali_gp_scheduler_resume(void)
 	mali_gp_scheduler_unlock();
 }
 
-_mali_osk_errcode_t _mali_ukk_gp_start_job(void *ctx, _mali_uk_gp_start_job_s *uargs)
+_mali_osk_errcode_t _mali_ukk_gp_start_job(_mali_uk_gp_start_job_s *args)
 {
 	struct mali_session_data *session;
 	struct mali_gp_job *job;
 
-	MALI_DEBUG_ASSERT_POINTER(uargs);
-	MALI_DEBUG_ASSERT_POINTER(ctx);
+	MALI_DEBUG_ASSERT_POINTER(args);
 
-	session = (struct mali_session_data*)ctx;
+	if (NULL == args->ctx)
+	{
+		return _MALI_OSK_ERR_INVALID_ARGS;
+	}
 
-	job = mali_gp_job_create(session, uargs, mali_scheduler_get_new_id());
+	session = (struct mali_session_data*)args->ctx;
+	if (NULL == session)
+	{
+		return _MALI_OSK_ERR_FAULT;
+	}
+
+	job = mali_gp_job_create(session, args, mali_scheduler_get_new_id());
 	if (NULL == job)
 	{
 		return _MALI_OSK_ERR_NOMEM;

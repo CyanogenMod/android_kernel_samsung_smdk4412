@@ -18,6 +18,12 @@ UMP_MEM_SIZE= $(CONFIG_UMP_MEM_SIZE)
 USING_MEMORY=1
 endif
 
+ifeq ($(CONFIG_UMP_VCM_ONLY),y)
+UMP_MEM_SIZE= $(CONFIG_UMP_MEM_SIZE)
+USING_MEMORY=2
+endif
+
+
 # For UMP Debug
 ifeq ($(CONFIG_VIDEO_UMP_DEBUG),y)
 DEFINES += -DDEBUG
@@ -72,12 +78,15 @@ ump-y := \
 		$(KBUILDROOT)common/ump_kernel_ref_drv.o\
 		$(OSKFILES)
 
+ump-$(CONFIG_UMP_VCM_ALLOC) += \
+                $(KBUILDROOT)linux/ump_kernel_memory_backend_vcm.o \
+
 EXTRA_CFLAGS += $(INCLUDES) \
 		$(DEFINES) 
 		
 		
 # Get subversion revision number, fall back to 0000 if no svn info is available
-SVN_REV:=$(shell ((svnversion | grep -E "^[0-9]+" && echo -n 'Revision: ' && svnversion) || git svn info | sed -e 's/$$$$/M/' | grep '^Revision: ' || echo ${MALI_RELEASE_NAME}) 2>/dev/null | sed -e 's/^Revision: //')
+SVN_REV:=$(shell ((svnversion | grep -qv exported && echo -n 'Revision: ' && svnversion) || git svn info | sed -e 's/$$$$/M/' | grep '^Revision: ' || echo ${MALI_RELEASE_NAME}) 2>/dev/null | sed -e 's/^Revision: //')
 		
 EXTRA_CFLAGS += -DSVN_REV=$(SVN_REV)
 EXTRA_CFLAGS += -DSVN_REV_STRING=\"$(SVN_REV)\"

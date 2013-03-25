@@ -18,15 +18,40 @@
 
 int gp_start_job_wrapper(struct mali_session_data *session_data, _mali_uk_gp_start_job_s __user *uargs)
 {
-	_mali_osk_errcode_t err;
+    _mali_uk_gp_start_job_s kargs;
+    _mali_osk_errcode_t err;
 
-	MALI_CHECK_NON_NULL(uargs, -EINVAL);
-	MALI_CHECK_NON_NULL(session_data, -EINVAL);
+    MALI_CHECK_NON_NULL(uargs, -EINVAL);
+    MALI_CHECK_NON_NULL(session_data, -EINVAL);
 
-	err = _mali_ukk_gp_start_job(session_data, uargs);
-	if (_MALI_OSK_ERR_OK != err) return map_errcode(err);
+	if (!access_ok(VERIFY_WRITE, uargs, sizeof(_mali_uk_gp_start_job_s)))
+	{
+		return -EFAULT;
+	}
 
-	return 0;
+    if (0 != copy_from_user(&kargs, uargs, sizeof(_mali_uk_gp_start_job_s))) return -EFAULT;
+
+    kargs.ctx = session_data;
+    err = _mali_ukk_gp_start_job(&kargs);
+    if (_MALI_OSK_ERR_OK != err) return map_errcode(err);
+
+    kargs.ctx = NULL; /* prevent kernel address to be returned to user space */
+    
+    if (0 != copy_to_user(uargs, &kargs, sizeof(_mali_uk_gp_start_job_s)))
+	{
+		/*
+		 * If this happens, then user space will not know that the job was actually started,
+		 * and if we return a queued job, then user space will still think that one is still queued.
+		 * This will typically lead to a deadlock in user space.
+		 * This could however only happen if user space deliberately passes a user buffer which
+		 * passes the access_ok(VERIFY_WRITE) check, but isn't fully writable at the time of copy_to_user().
+		 * The official Mali driver will never attempt to do that, and kernel space should not be affected.
+		 * That is why we do not bother to do a complex rollback in this very very very rare case.
+		 */
+		return -EFAULT;
+	}
+
+    return 0;
 }
 
 int gp_get_core_version_wrapper(struct mali_session_data *session_data, _mali_uk_get_gp_core_version_s __user *uargs)

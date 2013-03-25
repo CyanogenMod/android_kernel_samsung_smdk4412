@@ -49,8 +49,13 @@ USING_GPU_UTILIZATION=1
 USING_MALI_DVFS_ENABLED=1
 endif
 
-ifeq ($(CONFIG_VIDEO_MALI400MP_DEBUG),y)
+ifeq ($(CONFIG_VIDEO_UMP_DEBUG),y)
 BUILD=debug
+endif
+
+ifeq ($(CONFIG_VIDEO_MALI400MP_STREAMLINE_PROFILING),y)
+USING_PROFILING=1
+USING_TRACEPOINTS=1
 endif
 
 # set up defaults if not defined by the user
@@ -68,7 +73,7 @@ USING_MALI_RUN_TIME_PM ?= 0
 USING_MALI_PMM_TESTSUITE ?= 0
 USING_MALI_PMU ?= 0
 USING_GPU_UTILIZATION ?= 0
-OS_MEMORY_KERNEL_BUFFER_SIZE_IN_MB ?= 6
+OS_MEMORY_KERNEL_BUFFER_SIZE_IN_MB ?= 16
 USING_PROFILING ?= 0
 USING_INTERNAL_PROFILING ?= 0
 USING_TRACEPOINTS ?= 0
@@ -81,6 +86,9 @@ DISABLE_PP0 ?= 0
 DISABLE_PP1 ?= 0
 DISABLE_PP2 ?= 0
 DISABLE_PP3 ?= 0
+PROFILING_SKIP_PP_JOBS ?= 0
+PROFILING_SKIP_PP_AND_GP_JOBS ?= 0
+PROFILING_PRINT_L2_HITRATE_ON_GP_FINISH ?= 0
 TIMESTAMP ?= default
 BUILD ?= release 
 TARGET_PLATFORM ?= default
@@ -145,6 +153,9 @@ DEFINES += -DDISABLE_PP0=$(DISABLE_PP0)
 DEFINES += -DDISABLE_PP1=$(DISABLE_PP1)
 DEFINES += -DDISABLE_PP2=$(DISABLE_PP2)
 DEFINES += -DDISABLE_PP3=$(DISABLE_PP3)
+DEFINES += -DPROFILING_SKIP_PP_JOBS=$(PROFILING_SKIP_PP_JOBS)
+DEFINES += -DPROFILING_SKIP_PP_AND_GP_JOBS=$(PROFILING_SKIP_PP_AND_GP_JOBS)
+DEFINES += -DPROFILING_PRINT_L2_HITRATE_ON_GP_FINISH=$(PROFILING_PRINT_L2_HITRATE_ON_GP_FINISH)
 DEFINES += -DMALI_PP_SCHEDULER_FORCE_NO_JOB_OVERLAP=$(MALI_PP_SCHEDULER_FORCE_NO_JOB_OVERLAP)
 DEFINES += -DMALI_PP_SCHEDULER_KEEP_SUB_JOB_STARTS_ALIGNED=$(MALI_PP_SCHEDULER_KEEP_SUB_JOB_STARTS_ALIGNED)
 DEFINES += -DMALI_PP_SCHEDULER_FORCE_NO_JOB_OVERLAP_BETWEEN_APPS=$(MALI_PP_SCHEDULER_FORCE_NO_JOB_OVERLAP_BETWEEN_APPS)
@@ -168,7 +179,7 @@ else
 endif
 
 # Target build file
-obj-$(CONFIG_VIDEO_MALI400MP)		+= mali.o
+obj-$(CONFIG_VIDEO_UMP)	+= mali.o
 
 # Use our defines when compiling
 # MALI
@@ -279,7 +290,7 @@ EXTRA_CFLAGS += -I$(MALI_INCLUDE_PREFIX)timestamp-$(TIMESTAMP)
 else
 ifeq ($(USING_PROFILING),1)
 PROFILING_BACKEND_SOURCES = \
-	linux/mali_osk_profiling.o
+	linux/mali_osk_profiling_gator.o
 endif
 endif
 
@@ -320,7 +331,7 @@ ifeq ($(PANIC_ON_WATCHDOG_TIMEOUT),1)
 endif
 
 # Get subversion revision number, fall back to 0000 if no svn info is available
-SVN_REV:=$(shell ((svnversion | grep -E "^[0-9]+" && echo -n 'Revision: ' && svnversion) || git svn info | sed -e 's/$$$$/M/' | grep '^Revision: ' || echo ${MALI_RELEASE_NAME}) 2>/dev/null | sed -e 's/^Revision: //')
+SVN_REV:=$(shell ((svnversion | grep -qv exported && echo -n 'Revision: ' && svnversion) || git svn info | sed -e 's/$$$$/M/' | grep '^Revision: ' || echo ${MALI_RELEASE_NAME}) 2>/dev/null | sed -e 's/^Revision: //')
 
 EXTRA_CFLAGS += -DSVN_REV=$(SVN_REV)
 EXTRA_CFLAGS += -DSVN_REV_STRING=\"$(SVN_REV)\"

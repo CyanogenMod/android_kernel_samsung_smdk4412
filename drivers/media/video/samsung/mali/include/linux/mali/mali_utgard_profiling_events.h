@@ -71,7 +71,6 @@ typedef enum
     MALI_PROFILING_EVENT_REASON_SINGLE_SW_UMP_TRY_LOCK          = 53,
 	MALI_PROFILING_EVENT_REASON_SINGLE_SW_UMP_LOCK              = 54,
 	MALI_PROFILING_EVENT_REASON_SINGLE_SW_UMP_UNLOCK            = 55,
-	MALI_PROFILING_EVENT_REASON_SINGLE_LOCK_CONTENDED           = 56,
 } cinstr_profiling_event_reason_single_sw_t;
 
 /**
@@ -81,7 +80,6 @@ typedef enum
 {
 	MALI_PROFILING_EVENT_REASON_START_STOP_SW_NONE      = 0,
 	MALI_PROFILING_EVENT_REASON_START_STOP_MALI         = 1,
-	MALI_PROFILING_EVENT_REASON_START_STOP_BOTTOM_HALF  = 2,
 } cinstr_profiling_event_reason_start_stop_sw_t;
 
 /**
@@ -125,27 +123,5 @@ typedef enum
 	MALI_PROFILING_EVENT_REASON_SINGLE_GPU_NONE              = 0,
 	MALI_PROFILING_EVENT_REASON_SINGLE_GPU_FREQ_VOLT_CHANGE  = 1,
 } cinstr_profiling_event_reason_single_gpu_t;
-
-/**
- * These values are applicable for the 3rd data parameter when
- * the type MALI_PROFILING_EVENT_TYPE_START is used from the software channel
- * with the MALI_PROFILING_EVENT_REASON_START_STOP_BOTTOM_HALF reason.
- */
-typedef enum
-{
-	MALI_PROFILING_EVENT_DATA_CORE_GP0             =  1,
-	MALI_PROFILING_EVENT_DATA_CORE_PP0             =  5,
-	MALI_PROFILING_EVENT_DATA_CORE_PP1             =  6,
-	MALI_PROFILING_EVENT_DATA_CORE_PP2             =  7,
-	MALI_PROFILING_EVENT_DATA_CORE_PP3             =  8,
-	MALI_PROFILING_EVENT_DATA_CORE_PP4             =  9,
-	MALI_PROFILING_EVENT_DATA_CORE_PP5             = 10,
-	MALI_PROFILING_EVENT_DATA_CORE_PP6             = 11,
-	MALI_PROFILING_EVENT_DATA_CORE_PP7             = 12,
-} cinstr_profiling_event_data_core_t;
-
-#define MALI_PROFILING_MAKE_EVENT_DATA_CORE_GP(num) (MALI_PROFILING_EVENT_DATA_CORE_GP0 + (num))
-#define MALI_PROFILING_MAKE_EVENT_DATA_CORE_PP(num) (MALI_PROFILING_EVENT_DATA_CORE_PP0 + (num))
-
 
 #endif /*_MALI_UTGARD_PROFILING_EVENTS_H_*/
