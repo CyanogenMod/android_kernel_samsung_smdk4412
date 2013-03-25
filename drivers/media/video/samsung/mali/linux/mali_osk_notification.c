@@ -21,7 +21,11 @@
 
 #include <linux/sched.h>
 #include <linux/slab.h>
-#include <linux/spinlock.h>
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,26)
+#include <linux/semaphore.h>
+#else /* pre 2.6.26 the file was in the arch specific location */
+#include <asm/semaphore.h>
+#endif
 
 /**
  * Declaration of the notification queue object type
@@ -31,7 +35,7 @@
  */
 struct _mali_osk_notification_queue_t_struct
 {
-	spinlock_t mutex; /**< Mutex protecting the list */
+	struct semaphore mutex; /**< Mutex protecting the list */
 	wait_queue_head_t receive_queue; /**< Threads waiting for new entries to the queue */
 	struct list_head head; /**< List of notifications waiting to be picked up */
 };
@@ -49,7 +53,7 @@ _mali_osk_notification_queue_t *_mali_osk_notification_queue_init( void )
 	result = (_mali_osk_notification_queue_t *)kmalloc(sizeof(_mali_osk_notification_queue_t), GFP_KERNEL);
 	if (NULL == result) return NULL;
 
-	spin_lock_init(&result->mutex);
+	sema_init(&result->mutex, 1);
 	init_waitqueue_head(&result->receive_queue);
 	INIT_LIST_HEAD(&result->head);
 
@@ -117,22 +121,39 @@ void _mali_osk_notification_queue_send( _mali_osk_notification_queue_t *queue, _
     notification = container_of( object, _mali_osk_notification_wrapper_t, data );
 
 	/* lock queue access */
-	spin_lock(&queue->mutex);
+	down(&queue->mutex);
 	/* add to list */
 	list_add_tail(&notification->list, &queue->head);
 	/* unlock the queue */
-	spin_unlock(&queue->mutex);
+	up(&queue->mutex);
 
 	/* and wake up one possible exclusive waiter */
 	wake_up(&queue->receive_queue);
 }
+
+static int _mali_notification_queue_is_empty( _mali_osk_notification_queue_t *queue )
+{
+	int ret;
+
+	down(&queue->mutex);
+	ret = list_empty(&queue->head);
+	up(&queue->mutex);
+	return ret;
+}
+
+#if MALI_STATE_TRACKING
+mali_bool _mali_osk_notification_queue_is_empty( _mali_osk_notification_queue_t *queue )
+{
+	return _mali_notification_queue_is_empty(queue) ? MALI_TRUE : MALI_FALSE;
+}
+#endif
 
 _mali_osk_errcode_t _mali_osk_notification_queue_dequeue( _mali_osk_notification_queue_t *queue, _mali_osk_notification_t **result )
 {
 	_mali_osk_errcode_t ret = _MALI_OSK_ERR_ITEM_NOT_FOUND;
 	_mali_osk_notification_wrapper_t *wrapper_object;
 
-	spin_lock(&queue->mutex);
+	down(&queue->mutex);
 
 	if (!list_empty(&queue->head))
 	{
@@ -142,7 +163,7 @@ _mali_osk_errcode_t _mali_osk_notification_queue_dequeue( _mali_osk_notification
 		ret = _MALI_OSK_ERR_OK;
 	}
 
-	spin_unlock(&queue->mutex);
+	up(&queue->mutex);
 
 	return ret;
 }
@@ -156,10 +177,12 @@ _mali_osk_errcode_t _mali_osk_notification_queue_receive( _mali_osk_notification
     /* default result */
 	*result = NULL;
 
-	if (wait_event_interruptible(queue->receive_queue,
-	                             _MALI_OSK_ERR_OK == _mali_osk_notification_queue_dequeue(queue, result)))
+	while (_MALI_OSK_ERR_OK != _mali_osk_notification_queue_dequeue(queue, result))
 	{
-		return _MALI_OSK_ERR_RESTARTSYSCALL;
+		if (wait_event_interruptible(queue->receive_queue, !_mali_notification_queue_is_empty(queue)))
+		{
+			return _MALI_OSK_ERR_RESTARTSYSCALL;
+		}
 	}
 
 	return _MALI_OSK_ERR_OK; /* all ok */

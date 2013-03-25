@@ -1,18 +1,22 @@
 /*
- * Copyright (C) 2012 ARM Limited. All rights reserved.
- * 
+ * Copyright (C) 2010-2012 ARM Limited. All rights reserved.
+ *
  * This program is free software and is provided to you under the terms of the GNU General Public License version 2
  * as published by the Free Software Foundation, and any use by you of this program is subject to the terms of such GNU licence.
- * 
+ *
  * A copy of the licence is included with the program, and can also be obtained from Free Software
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
  */
 
-#ifndef __MALI_UK_TYPES_H__
-#define __MALI_UK_TYPES_H__
+/**
+ * @file ump_kernel_memory_backend_vcm.h
+ */
 
-/* Simple wrapper in order to find the OS specific location of this file */
-//#include <linux/mali/mali_utgard_uk_types.h>
-#include "../include/linux/mali/mali_utgard_uk_types.h"
+#ifndef __UMP_KERNEL_MEMORY_BACKEND_VCM_H__
+#define __UMP_KERNEL_MEMORY_BACKEND_VCM_H__
 
-#endif /* __MALI_UK_TYPES_H__ */
+#include "ump_kernel_memory_backend.h"
+
+ump_memory_backend * ump_vcm_memory_backend_create(const int max_allocation);
+
+#endif /* __UMP_KERNEL_MEMORY_BACKEND_VCM_H__ */

@@ -102,7 +102,7 @@ _mali_osk_errcode_t mali_group_start_gp_job(struct mali_group *group, struct mal
  */
 _mali_osk_errcode_t mali_group_start_pp_job(struct mali_group *group, struct mali_pp_job *job, u32 sub_job);
 
-/** @brief Resume GP job that suspended waiting for more heap memory
+/**Â @brief Resume GP job that suspended waiting for more heap memory
  */
 void mali_group_resume_gp_with_new_heap(struct mali_group *group, u32 job_id, u32 start_addr, u32 end_addr);
 /** @brief Abort GP job

@@ -13,6 +13,7 @@
 
 #include "mali_osk.h"
 
+extern int mali_hang_check_interval;
 extern int mali_max_job_runtime;
 
 typedef enum

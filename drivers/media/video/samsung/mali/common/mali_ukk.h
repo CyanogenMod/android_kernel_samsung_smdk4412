@@ -449,11 +449,10 @@ _mali_osk_errcode_t _mali_ukk_va_to_mali_pa( _mali_uk_va_to_mali_pa_s * args );
  *
  * Job completion can be awaited with _mali_ukk_wait_for_notification().
  *
- * @oaram ctx user-kernel context (mali_session)
- * @param uargs see _mali_uk_pp_start_job_s in "mali_utgard_uk_types.h". Use _mali_osk_copy_from_user to retrieve data!
+ * @param args see _mali_uk_pp_start_job_s in "mali_utgard_uk_types.h"
  * @return _MALI_OSK_ERR_OK on success, otherwise a suitable _mali_osk_errcode_t on failure.
  */
-_mali_osk_errcode_t _mali_ukk_pp_start_job( void *ctx, _mali_uk_pp_start_job_s *uargs );
+_mali_osk_errcode_t _mali_ukk_pp_start_job( _mali_uk_pp_start_job_s *args );
 
 /** @brief Returns the number of Fragment Processors in the system
  *
@@ -503,11 +502,10 @@ void _mali_ukk_pp_job_disable_wb(_mali_uk_pp_disable_wb_s *args);
  *
  * Job completion can be awaited with _mali_ukk_wait_for_notification().
  *
- * @oaram ctx user-kernel context (mali_session)
- * @param uargs see _mali_uk_gp_start_job_s in "mali_utgard_uk_types.h". Use _mali_osk_copy_from_user to retrieve data!
+ * @param args see _mali_uk_gp_start_job_s in "mali_utgard_uk_types.h"
  * @return _MALI_OSK_ERR_OK on success, otherwise a suitable _mali_osk_errcode_t on failure.
  */
-_mali_osk_errcode_t _mali_ukk_gp_start_job( void *ctx, _mali_uk_gp_start_job_s *uargs );
+_mali_osk_errcode_t _mali_ukk_gp_start_job( _mali_uk_gp_start_job_s *args );
 
 /** @brief Returns the number of Vertex Processors in the system.
  *

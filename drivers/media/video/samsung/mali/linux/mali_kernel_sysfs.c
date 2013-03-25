@@ -44,7 +44,6 @@
 #include "mali_kernel_core.h"
 #include "mali_user_settings_db.h"
 #include "mali_device_pause_resume.h"
-#include "mali_profiling_internal.h"
 
 #define POWER_BUFFER_SIZE 3
 
@@ -69,7 +68,6 @@ static const char* const mali_power_events[_MALI_MAX_EVENTS] = {
 
 static u32 virtual_power_status_register=0;
 static char pwr_buf[POWER_BUFFER_SIZE];
-
 
 static int open_copy_private_data(struct inode *inode, struct file *filp)
 {
@@ -792,7 +790,7 @@ static ssize_t profiling_record_read(struct file *filp, char __user *ubuf, size_
 	char buf[64];
 	int r;
 
-	r = sprintf(buf, "%u\n", _mali_internal_profiling_is_recording() ? 1 : 0);
+	r = sprintf(buf, "%u\n", _mali_osk_profiling_is_recording() ? 1 : 0);
 	return simple_read_from_buffer(ubuf, cnt, ppos, buf, r);
 }
 
@@ -825,16 +823,16 @@ static ssize_t profiling_record_write(struct file *filp, const char __user *ubuf
 		u32 limit = MALI_PROFILING_MAX_BUFFER_ENTRIES; /* This can be made configurable at a later stage if we need to */
 
 		/* check if we are already recording */
-		if (MALI_TRUE == _mali_internal_profiling_is_recording())
+		if (MALI_TRUE == _mali_osk_profiling_is_recording())
 		{
 			MALI_DEBUG_PRINT(3, ("Recording of profiling events already in progress\n"));
 			return -EFAULT;
 		}
 
 		/* check if we need to clear out an old recording first */
-		if (MALI_TRUE == _mali_internal_profiling_have_recording())
+		if (MALI_TRUE == _mali_osk_profiling_have_recording())
 		{
-			if (_MALI_OSK_ERR_OK != _mali_internal_profiling_clear())
+			if (_MALI_OSK_ERR_OK != _mali_osk_profiling_clear())
 			{
 				MALI_DEBUG_PRINT(3, ("Failed to clear existing recording of profiling events\n"));
 				return -EFAULT;
@@ -842,7 +840,7 @@ static ssize_t profiling_record_write(struct file *filp, const char __user *ubuf
 		}
 
 		/* start recording profiling data */
-		if (_MALI_OSK_ERR_OK != _mali_internal_profiling_start(&limit))
+		if (_MALI_OSK_ERR_OK != _mali_osk_profiling_start(&limit))
 		{
 			MALI_DEBUG_PRINT(3, ("Failed to start recording of profiling events\n"));
 			return -EFAULT;
@@ -854,7 +852,7 @@ static ssize_t profiling_record_write(struct file *filp, const char __user *ubuf
 	{
 		/* stop recording profiling data */
 		u32 count = 0;
-		if (_MALI_OSK_ERR_OK != _mali_internal_profiling_stop(&count))
+		if (_MALI_OSK_ERR_OK != _mali_osk_profiling_stop(&count))
 		{
 			MALI_DEBUG_PRINT(2, ("Failed to stop recording of profiling events\n"));
 			return -EFAULT;
@@ -878,7 +876,7 @@ static void *profiling_events_start(struct seq_file *s, loff_t *pos)
 	loff_t *spos;
 
 	/* check if we have data avaiable */
-	if (MALI_TRUE != _mali_internal_profiling_have_recording())
+	if (MALI_TRUE != _mali_osk_profiling_have_recording())
 	{
 		return NULL;
 	}
@@ -898,13 +896,13 @@ static void *profiling_events_next(struct seq_file *s, void *v, loff_t *pos)
 	loff_t *spos = v;
 
 	/* check if we have data avaiable */
-	if (MALI_TRUE != _mali_internal_profiling_have_recording())
+	if (MALI_TRUE != _mali_osk_profiling_have_recording())
 	{
 		return NULL;
 	}
 
 	/* check if the next entry actually is avaiable */
-	if (_mali_internal_profiling_get_count() <= (u32)(*spos + 1))
+	if (_mali_osk_profiling_get_count() <= (u32)(*spos + 1))
 	{
 		return NULL;
 	}
@@ -929,7 +927,7 @@ static int profiling_events_show(struct seq_file *seq_file, void *v)
 	index = (u32)*spos;
 
 	/* Retrieve all events */
-	if (_MALI_OSK_ERR_OK == _mali_internal_profiling_get_event(index, &timestamp, &event_id, data))
+	if (_MALI_OSK_ERR_OK == _mali_osk_profiling_get_event(index, &timestamp, &event_id, data))
 	{
 		seq_printf(seq_file, "%llu %u %u %u %u %u %u\n", timestamp, event_id, data[0], data[1], data[2], data[3], data[4]);
 		return 0;
