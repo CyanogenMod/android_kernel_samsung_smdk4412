@@ -21,7 +21,7 @@
  * software in any way with any other Broadcom software provided under a license
  * other than the GPL, without Broadcom's express prior written consent.
  *
- * $Id: bcmsdh_sdmmc.c 347640 2012-07-27 11:53:21Z $
+ * $Id: bcmsdh_sdmmc.c 379078 2013-01-16 00:41:36Z $
  */
 #include <typedefs.h>
 
@@ -250,9 +250,9 @@ sdioh_enable_func_intr(void)
 			return SDIOH_API_RC_FAIL;
 		}
 
-		/* Enable F1 and F2 interrupts, set master enable */
-		reg |= (INTR_CTL_FUNC1_EN | INTR_CTL_FUNC2_EN | INTR_CTL_MASTER_EN);
-
+		/* Enable F1 and F2 interrupts, clear master enable */
+		reg &= ~INTR_CTL_MASTER_EN;
+		reg |= (INTR_CTL_FUNC1_EN | INTR_CTL_FUNC2_EN);
 		sdio_writeb(gInstance->func[0], reg, SDIOD_CCCR_INTEN, &err);
 		sdio_release_host(gInstance->func[0]);
 
@@ -801,7 +801,7 @@ sdioh_request_byte(sdioh_info_t *sd, uint rw, uint func, uint regaddr, uint8 *by
 
 	DHD_PM_RESUME_WAIT(sdioh_request_byte_wait);
 	DHD_PM_RESUME_RETURN_ERROR(SDIOH_API_RC_FAIL);
-	if(rw) { /* CMD52 Write */
+	if(rw) { /* CMD53 Write */
 		if (func == 0) {
 			/* Can only directly write to some F0 registers.  Handle F2 enable
 			 * as a special case.
@@ -969,6 +969,7 @@ sdioh_request_packet(sdioh_info_t *sd, uint fix_inc, uint write, uint func,
 	void *pnext, *pprev;
 	uint ttl_len, dma_len, lft_len, xfred_len, pkt_len;
 	uint blk_num;
+	int blk_size;
 	struct mmc_request mmc_req;
 	struct mmc_command mmc_cmd;
 	struct mmc_data mmc_dat;
@@ -984,12 +985,13 @@ sdioh_request_packet(sdioh_info_t *sd, uint fix_inc, uint write, uint func,
 	for (pnext = pkt; pnext; pnext = PKTNEXT(sd->osh, pnext))
 		ttl_len += PKTLEN(sd->osh, pnext);
 
-	if (!sd->use_rxchain || ttl_len <= sd->client_block_size[func]) {
+	blk_size = sd->client_block_size[func];
+	if (!sd->use_rxchain || ttl_len <= blk_size) {
 		blk_num = 0;
 		dma_len = 0;
 	} else {
-		blk_num = ttl_len / sd->client_block_size[func];
-		dma_len = blk_num * sd->client_block_size[func];
+		blk_num = ttl_len / blk_size;
+		dma_len = blk_num * blk_size;
 	}
 	lft_len = ttl_len - dma_len;
 
@@ -1030,7 +1032,7 @@ sdioh_request_packet(sdioh_info_t *sd, uint fix_inc, uint write, uint func,
 
 		mmc_dat.sg = sd->sg_list;
 		mmc_dat.sg_len = SGCount;
-		mmc_dat.blksz = sd->client_block_size[func];
+		mmc_dat.blksz = blk_size;
 		mmc_dat.blocks = blk_num;
 		mmc_dat.flags = write ? MMC_DATA_WRITE : MMC_DATA_READ;
 
@@ -1086,8 +1088,8 @@ sdioh_request_packet(sdioh_info_t *sd, uint fix_inc, uint write, uint func,
 			 */
 			if (write == 0 || pkt_len < 32)
 				pkt_len = (pkt_len + 3) & 0xFFFFFFFC;
-			else if (pkt_len % DHD_SDALIGN)
-				pkt_len += DHD_SDALIGN - (pkt_len % DHD_SDALIGN);
+			else if (pkt_len % blk_size)
+				pkt_len += blk_size - (pkt_len % blk_size);
 
 #if defined(CUSTOMER_HW4) && defined(DYNAMIC_F2_BLKSIZE_OF_PROPTXSTATUS)
 			if (write && pkt_len > 64 && (pkt_len % 64) == 32)

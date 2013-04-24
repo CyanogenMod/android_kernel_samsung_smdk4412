@@ -97,6 +97,7 @@
 #define WLFC_CTL_TYPE_NIC_PRD_END		16
 #define WLFC_CTL_TYPE_AF_TXS			17
 #define WLFC_CTL_TYPE_TRANS_ID                  18
+#define WLFC_CTL_TYPE_COMP_TXSTATUS		19
 
 #define WLFC_CTL_TYPE_FILLER			255
 

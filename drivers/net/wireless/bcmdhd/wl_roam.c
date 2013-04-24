@@ -99,7 +99,7 @@ int set_roamscan_channel_list(struct net_device *dev,
 		chanspec_t channels[20];
 	} channel_list;
 	char iobuf[200];
-	uint band, band2G, band5G, bw;
+	uint band2G, band5G, bw;
 	roamscan_mode = 1;
 
 	if (n > 20)

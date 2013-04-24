@@ -24,7 +24,7 @@
  * software in any way with any other Broadcom software provided under a license
  * other than the GPL, without Broadcom's express prior written consent.
  *
- * $Id: wlioctl.h 357627 2012-09-19 12:42:22Z $
+ * $Id: wlioctl.h 366141 2012-11-01 01:55:06Z $
  */
 
 #ifndef _wlioctl_h_
@@ -518,6 +518,10 @@ typedef struct wl_uint32_list {
 /* used for association with a specific BSSID and chanspec list */
 typedef struct wl_assoc_params {
 	struct ether_addr bssid;	/* 00:00:00:00:00:00: broadcast scan */
+	uint16 bssid_cnt;		/* 0: use chanspec_num, and the single bssid,
+					 * otherwise count of chanspecs in chanspec_list
+					 * AND paired bssids following chanspec_list
+					 */
 	int32 chanspec_num;		/* 0: all available channels,
 					 * otherwise count of chanspecs in chanspec_list
 					 */
