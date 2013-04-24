@@ -21,7 +21,7 @@
  * software in any way with any other Broadcom software provided under a license
  * other than the GPL, without Broadcom's express prior written consent.
  *
- * $Id: bcmutils.h 354184 2012-08-30 08:08:08Z $
+ * $Id: bcmutils.h 365744 2012-10-30 22:01:29Z $
  */
 
 #ifndef	_bcmutils_h_
@@ -121,6 +121,8 @@ typedef struct {
 	uint32 max_avail;    
 	uint32 max_used;     
 	uint32 queue_capacity; 
+	uint32 rtsfail;        
+	uint32 acked;          
 } pktq_counters_t;
 #endif 
 
@@ -137,7 +139,9 @@ struct pktq {
 	
 	struct pktq_prec q[PKTQ_MAX_PREC];
 #ifdef PKTQ_LOG
-	pktq_counters_t	_prec_cnt[PKTQ_MAX_PREC];		
+	pktq_counters_t	_prec_cnt[PKTQ_MAX_PREC];     
+	pktq_counters_t _prec_bytes[PKTQ_MAX_PREC];   
+	uint32 _logtime;                   
 #endif
 };
 
@@ -289,6 +293,7 @@ extern void *pktq_penq(struct pktq *pq, int prec, void *p);
 extern void *pktq_penq_head(struct pktq *pq, int prec, void *p);
 extern void *pktq_pdeq(struct pktq *pq, int prec);
 extern void *pktq_pdeq_prev(struct pktq *pq, int prec, void *prev_p);
+extern void *pktq_pdeq_with_fn(struct pktq *pq, int prec, ifpkt_cb_t fn, int arg);
 extern void *pktq_pdeq_tail(struct pktq *pq, int prec);
 
 extern void pktq_pflush(osl_t *osh, struct pktq *pq, int prec, bool dir,
@@ -335,7 +340,8 @@ extern uint pkttotlen(osl_t *osh, void *p);
 extern void *pktlast(osl_t *osh, void *p);
 extern uint pktsegcnt(osl_t *osh, void *p);
 extern uint pktsegcnt_war(osl_t *osh, void *p);
-extern uint8 *pktoffset(osl_t *osh, void *p,  uint offset);
+extern uint8 *pktdataoffset(osl_t *osh, void *p,  uint offset);
+extern void *pktoffset(osl_t *osh, void *p,  uint offset);
 
 
 #define	PKTPRIO_VDSCP	0x100		
@@ -568,6 +574,24 @@ extern int bcm_format_ssid(char* buf, const uchar ssid[], uint ssid_len);
 #define	MAX(a, b)		(((a) > (b)) ? (a) : (b))
 #endif 
 
+
+#ifndef LIMIT_TO_RANGE
+#define LIMIT_TO_RANGE(x, min, max) \
+	((x) < (min) ? (min) : ((x) > (max) ? (max) : (x)))
+#endif 
+
+
+#ifndef LIMIT_TO_MAX
+#define LIMIT_TO_MAX(x, max) \
+	(((x) > (max) ? (max) : (x)))
+#endif 
+
+
+#ifndef LIMIT_TO_MIN
+#define LIMIT_TO_MIN(x, min) \
+	(((x) < (min) ? (min) : (x)))
+#endif 
+
 #define CEIL(x, y)		(((x) + ((y) - 1)) / (y))
 #define	ROUNDUP(x, y)		((((x) + ((y) - 1)) / (y)) * (y))
 #define	ISALIGNED(a, x)		(((uintptr)(a) & ((x) - 1)) == 0)
@@ -598,7 +622,7 @@ extern void *_bcmutils_dummy_fn;
 
 
 #ifndef setbit
-#ifndef NBBY		      
+#ifndef NBBY		  
 #define	NBBY	8	
 #endif 
 #define	setbit(a, i)	(((uint8 *)a)[(i) / NBBY] |= 1 << ((i) % NBBY))
@@ -606,6 +630,8 @@ extern void *_bcmutils_dummy_fn;
 #define	isset(a, i)	(((const uint8 *)a)[(i) / NBBY] & (1 << ((i) % NBBY)))
 #define	isclr(a, i)	((((const uint8 *)a)[(i) / NBBY] & (1 << ((i) % NBBY))) == 0)
 #endif 
+
+#define	isbitset(a, i)	(((a) & (1 << (i))) != 0)
 
 #define	NBITS(type)	(sizeof(type) * 8)
 #define NBITVAL(nbits)	(1 << (nbits))
@@ -663,12 +689,20 @@ extern void *_bcmutils_dummy_fn;
 #else
 #define MACDBG				"%02x:%02x:%02x"
 #define MAC2STRDBG(ea) (ea)[0], (ea)[4], (ea)[5]
-#endif /* SIMPLE_MAC_PRINT */
+#endif 
+
 
 typedef struct bcm_bit_desc {
 	uint32	bit;
 	const char* name;
 } bcm_bit_desc_t;
+
+
+typedef struct bcm_bit_desc_ex {
+	uint32 mask;
+	const bcm_bit_desc_t *bitfield;
+} bcm_bit_desc_ex_t;
+
 
 
 typedef struct bcm_tlv {
@@ -716,6 +750,9 @@ extern uint32 hndcrc32(uint8 *p, uint nbytes, uint32 crc);
 
 #if defined(DHD_DEBUG) || defined(WLMSG_PRHDRS) || defined(WLMSG_PRPKT) || \
 	defined(WLMSG_ASSOC)
+
+extern int bcm_format_field(const bcm_bit_desc_ex_t *bd, uint32 field, char* buf, int len);
+
 extern int bcm_format_flags(const bcm_bit_desc_t *bd, uint32 flags, char* buf, int len);
 #endif
 
@@ -737,7 +774,7 @@ extern bcm_tlv_t *bcm_parse_ordered_tlvs(void *buf, int buflen, uint key);
 
 
 extern const char *bcmerrorstr(int bcmerror);
-extern bcm_tlv_t *bcm_parse_tlvs(void *buf, int buflen, uint key);
+
 
 
 typedef uint32 mbool;

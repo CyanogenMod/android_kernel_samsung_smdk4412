@@ -21,7 +21,7 @@
  * software in any way with any other Broadcom software provided under a license
  * other than the GPL, without Broadcom's express prior written consent.
  *
- * $Id: linux_osl.h 352246 2012-08-22 05:42:04Z $
+ * $Id: linux_osl.h 388661 2013-03-04 05:50:45Z $
  */
 
 #ifndef _linux_osl_h_
@@ -92,7 +92,6 @@ extern struct pci_dev *osl_pci_device(osl_t *osh);
 
 typedef struct {
 	bool pkttag;
-	uint pktalloced; 	
 	bool mmbus;		
 	pktfree_cb_fn_t tx_fn;  
 	void *tx_ctx;		
@@ -139,7 +138,8 @@ extern void osl_dma_free_consistent(osl_t *osh, void *va, uint size, ulong pa);
 
 #define	DMA_UNMAP(osh, pa, size, direction, p, dmah) \
 	osl_dma_unmap((osh), (pa), (size), (direction))
-extern uint osl_dma_map(osl_t *osh, void *va, uint size, int direction);
+extern uint osl_dma_map(osl_t *osh, void *va, uint size, int direction, void *p,
+	hnddma_seg_map_t *txp_dmah);
 extern void osl_dma_unmap(osl_t *osh, uint pa, uint size, int direction);
 
 
@@ -165,8 +165,11 @@ extern int osl_error(int bcmerror);
 #include <linuxver.h>           
 #include <linux/kernel.h>       
 #include <linux/string.h>       
-
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(2, 4, 29)
 #define OSL_SYSUPTIME()		((uint32)jiffies_to_msecs(jiffies))
+#else
+#define OSL_SYSUPTIME()		((uint32)jiffies * (1000 / HZ))
+#endif
 #define	printf(fmt, args...)	printk(fmt , ## args)
 #include <linux/kernel.h>	
 #include <linux/string.h>	
@@ -218,6 +221,9 @@ extern int osl_error(int bcmerror);
 #define OSL_UNCACHED(va)	((void *)va)
 #define OSL_CACHED(va)		((void *)va)
 
+
+#define OSL_CACHE_FLUSH(va, len)
+
 #define OSL_PREF_RANGE_LD(va, sz)
 #define OSL_PREF_RANGE_ST(va, sz)
 
@@ -260,14 +266,14 @@ extern int osl_error(int bcmerror);
 #define	PKTDATA(osh, skb)		(((struct sk_buff*)(skb))->data)
 #define	PKTLEN(osh, skb)		(((struct sk_buff*)(skb))->len)
 #define PKTHEADROOM(osh, skb)		(PKTDATA(osh, skb)-(((struct sk_buff*)(skb))->head))
-#define PKTTAILROOM(osh, skb) ((((struct sk_buff*)(skb))->end)-(((struct sk_buff*)(skb))->tail))
+#define PKTTAILROOM(osh, skb)		skb_tailroom((struct sk_buff*)(skb))
+#define PKTPADTAILROOM(osh, skb, padlen)		skb_pad((struct sk_buff*)(skb), (padlen))
 #define	PKTNEXT(osh, skb)		(((struct sk_buff*)(skb))->next)
 #define	PKTSETNEXT(osh, skb, x)		(((struct sk_buff*)(skb))->next = (struct sk_buff*)(x))
 #define	PKTSETLEN(osh, skb, len)	__skb_trim((struct sk_buff*)(skb), (len))
 #define	PKTPUSH(osh, skb, bytes)	skb_push((struct sk_buff*)(skb), (bytes))
 #define	PKTPULL(osh, skb, bytes)	skb_pull((struct sk_buff*)(skb), (bytes))
 #define	PKTTAG(skb)			((void*)(((struct sk_buff*)(skb))->cb))
-#define PKTALLOCED(osh)			((osl_pubinfo_t *)(osh))->pktalloced
 #define PKTSETPOOL(osh, skb, x, y)	do {} while (0)
 #define PKTPOOL(osh, skb)		FALSE
 #define PKTSHRINK(osh, m)		(m)
@@ -286,6 +292,18 @@ typedef struct ctfpool {
 	uint 		slow_allocs;
 } ctfpool_t;
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(2, 6, 22)
+
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(2, 6, 36)
+#define	FASTBUF	(1 << 0)
+#define	CTFBUF	(1 << 1)
+#define	PKTSETFAST(osh, skb)	((((struct sk_buff*)(skb))->pktc_flags) |= FASTBUF)
+#define	PKTCLRFAST(osh, skb)	((((struct sk_buff*)(skb))->pktc_flags) &= (~FASTBUF))
+#define	PKTSETCTF(osh, skb)	((((struct sk_buff*)(skb))->pktc_flags) |= CTFBUF)
+#define	PKTCLRCTF(osh, skb)	((((struct sk_buff*)(skb))->pktc_flags) &= (~CTFBUF))
+#define	PKTISFAST(osh, skb)	((((struct sk_buff*)(skb))->pktc_flags) & FASTBUF)
+#define	PKTISCTF(osh, skb)	((((struct sk_buff*)(skb))->pktc_flags) & CTFBUF)
+#define	PKTFAST(osh, skb)	(((struct sk_buff*)(skb))->pktc_flags)
+#else
 #define	FASTBUF	(1 << 16)
 #define	CTFBUF	(1 << 17)
 #define	PKTSETFAST(osh, skb)	((((struct sk_buff*)(skb))->mac_len) |= FASTBUF)
@@ -295,6 +313,7 @@ typedef struct ctfpool {
 #define	PKTISFAST(osh, skb)	((((struct sk_buff*)(skb))->mac_len) & FASTBUF)
 #define	PKTISCTF(osh, skb)	((((struct sk_buff*)(skb))->mac_len) & CTFBUF)
 #define	PKTFAST(osh, skb)	(((struct sk_buff*)(skb))->mac_len)
+#endif
 #else
 #define	FASTBUF	(1 << 0)
 #define	CTFBUF	(1 << 1)
@@ -307,8 +326,13 @@ typedef struct ctfpool {
 #define	PKTFAST(osh, skb)	(((struct sk_buff*)(skb))->__unused)
 #endif 
 
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(2, 6, 36)
+#define	CTFPOOLPTR(osh, skb)	(((struct sk_buff*)(skb))->ctfpool)
+#define	CTFPOOLHEAD(osh, skb)	(((ctfpool_t *)((struct sk_buff*)(skb))->ctfpool)->head)
+#else
 #define	CTFPOOLPTR(osh, skb)	(((struct sk_buff*)(skb))->sk)
 #define	CTFPOOLHEAD(osh, skb)	(((ctfpool_t *)((struct sk_buff*)(skb))->sk)->head)
+#endif
 
 extern void *osl_ctfpool_add(osl_t *osh);
 extern void osl_ctfpool_replenish(osl_t *osh, uint thresh);
@@ -320,20 +344,45 @@ extern void osl_ctfpool_stats(osl_t *osh, void *b);
 
 #ifdef HNDCTF
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(2, 6, 22)
+
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(2, 6, 36)
+#define	SKIPCT	(1 << 2)
+#define	CHAINED	(1 << 3)
+#define	PKTSETSKIPCT(osh, skb)	(((struct sk_buff*)(skb))->pktc_flags |= SKIPCT)
+#define	PKTCLRSKIPCT(osh, skb)	(((struct sk_buff*)(skb))->pktc_flags &= (~SKIPCT))
+#define	PKTSKIPCT(osh, skb)	(((struct sk_buff*)(skb))->pktc_flags & SKIPCT)
+#define	PKTSETCHAINED(osh, skb)	(((struct sk_buff*)(skb))->pktc_flags |= CHAINED)
+#define	PKTCLRCHAINED(osh, skb)	(((struct sk_buff*)(skb))->pktc_flags &= (~CHAINED))
+#define	PKTISCHAINED(skb)	(((struct sk_buff*)(skb))->pktc_flags & CHAINED)
+#else
 #define	SKIPCT	(1 << 18)
+#define	CHAINED	(1 << 19)
 #define	PKTSETSKIPCT(osh, skb)	(((struct sk_buff*)(skb))->mac_len |= SKIPCT)
 #define	PKTCLRSKIPCT(osh, skb)	(((struct sk_buff*)(skb))->mac_len &= (~SKIPCT))
 #define	PKTSKIPCT(osh, skb)	(((struct sk_buff*)(skb))->mac_len & SKIPCT)
+#define	PKTSETCHAINED(osh, skb)	(((struct sk_buff*)(skb))->mac_len |= CHAINED)
+#define	PKTCLRCHAINED(osh, skb)	(((struct sk_buff*)(skb))->mac_len &= (~CHAINED))
+#define	PKTISCHAINED(skb)	(((struct sk_buff*)(skb))->mac_len & CHAINED)
+#endif
 #else 
 #define	SKIPCT	(1 << 2)
+#define	CHAINED	(1 << 3)
 #define	PKTSETSKIPCT(osh, skb)	(((struct sk_buff*)(skb))->__unused |= SKIPCT)
 #define	PKTCLRSKIPCT(osh, skb)	(((struct sk_buff*)(skb))->__unused &= (~SKIPCT))
 #define	PKTSKIPCT(osh, skb)	(((struct sk_buff*)(skb))->__unused & SKIPCT)
+#define	PKTSETCHAINED(osh, skb)	(((struct sk_buff*)(skb))->__unused |= CHAINED)
+#define	PKTCLRCHAINED(osh, skb)	(((struct sk_buff*)(skb))->__unused &= (~CHAINED))
+#define	PKTISCHAINED(skb)	(((struct sk_buff*)(skb))->__unused & CHAINED)
 #endif 
+typedef struct ctf_mark {
+	uint32	value;
+}	ctf_mark_t;
+#define CTF_MARK(m)				(m.value)
 #else 
 #define	PKTSETSKIPCT(osh, skb)
 #define	PKTCLRSKIPCT(osh, skb)
 #define	PKTSKIPCT(osh, skb)
+#define CTF_MARK(m)				0
 #endif 
 
 extern void osl_pktfree(osl_t *osh, void *skb, bool send);
@@ -357,8 +406,24 @@ extern struct sk_buff *osl_pkt_tonative(osl_t *osh, void *pkt);
 
 #define PKTSHARED(skb)                  (((struct sk_buff*)(skb))->cloned)
 
+#ifdef CONFIG_NF_CONNTRACK_MARK
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(2, 6, 0))
+#define PKTMARK(p)                     (((struct sk_buff *)(p))->mark)
+#define PKTSETMARK(p, m)               ((struct sk_buff *)(p))->mark = (m)
+#else
+#define PKTMARK(p)                     (((struct sk_buff *)(p))->nfmark)
+#define PKTSETMARK(p, m)               ((struct sk_buff *)(p))->nfmark = (m)
+#endif
+#else
+#define PKTMARK(p)                     0
+#define PKTSETMARK(p, m)
+#endif
+
+#define PKTALLOCED(osh)		osl_pktalloced(osh)
+extern uint osl_pktalloced(osl_t *osh);
+
 #define	DMA_MAP(osh, va, size, direction, p, dmah) \
-	osl_dma_map((osh), (va), (size), (direction))
+	osl_dma_map((osh), (va), (size), (direction), (p), (dmah))
 
 #ifdef PKTC
 
@@ -373,25 +438,45 @@ struct chain_node {
 #define CHAIN_NODE(skb)		((struct chain_node*)&(((struct sk_buff*)skb)->stamp))
 #endif
 
+#define	PKTCSETATTR(s, f, p, b)	({CHAIN_NODE(s)->flags = (f); CHAIN_NODE(s)->pkts = (p); \
+	                         CHAIN_NODE(s)->bytes = (b);})
+#define	PKTCCLRATTR(s)		({CHAIN_NODE(s)->flags = CHAIN_NODE(s)->pkts = \
+	                         CHAIN_NODE(s)->bytes = 0;})
+#define	PKTCGETATTR(s)		(CHAIN_NODE(s)->flags << 29 | CHAIN_NODE(s)->pkts << 20 | \
+	                         CHAIN_NODE(s)->bytes)
 #define	PKTCCNT(skb)		(CHAIN_NODE(skb)->pkts)
 #define	PKTCLEN(skb)		(CHAIN_NODE(skb)->bytes)
 #define	PKTCFLAGS(skb)		(CHAIN_NODE(skb)->flags)
-#define	PKTCSETCNT(skb, c)	(CHAIN_NODE(skb)->pkts = (c) & ((1 << 9) - 1))
-#define	PKTCSETLEN(skb, l)	(CHAIN_NODE(skb)->bytes = (l) & ((1 << 20) - 1))
+#define	PKTCSETCNT(skb, c)	(CHAIN_NODE(skb)->pkts = (c))
+#define	PKTCINCRCNT(skb)	(CHAIN_NODE(skb)->pkts++)
+#define	PKTCADDCNT(skb, c)	(CHAIN_NODE(skb)->pkts += (c))
+#define	PKTCSETLEN(skb, l)	(CHAIN_NODE(skb)->bytes = (l))
+#define	PKTCADDLEN(skb, l)	(CHAIN_NODE(skb)->bytes += (l))
 #define	PKTCSETFLAG(skb, fb)	(CHAIN_NODE(skb)->flags |= (fb))
 #define	PKTCCLRFLAG(skb, fb)	(CHAIN_NODE(skb)->flags &= ~(fb))
 #define	PKTCLINK(skb)		(CHAIN_NODE(skb)->link)
 #define	PKTSETCLINK(skb, x)	(CHAIN_NODE(skb)->link = (struct sk_buff*)(x))
-#define	PKTISCHAINED(skb)	(PKTCLINK(skb) != NULL)
 #define FOREACH_CHAINED_PKT(skb, nskb) \
 	for (; (skb) != NULL; (skb) = (nskb)) \
-		if ((nskb) = PKTCLINK(skb), PKTSETCLINK((skb), NULL), 1)
+		if ((nskb) = (PKTISCHAINED(skb) ? PKTCLINK(skb) : NULL), \
+		    PKTSETCLINK((skb), NULL), 1)
 #define	PKTCFREE(osh, skb, send) \
 do { \
 	void *nskb; \
 	ASSERT((skb) != NULL); \
 	FOREACH_CHAINED_PKT((skb), nskb) { \
+		PKTCLRCHAINED((osh), (skb)); \
+		PKTCCLRATTR((skb)); \
 		PKTFREE((osh), (skb), (send)); \
+	} \
+} while (0)
+#define PKTCENQTAIL(h, t, p) \
+do { \
+	if ((t) == NULL) { \
+		(h) = (t) = (p); \
+	} else { \
+		PKTSETCLINK((t), (p)); \
+		(t) = (p); \
 	} \
 } while (0)
 #endif 

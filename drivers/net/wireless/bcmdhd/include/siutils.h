@@ -22,7 +22,7 @@
  * software in any way with any other Broadcom software provided under a license
  * other than the GPL, without Broadcom's express prior written consent.
  *
- * $Id: siutils.h 347614 2012-07-27 10:24:51Z $
+ * $Id: siutils.h 364853 2012-10-25 18:54:06Z $
  */
 
 #ifndef	_siutils_h_
@@ -159,6 +159,7 @@ extern void si_setosh(si_t *sih, osl_t *osh);
 extern uint si_corereg(si_t *sih, uint coreidx, uint regoff, uint mask, uint val);
 extern void *si_coreregs(si_t *sih);
 extern uint si_wrapperreg(si_t *sih, uint32 offset, uint32 mask, uint32 val);
+extern uint si_core_wrapperreg(si_t *sih, uint32 coreidx, uint32 offset, uint32 mask, uint32 val);
 extern uint32 si_core_cflags(si_t *sih, uint32 mask, uint32 val);
 extern void si_core_cflags_wo(si_t *sih, uint32 mask, uint32 val);
 extern uint32 si_core_sflags(si_t *sih, uint32 mask, uint32 val);
@@ -247,6 +248,8 @@ static INLINE void * si_eci_init(si_t *sih) {return NULL;}
 #define si_seci_upd(sih, a)	do {} while (0)
 static INLINE void * si_seci_init(si_t *sih, uint8 use_seci) {return NULL;}
 #define si_seci_down(sih) do {} while (0)
+#define si_gci(sih) 0
+static INLINE void * si_gci_init(si_t *sih) {return NULL;}
 
 
 extern bool si_is_otp_disabled(si_t *sih);
@@ -282,6 +285,8 @@ extern char *si_coded_devpathvar(si_t *sih, char *varname, int var_len, const ch
 
 extern uint8 si_pcieclkreq(si_t *sih, uint32 mask, uint32 val);
 extern uint32 si_pcielcreg(si_t *sih, uint32 mask, uint32 val);
+extern uint8 si_pcieltrenable(si_t *sih, uint32 mask, uint32 val);
+extern void si_pcie_set_error_injection(si_t *sih, uint32 mode);
 extern void si_war42780_clkreq(si_t *sih, bool clkreq);
 extern void si_pci_down(si_t *sih);
 extern void si_pci_up(si_t *sih);
@@ -305,6 +310,7 @@ extern void si_btc_enable_chipcontrol(si_t *sih);
 extern void si_btcombo_p250_4313_war(si_t *sih);
 extern void si_btcombo_43228_war(si_t *sih);
 extern void si_clk_pmu_htavail_set(si_t *sih, bool set_clear);
+extern void si_pmu_synth_pwrsw_4313_war(si_t *sih);
 extern uint si_pll_reset(si_t *sih);
 
 
@@ -316,6 +322,8 @@ extern uint32 si_pciereg(si_t *sih, uint32 offset, uint32 mask, uint32 val, uint
 extern uint32 si_pcieserdesreg(si_t *sih, uint32 mdioslave, uint32 offset, uint32 mask, uint32 val);
 extern void si_pcie_set_request_size(si_t *sih, uint16 size);
 extern uint16 si_pcie_get_request_size(si_t *sih);
+extern void si_pcie_set_maxpayload_size(si_t *sih, uint16 size);
+extern uint16 si_pcie_get_maxpayload_size(si_t *sih);
 extern uint16 si_pcie_get_ssid(si_t *sih);
 extern uint32 si_pcie_get_bar0(si_t *sih);
 extern int si_pcie_configspace_cache(si_t *sih);
@@ -329,4 +337,11 @@ extern uint32 si_tcm_size(si_t *sih);
 
 extern int si_set_sromctl(si_t *sih, uint32 value);
 extern uint32 si_get_sromctl(si_t *sih);
+
+extern uint32 si_gci_direct(si_t *sih, uint offset, uint32 mask, uint32 val);
+extern void si_gci_reset(si_t *sih);
+extern void si_gci_set_functionsel(si_t *sih, uint32 pin, uint8 fnsel);
+extern uint8 si_gci_get_chipctrlreg_idx(uint32 pin, uint32 *regidx, uint32 *pos);
+extern uint32 si_gci_chipcontrol(si_t *sih, uint reg, uint32 mask, uint32 val);
+
 #endif	

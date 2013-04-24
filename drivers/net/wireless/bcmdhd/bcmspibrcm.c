@@ -2,13 +2,13 @@
  * Broadcom BCMSDH to gSPI Protocol Conversion Layer
  *
  * Copyright (C) 1999-2012, Broadcom Corporation
- *
+ * 
  *      Unless you and Broadcom execute a separate written software license
  * agreement governing use of this software, this software is licensed to you
  * under the terms of the GNU General Public License version 2 (the "GPL"),
  * available at http://www.broadcom.com/licenses/GPLv2.php, with the
  * following added to such license:
- *
+ * 
  *      As a special exception, the copyright holders of this software give you
  * permission to link this software with independent modules, and to copy and
  * distribute the resulting executable under terms of your choice, provided that
@@ -16,12 +16,12 @@
  * the license of that module.  An independent module is a module which is not
  * derived from this software.  The special exception does not apply to any
  * modifications of the software.
- *
+ * 
  *      Notwithstanding the above, under no circumstances may you combine this
  * software in any way with any other Broadcom software provided under a license
  * other than the GPL, without Broadcom's express prior written consent.
  *
- * $Id: bcmspibrcm.c 355377 2012-09-06 13:25:35Z $
+ * $Id: bcmspibrcm.c 359460 2012-09-28 01:51:23Z $
  */
 
 #define HSMODE
@@ -72,7 +72,7 @@ extern void spi_sendrecv(sdioh_info_t *sd, uint8 *msg_out, uint8 *msg_in, int ms
 uint sd_msglevel = SDH_ERROR_VAL;
 #else
 uint sd_msglevel = 0;
-#endif
+#endif 
 
 uint sd_hiok = FALSE;		/* Use hi-speed mode if available? */
 uint sd_sdmode = SDIOH_MODE_SPI;		/* Use SD4 mode by default */
@@ -336,7 +336,7 @@ enum {
 };
 
 const bcm_iovar_t sdioh_iovars[] = {
-	{"sd_msglevel",	IOV_MSGLEVEL,	0,	IOVT_UINT32,	0 },
+	{"sd_msglevel",	IOV_MSGLEVEL, 	0,	IOVT_UINT32,	0 },
 	{"sd_blocksize", IOV_BLOCKSIZE, 0,	IOVT_UINT32,	0 }, /* ((fn << 16) | size) */
 	{"sd_dma",	IOV_DMA,	0,	IOVT_BOOL,	0 },
 	{"sd_ints",	IOV_USEINTS,	0,	IOVT_BOOL,	0 },

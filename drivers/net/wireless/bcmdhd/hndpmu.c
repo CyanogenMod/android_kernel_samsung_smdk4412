@@ -22,7 +22,16 @@
  * software in any way with any other Broadcom software provided under a license
  * other than the GPL, without Broadcom's express prior written consent.
  *
- * $Id: hndpmu.c 357871 2012-09-20 07:17:35Z $
+ * $Id: hndpmu.c 367414 2012-11-08 00:40:54Z $
+ */
+
+/*
+ * Note: this file contains PLL/FLL related functions. A chip can contain multiple PLLs/FLLs.
+ * However, in the context of this file the baseband ('BB') PLL/FLL is referred to.
+ *
+ * Throughout this code, the prefixes 'pmu0_', 'pmu1_' and 'pmu2_' are used.
+ * They refer to different revisions of the PMU (which is at revision 18 @ Apr 25, 2012)
+ * pmu2_ marks the transition from PLL to ADFLL (Digital Frequency Locked Loop)
  */
 
 #include <bcm_cfg.h>
@@ -115,7 +124,6 @@ static const sdiod_drive_str_t sdiod_drive_strength_tab6_1v8[] = {
 	{2, 0x2},
 	{1, 0x1},
 	{0, 0x0} };
-
 
 #define SDIOD_DRVSTR_KEY(chip, pmu)	(((chip) << 16) | (pmu))
 

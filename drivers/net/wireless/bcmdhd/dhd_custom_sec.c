@@ -2,13 +2,13 @@
  * Customer HW 4 dependant file
  *
  * Copyright (C) 1999-2012, Broadcom Corporation
- * 
+ *
  *      Unless you and Broadcom execute a separate written software license
  * agreement governing use of this software, this software is licensed to you
  * under the terms of the GNU General Public License version 2 (the "GPL"),
  * available at http://www.broadcom.com/licenses/GPLv2.php, with the
  * following added to such license:
- * 
+ *
  *      As a special exception, the copyright holders of this software give you
  * permission to link this software with independent modules, and to copy and
  * distribute the resulting executable under terms of your choice, provided that
@@ -16,7 +16,7 @@
  * the license of that module.  An independent module is a module which is not
  * derived from this software.  The special exception does not apply to any
  * modifications of the software.
- * 
+ *
  *      Notwithstanding the above, under no circumstances may you combine this
  * software in any way with any other Broadcom software provided under a license
  * other than the GPL, without Broadcom's express prior written consent.
@@ -49,9 +49,18 @@ struct cntry_locales_custom {
 
 /* Locale table for sec */
 const struct cntry_locales_custom translate_custom_table[] = {
-#ifdef BCM4334_CHIP
-	{"",   "XZ", 11},  /* Universal if Country code is unknown or empty */
+#if defined(BCM4334_CHIP) || defined(BCM43241_CHIP) || defined(BCM4335_CHIP)
+	{"",   "XZ", 11},	/* Universal if Country code is unknown or empty */
+	{"IR", "XZ", 11},	/* Universal if Country code is IRAN, (ISLAMIC REPUBLIC OF) */
+	{"SD", "XZ", 11},	/* Universal if Country code is SUDAN */
+	{"SY", "XZ", 11},	/* Universal if Country code is SYRIAN ARAB REPUBLIC */
+	{"GL", "XZ", 11},	/* Universal if Country code is GREENLAND */
+	{"PS", "XZ", 11},	/* Universal if Country code is PALESTINIAN TERRITORY, OCCUPIED */
+	{"TL", "XZ", 11},	/* Universal if Country code is TIMOR-LESTE (EAST TIMOR) */
+	{"MH", "XZ", 11},	/* Universal if Country code is MARSHALL ISLANDS */
+	{"PK", "XZ", 11},	/* Universal if Country code is PAKISTAN */
 #endif
+#if defined(BCM4330_CHIP) || defined(BCM4334_CHIP) || defined(BCM43241_CHIP)
 	{"AE", "AE", 1},
 	{"AR", "AR", 1},
 	{"AT", "AT", 1},
@@ -61,7 +70,6 @@ const struct cntry_locales_custom translate_custom_table[] = {
 	{"BN", "BN", 1},
 	{"CA", "CA", 2},
 	{"CH", "CH", 1},
-	{"CN", "CN", 0},
 	{"CY", "CY", 1},
 	{"CZ", "CZ", 1},
 	{"DE", "DE", 3},
@@ -84,7 +92,6 @@ const struct cntry_locales_custom translate_custom_table[] = {
 	{"LT", "LT", 1},
 	{"LU", "LU", 1},
 	{"LV", "LV", 1},
-	{"MA", "MA", 1},
 	{"MT", "MT", 1},
 	{"MX", "MX", 1},
 	{"NL", "NL", 1},
@@ -96,26 +103,175 @@ const struct cntry_locales_custom translate_custom_table[] = {
 	{"SE", "SE", 1},
 	{"SI", "SI", 1},
 	{"SK", "SK", 1},
-	{"TR", "TR", 7},
-	{"UA", "UA", 2},
 	{"TW", "TW", 2},
-	{"IR", "XZ", 11},	/* Universal if Country code is IRAN, (ISLAMIC REPUBLIC OF) */
-	{"SD", "XZ", 11},	/* Universal if Country code is SUDAN */
-	{"SY", "XZ", 11},	/* Universal if Country code is SYRIAN ARAB REPUBLIC */
-	{"GL", "XZ", 11},	/* Universal if Country code is GREENLAND */
-	{"PS", "XZ", 11},	/* Universal if Country code is PALESTINIAN TERRITORY, OCCUPIED */
-	{"TL", "XZ", 11},	/* Universal if Country code is TIMOR-LESTE (EAST TIMOR) */
-	{"MH", "XZ", 11},	/* Universal if Country code is MARSHALL ISLANDS */
-	{"PK", "XZ", 11},	/* Universal if Country code is PAKISTAN */
-#ifdef BCM4334_CHIP
-	{"RU", "RU", 5},
+#endif /* defined(BCM4330_CHIP) || defined(BCM4334_CHIP) || defined(BCM43241_CHIP) */
+#if defined(BCM4334_CHIP) || defined(BCM43241_CHIP)
+	{"RU", "RU", 13},
 	{"SG", "SG", 4},
-	{"US", "US", 46}
-#endif
+	{"US", "US", 46},
+	{"UA", "UA", 8},
+	{"CO", "CO", 4},
+	{"ID", "ID", 1},
+	{"LA", "LA", 1},
+	{"LB", "LB", 2},
+	{"VN", "VN", 4},
+	{"MA", "MA", 1},
+	{"TR", "TR", 7},
+#endif /* defined(BCM4334_CHIP) || defined(BCM43241_CHIP) */
 #ifdef BCM4330_CHIP
-	{"RU", "RU", 1},
-	{"US", "US", 5}
-#endif
+	{"",   "XZ", 1},	/* Universal if Country code is unknown or empty */
+	{"RU", "RU", 13},
+	{"US", "US", 5},
+	{"UA", "UY", 0},
+	{"AD", "AL", 0},
+	{"CX", "AU", 2},
+	{"GE", "GB", 1},
+	{"ID", "MW", 0},
+	{"KI", "AU", 2},
+	{"NP", "SA", 0},
+	{"WS", "SA", 0},
+	{"LR", "BR", 0},
+	{"ZM", "IN", 0},
+	{"AN", "AG", 0},
+	{"AI", "AS", 0},
+	{"BM", "AS", 0},
+	{"DZ", "IL", 0},
+	{"LC", "AG", 0},
+	{"MF", "BY", 0},
+	{"GY", "CU", 0},
+	{"LA", "GB", 1},
+	{"LB", "BR", 0},
+	{"MA", "IL", 0},
+	{"MO", "BD", 0},
+	{"MW", "BD", 0},
+	{"QA", "BD", 0},
+	{"TR", "GB", 1},
+	{"TZ", "BF", 0},
+	{"VN", "BR", 0},
+	{"JO", "XZ", 1},
+	{"PG", "XZ", 1},
+	{"SA", "XZ", 1},
+#endif /* BCM4330_CHIP */
+#ifdef BCM4335_CHIP
+	{"AL", "AL", 2},
+	{"DZ", "DZ", 1},
+	{"AS", "AS", 2},
+	{"AI", "AI", 1},
+	{"AG", "AG", 2},
+	{"AR", "AR", 21},
+	{"AW", "AW", 2},
+	{"AU", "AU", 6},
+	{"AT", "AT", 4},
+	{"AZ", "AZ", 2},
+	{"BS", "BS", 2},
+	{"BH", "BH", 24},
+	{"BD", "BD", 1},
+	{"BY", "BY", 3},
+	{"BE", "BE", 4},
+	{"BM", "BM", 12},
+	{"BA", "BA", 2},
+	{"BR", "BR", 4},
+	{"VG", "VG", 2},
+	{"BN", "BN", 4},
+	{"BG", "BG", 4},
+	{"KH", "KH", 2},
+	{"CA", "CA", 31},
+	{"KY", "KY", 3},
+	{"CN", "CN", 9},
+	{"CO", "CO", 17},
+	{"CR", "CR", 17},
+	{"HR", "HR", 4},
+	{"CY", "CY", 4},
+	{"CZ", "CZ", 4},
+	{"DK", "DK", 4},
+	{"EE", "EE", 4},
+	{"ET", "ET", 2},
+	{"FI", "FI", 4},
+	{"FR", "FR", 5},
+	{"GF", "GF", 2},
+	{"DE", "DE", 7},
+	{"GR", "GR", 4},
+	{"GD", "GD", 2},
+	{"GP", "GP", 2},
+	{"GU", "GU", 12},
+	{"HK", "HK", 2},
+	{"HU", "HU", 4},
+	{"IS", "IS", 4},
+	{"IN", "IN", 3},
+	{"ID", "ID", 1},
+	{"IE", "IE", 5},
+	{"IL", "IL", 7},
+	{"IT", "IT", 4},
+	{"JP", "JP", 45},
+	{"JO", "JO", 3},
+	{"KW", "KW", 5},
+	{"LA", "LA", 2},
+	{"LV", "LV", 4},
+	{"LB", "LB", 5},
+	{"LS", "LS", 2},
+	{"LI", "LI", 4},
+	{"LT", "LT", 4},
+	{"LU", "LU", 1},
+	{"MO", "MO", 2},
+	{"MK", "MK", 2},
+	{"MW", "MW", 1},
+	{"MY", "MY", 3},
+	{"MV", "MV", 3},
+	{"MT", "MT", 4},
+	{"MQ", "MQ", 2},
+	{"MR", "MR", 2},
+	{"MU", "MU", 2},
+	{"YT", "YT", 2},
+	{"MX", "MX", 20},
+	{"MD", "MD", 2},
+	{"MC", "MC", 1},
+	{"ME", "ME", 2},
+	{"MA", "MA", 2},
+	{"NP", "NP", 3},
+	{"NL", "NL", 4},
+	{"AN", "AN", 2},
+	{"NZ", "NZ", 4},
+	{"NO", "NO", 4},
+	{"OM", "OM", 4},
+	{"PA", "PA", 17},
+	{"PG", "PG", 2},
+	{"PY", "PY", 2},
+	{"PE", "PE", 20},
+	{"PH", "PH", 5},
+	{"PL", "PL", 4},
+	{"PT", "PT", 4},
+	{"PR", "PR", 20},
+	{"RE", "RE", 2},
+	{"RO", "RO", 4},
+	{"SN", "SN", 2},
+	{"RS", "RS", 2},
+	{"SG", "SG", 4},
+	{"SK", "SK", 4},
+	{"SI", "SI", 4},
+	{"ES", "ES", 4},
+	{"LK", "LK", 3},
+	{"SE", "SE", 4},
+	{"CH", "CH", 4},
+	{"TW", "TW", 1},
+	{"TH", "TH", 5},
+	{"TT", "TT", 3},
+	{"TR", "TR", 7},
+	{"AE", "AE", 4},
+	{"UG", "UG", 2},
+	{"GB", "GB", 6},
+	{"UY", "UY", 1},
+	{"VI", "VI", 13},
+	{"VA", "VA", 2},
+	{"VE", "VE", 3},
+	{"VN", "VN", 4},
+	{"MA", "MA", 1},
+	{"ZM", "ZM", 2},
+	{"EC", "EC", 21},
+	{"SV", "SV", 19},
+	{"KR", "KR", 48},
+	{"RU", "RU", 13},
+	{"UA", "UA", 8},
+#endif /* BCM4335_CHIP */
 };
 
 /* Customized Locale convertor
@@ -160,6 +316,14 @@ void get_customized_country_code(char *country_iso_code, wl_country_t *cspec)
 #define PSMINFO "/data/.psm.info"
 #endif /* SLP_PATH */
 
+#ifdef BCM4330_CHIP
+#define CIS_BUF_SIZE            128
+#elif defined(BCM4334_CHIP)
+#define CIS_BUF_SIZE            256
+#else /* BCM4335_CHIP */
+#define CIS_BUF_SIZE            512
+#endif /* BCM4330_CHIP */
+
 #ifdef READ_MACADDR
 int dhd_read_macaddr(struct dhd_info *dhd, struct ether_addr *mac)
 {
@@ -169,43 +333,38 @@ int dhd_read_macaddr(struct dhd_info *dhd, struct ether_addr *mac)
 	char randommac[3]    = {0};
 	char buf[18]         = {0};
 	char *filepath_efs       = MACINFO_EFS;
-#ifdef CONFIG_TARGET_LOCALE_VZW
-	char *nvfilepath       = "/data/misc/wifi/.nvmac.info";
-#else
-	char *nvfilepath       = NVMACINFO;
-#endif
 	int ret = 0;
 
-		fp = filp_open(filepath_efs, O_RDONLY, 0);
-		if (IS_ERR(fp)) {
+	fp = filp_open(filepath_efs, O_RDONLY, 0);
+	if (IS_ERR(fp)) {
 start_readmac:
-			/* File Doesn't Exist. Create and write mac addr. */
-			fp = filp_open(filepath_efs, O_RDWR | O_CREAT, 0666);
-			if (IS_ERR(fp)) {
+		/* File Doesn't Exist. Create and write mac addr. */
+		fp = filp_open(filepath_efs, O_RDWR | O_CREAT, 0666);
+		if (IS_ERR(fp)) {
 			DHD_ERROR(("[WIFI] %s: File open error\n", filepath_efs));
-				return -1;
-			}
-			oldfs = get_fs();
-			set_fs(get_ds());
+			return -1;
+		}
+		oldfs = get_fs();
+		set_fs(get_ds());
 
-			/* Generating the Random Bytes for 3 last octects of the MAC address */
-			get_random_bytes(randommac, 3);
+		/* Generating the Random Bytes for 3 last octects of the MAC address */
+		get_random_bytes(randommac, 3);
 
-			sprintf(macbuffer, "%02X:%02X:%02X:%02X:%02X:%02X\n",
-				0x00, 0x12, 0x34, randommac[0], randommac[1], randommac[2]);
-			DHD_ERROR(("[WIFI]The Random Generated MAC ID: %s\n", macbuffer));
+		sprintf(macbuffer, "%02X:%02X:%02X:%02X:%02X:%02X\n",
+			0x00, 0x12, 0x34, randommac[0], randommac[1], randommac[2]);
+		DHD_ERROR(("[WIFI]The Random Generated MAC ID: %s\n", macbuffer));
 
-			if (fp->f_mode & FMODE_WRITE) {
+		if (fp->f_mode & FMODE_WRITE) {
 			ret = fp->f_op->write(fp, (const char *)macbuffer,
-				sizeof(macbuffer), &fp->f_pos);
-				if (ret < 0)
+			sizeof(macbuffer), &fp->f_pos);
+			if (ret < 0)
 				DHD_ERROR(("[WIFI]MAC address [%s] Failed to write into File: %s\n",
 					macbuffer, filepath_efs));
-				else
+			else
 				DHD_ERROR(("[WIFI]MAC address [%s] written into File: %s\n",
 					macbuffer, filepath_efs));
-			}
-			set_fs(oldfs);
+		}
+		set_fs(oldfs);
 		/* Reading the MAC Address from .mac.info file
 		   ( the existed file or just created file)
 		 */
@@ -215,7 +374,9 @@ start_readmac:
 		   .mac.info file( the existed file or just created file)
 		 */
 		ret = kernel_read(fp, 0, buf, 18);
-/* to prevent abnormal string display when mac address is displayed on the screen. */
+		/* to prevent abnormal string display
+		* when mac address is displayed on the screen.
+		*/
 		buf[17] = '\0';
 		if (strncmp(buf, "00:00:00:00:00:00", 17) < 1) {
 			DHD_ERROR(("goto start_readmac \r\n"));
@@ -273,8 +434,8 @@ int dhd_write_rdwr_macaddr(struct ether_addr *mac)
 		mac->octet[0], mac->octet[1], mac->octet[2],
 		mac->octet[3], mac->octet[4], mac->octet[5]);
 
-	/* /data/.mac.info will be created */
-	fp_mac = filp_open(filepath_data, O_RDWR | O_CREAT, 0666);
+	/* /efs/wifi/.mac.info will be created */
+	fp_mac = filp_open(filepath_efs, O_RDWR | O_CREAT, 0666);
 	if (IS_ERR(fp_mac)) {
 		DHD_ERROR(("[WIFI] %s: File open error\n", filepath_data));
 		return -1;
@@ -295,8 +456,8 @@ int dhd_write_rdwr_macaddr(struct ether_addr *mac)
 		set_fs(oldfs);
 		filp_close(fp_mac, NULL);
 	}
-	/* /efs/wifi/.mac.info will be created */
-	fp_mac = filp_open(filepath_efs, O_RDWR | O_CREAT, 0666);
+	/* /data/.mac.info will be created */
+	fp_mac = filp_open(filepath_data, O_RDWR | O_CREAT, 0666);
 	if (IS_ERR(fp_mac)) {
 		DHD_ERROR(("[WIFI] %s: File open error\n", filepath_efs));
 		return -1;
@@ -335,7 +496,7 @@ int dhd_check_rdwr_macaddr(struct dhd_info *dhd, dhd_pub_t *dhdp,
 #ifdef CONFIG_TARGET_LOCALE_NA
 	char *nvfilepath       = "/data/misc/wifi/.nvmac.info";
 #else
-	char *nvfilepath = NVMACINFO;
+	char *nvfilepath = "/efs/wifi/.nvmac.info";
 #endif
 	char cur_mac[128]   = {0};
 	char dummy_mac[ETHER_ADDR_LEN] = {0x00, 0x90, 0x4C, 0xC5, 0x12, 0x38};
@@ -346,11 +507,6 @@ int dhd_check_rdwr_macaddr(struct dhd_info *dhd, dhd_pub_t *dhdp,
 
 	fp_nvm = filp_open(nvfilepath, O_RDONLY, 0);
 	if (IS_ERR(fp_nvm)) { /* file does not exist */
-
-		/* Create the .nvmac.info */
-		fp_nvm = filp_open(nvfilepath, O_RDWR | O_CREAT, 0666);
-		if (!IS_ERR(fp_nvm))
-			filp_close(fp_nvm, NULL);
 
 		/* read MAC Address */
 		strcpy(cur_mac, "cur_etheraddr");
@@ -635,16 +791,16 @@ int dhd_write_rdwr_korics_macaddr(struct dhd_info *dhd, struct ether_addr *mac)
 #endif /* RDWR_KORICS_MACADDR */
 
 #ifdef USE_CID_CHECK
-static int dhd_write_cid_file(const char *filepath_efs, const char *buf, int buf_len)
+static int dhd_write_cid_file(const char *filepath_cid, const char *buf, int buf_len)
 {
 	struct file *fp = NULL;
 	mm_segment_t oldfs = {0};
 	int ret = 0;
 
 	/* File is always created. */
-	fp = filp_open(filepath_efs, O_RDWR | O_CREAT, 0666);
+	fp = filp_open(filepath_cid, O_RDWR | O_CREAT, 0666);
 	if (IS_ERR(fp)) {
-		DHD_ERROR(("[WIFI] %s: File open error\n", filepath_efs));
+		DHD_ERROR(("[WIFI] %s: File open error\n", filepath_cid));
 		return -1;
 	} else {
 		oldfs = get_fs();
@@ -654,10 +810,10 @@ static int dhd_write_cid_file(const char *filepath_efs, const char *buf, int buf
 			ret = fp->f_op->write(fp, buf, buf_len, &fp->f_pos);
 			if (ret < 0)
 				DHD_ERROR(("[WIFI] Failed to write CIS[%s]"
-					" into '%s'\n", buf, filepath_efs));
+					" into '%s'\n", buf, filepath_cid));
 			else
 				DHD_ERROR(("[WIFI] CID [%s] written into"
-					" '%s'\n", buf, filepath_efs));
+					" '%s'\n", buf, filepath_cid));
 		}
 		set_fs(oldfs);
 	}
@@ -678,27 +834,62 @@ static void dhd_dump_cis(const unsigned char *buf, int size)
 }
 #endif /* DUMP_CIS */
 
-#ifdef BCM4334_CHIP
-#define CIS_CID_OFFSET 43
-#else
-#define CIS_CID_OFFSET 31
-#endif /* BCM4334_CHIP */
+#define MAX_VID_LEN		8
+#define MAX_VNAME_LEN		16
+#define CIS_TUPLE_START		0x80
+#define CIS_TUPLE_VENDOR	0x81
+
+typedef struct {
+	uint8 vid_length;
+	unsigned char vid[MAX_VID_LEN];
+	char vname[MAX_VNAME_LEN];
+} vid_info_t;
+
+#if defined(BCM4330_CHIP)
+vid_info_t vid_info[] = {
+	{ 6, { 0x00, 0x20, 0xc7, 0x00, 0x00, }, { "murata" } },
+	{ 2, { 0x99, }, { "semcove" } },
+	{ 0, { 0x00, }, { "samsung" } }
+};
+#elif defined(BCM4334_CHIP)
+vid_info_t vid_info[] = {
+	{ 3, { 0x33, 0x33, }, { "semco" } },
+	{ 3, { 0xfb, 0x50, }, { "semcosh" } },
+	{ 6, { 0x00, 0x20, 0xc7, 0x00, 0x00, }, { "murata" } },
+	{ 0, { 0x00, }, { "samsung" } }
+};
+#else /* BCM4335_CHIP */
+vid_info_t vid_info[] = {
+	{ 3, { 0x33, 0x66, }, { "semcosh" } },		/* B0 Sharp 5G-FEM */
+	{ 3, { 0x33, 0x33, }, { "semco" } },		/* B0 Skyworks 5G-FEM and A0 chip */
+	{ 3, { 0x33, 0x88, }, { "semco3rd" } },		/* B0 Syri 5G-FEM */
+	{ 3, { 0x00, 0x11, }, { "muratafem1" } },	/* B0 ANADIGICS 5G-FEM */
+	{ 3, { 0x00, 0x22, }, { "muratafem2" } },	/* B0 TriQuint 5G-FEM */
+	{ 3, { 0x00, 0x33, }, { "muratafem3" } },	/* 3rd FEM: Reserved */
+	{ 0, { 0x00, }, { "murata" } }	/* Default: for Murata A0 module */
+};
+#endif /* BCM_CHIP_ID */
 
 int dhd_check_module_cid(dhd_pub_t *dhd)
 {
 	int ret = -1;
-#ifdef BCM4334_CHIP
-	unsigned char cis_buf[250] = {0};
-	const char *revfilepath = REVINFO;
-	int flag_b3 = 0;
-#else
-	unsigned char cis_buf[128] = {0};
-#endif
+	unsigned char cis_buf[CIS_BUF_SIZE] = {0};
 	const char *cidfilepath = CIDINFO;
+	cis_rw_t *cish = (cis_rw_t *)&cis_buf[8];
+	int idx, max;
+	vid_info_t *cur_info;
+	unsigned char *vid_start;
+	unsigned char vid_length;
+#if defined(BCM4334_CHIP) || defined(BCM4335_CHIP)
+	const char *revfilepath = REVINFO;
+#ifdef BCM4334_CHIP
+	int flag_b3;
+#else
+	char rev_str[10] = {0};
+#endif /* BCM4334_CHIP */
+#endif /* BCM4334_CHIP || BCM4335_CHIP */
 
 	/* Try reading out from CIS */
-	cis_rw_t *cish = (cis_rw_t *)&cis_buf[8];
-
 	cish->source = 0;
 	cish->byteoff = 0;
 	cish->nbytes = sizeof(cis_buf);
@@ -707,93 +898,99 @@ int dhd_check_module_cid(dhd_pub_t *dhd)
 	ret = dhd_wl_ioctl_cmd(dhd, WLC_GET_VAR, cis_buf,
 		sizeof(cis_buf), 0, 0);
 	if (ret < 0) {
-		DHD_TRACE(("%s: CIS reading failed, err=%d\n",
+		DHD_ERROR(("%s: CIS reading failed, err=%d\n",
 			__FUNCTION__, ret));
 		return ret;
-	} else {
-#ifdef BCM4334_CHIP
-		unsigned char semco_id[4] = {0x00, 0x00, 0x33, 0x33};
-
-		/* for SHARP FEM(new) */
-		unsigned char semco_id_sh[4] = {0x00, 0x00, 0xFB, 0x50};
-		DHD_ERROR(("%s: CIS reading success, ret=%d\n",
-			__FUNCTION__, ret));
-#ifdef DUMP_CIS
-		dump_cis(cis_buf, 48);
-#endif
-		if (memcmp(&cis_buf[CIS_CID_OFFSET], semco_id, 4) == 0) {
-			DHD_ERROR(("CID MATCH FOUND : Semco, "
-				"0x%02X 0x%02X 0x%02X 0x%02X\n",
-				cis_buf[CIS_CID_OFFSET],
-				cis_buf[CIS_CID_OFFSET+1], cis_buf[CIS_CID_OFFSET+2],
-				cis_buf[CIS_CID_OFFSET+3]));
-			dhd_write_cid_file(cidfilepath, "semco", 5);
-		} else if (memcmp(&cis_buf[CIS_CID_OFFSET], semco_id_sh, 4) == 0) {
-			DHD_ERROR(("CIS MATCH FOUND : Semco_sh, "
-				"0x%02X 0x%02X 0x%02X 0x%02X\n",
-				cis_buf[CIS_CID_OFFSET],
-				cis_buf[CIS_CID_OFFSET+1], cis_buf[CIS_CID_OFFSET+2],
-				cis_buf[CIS_CID_OFFSET+3]));
-			dhd_write_cid_file(cidfilepath, "semcosh", 7);
-		} else {
-			DHD_ERROR(("CID MATCH FOUND : Murata, "
-				"0x%02X 0x%02X 0x%02X 0x%02X\n", cis_buf[CIS_CID_OFFSET],
-				cis_buf[CIS_CID_OFFSET+1], cis_buf[CIS_CID_OFFSET+2],
-				cis_buf[CIS_CID_OFFSET+3]));
-			dhd_write_cid_file(cidfilepath, "murata", 6);
-		}
-
-		/* Try reading out from OTP to distinguish B2 or B3 */
-		memset(cis_buf, 0, sizeof(cis_buf));
-		cish = (cis_rw_t *)&cis_buf[8];
-
-		cish->source = 0;
-		cish->byteoff = 0;
-		cish->nbytes = sizeof(cis_buf);
-
-		strcpy(cis_buf, "otpdump");
-		ret = dhd_wl_ioctl_cmd(dhd, WLC_GET_VAR, cis_buf,
-			sizeof(cis_buf), 0, 0);
-		if (ret < 0) {
-			DHD_ERROR(("%s: OTP reading failed, err=%d\n",
-				__FUNCTION__, ret));
-			return ret;
-		}
-
-		/* otp 33th character is identifier for 4334B3 */
-		cis_buf[34] = '\0';
-		flag_b3 = bcm_atoi(&cis_buf[33]);
-		if (flag_b3 & 0x1) {
-			DHD_ERROR(("REV MATCH FOUND : 4334B3, %c\n", cis_buf[33]));
-			dhd_write_cid_file(revfilepath, "4334B3", 6);
-		}
-
-#else /* BCM4330_CHIP */
-		unsigned char murata_id[4] = {0x80, 0x06, 0x81, 0x00};
-		unsigned char semco_ve[4] = {0x80, 0x02, 0x81, 0x99};
-#ifdef DUMP_CIS
-		dhd_dump_cis(cis_buf, 48);
-#endif
-		if (memcmp(&cis_buf[CIS_CID_OFFSET], murata_id, 4) == 0) {
-			DHD_ERROR(("CID MATCH FOUND : Murata\n"));
-			dhd_write_cid_file(cidfilepath, "murata", 6);
-		} else if (memcmp(&cis_buf[CIS_CID_OFFSET], semco_ve, 4)
-			== 0) {
-			DHD_ERROR(("CID MATCH FOUND : Semco VE\n"));
-			dhd_write_cid_file(cidfilepath, "semcove", 7);
-		} else {
-			DHD_ERROR(("CID MISMATCH"
-				" 0x%02X 0x%02X 0x%02X 0x%02X\n",
-				cis_buf[CIS_CID_OFFSET],
-				cis_buf[CIS_CID_OFFSET + 1],
-				cis_buf[CIS_CID_OFFSET + 2],
-				cis_buf[CIS_CID_OFFSET + 3]));
-			dhd_write_cid_file(cidfilepath, "samsung", 7);
-		}
-#endif /* BCM4334_CHIP */
-		DHD_ERROR(("%s: CIS write success, err=%d\n",
-			__FUNCTION__, ret));
 	}
+
+	DHD_ERROR(("%s: CIS reading success, ret=%d\n",
+		__FUNCTION__, ret));
+#ifdef DUMP_CIS
+	dhd_dump_cis(cis_buf, 48);
+#endif
+
+	max = sizeof(cis_buf) - 4;
+	for (idx = 0; idx < max; idx++) {
+		if (cis_buf[idx] == CIS_TUPLE_START) {
+			if (cis_buf[idx + 2] == CIS_TUPLE_VENDOR) {
+				vid_length = cis_buf[idx + 1];
+				vid_start = &cis_buf[idx + 3];
+				/* found CIS tuple */
+				break;
+			} else {
+				/* Go to next tuple if tuple value is not vendor type */
+				idx += (cis_buf[idx + 1] + 1);
+			}
+		}
+	}
+
+	if (idx < max) {
+		max = sizeof(vid_info) / sizeof(vid_info_t);
+		for (idx = 0; idx < max; idx++) {
+			cur_info = &vid_info[idx];
+			if ((cur_info->vid_length == vid_length) &&
+				(cur_info->vid_length != 0) &&
+				(memcmp(cur_info->vid, vid_start, cur_info->vid_length - 1) == 0))
+				goto write_cid;
+		}
+	}
+
+	/* find default nvram, if exist */
+	DHD_ERROR(("%s: cannot find CIS TUPLE set as default\n", __FUNCTION__));
+	max = sizeof(vid_info) / sizeof(vid_info_t);
+	for (idx = 0; idx < max; idx++) {
+		cur_info = &vid_info[idx];
+		if (cur_info->vid_length == 0)
+			goto write_cid;
+	}
+	DHD_ERROR(("%s: cannot find default CID\n", __FUNCTION__));
+	return -1;
+
+write_cid:
+	DHD_ERROR(("CIS MATCH FOUND : %s\n", cur_info->vname));
+	dhd_write_cid_file(cidfilepath, cur_info->vname, strlen(cur_info->vname)+1);
+#if defined(BCM4334_CHIP)
+	/* Try reading out from OTP to distinguish B2 or B3 */
+	memset(cis_buf, 0, sizeof(cis_buf));
+	cish = (cis_rw_t *)&cis_buf[8];
+
+	cish->source = 0;
+	cish->byteoff = 0;
+	cish->nbytes = sizeof(cis_buf);
+
+	strcpy(cis_buf, "otpdump");
+	ret = dhd_wl_ioctl_cmd(dhd, WLC_GET_VAR, cis_buf,
+		sizeof(cis_buf), 0, 0);
+	if (ret < 0) {
+		DHD_ERROR(("%s: OTP reading failed, err=%d\n",
+			__FUNCTION__, ret));
+		return ret;
+	}
+
+	/* otp 33th character is identifier for 4334B3 */
+	cis_buf[34] = '\0';
+	flag_b3 = bcm_atoi(&cis_buf[33]);
+	if (flag_b3 & 0x1) {
+		DHD_ERROR(("REV MATCH FOUND : 4334B3, %c\n", cis_buf[33]));
+		dhd_write_cid_file(revfilepath, "4334B3", 6);
+	}
+#endif /* BCM4334_CHIP */
+#if defined(BCM4335_CHIP)
+	DHD_TRACE(("%s: BCM4335 Multiple Revision Check\n", __FUNCTION__));
+	if (concate_revision(dhd->bus, rev_str, sizeof(rev_str),
+		rev_str, sizeof(rev_str)) < 0) {
+		DHD_ERROR(("%s: fail to concate revision\n", __FUNCTION__));
+		ret = -1;
+	} else {
+		if (strstr(rev_str, "_a0")) {
+			DHD_ERROR(("REV MATCH FOUND : 4335A0\n"));
+			dhd_write_cid_file(revfilepath, "BCM4335A0", 9);
+		} else {
+			DHD_ERROR(("REV MATCH FOUND : 4335B0\n"));
+			dhd_write_cid_file(revfilepath, "BCM4335B0", 9);
+		}
+	}
+#endif /* BCM4335_CHIP */
 
 	return ret;
 }
@@ -829,12 +1026,16 @@ static int dhd_write_mac_file(const char *filepath, const char *buf, int buf_len
 	return 0;
 }
 
+#ifdef BCM4335_CHIP
+#define CIS_MAC_OFFSET 31
+#else
 #define CIS_MAC_OFFSET 33
+#endif /* BCM4335_CHIP */
 
 int dhd_check_module_mac(dhd_pub_t *dhd, struct ether_addr *mac)
 {
 	int ret = -1;
-	unsigned char cis_buf[250] = {0};
+	unsigned char cis_buf[CIS_BUF_SIZE] = {0};
 	unsigned char mac_buf[20] = {0};
 	unsigned char otp_mac_buf[20] = {0};
 	const char *macfilepath = MACINFO_EFS;
@@ -861,7 +1062,7 @@ int dhd_check_module_mac(dhd_pub_t *dhd, struct ether_addr *mac)
 	} else {
 		unsigned char mac_id[6] = {0x00, 0x00, 0x00, 0x00, 0x00, 0x00};
 #ifdef DUMP_CIS
-		dump_cis(cis_buf, 48);
+		dhd_dump_cis(cis_buf, 48);
 #endif
 		mac_id[0] = cis_buf[CIS_MAC_OFFSET];
 		mac_id[1] = cis_buf[CIS_MAC_OFFSET + 1];
@@ -998,6 +1199,8 @@ void sec_control_pm(dhd_pub_t *dhd, uint *power_mode)
 	mm_segment_t oldfs = {0};
 	char power_val = 0;
 	char iovbuf[WL_EVENTING_MASK_LEN + 12];
+	int ret = 0;
+	uint32 lpc = 0;
 
 	g_pm_control = FALSE;
 
@@ -1053,6 +1256,12 @@ void sec_control_pm(dhd_pub_t *dhd, uint *power_mode)
 			dhd_wl_ioctl_cmd(dhd, WLC_SET_VAR, iovbuf,
 				sizeof(iovbuf), TRUE, 0);
 #endif
+			/* Set lpc 0 */
+			bcm_mkiovar("lpc", (char *)&lpc, 4, iovbuf, sizeof(iovbuf));
+			if ((ret = dhd_wl_ioctl_cmd(dhd, WLC_SET_VAR, iovbuf,
+				sizeof(iovbuf), TRUE, 0)) < 0) {
+				DHD_ERROR(("%s Set lpc failed  %d\n", __FUNCTION__, ret));
+			}
 		} else {
 			dhd_wl_ioctl_cmd(dhd, WLC_SET_PM, (char *)power_mode,
 				sizeof(uint), TRUE, 0);
@@ -1145,6 +1354,7 @@ int dhd_sel_ant_from_file(dhd_pub_t *dhd)
 	struct file *fp = NULL;
 	int ret = -1;
 	uint32 ant_val = 0;
+	uint32 btc_mode = 0;
 	char *filepath = "/data/.ant.info";
 	char iovbuf[WLC_IOCTL_SMLEN];
 
@@ -1174,6 +1384,18 @@ int dhd_sel_ant_from_file(dhd_pub_t *dhd)
 		}
 	}
 
+	/* bt coex mode off */
+	if (strstr(fw_path, "_mfg") != NULL) {
+		bcm_mkiovar("btc_mode", (char *)&btc_mode, 4, iovbuf, sizeof(iovbuf));
+		ret = dhd_wl_ioctl_cmd(dhd, WLC_SET_VAR, iovbuf, sizeof(iovbuf), TRUE, 0);
+		if (ret) {
+			DHD_ERROR(("[WIFI] %s: Fail to execute dhd_wl_ioctl_cmd(): "
+				"btc_mode, ret=%d\n",
+				__FUNCTION__, ret));
+			return ret;
+		}
+	}
+
 	/* Select Antenna */
 	bcm_mkiovar("txchain", (char *)&ant_val, 4, iovbuf, sizeof(iovbuf));
 	ret = dhd_wl_ioctl_cmd(dhd, WLC_SET_VAR, iovbuf, sizeof(iovbuf), TRUE, 0);
@@ -1194,4 +1416,30 @@ int dhd_sel_ant_from_file(dhd_pub_t *dhd)
 	return 0;
 }
 #endif /* MIMO_ANTENNA_SETTING */
+#ifdef USE_WL_FRAMEBURST
+uint32 sec_control_frameburst(void)
+{
+	struct file *fp = NULL;
+	char *filepath = "/data/.frameburst.info";
+	char frameburst_val = 0;
+	uint32 frameburst = 1; /* default enabled */
+	int ret = 0;
+
+	fp = filp_open(filepath, O_RDONLY, 0);
+	if (IS_ERR(fp) || (fp == NULL)) {
+		DHD_INFO(("[WIFI] %s: File open failed, so enable frameburst as a default.\n",
+			__FUNCTION__));
+	} else {
+		ret = kernel_read(fp, fp->f_pos, &frameburst_val, 1);
+		if (ret > 0 && frameburst_val == '0') {
+			/* Set frameburst to disable */
+			frameburst = 0;
+		}
+
+		DHD_INFO(("set frameburst value = %d\n", frameburst));
+		filp_close(fp, NULL);
+	}
+	return frameburst;
+}
+#endif /* USE_WL_FRAMEBURST */
 #endif /* CUSTOMER_HW4 */

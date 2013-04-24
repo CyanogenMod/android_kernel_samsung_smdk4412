@@ -21,7 +21,7 @@
  * software in any way with any other Broadcom software provided under a license
  * other than the GPL, without Broadcom's express prior written consent.
  *
- * $Id: bcmdefs.h 316830 2012-02-23 20:29:22Z $
+ * $Id: bcmdefs.h 366265 2012-11-01 20:08:27Z $
  */
 
 #ifndef	_bcmdefs_h_
@@ -54,8 +54,13 @@
 #define	BCMNMIATTACHDATA(_data)	_data
 #define CONST	const
 #ifndef BCMFASTPATH
+#if defined(__ARM_ARCH_7A__)
+#define BCMFASTPATH		__attribute__ ((__section__ (".text.fastpath")))
+#define BCMFASTPATH_HOST	__attribute__ ((__section__ (".text.fastpath_host")))
+#else
 #define BCMFASTPATH
 #define BCMFASTPATH_HOST
+#endif
 #endif 
 
 
@@ -177,9 +182,9 @@ typedef struct {
 
 #if defined(BCM_RPC_NOCOPY) || defined(BCM_RCP_TXNOCOPY)
 
-#define BCMEXTRAHDROOM 220
+#define BCMEXTRAHDROOM 260
 #else 
-#define BCMEXTRAHDROOM 172
+#define BCMEXTRAHDROOM 204
 #endif 
 
 

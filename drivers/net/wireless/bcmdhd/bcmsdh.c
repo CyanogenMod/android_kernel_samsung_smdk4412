@@ -22,7 +22,7 @@
  * software in any way with any other Broadcom software provided under a license
  * other than the GPL, without Broadcom's express prior written consent.
  *
- * $Id: bcmsdh.c 347614 2012-07-27 10:24:51Z $
+ * $Id: bcmsdh.c 369547 2012-11-19 08:57:31Z $
  */
 
 /**
@@ -45,7 +45,9 @@
 
 #include <sdio.h>	/* SDIO Device and Protocol Specs */
 
+#ifdef CUSTOMER_HW4
 #include <dhd_sec_feature.h>
+#endif /* CUSTOMER_HW4 */
 
 #define SDIOH_API_ACCESS_RETRY_LIMIT	2
 const uint bcmsdh_msglevel = BCMSDH_ERROR_VAL;
@@ -764,10 +766,10 @@ bcmsdh_gpioout(void *sdh, uint32 gpio, bool enab)
 
 #ifdef BCMSDIOH_TXGLOM
 void
-bcmsdh_glom_post(void *sdh, uint8 *frame, uint len)
+bcmsdh_glom_post(void *sdh, uint8 *frame, void *pkt, uint len)
 {
 	bcmsdh_info_t *bcmsdh = (bcmsdh_info_t *)sdh;
-	sdioh_glom_post(bcmsdh->sdioh, frame, len);
+	sdioh_glom_post(bcmsdh->sdioh, frame, pkt, len);
 }
 
 void

@@ -22,7 +22,7 @@
  * software in any way with any other Broadcom software provided under a license
  * other than the GPL, without Broadcom's express prior written consent.
  *
- * $Id: sbhnddma.h 309193 2012-01-19 00:03:57Z $
+ * $Id: sbhnddma.h 348178 2012-07-31 22:27:41Z $
  */
 
 #ifndef	_sbhnddma_h_
@@ -233,9 +233,15 @@ typedef volatile struct {
 
 #define D64RINGALIGN_BITS	13
 #define	D64MAXRINGSZ		(1 << D64RINGALIGN_BITS)
-#define	D64RINGALIGN		(1 << D64RINGALIGN_BITS)
+#define	D64RINGBOUNDARY		(1 << D64RINGALIGN_BITS)
 
 #define	D64MAXDD	(D64MAXRINGSZ / sizeof (dma64dd_t))
+
+
+#define	D64MAXDD_LARGE		((1 << 16) / sizeof (dma64dd_t))
+
+
+#define	D64RINGBOUNDARY_LARGE	(1 << 16)
 
 
 #define	D64_XC_XE		0x00000001	
@@ -258,7 +264,7 @@ typedef volatile struct {
 #define	D64_XP_LD_MASK		0x00001fff	
 
 
-#define	D64_XS0_CD_MASK		0x00001fff	
+#define	D64_XS0_CD_MASK		(di->d64_xs0_cd_mask)	
 #define	D64_XS0_XS_MASK		0xf0000000     	
 #define	D64_XS0_XS_SHIFT		28
 #define	D64_XS0_XS_DISABLED	0x00000000	
@@ -267,7 +273,7 @@ typedef volatile struct {
 #define	D64_XS0_XS_STOPPED	0x30000000	
 #define	D64_XS0_XS_SUSP		0x40000000	
 
-#define	D64_XS1_AD_MASK		0x00001fff	
+#define	D64_XS1_AD_MASK		(di->d64_xs1_ad_mask)	
 #define	D64_XS1_XE_MASK		0xf0000000     	
 #define	D64_XS1_XE_SHIFT		28
 #define	D64_XS1_XE_NOERR	0x00000000	
@@ -306,7 +312,7 @@ typedef volatile struct {
 #define	D64_RP_LD_MASK		0x00001fff	
 
 
-#define	D64_RS0_CD_MASK		0x00001fff	
+#define	D64_RS0_CD_MASK		(di->d64_rs0_cd_mask)	
 #define	D64_RS0_RS_MASK		0xf0000000     	
 #define	D64_RS0_RS_SHIFT		28
 #define	D64_RS0_RS_DISABLED	0x00000000	

@@ -22,7 +22,7 @@
  * software in any way with any other Broadcom software provided under a license
  * other than the GPL, without Broadcom's express prior written consent.
  *
- * $Id: dbus.h 323680 2012-03-26 17:52:31Z $
+ * $Id: dbus.h 349214 2012-08-07 10:04:38Z $
  */
 
 #ifndef __DBUS_H__
@@ -33,7 +33,6 @@
 #define DBUSTRACE(args)
 #define DBUSERR(args)
 #define DBUSINFO(args)
-#define DBUSTRACE(args)
 #define DBUSDBGLOCK(args)
 
 enum {
@@ -77,8 +76,8 @@ enum {
 #define DBUS_TX_RETRY_LIMIT		3		/* retries for failed txirb */
 #define DBUS_TX_TIMEOUT_INTERVAL	250		/* timeout for txirb complete, in ms */
 
-#define DBUS_BUFFER_SIZE_TX	16000
-#define DBUS_BUFFER_SIZE_RX	5000
+#define DBUS_BUFFER_SIZE_TX	32000
+#define DBUS_BUFFER_SIZE_RX	24000
 
 #define DBUS_BUFFER_SIZE_TX_NOAGG	2048
 #define DBUS_BUFFER_SIZE_RX_NOAGG	2048
@@ -296,7 +295,6 @@ extern int dbus_send_ctl(dbus_pub_t *pub, uint8 *buf, int len);
 extern int dbus_recv_ctl(dbus_pub_t *pub, uint8 *buf, int len);
 extern int dbus_recv_bulk(dbus_pub_t *pub, uint32 ep_idx);
 extern int dbus_poll_intr(dbus_pub_t *pub);
-
 extern int dbus_get_stats(dbus_pub_t *pub, dbus_stats_t *stats);
 extern int dbus_get_attrib(dbus_pub_t *pub, dbus_attrib_t *attrib);
 extern int dbus_get_device_speed(dbus_pub_t *pub);

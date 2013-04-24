@@ -20,7 +20,7 @@
 * software in any way with any other Broadcom software provided under a license
 * other than the GPL, without Broadcom's express prior written consent.
 *
-* $Id: dhd_custom_gpio.c 353167 2012-08-24 22:11:30Z $
+* $Id: dhd_custom_gpio.c 353280 2012-08-26 04:33:17Z $
 */
 
 #include <typedefs.h>

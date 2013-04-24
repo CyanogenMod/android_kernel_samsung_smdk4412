@@ -1,47 +1,47 @@
-config BCMDHD
-    tristate "Broadcom 43xx wireless cards support"
-    depends on MMC
-    default m
-    ---help---
-      This module adds support for wireless adapters based on
-      Broadcom 4329/30 chipset.
-
-      This driver uses the kernel's wireless extensions subsystem.
-
-      If you choose to build a module, it'll be called dhd. Say M if
-      unsure.
-
 config BCM4330
-	bool "Broadcom 4330 wireless cards support"
-	depends on BCMDHD
+	tristate "Broadcom 4330 wireless cards support"
+	depends on WLAN
 	---help---
 	  This module adds support for wireless adapters based on
 	  Broadcom 4330 chipset.
 
 config BCM4334
-	bool "Broadcom 4334 wireless cards support"
-	depends on BCMDHD
-    default y
+	tristate "Broadcom 4334 wireless cards support"
+	depends on WLAN
 	---help---
 	  This module adds support for wireless adapters based on
 	  Broadcom 4334 chipset.
 
+config BCM4335
+	tristate "Broadcom 4335 wireless cards support"
+	depends on WLAN
+	---help---
+	  This module adds support for wireless adapters based on
+	  Broadcom 4335 chipset.
+
 config BCM43241
-	bool "Broadcom 43241 wireless cards support"
-	depends on BCMDHD
+	tristate "Broadcom 43241 wireless cards support"
+	depends on WLAN
 	---help---
 	  This module adds support for wireless adapters based on
 	  Broadcom 43241 chipset.
 
+config BROADCOM_WIFI
+	bool "Broadcom WiFi Driver"
+	depends on (BCM4330 || BCM4334 || BCM43241)
+	default y
+	---help---
+		This is a configuration for broadcom WLAN driver.
+
 config BCMDHD_FW_PATH
-	depends on BCMDHD
+	depends on WLAN
 	string "Firmware path"
 	default "/system/etc/firmware/fw_bcmdhd.bin"
 	---help---
 	  Path to the firmware file.
 
 config BCMDHD_NVRAM_PATH
-	depends on BCMDHD
+	depends on WLAN
 	string "NVRAM path"
 	default "/system/etc/wifi/bcmdhd.cal"
 	---help---
@@ -71,13 +71,20 @@ config DHD_USE_SCHED_SCAN
 
 config BROADCOM_WIFI_RESERVED_MEM
 	bool "BROADCOM Reserved memory for wifi device"
-	depends on (BCM4330 || BCM4334 || BCM43241)
+	depends on (BCM4330 || BCM4334 || BCM4335 || BCM43241)
 	---help---
 	  This is a configuration for broadcom WLAN driver.
 
+config BCM4335BT
+	bool "BROADCOM BTLOCK Enable"
+	depends on BCM4335
+	default y
+	---help---
+	  This is a configuration for bt lock enable.
+
 config WLAN_REGION_CODE
 	int "---Region codes for Broadcom WiFi Driver"
-	depends on (BCM4330 || BCM4334 || BCM43241)
+	depends on (BCM4330 || BCM4334 || BCM4335 || BCM43241)
 	default 100
 	---help---
 		This is a region code for Broadcom Wi-Fi featured functions.
@@ -88,3 +95,4 @@ config WLAN_REGION_CODE
 		- 202 : KOR KTT
 		- 203 : KOR LGT
 		- 300 : CHN OPEN
+		- 400 : JPN OPEN

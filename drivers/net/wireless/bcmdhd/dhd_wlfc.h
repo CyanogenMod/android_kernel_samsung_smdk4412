@@ -18,7 +18,7 @@
 *      Notwithstanding the above, under no circumstances may you combine this
 * software in any way with any other Broadcom software provided under a license
 * other than the GPL, without Broadcom's express prior written consent.
-* $Id: dhd_wlfc.h 341930 2012-06-29 04:51:25Z $
+* $Id: dhd_wlfc.h 381116 2013-01-25 06:08:41Z $
 *
 */
 #ifndef __wlfc_host_driver_definitions_h__
@@ -27,9 +27,10 @@
 /* 16 bits will provide an absolute max of 65536 slots */
 #define WLFC_HANGER_MAXITEMS 1024
 
-#define WLFC_HANGER_ITEM_STATE_FREE		1
-#define WLFC_HANGER_ITEM_STATE_INUSE	2
+#define WLFC_HANGER_ITEM_STATE_FREE				1
+#define WLFC_HANGER_ITEM_STATE_INUSE			2
 #define WLFC_HANGER_ITEM_STATE_INUSE_SUPPRESSED	3
+
 #define WLFC_PKTID_HSLOT_MASK			0xffff /* allow 16 bits only */
 #define WLFC_PKTID_HSLOT_SHIFT			8
 
@@ -84,6 +85,7 @@ typedef struct wlfc_hanger {
 	uint32 failed_to_push;
 	uint32 failed_to_pop;
 	uint32 failed_slotfind;
+	uint32 slot_pos;
 	wlfc_hanger_item_t items[1];
 } wlfc_hanger_t;
 
@@ -97,12 +99,8 @@ typedef struct wlfc_hanger {
 
 #define WLFC_PSQ_LEN			2048
 
-#define WLFC_SENDQ_LEN			256
-
-
 #define WLFC_FLOWCONTROL_HIWATER	(2048 - 256)
 #define WLFC_FLOWCONTROL_LOWATER	256
-
 
 typedef struct wlfc_mac_descriptor {
 	uint8 occupied;
@@ -127,9 +125,15 @@ typedef struct wlfc_mac_descriptor {
 	/* 1= send on next opportunity */
 	uint8 send_tim_signal;
 	uint8 mac_handle;
+	/* Number of packets in transit for this entry. */
 	uint transit_count;
+	/* Numbe of suppression to wait before evict from delayQ */
 	uint suppr_transit_count;
+	/* Used when a new suppress is detected to track the number of
+	 * packets getting suppressed
+	 */
 	uint suppress_count;
+	/* flag. TRUE when in suppress state */
     uint8 suppressed;
 
 #ifdef PROP_TXSTATUS_DEBUG
@@ -153,7 +157,6 @@ typedef struct athost_wl_stat_counters {
 	uint32	tlv_parse_failed;
 	uint32	rollback;
 	uint32	rollback_failed;
-	uint32	sendq_full_error;
 	uint32	delayq_full_error;
 	uint32	credit_request_failed;
 	uint32	packet_request_failed;
@@ -178,7 +181,7 @@ typedef struct athost_wl_stat_counters {
 	uint32	dhd_hdrpulls;
 	uint32	generic_error;
 	/* an extra one for bc/mc traffic */
-	uint32	sendq_pkts[AC_COUNT + 1];
+	uint32	send_pkts[AC_COUNT + 1];
 #ifdef PROP_TXSTATUS_DEBUG
 	/* all pkt2bus -> txstatus latency accumulated */
 	uint32	latency_sample_count;
@@ -236,8 +239,6 @@ typedef struct athost_wl_status_info {
 
 	/* Credit borrow counts for each FIFO from each of the other FIFOs */
 	int		credits_borrowed[AC_COUNT + 2][AC_COUNT + 2];
-
-	struct  pktq SENDQ;
 
 	/* packet hanger and MAC->handle lookup table */
 	void*	hanger;
