@@ -12,6 +12,8 @@
 
 #include <linux/wakelock.h>
 
+#define CAM_MAJOR	119
+
 #define CONFIG_CAM_DEBUG
 
 #define cam_warn(fmt, ...)	\
@@ -188,6 +190,12 @@ struct m5mo_state {
 	unsigned int check_dataline:1;
 	int anti_banding;
 };
+
+extern struct class *camera_class;
+
+/*
+ * ISP CMD Category Definitions
+ */
 
 /* Category */
 #define M5MO_CATEGORY_SYS	0x00

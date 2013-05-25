@@ -4,6 +4,23 @@
 #include "mdnie.h"
 
 
+static const unsigned short tune_cyanogenmod[] = {
+	/*start */
+	0x0001, 0x0000, /* */
+	0x002c, 0x0fff, /*DNR bypass 0x003C */
+	0x002d, 0x1900, /*DNR bypass 0x0a08 */
+	0x002e, 0x0000, /*DNR bypass 0x1010 */
+	0x002f, 0x0fff, /*DNR bypass 0x0400 */
+	0x003A, 0x0009, /*HDTR (DE off)(CS only 9) */
+	0x003B, 0x0000, /*DE SHARPNESS */
+	0x003C, 0x0000, /*NOISE LEVEL */
+	0x003F, 0x0000, /*CS GAIN */
+	0x0042, 0x003f, /*DE TH (MAX DIFF) */
+	0x0028, 0x0000, /*Register Mask */
+	/*end */
+	END_SEQ, 0x0000,
+};
+
 static const unsigned short tune_dynamic_gallery[] = {
 	/*start U1 dynamic gallery */
 	0x0001, 0x0041, /*SCR + PCC */

@@ -88,6 +88,7 @@
 
 /* Autocalibration */
 #if defined(CONFIG_TARGET_LOCALE_NAATT)\
+	|| defined(CONFIG_TARGET_LOCALE_NAATT_TEMP)\
 	|| defined(CONFIG_TARGET_LOCALE_NA)\
 	|| defined(CONFIG_MACH_Q1_BD)\
 	|| defined(CONFIG_MACH_M0)\
@@ -116,7 +117,8 @@
 #define TK_HAS_FIRMWARE_UPDATE
 #endif
 
-#if defined(CONFIG_TARGET_LOCALE_NAATT)
+#if defined(CONFIG_TARGET_LOCALE_NAATT) \
+	|| defined(CONFIG_TARGET_LOCALE_NAATT_TEMP)
 #define TK_USE_4KEY_TYPE_ATT
 #elif defined(CONFIG_MACH_LOCALE_NA) \
 	|| defined(CONFIG_MACH_U1_NA_SPR) \

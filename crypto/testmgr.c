@@ -145,6 +145,7 @@ bool in_fips_err()
 {
 	return (IN_FIPS_ERROR == FIPS_ERR);
 }
+EXPORT_SYMBOL_GPL(in_fips_err);
 
 void set_in_fips_err()
 {

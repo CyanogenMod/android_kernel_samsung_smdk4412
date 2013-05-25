@@ -37,6 +37,7 @@ struct s5k5bafx_platform_data {
 	/* This SoC supports Parallel & CSI-2 */
 	u32 is_mipi;		/* set to 1 if mipi */
 	s32 streamoff_delay;	/* ms, type is signed */
+	bool init_streamoff;
 
 	u8 dbg_level;
 };

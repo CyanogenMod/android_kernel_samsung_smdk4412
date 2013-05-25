@@ -264,9 +264,6 @@ retry:
 	}
 
 	/* subdev call for init */
-#if !defined(CONFIG_MACH_PX)
-	do_gettimeofday(&ctrl->before_time);
-#endif
 	if (ctrl->cap->fmt.priv == V4L2_PIX_FMT_MODE_CAPTURE) {
 		ret = v4l2_subdev_call(cam->sd, core, init, 1);
 		pixelformat = V4L2_PIX_FMT_JPEG;
@@ -1863,20 +1860,8 @@ int fimc_streamon_capture(void *fh)
 								STREAM_MODE_CAM_ON);
 					}
 				} else {
-					do_gettimeofday(&ctrl->curr_time);
-					inner_elapsed_usec = \
-						(ctrl->curr_time.tv_sec - ctrl->before_time.tv_sec) * USEC_PER_SEC \
-						+ ctrl->curr_time.tv_usec - ctrl->before_time.tv_usec;
-					inner_elapsed_usec = inner_elapsed_usec / 1000;
-
-					/* printk(KERN_INFO "\n\nfront cam stream off remain time = %dms\n",
-								inner_elapsed_usec);*/
-
-					if (150 > inner_elapsed_usec) {
-						/*printk(KERN_INFO "front cam stream off added msleep = %dms\n",
-							150 - inner_elapsed_usec);*/
-						msleep(150 - inner_elapsed_usec);
-					}
+					v4l2_subdev_call(cam->sd, video, s_stream,
+						STREAM_MODE_WAIT_OFF);
 				}
 #endif
 				if (cam->id == CAMERA_CSI_C) {
@@ -2035,10 +2020,11 @@ int fimc_streamoff_capture(void *fh)
 			STREAM_MODE_CAM_OFF);
 #endif /* CONFIG_VIDEO_IMPROVE_STREAMOFF */
 #else /* CONFIG_MACH_PX */
-	if (get_fimc_dev()->active_camera == 1)
-		v4l2_subdev_call(ctrl->cam->sd, video, s_stream, STREAM_MODE_CAM_OFF);
-
-	do_gettimeofday(&ctrl->before_time);
+	if (get_fimc_dev()->active_camera == 1) {
+		if ((ctrl->id != FIMC2) && (ctrl->cam->type == CAM_TYPE_MIPI))
+			v4l2_subdev_call(ctrl->cam->sd, video, s_stream,
+				STREAM_MODE_CAM_OFF);
+	}
 #endif
 
 	/* wait for stop hardware */

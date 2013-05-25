@@ -19,7 +19,7 @@
 #include "mali_osk.h"
 
 #ifdef CONFIG_CPU_EXYNOS4210
-#define MALI_DVFS_STEPS 2
+#define MALI_DVFS_STEPS 3
 #else
 #define MALI_DVFS_STEPS 5
 #endif

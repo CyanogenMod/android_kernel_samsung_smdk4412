@@ -1,0 +1,26 @@
+#!/stage1/busybox sh
+_PATH="$PATH"
+export PATH=/stage1
+
+busybox cd /
+busybox date >>boot.txt
+exec >>boot.txt 2>&1
+busybox rm init
+busybox mount -t proc proc /proc
+busybox mount -t sysfs sysfs /sys
+
+load_image=/stage1/boot.cpio
+
+if busybox grep -q bootmode=2 /proc/cmdline ; then
+	# recovery boot
+	load_image=/stage1/recovery.cpio
+fi
+
+busybox cpio -i < ${load_image}
+
+busybox umount /sys
+busybox umount /proc
+busybox date >>boot.txt
+busybox rm -fr /stage1 /dev/*
+export PATH="${_PATH}"
+exec /init

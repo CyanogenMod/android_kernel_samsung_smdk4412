@@ -13127,7 +13127,7 @@ static const u32 s5k5bafx_fps_25fix[] =
 	0x0F120000,
 };
 
-
+#ifdef SUPPORT_FACTORY_TEST
 /*******************************************************
 *	CAMERA_DTP_ON
 *******************************************************/
@@ -13228,5 +13228,6 @@ static const u32 s5k5bafx_pattern_off[] = {
 	0x002A3100,
 	0x0F120000, /* Colorbar pattern */
 };
+#endif /* SUPPORT_FACTORY_TEST */
 
 #endif /* __S5K5BAFX_REGS_H */

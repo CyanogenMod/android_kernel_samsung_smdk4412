@@ -871,6 +871,10 @@ config MACH_Q1_BD
 	bool "Q1 Board"
 
 endchoice
+config TARGET_LOCALE_NAATT_TEMP
+    bool "Support North America GSM ATT Board"
+	depends on MACH_U1
+    default n
 
 config MACH_PX
 	bool "PX board"
@@ -1711,6 +1715,12 @@ config SEC_MODEM_T0_TD_DUAL
 	select EHCI_IRQ_DISTRIBUTION
 	select TDSCDMA_MODEM_SPRD8803
 	select LINK_DEVICE_SPI
+
+config SEC_MODEM_U1_SPR
+        bool "U1 with qsc6085"
+        select CDMA_MODEM_QSC6085
+        select LINK_DEVICE_DPRAM
+        select INTERNAL_MODEM_IF
 
 endchoice
 

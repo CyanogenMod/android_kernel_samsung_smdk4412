@@ -24,12 +24,13 @@
 #define S5K5BAFX_BURST_MODE
 /* #define CONFIG_LOAD_FILE */
 /* #define SUPPORT_FACTORY_TEST */
-#define NEW_CAM_DRV
 
 /** Debuging Feature **/
-/* #define CONFIG_CAM_DEBUG */
+#define CONFIG_CAM_DEBUG
 /* #define CONFIG_CAM_TRACE *//* Enable it with CONFIG_CAM_DEBUG */
 /***********************************/
+
+#define CAM_MAJOR	119
 
 #define TAG_NAME	"["S5K5BAFX_DRIVER_NAME"]"" "
 #define cam_err(fmt, ...)	\
@@ -156,6 +157,11 @@ struct s5k5bafx_regset_table {
 #endif
 
 #define EV_MIN_VLAUE	EV_MINUS_4
+#define ANTI_BANDING_MAX	ANTI_BANDING_50_60Hz
+#define CAM_VT_MODE_FD		(CAM_VT_MODE_VOIP + 1)
+#undef CAM_VT_MODE_MAX
+#define CAM_VT_MODE_MAX		(CAM_VT_MODE_FD + 1)
+#define INIT_MODE_MAX		CAM_VT_MODE_MAX
 #define GET_EV_INDEX(EV)	((EV) - (EV_MIN_VLAUE))
 
 struct s5k5bafx_regs {
@@ -165,14 +171,12 @@ struct s5k5bafx_regs {
 	struct s5k5bafx_regset_table preview_start;
 	struct s5k5bafx_regset_table capture_start;
 	struct s5k5bafx_regset_table fps[I_FPS_MAX];
-	struct s5k5bafx_regset_table init;	/* Used */
-	struct s5k5bafx_regset_table init_vt;	/* Used */
-	struct s5k5bafx_regset_table init_vt_wifi;	/* Used */
-	struct s5k5bafx_regset_table init_recording;	/* Used */
+	struct s5k5bafx_regset_table init[INIT_MODE_MAX];
+	struct s5k5bafx_regset_table init_recording[ANTI_BANDING_MAX];
 	struct s5k5bafx_regset_table get_light_level;
 	struct s5k5bafx_regset_table get_iso;
 	struct s5k5bafx_regset_table get_shutterspeed;
-	struct s5k5bafx_regset_table stream_stop;	/* Used */
+	struct s5k5bafx_regset_table stream_stop;
 	struct s5k5bafx_regset_table dtp_on;
 	struct s5k5bafx_regset_table dtp_off;
 };
@@ -199,7 +203,9 @@ struct s5k5bafx_state {
 	struct mutex ctrl_lock;
 
 	enum v4l2_sensor_mode sensor_mode;
+	s32 *init_mode;
 	s32 vt_mode;
+	s32 anti_banding;
 	s32 req_fps;
 	s32 fps;
 #ifdef CONFIG_USE_SW_I2C
@@ -214,16 +220,39 @@ struct s5k5bafx_state {
 	u32 initialized:1;
 };
 
+#if !defined(CONFIG_MACH_PX)
+extern struct class *camera_class;
+#endif
+
 static inline struct s5k5bafx_state *to_state(struct v4l2_subdev *sd)
 {
 	return container_of(sd, struct s5k5bafx_state, sd);
 }
 
-static inline void debug_msleep(struct v4l2_subdev *sd, u32 msecs)
+static inline void msleep_debug(struct v4l2_subdev *sd, u32 msecs)
 {
+	u32 delta_halfrange; /* in us unit */
+
+	if (unlikely(!msecs))
+		return;
+
 	cam_dbg("delay for %dms\n", msecs);
-	msleep(msecs);
+
+	if (msecs <= 7)
+		delta_halfrange = 100;
+	else
+		delta_halfrange = 300;
+
+	if (msecs <= 20)
+		usleep_range((msecs * 1000 - delta_halfrange),
+			(msecs * 1000 + delta_halfrange));
+	else
+		msleep(msecs);
 }
+
+/* Start-up time for Smart-stay
+ * device open + start preview + callback time */
+#define SMARTSTAY_STARTUP_TIME	(20 + 1000 + 0)
 
 #ifdef CONFIG_LOAD_FILE
 #include <linux/vmalloc.h>
@@ -261,7 +290,13 @@ static s32 large_file;
 #define REG_ADDR_SHUTTER    0x14D0
 #define REG_PAGE_ISO        0x7000
 #define REG_ADDR_ISO        0x14C8
-	
+
+#ifdef CONFIG_MACH_P8
 #include  "s5k5bafx_regs-p8.h"
+#elif defined(CONFIG_MACH_U1_KOR_LGT)
+#include  "s5k5bafx_setfile_lgt.h"
+#else
+#include  "s5k5bafx_setfile.h"
+#endif
 
 #endif /* __S5K5BAFX_H */

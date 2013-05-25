@@ -28,6 +28,8 @@
 #include <mach/cpufreq.h>
 #include <linux/input/mt.h>
 
+#include "../keyboard/cypress/cypress-touchkey.h"
+
 #define OBJECT_TABLE_START_ADDRESS	7
 #define OBJECT_TABLE_ELEMENT_SIZE	6
 
@@ -187,7 +189,7 @@ struct mxt224_data {
 	bool median_err_flag;
 	int touch_is_pressed_arr[MAX_USING_FINGER_NUM];
 
-#if defined(CONFIG_TARGET_LOCALE_NAATT)
+#if defined(CONFIG_TARGET_LOCALE_NAATT) || defined(CONFIG_TARGET_LOCALE_NAATT_TEMP)
 	bool gain_change_flag;
 	int gain_ta;
 #endif
@@ -1337,6 +1339,10 @@ static void report_input_data(struct mxt224_data *data)
 			copy_data->lock_status = 1;
 		}
 	}
+
+    /* tell cypress keypad we had finger activity */
+    touchscreen_state_report(touch_is_pressed);
+
 }
 
 void palm_recovery(void)

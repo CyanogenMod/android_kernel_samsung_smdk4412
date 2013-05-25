@@ -15,6 +15,9 @@
 
 #include <linux/types.h>
 
+/* #define CONFIG_CAM_DEBUG */
+
+#define CAM_MAJOR	119
 #define S5K5BAFX_DRIVER_NAME	"S5K5BAFX"
 
 typedef enum {
@@ -64,7 +67,6 @@ static inline struct s5k5bafx_state *to_state(struct v4l2_subdev *sd)
 	return container_of(sd, struct s5k5bafx_state, sd);
 }
 
-/*#define CONFIG_CAM_DEBUG */
 #define cam_warn(fmt, ...)	\
 	do { \
 		printk(KERN_WARNING "%s: " fmt, __func__, ##__VA_ARGS__); \
@@ -96,6 +98,9 @@ static inline struct s5k5bafx_state *to_state(struct v4l2_subdev *sd)
 
 
 /*********** Sensor specific ************/
+#define S5K5BAFX_CHIP_ID	0x05BA
+#define S5K5BAFX_CHIP_REV	0xA0
+
 /* #define S5K5BAFX_100MS_DELAY	0xAA55AA5F */
 /* #define S5K5BAFX_10MS_DELAY	0xAA55AA5E */
 #define S5K5BAFX_DELAY		0xFFFF0000
@@ -106,6 +111,11 @@ static inline struct s5k5bafx_state *to_state(struct v4l2_subdev *sd)
 #define REG_ADDR_SHUTTER    0x14D0
 #define REG_PAGE_ISO        0x7000
 #define REG_ADDR_ISO        0x14C8
+
+
+/* Start-up time for Smart-stay
+ * device open + start preview + callback time */
+#define SMARTSTAY_STARTUP_TIME	(20 + 1285 + 905)
 
 #ifdef CONFIG_MACH_U1_KOR_LGT
 #include  "s5k5bafx_setfile_lgt.h"

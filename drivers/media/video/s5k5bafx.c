@@ -686,13 +686,13 @@ static int s5k5bafx_set_preview_start(struct v4l2_subdev *sd)
 	struct s5k5bafx_state *state = to_state(sd);
 	int err = -EINVAL;
 
-	cam_info("reset preview\n");
+	cam_info("set preview\n");
 
 #ifdef CONFIG_LOAD_FILE
 	err = s5k5bafx_write_regs_from_sd(sd, "s5k5bafx_preview");
 #else
 	err = s5k5bafx_write_regs(sd, s5k5bafx_preview,
-		sizeof(s5k5bafx_preview) / sizeof(s5k5bafx_preview[0]));
+			ARRAY_SIZE(s5k5bafx_preview));
 #endif
 	if (state->check_dataline)
 		err = s5k5bafx_check_dataline(sd, 1);
@@ -823,13 +823,6 @@ static int s5k5bafx_s_fmt(struct v4l2_subdev *sd, struct v4l2_mbus_framefmt *ffm
 	 * We need to check here what are the formats the camera support, and
 	 * set the most appropriate one according to the request from FIMC
 	 */
-
-#ifdef CONFIG_VIDEO_CONFERENCE_CALL
-	if (state->vt_mode == 3) {
-		state->req_fmt.width = fmt->fmt.pix.height;
-		state->req_fmt.height = fmt->fmt.pix.width;
-	}
-#endif
 
 	state->req_fmt.width = ffmt->width;
 	state->req_fmt.height = ffmt->height;
@@ -1037,6 +1030,39 @@ static int s5k5bafx_control_stream(struct v4l2_subdev *sd, stream_cmd_t cmd)
 	return err;
 }
 
+static int s5k5bafx_check_device(struct v4l2_subdev *sd)
+{
+	struct s5k5bafx_state *state = to_state(sd);
+	const u32 write_reg = 0x00287000;
+	u16 read_value = 0;
+	int err = -ENODEV;
+
+	/* enter read mode */
+	err = s5k5bafx_read_reg(sd, 0xD000, 0x1006, &read_value);
+	if (unlikely(err < 0))
+		return -ENODEV;
+
+	if (likely(read_value == S5K5BAFX_CHIP_ID))
+		cam_info("Sensor ChipID: 0x%04X\n", S5K5BAFX_CHIP_ID);
+	else
+		cam_info("Sensor ChipID: 0x%04X, unknown ChipID\n", read_value);
+
+	err = s5k5bafx_read_reg(sd, 0xD000, 0x1008, &read_value);
+	if (likely((u8)read_value == S5K5BAFX_CHIP_REV))
+		cam_info("Sensor revision: 0x%02X\n", S5K5BAFX_CHIP_REV);
+	else
+		cam_info("Sensor revision: 0x%02X, unknown revision\n",
+				(u8)read_value);
+
+	/* restore write mode */
+	err = s5k5bafx_write_regs(sd, &write_reg, 1);
+	if (err < 0)
+		return -ENODEV;
+
+	return 0;
+}
+
+
 static int s5k5bafx_init(struct v4l2_subdev *sd, u32 val)
 {
 	/* struct i2c_client *client = v4l2_get_subdevdata(sd); */
@@ -1044,6 +1070,8 @@ static int s5k5bafx_init(struct v4l2_subdev *sd, u32 val)
 	int err = -EINVAL;
 
 	cam_dbg("E\n");
+
+	s5k5bafx_check_device(sd);
 
 	/* set initial regster value */
 #ifdef CONFIG_LOAD_FILE
@@ -1079,35 +1107,32 @@ static int s5k5bafx_init(struct v4l2_subdev *sd, u32 val)
 		if (!state->vt_mode) {
 			cam_info("load camera common setting\n");
 			err = s5k5bafx_write_regs(sd, s5k5bafx_common,
-				sizeof(s5k5bafx_common) / \
-				sizeof(s5k5bafx_common[0]));
+				ARRAY_SIZE(s5k5bafx_common));
 		} else {
-#ifdef CONFIG_VIDEO_CONFERENCE_CALL
-			if (state->vt_mode == 1 || state->vt_mode == 3) {
-#else
 			if (state->vt_mode == 1) {
-#endif
 				cam_info("load camera VT call setting\n");
 				err = s5k5bafx_write_regs(sd, s5k5bafx_vt_common,
-					sizeof(s5k5bafx_vt_common) / \
-					sizeof(s5k5bafx_vt_common[0]));
+					ARRAY_SIZE(s5k5bafx_vt_common));
+			} else if (state->vt_mode == 3) {
+				cam_info("load camera smart stay setting\n");
+				err = s5k5bafx_write_regs(sd,
+					s5k5bafx_recording_50Hz_common,
+					ARRAY_SIZE(
+					s5k5bafx_recording_50Hz_common));
 			} else {
 				cam_info("load camera WIFI VT call setting\n");
 				err = s5k5bafx_write_regs(sd, s5k5bafx_vt_wifi_common,
-					sizeof(s5k5bafx_vt_wifi_common) / \
-					sizeof(s5k5bafx_vt_wifi_common[0]));
+					ARRAY_SIZE(s5k5bafx_vt_wifi_common));
 			}
 		}
 	} else {
 		cam_info("load recording setting\n");
 		if (ANTI_BANDING_50HZ == state->anti_banding) {
 			err = s5k5bafx_write_regs(sd, s5k5bafx_recording_50Hz_common,
-				sizeof(s5k5bafx_recording_50Hz_common) / \
-				sizeof(s5k5bafx_recording_50Hz_common[0]));
+				ARRAY_SIZE(s5k5bafx_recording_50Hz_common));
 		} else {
 			err = s5k5bafx_write_regs(sd, s5k5bafx_recording_60Hz_common,
-				sizeof(s5k5bafx_recording_60Hz_common) / \
-				sizeof(s5k5bafx_recording_60Hz_common[0]));
+				ARRAY_SIZE(s5k5bafx_recording_60Hz_common));
 		}
 	}
 #endif
@@ -1528,6 +1553,53 @@ ssize_t s5k5bafx_camera_type_show(struct device *dev,
 
 static DEVICE_ATTR(front_camtype, S_IRUGO, s5k5bafx_camera_type_show, NULL);
 
+ssize_t s5k5bafx_startup_time_show(struct device *dev,
+		struct device_attribute *attr, char *buf)
+{
+	char *cam_type;
+	cam_info("%s\n", __func__);
+
+	return sprintf(buf, "%d\n", SMARTSTAY_STARTUP_TIME);
+}
+
+static DEVICE_ATTR(startup_time, S_IRUGO, s5k5bafx_startup_time_show, NULL);
+
+static struct device *s5k5bafx_sysdev;
+
+static int s5k5bafx_create_sysfs(void)
+{
+	cam_dbg("%s\n", __func__);
+
+	s5k5bafx_sysdev = device_create(camera_class, NULL,
+				MKDEV(CAM_MAJOR, 1), NULL, "front");
+	if (IS_ERR(s5k5bafx_sysdev)) {
+		cam_err("failed to create device s5k5bafx_dev!\n");
+		return 0;
+	}
+
+	if (device_create_file(s5k5bafx_sysdev, &dev_attr_front_camtype) < 0) {
+		cam_err("failed to create device file, %s\n",
+				dev_attr_front_camtype.attr.name);
+	}
+
+	if (device_create_file(s5k5bafx_sysdev, &dev_attr_startup_time) < 0) {
+		cam_err("failed to create device file, %s\n",
+				dev_attr_startup_time.attr.name);
+	}
+
+	return 0;
+}
+
+static int s5k5bafx_remove_sysfs(void)
+{
+	device_remove_file(s5k5bafx_sysdev, &dev_attr_front_camtype);
+	device_remove_file(s5k5bafx_sysdev, &dev_attr_startup_time);
+	device_destroy(camera_class, s5k5bafx_sysdev->devt);
+	s5k5bafx_sysdev = NULL;
+
+	return 0;
+}
+
 /*
  * s5k5bafx_probe
  * Fetching platform data is being done with s_config subdev call.
@@ -1561,23 +1633,6 @@ static int s5k5bafx_probe(struct i2c_client *client,
 
 	/* Registering subdev */
 	v4l2_i2c_subdev_init(sd, client, &s5k5bafx_ops);
-
-	if (state->s5k5bafx_dev == NULL) {
-		state->s5k5bafx_dev =
-		    device_create(camera_class, NULL, 0, NULL,
-				  "front");
-		if (IS_ERR(state->s5k5bafx_dev)) {
-			cam_err("failed to create device s5k5bafx_dev!\n");
-		} else {
-			dev_set_drvdata(state->s5k5bafx_dev, state);
-			if (device_create_file
-			    (state->s5k5bafx_dev,
-			     &dev_attr_front_camtype) < 0) {
-				cam_err("failed to create device file, %s\n",
-				dev_attr_front_camtype.attr.name);
-			}
-		}
-	}
 
 	/*
 	 * Assign default format and resolution
@@ -1621,10 +1676,6 @@ static int s5k5bafx_remove(struct i2c_client *client)
 
 	state->initialized = 0;
 
-	device_remove_file(state->s5k5bafx_dev, &dev_attr_front_camtype);
-	device_destroy(camera_class, 0);
-	state->s5k5bafx_dev = NULL;
-
 	v4l2_device_unregister_subdev(sd);
 	kfree(to_state(sd));
 
@@ -1657,12 +1708,14 @@ static struct i2c_driver s5k5bafx_i2c_driver = {
 static int __init s5k5bafx_mod_init(void)
 {
 	cam_dbg("E\n");
+	s5k5bafx_create_sysfs();
 	return i2c_add_driver(&s5k5bafx_i2c_driver);
 }
 
 static void __exit s5k5bafx_mod_exit(void)
 {
 	cam_dbg("E\n");
+	s5k5bafx_remove_sysfs();
 	i2c_del_driver(&s5k5bafx_i2c_driver);
 }
 module_init(s5k5bafx_mod_init);
