@@ -741,11 +741,11 @@ static inline int link_pm_slave_wake(struct link_pm_data *pm_data)
 				!= HOSTWAKE_TRIGLEVEL) {
 		if (gpio_get_value(pm_data->gpio_link_slavewake)) {
 			gpio_set_value(pm_data->gpio_link_slavewake, 0);
-			mif_info("gpio [SWK] set [0]\n");
+			mif_debug("gpio [SWK] set [0]\n");
 			mdelay(5);
 		}
 		gpio_set_value(pm_data->gpio_link_slavewake, 1);
-		mif_info("gpio [SWK] set [1]\n");
+		mif_debug("gpio [SWK] set [1]\n");
 		mdelay(5);
 
 		/* wait host wake signal*/
@@ -860,7 +860,7 @@ static irqreturn_t link_pm_irq_handler(int irq, void *data)
 		runtime pm status changes to ACTIVE
 	*/
 	value = gpio_get_value(pm_data->gpio_link_hostwake);
-	mif_info("gpio [HWK] get [%d]\n", value);
+	mif_debug("gpio [HWK] get [%d]\n", value);
 
 	/*
 	* igonore host wakeup interrupt at suspending kernel
