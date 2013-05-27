@@ -27,7 +27,7 @@
 
 static int xmm6260_on(struct modem_ctl *mc)
 {
-	mif_info("xmm6260_on()\n");
+	mif_debug("xmm6260_on()\n");
 
 	if (!mc->gpio_cp_reset || !mc->gpio_cp_on || !mc->gpio_reset_req_n) {
 		mif_err("no gpio data\n");
@@ -66,7 +66,7 @@ static int xmm6260_on(struct modem_ctl *mc)
 
 static int xmm6260_off(struct modem_ctl *mc)
 {
-	mif_info("xmm6260_off()\n");
+	mif_debug("xmm6260_off()\n");
 
 	if (!mc->gpio_cp_reset || !mc->gpio_cp_on) {
 		mif_err("no gpio data\n");
@@ -85,7 +85,7 @@ static int xmm6260_off(struct modem_ctl *mc)
 static int xmm6260_reset(struct modem_ctl *mc)
 {
 
-	mif_info("xmm6260_reset()\n");
+	mif_debug("xmm6260_reset()\n");
 
 	if (!mc->gpio_cp_reset || !mc->gpio_reset_req_n)
 		return -ENXIO;
@@ -122,7 +122,7 @@ static int xmm6260_reset(struct modem_ctl *mc)
 
 static int xmm6260_boot_on(struct modem_ctl *mc)
 {
-	mif_info("xmm6260_boot_on()\n");
+	mif_debug("xmm6260_boot_on()\n");
 
 	if (!mc->gpio_flm_uart_sel) {
 		mif_err("no gpio data\n");
@@ -136,7 +136,7 @@ static int xmm6260_boot_on(struct modem_ctl *mc)
 
 static int xmm6260_boot_off(struct modem_ctl *mc)
 {
-	mif_info("xmm6260_boot_off()\n");
+	mif_debug("xmm6260_boot_off()\n");
 
 	if (!mc->gpio_flm_uart_sel) {
 		mif_err("no gpio data\n");
