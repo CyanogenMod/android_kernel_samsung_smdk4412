@@ -45,7 +45,7 @@ static int gc_thread_func(void *data)
 		if (kthread_should_stop())
 			break;
 
-		if (sbi->sb->s_writers.frozen >= SB_FREEZE_WRITE) {
+		if (sbi->sb->s_frozen >= SB_FREEZE_WRITE) {
 			wait_ms = increase_sleep_time(gc_th, wait_ms);
 			continue;
 		}
