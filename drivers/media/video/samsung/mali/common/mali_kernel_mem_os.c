@@ -243,11 +243,7 @@ static void os_allocator_release(void * ctx, void * handle)
 
 static mali_physical_memory_allocation_result os_allocator_allocate_page_table_block(void * ctx, mali_page_table_block * block)
 {
-#ifdef CONFIG_CPU_EXYNOS4210
-	int allocation_order = 6; /* _MALI_OSK_CPU_PAGE_SIZE << 6 */
-#else
 	int allocation_order = 11; /* _MALI_OSK_CPU_PAGE_SIZE << 11 */
-#endif
 	void *virt = NULL;
 	u32 size = _MALI_OSK_CPU_PAGE_SIZE << allocation_order;
 	os_allocator * info;
