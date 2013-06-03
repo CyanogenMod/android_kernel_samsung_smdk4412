@@ -284,9 +284,15 @@ bool cma_is_registered_region(phys_addr_t start, size_t size)
 {
 	struct cma_region *reg;
 
+	if (start + size <= start)
+		return false;
+
 	cma_foreach_region(reg) {
 		if ((start >= reg->start) &&
-			((start + size) <= (reg->start + reg->size)))
+			((start + size) <= (reg->start + reg->size)) &&
+			(size <= reg->size) &&
+			(start < (reg->start + reg->size)))
+
 			return true;
 	}
 	return false;

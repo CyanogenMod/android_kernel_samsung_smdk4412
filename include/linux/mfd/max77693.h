@@ -150,8 +150,4 @@ struct max77693_muic_data {
 extern int max7693_muic_cp_usb_state(void);
 #endif
 
-#if defined(CONFIG_MUIC_MAX77693_SUPPORT_OTG_AUDIO_DOCK)
-extern void max77693_muic_attach_audio_dock(void);
-#endif /* CONFIG_MUIC_MAX77693_SUPPORT_OTG_AUDIO_DOCK */
-
 #endif				/* __LINUX_MFD_MAX77693_H */

@@ -677,41 +677,59 @@ static int mmc_movi_read_req(struct mmc_card *card,
 	return 0;
 }
 
+#define MOVI_CONT_VHX0	0x56485830
+#define MOVI_CONT_VMX0	0x564D5830
+
 int mmc_start_movi_smart(struct mmc_card *card)
 {
-	int err;
+	int ret;
 	u8 data_buf[512];
 	u32 date = 0;
+	u32 old_date = 0;
+	u32 movi_ver = 0;
 
-	err = mmc_movi_cmd(card->host, 0xEFAC62EC);
-	if (err)
-		return err;
+	ret = mmc_movi_cmd(card->host, 0xEFAC62EC);
+	if (ret)
+		return ret;
 
-	err = mmc_movi_cmd(card->host, 0x0000CCEE);
-	if (err)
-		return err;
+	ret = mmc_movi_cmd(card->host, 0x0000CCEE);
+	if (ret)
+		return ret;
 
-	err = mmc_movi_read_req(card, (void *)data_buf, 0x1000, 1);
-	if (err)
-		return err;
+	ret = mmc_movi_read_req(card, (void *)data_buf, 0x1000, 1);
+	if (ret)
+		return ret;
 
-	err = mmc_movi_cmd(card->host, 0xEFAC62EC);
-	if (err)
-		return err;
+	ret = mmc_movi_cmd(card->host, 0xEFAC62EC);
+	if (ret)
+		return ret;
 
-	err = mmc_movi_cmd(card->host, 0x00DECCEE);
-	if (err)
-		return err;
+	ret = mmc_movi_cmd(card->host, 0x00DECCEE);
+	if (ret)
+		return ret;
+
+	movi_ver = ((data_buf[312] << 24) | (data_buf[313] << 16) |
+			(data_buf[314] << 8) | data_buf[315]);
+	if (movi_ver == MOVI_CONT_VMX0)
+		ret = MMC_MOVI_VER_VMX0;
+	else if (movi_ver == MOVI_CONT_VHX0)
+		ret = MMC_MOVI_VER_VHX0;
+	else
+		ret = 0x0;
 
 	date = ((data_buf[327] << 24) | (data_buf[326] << 16) |
 				(data_buf[325] << 8) | data_buf[324]);
 
-	if (date !=  0x20120413) {
-		err = -1;
-		return err;
-		}
+	card->movi_fwver = data_buf[320];
+	card->movi_fwdate = date;
 
-	return 0x2;
+	old_date =  ((data_buf[351] << 24) | (data_buf[350] << 16) |
+			(data_buf[349] << 8) | data_buf[348]);
+
+	pr_info("%s : %02x : %02x : %08x : %x.\n", mmc_hostname(card->host),
+			ret, card->movi_fwver, card->movi_fwdate, old_date);
+
+	return ret;
 }
 EXPORT_SYMBOL_GPL(mmc_start_movi_smart);
 
