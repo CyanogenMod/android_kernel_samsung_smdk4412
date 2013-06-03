@@ -9,9 +9,6 @@
  * the Free Software Foundation; either version 2 of the License, or
  * (at your option) any later version.
  */
-#if defined(CONFIG_MUIC_MAX77693_SUPPORT_OTG_AUDIO_DOCK)
-#include <linux/mfd/max77693.h>
-#endif /* CONFIG_MUIC_MAX77693_SUPPORT_OTG_AUDIO_DOCK */
 #include <linux/power_supply.h>
 
 #define PSY_CHG_NAME "max77693-charger"
@@ -48,7 +45,6 @@ static void call_audiodock_notify(struct usb_device *dev)
 		    id->idVendor == le16_to_cpu(dev->descriptor.idVendor) &&
 		    id->idProduct == le16_to_cpu(dev->descriptor.idProduct)) {
 			dev_info(&dev->dev, "Audio Dock is connected!\n");
-			max77693_muic_attach_audio_dock();
 			return;
 		}
 	}

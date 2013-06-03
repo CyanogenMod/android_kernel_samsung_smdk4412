@@ -835,9 +835,10 @@ static struct s3c_mshci_platdata exynos4_mshc_pdata __initdata = {
 				  MMC_CAP_UHS_DDR50 | MMC_CAP_CMD23,
 #ifdef CONFIG_MMC_MSHCI_ENABLE_CACHE
 	.host_caps2		= MMC_CAP2_ADAPT_PACKED | MMC_CAP2_PACKED_CMD |
-				  MMC_CAP2_CACHE_CTRL,
+				  MMC_CAP2_CACHE_CTRL | MMC_CAP2_POWEROFF_NOTIFY,
 #else
-	.host_caps2		= MMC_CAP2_ADAPT_PACKED | MMC_CAP2_PACKED_CMD,
+	.host_caps2		= MMC_CAP2_ADAPT_PACKED | MMC_CAP2_PACKED_CMD |
+				  MMC_CAP2_POWEROFF_NOTIFY,
 #endif
 #elif defined(CONFIG_EXYNOS4_MSHC_8BIT)
 	.max_width		= 8,
@@ -3430,29 +3431,16 @@ static void __init exynos4_reserve(void)
 			.start = 0x65800000,
 			.reserved = 1,
 		};
-		
+
 		if (cma_early_region_register(&fimc_reg))
 			pr_err("S5P/CMA: Failed to register '%s'\n",
-				fimc_reg.name);
+						fimc_reg.name);
 	}
 #endif
 
 #if defined(CONFIG_USE_MFC_CMA) && defined(CONFIG_MACH_M0)
 	ret = dma_declare_contiguous(&s5p_device_mfc.dev,
 			0x02800000, 0x5C800000, 0);
-
-	if (ret == 0) {
-		static struct cma_region mfc_reg = {
-			.name = "mfc",
-			.size = 0x02800000,
-			.start = 0x5C800000,
-			.reserved = 1,
-		};
-
-		if (cma_early_region_register(&mfc_reg))
-			pr_err("S5P/CMA: Failed to register '%s'\n",
-				mfc_reg.name);
-	}
 #endif
 	if (ret != 0)
 		printk(KERN_ERR "%s Fail\n", __func__);

@@ -413,7 +413,7 @@ enum {
 #if defined(CONFIG_SWITCH_DUAL_MODEM)
 	CP_ESC_USB_MODE,
 #endif
-
+	OPEN_USB_MODE
 };
 
 enum {

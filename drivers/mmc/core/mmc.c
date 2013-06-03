@@ -35,6 +35,27 @@
 #endif
 #endif
 
+/*
+ * If moviNAND VHX 4.41 device
+ * enable PON to force.
+ */
+#define CHECK_MOVI_VHX4_41				\
+	(card->ext_csd.rev == 5 && card->movi_fwver >= 0x1C)
+
+/*
+ * If moviNAND VHX 4.5 device
+ * enable PON to force.
+ */
+#define CHECK_MOVI_VHX4_5				\
+	(card->ext_csd.rev == 6 && card->movi_fwver >= 0x0A)
+
+#define CHECK_MOVI_PON_SUPPORT				\
+	(card->cid.manfid == 0x15 &&			\
+	 ext_csd[EXT_CSD_VENDOR_SPECIFIC_FIELD] & 0x2)
+
+#define CHECK_PON_ENABLE				\
+	(card->ext_csd.feature_support & MMC_POWEROFF_NOTIFY_FEATURE)
+
 static const unsigned int tran_exp[] = {
 	10000,		100000,		1000000,	10000000,
 	0,		0,		0,		0
@@ -333,6 +354,7 @@ static int mmc_get_ext_csd(struct mmc_card *card, u8 **new_ext_csd)
 static int mmc_read_ext_csd(struct mmc_card *card, u8 *ext_csd)
 {
 	int err = 0;
+	int movi_ver_check = 0;
 
 	BUG_ON(!card);
 
@@ -581,9 +603,47 @@ static int mmc_read_ext_csd(struct mmc_card *card, u8 *ext_csd)
 	}
 
 	if (card->ext_csd.rev >= 5) {
-		/* enable discard feature if emmc is 4.41+ */
+		/* If moviNAND, run smart report */
+		if (card->cid.manfid == 0x15) {
+			card->host->card = card;
+			movi_ver_check = mmc_start_movi_smart(card);
+		}
+
+		/* enable discard feature if emmc is 4.41+ moviNand */
 		if ((ext_csd[EXT_CSD_VENDOR_SPECIFIC_FIELD + 0] & 0x1) &&
 			(card->cid.manfid == 0x15))
+			card->ext_csd.feature_support |= MMC_DISCARD_FEATURE;
+
+		/* enable PON feature if moviNAND VHX/VMX devices */
+		if (CHECK_MOVI_PON_SUPPORT) {
+			if ((movi_ver_check & MMC_MOVI_VER_VHX0) &&
+					(CHECK_MOVI_VHX4_41 ||
+					 CHECK_MOVI_VHX4_5)) {
+				card->ext_csd.feature_support |=
+					MMC_POWEROFF_NOTIFY_FEATURE;
+				card->ext_csd.generic_cmd6_time = 100;
+				card->ext_csd.power_off_longtime = 600;
+			}
+			if (movi_ver_check & MMC_MOVI_VER_VMX0) {
+				card->ext_csd.feature_support |=
+					MMC_POWEROFF_NOTIFY_FEATURE;
+			}
+			pr_info("%s : %s PON feature : "
+					"%02x : %02x(%02x) : %08x\n",
+					mmc_hostname(card->host),
+					card->ext_csd.feature_support & MMC_POWEROFF_NOTIFY_FEATURE ?
+					"enable" : "disable",
+					movi_ver_check,
+					card->movi_fwver,  ext_csd[82],
+					card->movi_fwdate);
+		}
+
+		/*
+		 * enable discard feature if emmc is 4.41+ Toshiba eMMC 19nm
+		 * Normally, emmc 4.5 use EXT_CSD[501]
+		 */
+		if ((ext_csd[EXT_CSD_MAX_PACKED_READS] & 0x3F) &&
+			(card->cid.manfid == 0x11))
 			card->ext_csd.feature_support |= MMC_DISCARD_FEATURE;
 
 		/* check whether the eMMC card supports HPI */
@@ -717,6 +777,7 @@ MMC_DEV_ATTR(serial, "0x%08x\n", card->cid.serial);
 MMC_DEV_ATTR(enhanced_area_offset, "%llu\n",
 		card->ext_csd.enhanced_area_offset);
 MMC_DEV_ATTR(enhanced_area_size, "%u\n", card->ext_csd.enhanced_area_size);
+MMC_DEV_ATTR(fwver, "%02x : %x\n", card->movi_fwver, card->movi_fwdate);
 
 static struct attribute *mmc_std_attrs[] = {
 	&dev_attr_cid.attr,
@@ -732,6 +793,7 @@ static struct attribute *mmc_std_attrs[] = {
 	&dev_attr_serial.attr,
 	&dev_attr_enhanced_area_offset.attr,
 	&dev_attr_enhanced_area_size.attr,
+	&dev_attr_fwver.attr,
 	NULL,
 };
 
@@ -1111,22 +1173,20 @@ static int mmc_init_card(struct mmc_host *host, u32 ocr,
 	 * set the notification byte in the ext_csd register of device
 	 */
 	if ((host->caps2 & MMC_CAP2_POWEROFF_NOTIFY) &&
-	    (card->ext_csd.rev >= 6)) {
+	    ((card->ext_csd.rev >= 5) && CHECK_PON_ENABLE)) {
 		err = mmc_switch(card, EXT_CSD_CMD_SET_NORMAL,
 				 EXT_CSD_POWER_OFF_NOTIFICATION,
 				 EXT_CSD_POWER_ON,
 				 card->ext_csd.generic_cmd6_time);
 		if (err && err != -EBADMSG)
 			goto free_card;
-	}
-
-	if (!err && (host->caps2 & MMC_CAP2_POWEROFF_NOTIFY))
 		/*
 		 * The err can be -EBADMSG or 0,
 		 * so check for success and update the flag
 		 */
 		if (!err)
 			card->poweroff_notify_state = MMC_POWERED_ON;
+	}
 
 	/*
 	 * Activate high speed (if supported)
@@ -1656,10 +1716,10 @@ int mmc_attach_mmc(struct mmc_host *host)
 
 	if (!strncmp(host->card->cid.prod_name, "VTU00M", 6) &&
 		(host->card->cid.prod_rev == 0xf1) &&
-		(mmc_start_movi_smart(host->card) == 0x2))
+		(host->card->movi_fwdate == 0x20120413)) {
+		/* It needs host work-around codes */
 		host->card->movi_ops = 0x2;
 
-	if (host->card->movi_ops == 0x2) {
 		err = mmc_start_movi_operation(host->card);
 		if (err) {
 			pr_warning("%s: movi operation is failed\n",
