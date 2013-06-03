@@ -1,4 +1,17 @@
-
+/*  drivers/mmc/cprmdrv_samsung.c
+ *
+ *  Copyright   2010 Samsung Electronics Co.Ltd
+ *
+ *  This program is free software; you can redistribute it and/or modify
+ *  it under the terms of the GNU General Public License as published by
+ *  the Free Software Foundation; either version 2 of the License, or
+ *  (at your option) any later version.
+ *
+ *  This program is distributed in the hope that it will be useful,
+ *  but WITHOUT ANY WARRANTY; without even the implied warranty of
+ *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ *  GNU General Public License for more details.
+ */
 #include <linux/mmc/core.h>
 #include <linux/mmc/card.h>
 #include <linux/mmc/host.h>
@@ -54,7 +67,6 @@ static int CPRM_CMD_SecureRW(struct mmc_card *card,
 	struct mmc_command cmd;
 	struct mmc_command stop;
 	struct mmc_data data;
-	unsigned int timeout_us;
 
 	struct scatterlist sg;
 
@@ -91,17 +103,8 @@ static int CPRM_CMD_SecureRW(struct mmc_card *card,
 
 	memset(&data, 0, sizeof(struct mmc_data));
 
-	data.timeout_ns = card->csd.tacc_ns * 100;
-	data.timeout_clks = card->csd.tacc_clks * 100;
-
-	timeout_us = data.timeout_ns / 1000;
-	timeout_us += data.timeout_clks * 1000 /
-		(card->host->ios.clock / 1000);
-
-	if (timeout_us > 100000) {
 		data.timeout_ns = 100000000;
 		data.timeout_clks = 0;
-	}
 
 #if defined(CONFIG_TARGET_LOCALE_NTT)
 	data.timeout_ns = 100000000;
@@ -178,7 +181,6 @@ static int CPRM_CMD_SecureMultiRW(struct mmc_card *card,
 	struct mmc_command cmd;
 	struct mmc_command stop;
 	struct mmc_data data;
-	unsigned int timeout_us;
 	unsigned long flags;
 
 	struct scatterlist sg;
@@ -212,17 +214,8 @@ static int CPRM_CMD_SecureMultiRW(struct mmc_card *card,
 
 	memset(&data, 0, sizeof(struct mmc_data));
 
-	data.timeout_ns = card->csd.tacc_ns * 100;
-	data.timeout_clks = card->csd.tacc_clks * 100;
-
-	timeout_us = data.timeout_ns / 1000;
-	timeout_us += data.timeout_clks * 1000 /
-		(card->host->ios.clock / 1000);
-
-	if (timeout_us > 100000) {
 		data.timeout_ns = 100000000;
 		data.timeout_clks = 0;
-	}
 
 #if defined(CONFIG_TARGET_LOCALE_NTT)
 	data.timeout_ns = 100000000;

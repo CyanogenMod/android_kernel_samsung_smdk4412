@@ -969,7 +969,7 @@ static int mmc_sdio_resume(struct mmc_host *host)
 	}
 
 	if (!err && host->sdio_irqs)
-		wake_up_process(host->sdio_irq_thread);
+		mmc_signal_sdio_irq(host);
 	mmc_release_host(host);
 
 	/*

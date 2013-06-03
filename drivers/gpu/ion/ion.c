@@ -1034,8 +1034,8 @@ static int ion_share_mmap(struct file *file, struct vm_area_struct *vma)
 		return -EINVAL;
 	}
 
-	if ((size > buffer->size) || (size + (vma->vm_pgoff << PAGE_SHIFT) >
-				     buffer->size)) {
+	if (((vma->vm_pgoff << PAGE_SHIFT) >= buffer->size) ||
+		(size > (buffer->size - (vma->vm_pgoff << PAGE_SHIFT)))) {
 		pr_err("%s: trying to map larger area than handle has available"
 		       "\n", __func__);
 		ret = -EINVAL;

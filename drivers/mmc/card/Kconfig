@@ -81,3 +81,10 @@ config MMC_SELECTIVE_PACKED_CMD_POLICY
 	tristate "Change the condition of Pakced command"
 	help
 	  Say Y here to change packed_cmd policy
+
+config MMC_CPRM
+	bool "Japan only CPRM MMC driver"
+	depends on MMC_BLOCK
+	default n
+	help
+	  Japan only feature of CPRM MMC driver.

@@ -518,7 +518,7 @@ static struct s3cfb_lcd ea8061 = {
 	.p_width = 74,
 	.p_height = 131,
 	.bpp = 24,
-	.freq = 58,
+	.freq = 60,
 
 	/* minumun value is 0 except for wr_act time. */
 	.cpu_timing = {
@@ -530,7 +530,7 @@ static struct s3cfb_lcd ea8061 = {
 
 	.timing = {
 		.h_fp = 52,
-		.h_bp = 121,
+		.h_bp = 96,
 		.h_sw = 4,
 		.v_fp = 13,
 		.v_fpe = 1,
@@ -598,7 +598,7 @@ static struct s3cfb_lcd ea8061 = {
 	.p_width = 64,
 	.p_height = 106,
 	.bpp = 24,
-	.freq = 58,
+	.freq = 60,
 
 	/* minumun value is 0 except for wr_act time. */
 	.cpu_timing = {
@@ -610,7 +610,7 @@ static struct s3cfb_lcd ea8061 = {
 
 	.timing = {
 		.h_fp = 52,
-		.h_bp = 121,
+		.h_bp = 96,
 		.h_sw = 4,
 		.v_fp = 13,
 		.v_fpe = 1,

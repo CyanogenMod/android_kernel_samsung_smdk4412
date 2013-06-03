@@ -637,7 +637,7 @@ static void battery_notify_full_state(struct battery_info *info)
 			info->battery_raw_soc, info->battery_full_soc,
 						info->battery_soc);
 
-	if ((info->recharge_phase && info->full_charged_state) ||
+	if (info->full_charged_state ||
 		((info->charge_real_state != POWER_SUPPLY_STATUS_DISCHARGING) &&
 		(info->battery_raw_soc > info->battery_full_soc) &&
 		(info->battery_soc == 100))) {
@@ -808,7 +808,7 @@ static bool battery_fullcharged_cond(struct battery_info *info)
 	if (info->charge_real_state == POWER_SUPPLY_STATUS_FULL) {
 		if ((info->battery_vcell > f_cond_vcell) &&
 		    (info->battery_soc > f_cond_soc)) {
-			pr_info("%s: real full charged, v(%d), s(%d)\n",
+			pr_debug("%s: real full charged, v(%d), s(%d)\n",
 					__func__, info->battery_vcell,
 						info->battery_soc);
 #if defined(USE_2STEP_TERM)
@@ -1606,6 +1606,8 @@ charge_ok:
 	case POWER_SUPPLY_TYPE_DOCK:
 		if (!info->pdata->suspend_chging)
 			wake_lock(&info->charge_wake_lock);
+		/* default dock prop is AC */
+		info->online_prop = ONLINE_PROP_AC;
 		muic_cb_typ = max77693_muic_get_charging_type();
 		switch (muic_cb_typ) {
 		case CABLE_TYPE_AUDIODOCK_MUIC:
@@ -1633,6 +1635,7 @@ charge_ok:
 		case CABLE_TYPE_SMARTDOCK_USB_MUIC:
 			pr_info("%s: smart dock usb(low), %d\n",
 					__func__, DOCK_TYPE_LOW_CURR);
+			info->online_prop = ONLINE_PROP_USB;
 			battery_charge_control(info,
 						DOCK_TYPE_LOW_CURR,
 						DOCK_TYPE_LOW_CURR);
@@ -2037,7 +2040,9 @@ static int samsung_usb_get_property(struct power_supply *ps,
 	val->intval = ((info->charge_virt_state !=
 				POWER_SUPPLY_STATUS_DISCHARGING) &&
 			((info->cable_type == POWER_SUPPLY_TYPE_USB) ||
-			(info->cable_type == POWER_SUPPLY_TYPE_USB_CDP)));
+			(info->cable_type == POWER_SUPPLY_TYPE_USB_CDP) ||
+			((info->cable_type == POWER_SUPPLY_TYPE_DOCK) &&
+				(info->online_prop == ONLINE_PROP_USB))));
 
 	return 0;
 }
@@ -2057,7 +2062,8 @@ static int samsung_ac_get_property(struct power_supply *ps,
 				POWER_SUPPLY_STATUS_DISCHARGING) &&
 			((info->cable_type == POWER_SUPPLY_TYPE_MAINS) ||
 			(info->cable_type == POWER_SUPPLY_TYPE_MISC) ||
-			(info->cable_type == POWER_SUPPLY_TYPE_DOCK) ||
+			((info->cable_type == POWER_SUPPLY_TYPE_DOCK) &&
+				(info->online_prop != ONLINE_PROP_USB)) ||
 			(info->cable_type == POWER_SUPPLY_TYPE_WIRELESS)));
 
 	return 0;
