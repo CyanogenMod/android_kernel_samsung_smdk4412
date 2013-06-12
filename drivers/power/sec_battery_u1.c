@@ -214,7 +214,7 @@
 #endif
 
 #ifdef CONFIG_TARGET_LOCALE_NA
-#define FULL_CHARGE_COND_VOLTAGE    (4000 * 1000)	/* 4.00 V */
+#define FULL_CHARGE_COND_VOLTAGE    (4150 * 1000)	/* 4.15 V */
 #else
 #define FULL_CHARGE_COND_VOLTAGE    (4150 * 1000)	/* 4.15 V */
 #endif
@@ -527,14 +527,6 @@ static int sec_bat_get_property(struct power_supply *ps,
 		break;
 #endif
 	case POWER_SUPPLY_PROP_CAPACITY:
-#ifdef CONFIG_TARGET_LOCALE_NA
-		if (info->charging_status != POWER_SUPPLY_STATUS_FULL
-		    && info->batt_soc == 100) {
-			val->intval = 99;
-			break;
-		}
-#endif				/*CONFIG_TARGET_LOCALE_NA */
-
 		if (info->charging_status == POWER_SUPPLY_STATUS_FULL) {
 			val->intval = 100;
 			break;
@@ -1993,6 +1985,9 @@ static bool sec_bat_check_ing_level_trigger(struct sec_bat_info *info)
 #endif
 					if (info->batt_vcell >=
 					    FULL_CHARGE_COND_VOLTAGE) {
+#if defined(CONFIG_TARGET_LOCALE_NA)
+						if (info->batt_soc > 99){
+#endif
 						/* USB full charged */
 						info->charging_int_full_count++;
 						if (info->
@@ -2010,6 +2005,9 @@ static bool sec_bat_check_ing_level_trigger(struct sec_bat_info *info)
 							 __func__,
 							 info->
 						 charging_int_full_count);
+#if defined(CONFIG_TARGET_LOCALE_NA)
+						}
+#endif
 					} else {
 						info->charging_int_full_count =
 						    0;

@@ -160,7 +160,7 @@ void kernel_sec_set_cp_upload(void)
 		}
 		mdelay(10);
 		if (++wait_count > 500) {
-			printk(KERN_EMERG"- Fail to set CP uploadmode." /
+			printk(KERN_EMERG"- Fail to set CP uploadmode." \
 				"cp_irq_mask: 0x%04X\n", cp_irq_mask);
 			break;
 			}
@@ -566,7 +566,7 @@ bool kernel_set_debug_level(int level)
 	}
 	else
 	{*/
-		printk(KERN_NOTICE "(kernel_set_debug_level)" /
+		printk(KERN_NOTICE "(kernel_set_debug_level)" \
 		" sec_set_param_value is not intialized !!\n");
 		return 0;
 	/*}*/

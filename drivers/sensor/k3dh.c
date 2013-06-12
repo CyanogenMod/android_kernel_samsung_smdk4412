@@ -79,7 +79,44 @@ struct k3dh_data {
 	struct k3dh_acc acc_xyz;
 	u8 ctrl_reg1_shadow;
 	atomic_t opened; /* opened implies enabled */
+	struct accel_platform_data *acc_pdata;
 };
+
+static struct k3dh_data *g_k3dh;
+
+
+static void k3dh_xyz_position_adjust(struct k3dh_acc *acc,
+		int position)
+{
+	const int position_map[][3][3] = {
+	{{ 0, -1,  0}, { 1,  0,  0}, { 0,  0,  1} }, /* 0 top/upper-left */
+	{{ 1,  0,  0}, { 0,  1,  0}, { 0,  0,  1} }, /* 1 top/upper-right */
+	{{ 0,  1,  0}, {-1,  0,  0}, { 0,  0,  1} }, /* 2 top/lower-right */
+	{{-1,  0,  0}, { 0, -1,  0}, { 0,  0,  1} }, /* 3 top/lower-left */
+	{{ 0,  1,  0}, { 1,  0,  0}, { 0,  0, -1} }, /* 4 bottom/upper-left */
+	{{-1,  0,  0}, { 0,  1,  0}, { 0,  0, -1} }, /* 5 bottom/upper-right */
+	{{ 0, -1,  0}, {-1,  0,  0}, { 0,  0, -1} }, /* 6 bottom/lower-right */
+	{{ 1,  0,  0}, { 0, -1,  0}, { 0,  0, -1} }, /* 7 bottom/lower-left*/
+	};
+
+	struct k3dh_acc xyz_adjusted = {0,};
+	s16 raw[3] = {0,};
+	int j;
+	raw[0] = acc->x;
+	raw[1] = acc->y;
+	raw[2] = acc->z;
+	for (j = 0; j < 3; j++) {
+		xyz_adjusted.x +=
+		(position_map[position][0][j] * raw[j]);
+		xyz_adjusted.y +=
+		(position_map[position][1][j] * raw[j]);
+		xyz_adjusted.z +=
+		(position_map[position][2][j] * raw[j]);
+	}
+	acc->x = xyz_adjusted.x;
+	acc->y = xyz_adjusted.y;
+	acc->z = xyz_adjusted.z;
+}
 
 /* Read X,Y and Z-axis acceleration raw data */
 static int k3dh_read_accel_raw_xyz(struct k3dh_data *data,
@@ -101,21 +138,23 @@ static int k3dh_read_accel_raw_xyz(struct k3dh_data *data,
 	acc->y = (acc_data[3] << 8) | acc_data[2];
 	acc->z = (acc_data[5] << 8) | acc_data[4];
 
-#if defined(CONFIG_MACH_U1_NA_SPR)
-	acc->x = -acc->x >> 4;
-#else
 	acc->x = acc->x >> 4;
-#endif
 	acc->y = acc->y >> 4;
-	#if defined(CONFIG_MACH_U1_NA_SPR_REV05) \
-		|| defined(CONFIG_MACH_U1_NA_SPR_EPIC2_REV00) \
-		|| defined(CONFIG_MACH_U1_NA_USCC_REV05) \
-		|| defined(CONFIG_MACH_Q1_BD)
+#if defined(CONFIG_MACH_U1_NA_SPR_REV05) \
+	|| defined(CONFIG_MACH_U1_NA_SPR_EPIC2_REV00) \
+	|| defined(CONFIG_MACH_U1_NA_USCC_REV05) \
+	|| defined(CONFIG_MACH_Q1_BD) \
+	|| defined(CONFIG_MACH_U1_NA_USCC) \
+	|| defined(CONFIG_MACH_U1_NA_SPR)
 	acc->z = -acc->z >> 4;
-	#else
+#else
 	acc->z = acc->z >> 4;
-	#endif
+#endif
 
+	if (g_k3dh->acc_pdata &&
+		g_k3dh->acc_pdata->axis_adjust)
+		k3dh_xyz_position_adjust(acc,
+			g_k3dh->acc_pdata->accel_get_position());
 	return 0;
 }
 
@@ -603,6 +642,7 @@ static int k3dh_probe(struct i2c_client *client,
 	}
 
 	data->client = client;
+	g_k3dh = data;
 	i2c_set_clientdata(client, data);
 
 	init_completion(&data->data_ready);
@@ -622,6 +662,14 @@ static int k3dh_probe(struct i2c_client *client,
 	}
 
 	pdata = client->dev.platform_data;
+	data->acc_pdata = pdata;
+	/* accelerometer position set */
+	if (!pdata) {
+		pr_err("using defualt position\n");
+	} else {
+		pr_info("successful, position = %d\n",
+			pdata->accel_get_position());
+	}
 
 #if defined(CONFIG_MACH_U1) || defined(CONFIG_MACH_TRATS)
 	/* creating class/device for test */

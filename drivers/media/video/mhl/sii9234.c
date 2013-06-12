@@ -41,6 +41,7 @@
 #include <linux/proc_fs.h>
 #include <linux/wakelock.h>
 #include <linux/earlysuspend.h>
+#include <linux/hrtimer.h>
 #ifdef CONFIG_EXTCON
 #include <linux/extcon.h>
 #endif
@@ -54,7 +55,8 @@
 /* #define __CONFIG_MHL_SWING_LEVEL__ */
 #define	__CONFIG_SS_FACTORY__
 #define	__CONFIG_MHL_DEBUG__
-#if defined(CONFIG_MACH_T0) || defined(CONFIG_MACH_M3)
+#if defined(CONFIG_MACH_T0) || defined(CONFIG_MACH_M3) \
+	|| defined(CONFIG_MACH_M0_DUOSCTC)
 #	define __CONFIG_MHL_VER_1_2__
 #else
 #	define __CONFIG_MHL_VER_1_1__
@@ -576,54 +578,68 @@ void sii9234_tmds_offon_work(struct work_struct *work)
 }
 #endif
 
-static int mhl_wake_toggle(struct sii9234_data *sii9234,
-			   unsigned long high_period, unsigned long low_period)
+/* pulse_timerfunc()                                                 *
+ * This function makes hrtimer be used for generating the wake pulse.*
+ * Usleep_range() cannot guarantee the exact timing.                 */
+
+static enum hrtimer_restart pulse_timerfunc(struct hrtimer *timer)
 {
 	int ret;
+	struct sii9234_data *sii9234 = dev_get_drvdata(sii9244_mhldev);
+	unsigned long width[] = { T_SRC_WAKE_PULSE_WIDTH_1,
+		T_SRC_WAKE_PULSE_WIDTH_1, T_SRC_WAKE_PULSE_WIDTH_2,
+		T_SRC_WAKE_PULSE_WIDTH_1, T_SRC_WAKE_PULSE_WIDTH_1,
+		T_SRC_WAKE_PULSE_WIDTH_1, T_SRC_WAKE_TO_DISCOVER };
 
-	/* These bits are not documented. */
+	if (unlikely(sii9234->wp_cnt >= 7)) {
+		sii9234->wp_cnt = 0;
+		sii9234->wake_pulse_completed = 1;
+		pr_info("sii9234: %s is finished!\n", __func__);
+		wake_up(&sii9234->wq_pulse);
+		return HRTIMER_NORESTART;
+	}
+
+	hrtimer_start(&sii9234->pulse_timer,
+			ktime_set(0, NSEC_PER_MSEC * width[sii9234->wp_cnt]),
+			HRTIMER_MODE_REL);
+	if (sii9234->wp_cnt % 2 == 0) {
+		ret = mhl_tx_clear_reg(sii9234, MHL_TX_DISC_CTRL7_REG,
+					(1 << 7) | (1 << 6));
+		if (ret < 0)
+			return HRTIMER_NORESTART;
+	} else {
+		ret = mhl_tx_set_reg(sii9234, MHL_TX_DISC_CTRL7_REG,
+				(1 << 7) | (1 << 6));
+		if (ret < 0)
+			return HRTIMER_NORESTART;
+	}
+	sii9234->wp_cnt++;
+	return HRTIMER_NORESTART;
+}
+static int mhl_send_wake_pulses(struct sii9234_data *sii9234)
+{
+
+	int ret;
+	sii9234->wp_cnt = 0;
+	sii9234->wake_pulse_completed = 0;
+	hrtimer_start(&sii9234->pulse_timer,
+			ktime_set(0,  NSEC_PER_MSEC * T_SRC_WAKE_PULSE_WIDTH_1),
+			HRTIMER_MODE_REL);
 	ret =
 	    mhl_tx_set_reg(sii9234, MHL_TX_DISC_CTRL7_REG, (1 << 7) | (1 << 6));
 	if (ret < 0)
 		return ret;
-
-	usleep_range(high_period * USEC_PER_MSEC, high_period * USEC_PER_MSEC);
-
-	ret =
-	    mhl_tx_clear_reg(sii9234, MHL_TX_DISC_CTRL7_REG,
-			     (1 << 7) | (1 << 6));
-	if (ret < 0)
-		return ret;
-
-	usleep_range(low_period * USEC_PER_MSEC, low_period * USEC_PER_MSEC);
-
-	return 0;
-}
-
-static int mhl_send_wake_pulses(struct sii9234_data *sii9234)
-{
-	int ret;
-
-	ret = mhl_wake_toggle(sii9234, T_SRC_WAKE_PULSE_WIDTH_1,
-			      T_SRC_WAKE_PULSE_WIDTH_1);
-	if (ret < 0)
-		return ret;
-
-	ret = mhl_wake_toggle(sii9234, T_SRC_WAKE_PULSE_WIDTH_1,
-			      T_SRC_WAKE_PULSE_WIDTH_2);
-	if (ret < 0)
-		return ret;
-
-	ret = mhl_wake_toggle(sii9234, T_SRC_WAKE_PULSE_WIDTH_1,
-			      T_SRC_WAKE_PULSE_WIDTH_1);
-	if (ret < 0)
-		return ret;
-
-	ret = mhl_wake_toggle(sii9234, T_SRC_WAKE_PULSE_WIDTH_1,
-			      T_SRC_WAKE_TO_DISCOVER);
-	if (ret < 0)
-		return ret;
-
+	ret = wait_event_timeout(sii9234->wq_pulse,
+				 sii9234->wake_pulse_completed == 1,
+				 msecs_to_jiffies(T_WAIT_TIMEOUT_WAKE_PULSE));
+	if (ret == 0) {
+		pr_err("[ERROR] %s time out!\n", __func__);
+		return -1;
+	}
+	if (sii9234->wake_pulse_completed != 1) {
+		pr_err("[ERROR] %s was not finished!\n", __func__);
+		return -1;
+	}
 	return 0;
 }
 
@@ -2483,7 +2499,7 @@ static int sii9234_30pin_reg_init_for_9290(struct sii9234_data *sii9234)
 	ret = mhl_tx_write_reg(sii9234, 0xA1, 0xFC);
 	if (ret < 0)
 		return ret;
-#ifdef	CONFIG_MACH_P4NOTE
+#ifdef CONFIG_MACH_P4NOTE
 	ret = mhl_tx_write_reg(sii9234, 0xA3, 0xC0);	/*output swing level*/
 	if (ret < 0)
 		return ret;
@@ -3581,6 +3597,7 @@ static ssize_t sysfs_check_mhl_command(struct class *class,
 				       struct class_attribute *attr, char *buf)
 {
 	int size;
+	int ret;
 	u8 sii_id = 0;
 	struct sii9234_data *sii9234 = dev_get_drvdata(sii9244_mhldev);
 
@@ -3590,7 +3607,11 @@ static ssize_t sysfs_check_mhl_command(struct class *class,
 	if (sii9234->pdata->hw_reset)
 		sii9234->pdata->hw_reset();
 
-	mhl_tx_read_reg(sii9234, MHL_TX_IDH_REG, &sii_id);
+	ret = mhl_tx_read_reg(sii9234, MHL_TX_IDH_REG, &sii_id);
+	if (unlikely(ret < 0))
+		pr_err("[ERROR] %s(): Failed to read register"
+			" MHL_TX_IDH_REG!\n", __func__);
+
 	pr_info("sii9234 : sel_show sii_id: %X\n", sii_id);
 
 	if (sii9234->pdata->hw_onoff)
@@ -4045,6 +4066,11 @@ static int __devinit sii9234_mhl_tx_i2c_probe(struct i2c_client *client,
 	!defined(CONFIG_SAMSUNG_MHL_9290)
 	is_mhl_power_state_on = sii9234_is_mhl_power_state_on;
 #endif
+	init_waitqueue_head(&sii9234->wq_pulse);
+	hrtimer_init(&sii9234->pulse_timer, CLOCK_MONOTONIC, HRTIMER_MODE_REL);
+	sii9234->pulse_timer.function = pulse_timerfunc;
+	sii9234->wp_cnt = 0;
+	sii9234->wake_pulse_completed = 0;
 
 	return 0;
 

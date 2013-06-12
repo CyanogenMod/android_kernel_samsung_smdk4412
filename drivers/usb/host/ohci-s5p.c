@@ -173,16 +173,18 @@ static int ohci_hcd_s5p_drv_runtime_resume(struct device *dev)
 	struct s5p_ohci_platdata *pdata = pdev->dev.platform_data;
 	struct s5p_ohci_hcd *s5p_ohci = platform_get_drvdata(pdev);
 	struct usb_hcd *hcd = s5p_ohci->hcd;
+	int ret = 0;
 
 	if (dev->power.is_suspended)
 		return 0;
 
 	if (pdata->phy_resume)
-		pdata->phy_resume(pdev, S5P_USB_PHY_HOST);
-	/* Mark hardware accessible again as we are out of D3 state by now */
-	set_bit(HCD_FLAG_HW_ACCESSIBLE, &hcd->flags);
+		ret = pdata->phy_resume(pdev, S5P_USB_PHY_HOST);
 
-	ohci_finish_controller_resume(hcd);
+	if (!ret) {
+		set_bit(HCD_FLAG_HW_ACCESSIBLE, &hcd->flags);
+		ohci_finish_controller_resume(hcd);
+	}
 
 	return 0;
 }
@@ -473,6 +475,9 @@ static void ohci_hcd_s5p_drv_shutdown(struct platform_device *pdev)
 
 	if (hcd->driver->shutdown)
 		hcd->driver->shutdown(hcd);
+
+	clear_bit(HCD_FLAG_HW_ACCESSIBLE, &hcd->flags);
+
 }
 
 static const struct dev_pm_ops ohci_s5p_pm_ops = {

@@ -39,4 +39,7 @@
 /* device needs hsic specific tunning */
 #define USB_QUIRK_HSIC_TUNE		0x00000200
 
+/* resume bus driver after dpm resume  */
+#define USB_QUIRK_NO_DPM_RESUME         0x00000400
+
 #endif /* __LINUX_USB_QUIRKS_H */

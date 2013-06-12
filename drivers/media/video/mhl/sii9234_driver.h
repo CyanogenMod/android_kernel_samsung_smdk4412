@@ -61,6 +61,10 @@
 #define T_SRC_WAKE_PULSE_WIDTH_2	60
 #define T_SRC_WAKE_TO_DISCOVER		500
 #define T_SRC_VBUS_CBUS_T0_STABLE	500
+#define T_WAIT_TIMEOUT_WAKE_PULSE	(T_SRC_WAKE_PULSE_WIDTH_1 * 6 \
+					+ T_SRC_WAKE_PULSE_WIDTH_2 \
+					+ T_SRC_WAKE_TO_DISCOVER \
+					+ 150)
 
 #define T_SRC_CBUS_FLOAT		100
 #define T_HPD_WIDTH			100
@@ -562,6 +566,10 @@ struct sii9234_data {
 #ifdef __CONFIG_TMDS_OFFON_WORKAROUND__
 	bool tmds_state;
 #endif
+	wait_queue_head_t		wq_pulse;
+	bool				wake_pulse_completed;
+	unsigned int			wp_cnt;
+	struct hrtimer			pulse_timer;
 };
 
 #ifdef __MHL_NEW_CBUS_MSC_CMD__

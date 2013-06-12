@@ -152,6 +152,8 @@ source "drivers/extcon/Kconfig"
 
 source "drivers/barcode_emul/Kconfig"
 
+source "drivers/dpram/Kconfig"
+
 # Secure OS Mobicore
 source "drivers/gud/Kconfig"
 

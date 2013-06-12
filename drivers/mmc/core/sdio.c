@@ -147,10 +147,14 @@ static int sdio_read_cccr(struct mmc_card *card, u32 ocr)
 	}
 
 	if (cccr_vsn >= SDIO_CCCR_REV_1_20) {
+#ifdef CONFIG_WIMAX_CMC
+		ret = mmc_io_rw_direct(card, 0, 0, SDIO_CCCR_SPEED, 0, &data);
+#else
 		ret = mmc_io_rw_direct(card, 0, 0, SDIO_CCCR_SPEED, 0, &speed);
+#endif
 		if (ret)
 			goto out;
-
+#ifndef CONFIG_WIMAX_CMC
 		card->scr.sda_spec3 = 0;
 		card->sw_caps.sd3_bus_mode = 0;
 		card->sw_caps.sd3_drv_type = 0;
@@ -201,6 +205,10 @@ static int sdio_read_cccr(struct mmc_card *card, u32 ocr)
 				card->sw_caps.hs_max_dtr = 25000000;
 			}
 		}
+#else
+		if (data & SDIO_SPEED_SHS)
+			card->cccr.high_speed = 1;
+#endif
 	}
 
 out:
@@ -382,6 +390,7 @@ static unsigned mmc_sdio_get_max_clock(struct mmc_card *card)
 	return max_dtr;
 }
 
+#ifndef CONFIG_WIMAX_CMC
 static unsigned char host_drive_to_sdio_drive(int host_strength)
 {
 	switch (host_strength) {
@@ -569,7 +578,7 @@ out:
 
 	return err;
 }
-
+#endif
 /*
  * Handle the detection and initialisation of a card.
  *
@@ -636,6 +645,7 @@ static int mmc_sdio_init_card(struct mmc_host *host, u32 ocr,
 	if (host->ops->init_card)
 		host->ops->init_card(host, card);
 
+#ifndef CONFIG_WIMAX_CMC
 	/*
 	 * If the host and card support UHS-I mode request the card
 	 * to switch to 1.8V signaling level.  No 1.8v signalling if
@@ -659,7 +669,7 @@ static int mmc_sdio_init_card(struct mmc_host *host, u32 ocr,
 		ocr &= ~R4_18V_PRESENT;
 		host->ocr &= ~R4_18V_PRESENT;
 	}
-
+#endif
 	/*
 	 * For native busses:  set card RCA and quit open drain mode.
 	 */
@@ -776,7 +786,30 @@ static int mmc_sdio_init_card(struct mmc_host *host, u32 ocr,
 	err = sdio_disable_cd(card);
 	if (err)
 		goto remove;
+#ifdef CONFIG_WIMAX_CMC
+	/*
+	 * Switch to high-speed (if supported).
+	 */
+	err = sdio_enable_hs(card);
+	if (err > 0)
+		mmc_sd_go_highspeed(card);
+	else if (err)
+		goto remove;
 
+	/*
+	 * Change to the card's maximum speed.
+	 */
+	mmc_set_clock(host, mmc_sdio_get_max_clock(card));
+
+	/*
+	 * Switch to wider bus (if supported).
+	 */
+	err = sdio_enable_4bit_bus(card);
+	if (err > 0)
+		mmc_set_bus_width(card->host, MMC_BUS_WIDTH_4);
+	else if (err)
+		goto remove;
+#else
 	/* Initialization sequence for UHS-I cards */
 	/* Only if card supports 1.8v and UHS signaling */
 	if ((ocr & R4_18V_PRESENT) && card->sw_caps.sd3_bus_mode) {
@@ -810,6 +843,7 @@ static int mmc_sdio_init_card(struct mmc_host *host, u32 ocr,
 		else if (err)
 			goto remove;
 	}
+#endif
 finish:
 	if (!oldcard)
 		host->card = card;
@@ -911,6 +945,11 @@ out:
 static int mmc_sdio_suspend(struct mmc_host *host)
 {
 	int i, err = 0;
+	
+#ifdef CONFIG_WIMAX_CMC
+	if (host->pm_flags & MMC_PM_IGNORE_SUSPEND_RESUME)
+		return err;
+#endif
 
 	for (i = 0; i < host->card->sdio_funcs; i++) {
 		struct sdio_func *func = host->card->sdio_func[i];
@@ -933,8 +972,7 @@ static int mmc_sdio_suspend(struct mmc_host *host)
 		}
 	}
 
-#ifdef CONFIG_MACH_PX
-#else
+#ifndef CONFIG_MACH_PX
 	if (!err && mmc_card_keep_power(host) && mmc_card_wake_sdio_irq(host)) {
 		mmc_claim_host(host);
 		sdio_disable_wide(host->card);
@@ -948,6 +986,11 @@ static int mmc_sdio_suspend(struct mmc_host *host)
 static int mmc_sdio_resume(struct mmc_host *host)
 {
 	int i, err = 0;
+	
+#ifdef CONFIG_WIMAX_CMC
+	if (host->pm_flags & MMC_PM_IGNORE_SUSPEND_RESUME)
+		return err;
+#endif
 
 	BUG_ON(!host);
 	BUG_ON(!host->card);
@@ -1299,3 +1342,66 @@ err:
 	return err;
 }
 EXPORT_SYMBOL(sdio_reset_comm);
+
+#ifdef CONFIG_WIMAX_CMC
+int cmc732_sdio_reset_comm(struct mmc_card *card)
+{
+        struct mmc_host *host = card->host;
+        u32 ocr;
+        int err;
+	printk("%s():\n",__func__);
+	cmc732_sdio_reset(host);
+	err = mmc_send_io_op_cond(host, 0, &ocr);
+        if (err)
+                goto err;
+#if 1//refer to mmc_attach_sdio()
+        if (!host->index)
+                ocr |= 0x00000080; //correct cmc ocr to show support for 1.8v operation
+        host->ocr = mmc_select_voltage(host, ocr);
+        if (!host->index)
+                host->ocr = 0x8000;//lie to cmc card that 2.8v operation selected
+#else
+        host->ocr = mmc_select_voltage(host, ocr);
+#endif
+        if (!host->ocr) {
+                err = -EINVAL;
+                goto err;
+        }
+        err = mmc_send_io_op_cond(host, host->ocr, &ocr);
+        if (err)
+                goto err;
+        if (mmc_host_is_spi(host)) {
+                err = mmc_spi_set_crc(host, use_spi_crc);
+                if (err)
+                goto err;
+        }
+        if (!mmc_host_is_spi(host)) {
+                err = mmc_send_relative_addr(host, &card->rca);
+                if (err)
+                        goto err;
+                mmc_set_bus_mode(host, MMC_BUSMODE_PUSHPULL);
+        }
+        if (!mmc_host_is_spi(host)) {
+                err = mmc_select_card(card);
+                if (err)
+                        goto err;
+        }
+        err = sdio_enable_hs(card);
+        if (err)
+                goto err;
+        if (mmc_card_highspeed(card)) {
+                mmc_set_clock(host, 50000000);
+        } else {
+                mmc_set_clock(host, card->cis.max_dtr);
+        }
+        err = sdio_enable_wide(card);
+        if (err)
+                goto err;
+        return 0;
+err:
+        printk("%s: Error resetting SDIO communications (%d)\n",
+               mmc_hostname(host), err);
+        return err;
+}
+EXPORT_SYMBOL(cmc732_sdio_reset_comm);
+#endif

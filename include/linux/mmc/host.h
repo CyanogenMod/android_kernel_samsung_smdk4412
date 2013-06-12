@@ -266,7 +266,11 @@ struct mmc_host {
 	int			clk_requests;	/* internal reference counter */
 	unsigned int		clk_delay;	/* number of MCI clk hold cycles */
 	bool			clk_gated;	/* clock gated */
+#ifdef CONFIG_WIMAX_CMC
+	struct work_struct	clk_gate_work;	/* delayed clock gate */
+#else
 	struct delayed_work	clk_gate_work; /* delayed clock gate */
+#endif
 	unsigned int		clk_old;	/* old clock value cache */
 	spinlock_t		clk_lock;	/* lock for clk fields */
 	struct mutex		clk_gate_mutex;	/* mutex for clock gating */

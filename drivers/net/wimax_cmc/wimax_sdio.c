@@ -370,58 +370,60 @@ void control_recv(struct net_adapter *adapter, void *buffer, u32 length)
 	mutex_unlock(&adapter->control_lock);
 }
 
-void prepare_skb(struct net_adapter *adapter, struct sk_buff *rx_skb)
+void prepare_skb(struct net_adapter *adapter, struct sk_buff *rx_skb )
 {
-	skb_reserve(rx_skb,
-			(ETHERNET_ADDRESS_LENGTH * 2) +
-			NET_IP_ALIGN);
+        skb_reserve(rx_skb,
+                        (ETHERNET_ADDRESS_LENGTH * 2) +
+                        NET_IP_ALIGN);
 
-	memcpy(skb_push(rx_skb,
-			(ETHERNET_ADDRESS_LENGTH * 2)),
-			adapter->eth_header,
-			(ETHERNET_ADDRESS_LENGTH * 2));
+        memcpy(skb_push(rx_skb,
+                        (ETHERNET_ADDRESS_LENGTH * 2)),
+                        adapter->eth_header,
+                        (ETHERNET_ADDRESS_LENGTH * 2));
 
-	rx_skb->dev = adapter->net;
-	rx_skb->ip_summed = CHECKSUM_UNNECESSARY;
+        rx_skb->dev = adapter->net;
+        rx_skb->ip_summed = CHECKSUM_UNNECESSARY;
 }
 void flush_skb(struct net_adapter *adapter)
 {
-	if (adapter->rx_skb) {
-		dev_kfree_skb(adapter->rx_skb);
-		adapter->rx_skb = NULL;
-	}
+        if (adapter->rx_skb) {
+	        dev_kfree_skb(adapter->rx_skb);
+                adapter->rx_skb = NULL;
+        }
 }
 struct sk_buff *fetch_skb(struct net_adapter *adapter)
 {
-	struct sk_buff *ret_skb;
-	if (adapter->rx_skb) {
-		ret_skb = adapter->rx_skb;
-		adapter->rx_skb = NULL;
-		return ret_skb;
-	}
-	ret_skb = dev_alloc_skb(WIMAX_MTU_SIZE+2+
-			(ETHERNET_ADDRESS_LENGTH * 2) +
-					NET_IP_ALIGN);
-	if (!ret_skb) {
-		pr_debug("unable to allocate skb");
-		return NULL;
-	}
-	prepare_skb(adapter, ret_skb);
-	return ret_skb;
+        struct sk_buff *ret_skb;
+        if (adapter->rx_skb)
+        {
+        	ret_skb = adapter->rx_skb;
+                adapter->rx_skb = NULL;
+                return ret_skb;
+        }
+        ret_skb = dev_alloc_skb(WIMAX_MTU_SIZE+2+
+                                        (ETHERNET_ADDRESS_LENGTH * 2) +
+                                        NET_IP_ALIGN);
+        if (!ret_skb) {
+                                pr_debug("unable to allocate skb");
+                                return NULL;
+        }
+        prepare_skb(adapter, ret_skb);
+        return ret_skb;
 }
 void pull_skb(struct net_adapter *adapter)
 {
-	struct sk_buff *t_skb;
-	if (adapter->rx_skb == NULL) {
-		t_skb = dev_alloc_skb(WIMAX_MTU_SIZE+2+
-				(ETHERNET_ADDRESS_LENGTH * 2) +
-				NET_IP_ALIGN);
-		if (!t_skb) {
-			pr_debug("unable to allocate skb");
-			return;
-		}
-		prepare_skb(adapter, t_skb);
-		adapter->rx_skb = t_skb;
+        struct sk_buff *t_skb;
+        if (adapter->rx_skb == NULL)
+        {
+	        t_skb = dev_alloc_skb(WIMAX_MTU_SIZE+2+
+        		        (ETHERNET_ADDRESS_LENGTH * 2) +
+                                 NET_IP_ALIGN);
+                if (!t_skb) {
+                	pr_debug("unable to allocate skb");
+                        return;
+                }
+                prepare_skb(adapter, t_skb);
+                adapter->rx_skb = t_skb;
 	}
 }
 
@@ -497,8 +499,7 @@ static void adapter_rx_packet(struct net_adapter *adapter)
 					}
 			} else {
 				rx_skb = dev_alloc_skb(hdr->length +
-				      (ETHERNET_ADDRESS_LENGTH * 2) +
-							NET_IP_ALIGN);
+				      (ETHERNET_ADDRESS_LENGTH * 2) + NET_IP_ALIGN);
 				if (!rx_skb) {
 					pr_err("unable to allocate skb");
 					break;
@@ -1087,7 +1088,7 @@ int con0_poll_thread(void *data)
 
 	wake_lock(&g_cfg->wimax_driver_lock);
 
-	while ((g_cfg->power_state != CMC_POWERING_OFF) &&
+	while ((g_cfg->power_state != CMC_POWERING_OFF) && 
 					(g_cfg->power_state != CMC_POWER_OFF)) {
 		curr_val = adapter->pdata->is_modem_awake();
 		if ((prev_val && (!curr_val)) || (!curr_val)) {
@@ -1096,9 +1097,8 @@ int con0_poll_thread(void *data)
 		}
 		prev_val = curr_val;
 		wait_event_interruptible_timeout(adapter->con0_poll,
-				(g_cfg->power_state == CMC_POWERING_OFF) ||
-				(g_cfg->power_state == CMC_POWER_OFF),
-				msecs_to_jiffies(40));
+				(g_cfg->power_state == CMC_POWERING_OFF) || 
+					(g_cfg->power_state == CMC_POWER_OFF), msecs_to_jiffies(40));
 	}
 	wake_unlock(&g_cfg->wimax_driver_lock);
 	do_exit(0);
@@ -1227,9 +1227,8 @@ static int wimax_power_on(struct wimax732_platform_data *pdata)
 	init_waitqueue_head(&adapter->modem_resp_event);
 	count = 0;
 
-	while (!adapter->modem_resp) {
-		/*This command will start the
-		firmware download sequence through sdio*/
+	while(!adapter->modem_resp) {
+		/*This command will start the firmware download sequence through sdio*/
 		send_cmd_packet(adapter, MSG_DRIVER_OK_REQ);
 		ret = wait_event_interruptible_timeout(
 				adapter->modem_resp_event,
@@ -1282,7 +1281,7 @@ static int wimax_power_on(struct wimax732_platform_data *pdata)
 				goto mac_request_fail;
 			ret = wait_for_completion_interruptible_timeout(
 					&adapter->mac,
-			msecs_to_jiffies((MAC_RETRY_COUNT - count) *
+					msecs_to_jiffies((MAC_RETRY_COUNT - count) * 
 					MAC_RETRY_INTERVAL));
 			if (ret == -ERESTARTSYS) {
 				pr_err("-ERESTARTSYS MAC request fail");
@@ -1297,7 +1296,7 @@ static int wimax_power_on(struct wimax732_platform_data *pdata)
 		adapter->wtm_task = kthread_create(con0_poll_thread,
 				adapter, "%s", "wimax_con0_poll_thread");
 		if (adapter->wtm_task)
-			wake_up_process(adapter->wtm_task);
+		wake_up_process(adapter->wtm_task);
 	}
 #endif
 	adapter->uwibro_dev.minor = MISC_DYNAMIC_MINOR;
@@ -1436,8 +1435,9 @@ static int wimax_power_off(struct wimax732_platform_data *pdata)
 	adapter = (struct net_adapter	*) pdata->adapter_data;
 	g_cfg->power_state = CMC_POWERING_OFF;
 #ifdef WIMAX_CON0_POLL
-	if (g_cfg->wimax_mode == WTM_MODE)
+	if (g_cfg->wimax_mode == WTM_MODE) {
 		wake_up_interruptible(&adapter->con0_poll);
+	}
 #endif
 
 	cmc732_release_wake_irq(adapter);
@@ -1565,14 +1565,14 @@ static long swmxdev_ioctl(struct file *file, u32 cmd,
 		ret = eeprom_write_rev();
 		break;
 	}
-	case CONTROL_IOCTL_WIMAX_CHECK_CERT: {
+    case CONTROL_IOCTL_WIMAX_CHECK_CERT: {
 		pr_debug("CONTROL_IOCTL_WIMAX_CHECK_CERT");
 		wimax_power_off(gpdata);
 		ret = eeprom_check_cert();
 		break;
 	}
 	case CONTROL_IOCTL_WIMAX_CHECK_CAL: {
-	pr_debug("CONTROL_IOCTL_WIMAX_CHECK_CAL");
+    	pr_debug("CONTROL_IOCTL_WIMAX_CHECK_CAL");
 		wimax_power_off(gpdata);
 		ret = eeprom_check_cal();
 		break;

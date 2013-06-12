@@ -81,4 +81,6 @@ extern void idma_init(void *regs);
 /* These functions are used for srp driver. */
 extern int idma_irq_callback(void);
 extern void idma_stop(void);
+extern int idma_is_running(void);
+
 #endif /* __S3C_IDMA_H_ */

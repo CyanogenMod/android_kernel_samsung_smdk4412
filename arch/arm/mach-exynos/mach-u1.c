@@ -395,6 +395,9 @@ static int m5mo_power_on(void)
 
 	/* VT_CORE_1.5V */
 	ret = gpio_direction_output(GPIO_VT_CAM_15V, 1);
+#ifdef CONFIG_TARGET_LOCALE_NA
+	s3c_gpio_setpull(GPIO_VT_CAM_15V, S3C_GPIO_PULL_NONE);
+#endif /* CONFIG_TARGET_LOCALE_NA */
 	CAM_CHECK_ERR_RET(ret, "output VT_CAM_1.5V");
 	udelay(20);
 
@@ -836,12 +839,26 @@ static int m5mo_power(int enable)
 
 	printk(KERN_DEBUG "%s %s\n", __func__, enable ? "on" : "down");
 	if (enable) {
+#if defined(CONFIG_TARGET_LOCALE_NA)
+		exynos_cpufreq_lock(DVFS_LOCK_ID_CAM, 1);
 		ret = m5mo_power_on();
+		exynos_cpufreq_lock_free(DVFS_LOCK_ID_CAM);
+#else
+
+		ret = m5mo_power_on();
+#endif
 		if (unlikely(ret))
 			goto error_out;
-	} else
+	} else {
+#if defined(CONFIG_TARGET_LOCALE_NA)
+		exynos_cpufreq_lock(DVFS_LOCK_ID_CAM, 1);
 		ret = m5mo_power_down();
+		exynos_cpufreq_lock_free(DVFS_LOCK_ID_CAM);
+#else
 
+		ret = m5mo_power_down();
+#endif
+	}
 	ret = s3c_csis_power(enable);
 	m5mo_flash_power(enable);
 
@@ -3943,6 +3960,10 @@ static void u1_sound_init(void)
 		return;
 	}
 	gpio_direction_output(GPIO_MIC_BIAS_EN, 1);
+#ifdef CONFIG_TARGET_LOCALE_NA
+	s3c_gpio_setpull(GPIO_MIC_BIAS_EN, S3C_GPIO_PULL_NONE);
+#endif /* CONFIG_TARGET_LOCALE_NA */
+
 	gpio_set_value(GPIO_MIC_BIAS_EN, 0);
 	gpio_free(GPIO_MIC_BIAS_EN);
 
@@ -3952,6 +3973,10 @@ static void u1_sound_init(void)
 		return;
 	}
 	gpio_direction_output(GPIO_EAR_MIC_BIAS_EN, 1);
+#ifdef CONFIG_TARGET_LOCALE_NA
+	s3c_gpio_setpull(GPIO_EAR_MIC_BIAS_EN, S3C_GPIO_PULL_NONE);
+#endif /* CONFIG_TARGET_LOCALE_NA */
+
 	gpio_set_value(GPIO_EAR_MIC_BIAS_EN, 0);
 	gpio_free(GPIO_EAR_MIC_BIAS_EN);
 
@@ -3973,6 +3998,10 @@ static void u1_sound_init(void)
 			return;
 		}
 		gpio_direction_output(GPIO_SUB_MIC_BIAS_EN, 0);
+#ifdef CONFIG_TARGET_LOCALE_NA
+		s3c_gpio_setpull(GPIO_SUB_MIC_BIAS_EN, S3C_GPIO_PULL_NONE);
+#endif /* CONFIG_TARGET_LOCALE_NA */
+
 		gpio_free(GPIO_SUB_MIC_BIAS_EN);
 	}
 #endif /* #if defined(CONFIG_MACH_Q1_BD) */
@@ -4575,6 +4604,94 @@ static struct sec_bat_adc_table_data temper_table_ADC7[] =  {
 	{ 1669,	 -60 },
 	{ 1688,	 -70 },
 };
+#endif
+/* temperature table for ADC 7 */
+#ifdef CONFIG_TARGET_LOCALE_NA
+static struct sec_bat_adc_table_data  temper_table_ADC7[] =  {
+	{  145,  670 },
+	{  165,  660 },
+	{  185,  650 },
+	{  205,  640 },
+	{  225,  630 },
+	{  245,  620 },
+	{  265,  610 },
+	{  285,  600 },
+	{  305,  590 },
+	{  325,  580 },
+	{  345,  570 },
+	{  365,  560 },
+	{  385,  550 },
+	{  405,  540 },
+	{  425,  530 },
+	{  445,  520 },
+	{  465,  510 },
+	{  485,  500 },
+	{  505,  490 },
+	{  525,  480 },
+	{  545,  470 },
+	{  565,  460 },
+	{  585,  450 },
+	{  605,  440 },
+	{  625,  430 },
+	{  645,  420 },
+	{  665,  410 },
+	{  685,  400 },
+	{  705,  390 },
+	{  725,  380 },
+	{  745,  370 },
+	{  765,  360 },
+	{  785,  350 },
+	{  805,  340 },
+	{  825,  330 },
+	{  845,  320 },
+	{  865,  310 },
+	{  885,  300 },
+	{  905,  290 },
+	{  925,  280 },
+	{  945,  270 },
+	{  965,  260 },
+	{  995,  250 },
+	{ 1015,  240 },
+	{ 1045,  230 },
+	{ 1065,  220 },
+	{ 1085,  210 },
+	{ 1105,  200 },
+	{ 1125,  190 },
+	{ 1145,  180 },
+	{ 1165,  170 },
+	{ 1185,  160 },
+	{ 1205,  150 },
+	{ 1225,  140 },
+	{ 1245,  130 },
+	{ 1265,  120 },
+	{ 1285,  110 },
+	{ 1305,  100 },
+	{ 1335,   90 },
+	{ 1365,   80 },
+	{ 1395,   70 },
+	{ 1425,   60 },
+	{ 1455,   50 },
+	{ 1475,   40 },
+	{ 1495,   30 },
+	{ 1515,   20 },
+	{ 1535,   10 },
+	{ 1545,    0 },
+	{ 1555,  -10 },
+	{ 1565,  -20 },
+	{ 1575,  -30 },
+	{ 1585,  -40 },
+	{ 1595,  -50 },
+	{ 1605,  -60 },
+	{ 1615,  -70 },
+	{ 1625,  -80 },
+	{ 1635,  -90 },
+	{ 1645,  -100 },
+	{ 1655,  -110 },
+	{ 1665,  -120 },
+	{ 1675,  -130 },
+	{ 1685,  -140 },
+};
+
 #else
 /* temperature table for ADC 7 */
 static struct sec_bat_adc_table_data temper_table_ADC7[] = {
@@ -5186,7 +5303,7 @@ static struct sec_jack_buttons_zone sec_jack_buttons_zones[] = {
 		/* 0 <= adc <=170, stable zone */
 		.code = KEY_MEDIA,
 		.adc_low = 0,
-#if defined(CONFIG_TARGET_LOCALE_NTT)
+#if defined(CONFIG_TARGET_LOCALE_NTT) || defined(CONFIG_TARGET_LOCALE_NA)
 		.adc_high = 150,
 #else
 		.adc_high = 170,
@@ -5195,7 +5312,7 @@ static struct sec_jack_buttons_zone sec_jack_buttons_zones[] = {
 	{
 		/* 171 <= adc <= 370, stable zone */
 		.code = KEY_VOLUMEUP,
-#if defined(CONFIG_TARGET_LOCALE_NTT)
+#if defined(CONFIG_TARGET_LOCALE_NTT) || defined(CONFIG_TARGET_LOCALE_NA)
 		.adc_low = 151,
 #else
 		.adc_low = 171,
@@ -5460,7 +5577,11 @@ static const u8 *mxt224_config[] = {
 #define MXT224E_THRESHOLD_BATT		40
 #define MXT224E_T48_THRESHOLD_BATT		28
 #define MXT224E_THRESHOLD_CHRG		37
+#if defined(CONFIG_MACH_U1_NA_SPR)
+#define MXT224E_CALCFG_BATT		0x72
+#else
 #define MXT224E_CALCFG_BATT		0x42
+#endif
 #define MXT224E_CALCFG_CHRG		0x52
 #if defined(CONFIG_TARGET_LOCALE_NA)
 #define MXT224E_ATCHFRCCALTHR_NORMAL		45
@@ -7167,8 +7288,9 @@ static struct platform_device *smdkc210_devices[] __initdata = {
 	&exynos4_device_pd[PD_LCD1],
 	&exynos4_device_pd[PD_CAM],
 	&exynos4_device_pd[PD_TV],
+#ifndef CONFIG_TARGET_LOCALE_NA
 	&exynos4_device_pd[PD_GPS],
-
+#endif /* CONFIG_TARGET_LOCALE_NA */
 #if defined(CONFIG_WIMAX_CMC)
 	&s3c_device_cmc732,
 #endif

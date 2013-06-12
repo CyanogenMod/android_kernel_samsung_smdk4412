@@ -341,10 +341,12 @@ static int check_usb_op(void)
 #endif
 }
 
-#ifdef CONFIG_SND_SAMSUNG_RP
-#if defined(CONFIG_MACH_U1_NA_SPR)
+#if defined (CONFIG_MACH_U1_NA_SPR) || (CONFIG_MACH_U1_NA_USCC)
 #include "../../../sound/soc/samsung/srp-types.h"
+#include "../../../sound/soc/samsung/idma.h"
 #endif
+
+#ifdef CONFIG_SND_SAMSUNG_RP
 extern int srp_get_op_level(void);	/* By srp driver */
 #endif
 
@@ -370,14 +372,30 @@ static inline int check_gps_uart_op(void)
 	return gps_is_running;
 }
 
-#ifdef CONFIG_INTERNAL_MODEM_IF
+#if defined(CONFIG_INTERNAL_MODEM_IF) || defined(CONFIG_SAMSUNG_PHONE_TTY)
 static int check_idpram_op(void)
 {
 	/* This pin is high when CP might be accessing dpram */
+#ifdef CONFIG_MACH_U1_NA_SPR
+	int cp_int = __raw_readl(S5P_VA_GPIO2 + 0xC24) & 4;
+#else
 	int cp_int = gpio_get_value(GPIO_CP_AP_DPRAM_INT);
+#endif
 	if (cp_int != 0)
 		pr_info("%s cp_int is high.\n", __func__);
 	return cp_int;
+}
+#endif
+
+#if defined(CONFIG_ISDBT)
+static int check_isdbt_op(void)
+{
+	/* This pin is high when isdbt is working */
+	int isdbt_is_running = gpio_get_value(GPIO_ISDBT_EN);
+
+	if (isdbt_is_running != 0)
+		printk(KERN_INFO "isdbt_is_running is high\n");
+	return isdbt_is_running;
 }
 #endif
 
@@ -410,21 +428,28 @@ static int exynos4_check_operation(void)
 #ifdef CONFIG_SND_SAMSUNG_RP
 	if (srp_get_op_level())
 		return 1;
-#if defined(CONFIG_MACH_U1_NA_SPR)
+#endif
+
+#if defined (CONFIG_MACH_U1_NA_SPR) || (CONFIG_MACH_U1_NA_USCC)
+#ifdef CONFIG_SND_SAMSUNG_RP
 	if (!srp_get_status(IS_RUNNING))
+		return 1;
+#elif defined(CONFIG_SND_SAMSUNG_ALP)
+	if (!idma_is_running())
 		return 1;
 #endif
 #endif
+
 	if (check_usb_op())
 		return 1;
 
-#if defined(CONFIG_BT)
-	if (check_bt_op())
+#if defined(CONFIG_ISDBT)
+	if (check_isdbt_op())
 		return 1;
 #endif
 
-#ifdef CONFIG_INTERNAL_MODEM_IF
-	if (check_idpram_op())
+#if defined(CONFIG_BT)
+	if (check_bt_op())
 		return 1;
 #endif
 
@@ -439,6 +464,10 @@ static int exynos4_check_operation(void)
 		return 1;
 	}
 
+#ifdef CONFIG_INTERNAL_MODEM_IF
+	if (check_idpram_op())
+		return 1;
+#endif
 	return 0;
 }
 
@@ -634,7 +663,7 @@ static int exynos4_enter_core0_lpa(struct cpuidle_device *dev,
 #endif
 	local_irq_disable();
 
-#ifdef CONFIG_INTERNAL_MODEM_IF
+#if defined(CONFIG_INTERNAL_MODEM_IF) || defined(CONFIG_SAMSUNG_PHONE_TTY)
 	gpio_set_value(GPIO_PDA_ACTIVE, 0);
 #endif
 
@@ -730,7 +759,7 @@ early_wakeup:
 
 	if (log_en)
 		pr_info("---lpa\n");
-#ifdef CONFIG_INTERNAL_MODEM_IF
+#if defined(CONFIG_INTERNAL_MODEM_IF) || defined(CONFIG_SAMSUNG_PHONE_TTY)
 	gpio_set_value(GPIO_PDA_ACTIVE, 1);
 #endif
 

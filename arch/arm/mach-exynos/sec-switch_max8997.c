@@ -128,6 +128,64 @@ static ssize_t u1_switch_store_vbus(struct device *dev,
 DEVICE_ATTR(disable_vbus, 0664, u1_switch_show_vbus,
 	    u1_switch_store_vbus);
 
+#if defined(CONFIG_TARGET_LOCALE_NA)
+#define USB_PATH_AP	0
+#define USB_PATH_CP	1
+#define USB_PATH_ALL	2
+static int hub_usb_path;
+
+int u1_get_usb_hub_path(void)
+{
+	return hub_usb_path;
+}
+EXPORT_SYMBOL_GPL(u1_get_usb_hub_path);
+
+static ssize_t u1_switch_show_usb_path(struct device *dev,
+		struct device_attribute *attr, char *buf)
+{
+	int i;
+
+	switch (hub_usb_path) {
+	case USB_PATH_AP:
+		i = sprintf(buf, "USB_PATH: AP\n");
+		break;
+	case USB_PATH_CP:
+		i = sprintf(buf, "USB_PATH: CP\n");
+		break;
+	case USB_PATH_ALL:
+		i = sprintf(buf, "USB_PATH: ALL\n");
+		break;
+	default:
+		i = sprintf(buf, "USB_PATH: Unknown!\n");
+		break;
+	}
+
+	return i;
+}
+
+static ssize_t u1_switch_store_usb_path(struct device *dev,
+				    struct device_attribute *attr,
+				    const char *buf, size_t count)
+{
+	if (!strncmp(buf, "AP", 2))
+		hub_usb_path = USB_PATH_AP;
+	else if (!strncmp(buf, "CP", 2))
+		hub_usb_path = USB_PATH_CP;
+	else if (!strncmp(buf, "ALL", 3))
+		hub_usb_path = USB_PATH_ALL;
+	else {
+		pr_warn("%s: Wrong command\n", __func__);
+		return count;
+	}
+	pr_info("%s: USB PATH = %d\n", __func__, hub_usb_path);
+
+	return count;
+}
+
+static DEVICE_ATTR(set_usb_path, 0664, u1_switch_show_usb_path,
+		   u1_switch_store_usb_path);
+#endif /* CONFIG_TARGET_LOCALE_NA */
+
 #ifdef CONFIG_TARGET_LOCALE_KOR
 #include "../../../drivers/usb/gadget/s3c_udc.h"
 /* usb access control for SEC DM */

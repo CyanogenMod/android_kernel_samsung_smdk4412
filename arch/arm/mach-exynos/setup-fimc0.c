@@ -38,7 +38,7 @@ void s3c_fimc0_cfg_gpio(struct platform_device *pdev)
 		* FIELD */
 		s3c_gpio_cfgrange_nopull(EXYNOS4210_GPJ1(0), 5,
 					S3C_GPIO_SFN(2));
-#if !defined(CONFIG_MACH_P8LTE) || !defined(CONFIG_VIDEO_S5K5BBGX)
+#if !defined(CONFIG_MACH_P8LTE) && !defined(CONFIG_VIDEO_S5K5BBGX)
 		/* CAM B port(b0011) : DATA[0-7] */
 		s3c_gpio_cfgrange_nopull(EXYNOS4210_GPE1(0), 8,
 					S3C_GPIO_SFN(3));
@@ -74,7 +74,7 @@ void s3c_fimc0_cfg_gpio(struct platform_device *pdev)
 	s3c_gpio_cfgpin(EXYNOS4210_GPJ1(3), S3C_GPIO_INPUT);
 	s3c_gpio_setpull(EXYNOS4210_GPJ1(3), S3C_GPIO_PULL_DOWN);
 
-#if !defined(CONFIG_MACH_P8LTE)
+#if !defined(CONFIG_MACH_P8LTE) && !defined(CONFIG_MACH_U1_NA_SPR)
 	/* CAM B port(b0011) : DATA[0-7] */
 	s3c_gpio_cfgrange_nopull(EXYNOS4210_GPE1(0), 8, S3C_GPIO_SFN(3));
 	/* CAM B port(b0011) : PCLK, VSYNC, HREF, FIELD, CLKOUT */
