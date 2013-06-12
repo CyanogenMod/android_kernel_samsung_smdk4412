@@ -53,6 +53,7 @@ static DEFINE_IDR(mmc_host_idr);
 static DEFINE_SPINLOCK(mmc_host_lock);
 
 #ifdef CONFIG_MMC_CLKGATE
+#ifndef CONFIG_WIMAX_CMC
 static ssize_t clkgate_delay_show(struct device *dev,
 		struct device_attribute *attr, char *buf)
 {
@@ -74,6 +75,7 @@ static ssize_t clkgate_delay_store(struct device *dev,
 	spin_unlock_irqrestore(&host->clk_lock, flags);
 	return count;
 }
+#endif
 /*
  * Enabling clock gating will make the core call out to the host
  * once up and once down when it performs a request or card operation
@@ -108,10 +110,14 @@ static void mmc_host_clk_gate_delayed(struct mmc_host *host)
 	if (!host->clk_requests) {
 		spin_unlock_irqrestore(&host->clk_lock, flags);
 		/* wait only when clk_gate_delay is 0 */
+#ifdef CONFIG_WIMAX_CMC
 		if (!host->clkgate_delay) {
+#endif
 			tick_ns = DIV_ROUND_UP(1000000000, freq);
 			ndelay(host->clk_delay * tick_ns);
+#ifdef CONFIG_WIMAX_CMC
 		}
+#endif
 	} else {
 		/* New users appeared while waiting for this work */
 		spin_unlock_irqrestore(&host->clk_lock, flags);
@@ -135,9 +141,13 @@ static void mmc_host_clk_gate_delayed(struct mmc_host *host)
  */
 static void mmc_host_clk_gate_work(struct work_struct *work)
 {
+#ifdef CONFIG_WIMAX_CMC
+	struct mmc_host *host = container_of(work, struct mmc_host,
+					      clk_gate_work);
+#else
 	struct mmc_host *host = container_of(work, struct mmc_host,
 					      clk_gate_work.work);
-
+#endif
 	mmc_host_clk_gate_delayed(host);
 }
 
@@ -152,9 +162,10 @@ static void mmc_host_clk_gate_work(struct work_struct *work)
 void mmc_host_clk_hold(struct mmc_host *host)
 {
 	unsigned long flags;
-
+#ifndef CONFIG_WIMAX_CMC
 	/* cancel any clock gating work scheduled by mmc_host_clk_release() */
 	cancel_delayed_work_sync(&host->clk_gate_work);
+#endif
 	mutex_lock(&host->clk_gate_mutex);
 	spin_lock_irqsave(&host->clk_lock, flags);
 	if (host->clk_gated) {
@@ -204,9 +215,12 @@ void mmc_host_clk_release(struct mmc_host *host)
 	host->clk_requests--;
 	if (mmc_host_may_gate_card(host->card) &&
 	    !host->clk_requests)
+#ifdef CONFIG_WIMAX_CMC
+		queue_work(system_nrt_wq, &host->clk_gate_work);
+#else
 		queue_delayed_work(system_nrt_wq, &host->clk_gate_work,
 				msecs_to_jiffies(host->clkgate_delay));
-
+#endif
 	spin_unlock_irqrestore(&host->clk_lock, flags);
 }
 
@@ -239,13 +253,19 @@ static inline void mmc_host_clk_init(struct mmc_host *host)
 	host->clk_requests = 0;
 	/* Hold MCI clock for 8 cycles by default */
 	host->clk_delay = 8;
+#ifndef CONFIG_WIMAX_CMC
 	/*
 	 * Default clock gating delay is 0ms to avoid wasting power.
 	 * This value can be tuned by writing into sysfs entry.
 	 */
 	host->clkgate_delay = 3;
+#endif
 	host->clk_gated = false;
+#ifdef CONFIG_WIMAX_CMC
+	INIT_WORK(&host->clk_gate_work, mmc_host_clk_gate_work);
+#else
 	INIT_DELAYED_WORK(&host->clk_gate_work, mmc_host_clk_gate_work);
+#endif
 	spin_lock_init(&host->clk_lock);
 	mutex_init(&host->clk_gate_mutex);
 }
@@ -260,14 +280,18 @@ static inline void mmc_host_clk_exit(struct mmc_host *host)
 	 * Wait for any outstanding gate and then make sure we're
 	 * ungated before exiting.
 	 */
+#ifdef CONFIG_WIMAX_CMC
+	if (cancel_work_sync(&host->clk_gate_work))
+#else
 	if (cancel_delayed_work_sync(&host->clk_gate_work))
+#endif
 		mmc_host_clk_gate_delayed(host);
 	if (host->clk_gated)
 		mmc_host_clk_hold(host);
 	/* There should be only one user now */
 	WARN_ON(host->clk_requests > 1);
 }
-
+#ifndef CONFIG_WIMAX_CMC
 static inline void mmc_host_clk_sysfs_init(struct mmc_host *host)
 {
 	host->clkgate_delay_attr.show = clkgate_delay_show;
@@ -279,7 +303,7 @@ static inline void mmc_host_clk_sysfs_init(struct mmc_host *host)
 		pr_err("%s: Failed to create clkgate_delay sysfs entry\n",
 				mmc_hostname(host));
 }
-
+#endif
 #else
 
 static inline void mmc_host_clk_init(struct mmc_host *host)
@@ -384,7 +408,9 @@ int mmc_add_host(struct mmc_host *host)
 	mmc_add_host_debugfs(host);
 #endif
 
+#ifndef CONFIG_WIMAX_CMC
 	mmc_host_clk_sysfs_init(host);
+#endif
 
 	mmc_start_host(host);
 	if (!(host->pm_flags & MMC_PM_IGNORE_PM_NOTIFY))

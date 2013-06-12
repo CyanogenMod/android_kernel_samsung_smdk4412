@@ -788,7 +788,11 @@ int mmc_send_hpi_cmd(struct mmc_card *card, u32 *status)
 
 	opcode = card->ext_csd.hpi_cmd;
 	if (opcode == MMC_STOP_TRANSMISSION)
+#ifdef CONFIG_WIMAX_CMC
+		cmd.flags = MMC_RSP_R1 | MMC_CMD_AC;
+#else
 		cmd.flags = MMC_RSP_R1B | MMC_CMD_AC;
+#endif
 	else if (opcode == MMC_SEND_STATUS)
 		cmd.flags = MMC_RSP_R1 | MMC_CMD_AC;
 

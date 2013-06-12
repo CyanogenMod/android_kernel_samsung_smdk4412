@@ -8,6 +8,9 @@
 
 /* charger cable state */
 extern bool is_cable_attached;
+#ifdef CONFIG_MACH_U1_NA_SPR
+static void cdma_wimax_chk_modem_pwroff(void);
+#endif
 static void sec_power_off(void)
 {
 	int poweroff_try = 0;
@@ -17,6 +20,9 @@ static void sec_power_off(void)
 	pr_emerg("%s : cable state=%d\n", __func__, is_cable_attached);
 
 	while (1) {
+#ifdef CONFIG_MACH_U1_NA_SPR
+		cdma_wimax_chk_modem_pwroff();
+#endif
 		/* Check reboot charging */
 		if (is_cable_attached || (poweroff_try >= 5)) {
 			pr_emerg
@@ -70,6 +76,34 @@ static void sec_power_off(void)
 #define REBOOT_SET_SWSEL	0x000e0000
 #define REBOOT_SET_SUD		0x000f0000
 
+#ifdef CONFIG_MACH_U1_NA_SPR
+static void cdma_wimax_chk_modem_pwroff(void)
+{
+	int phone_wait_cnt = 0;
+
+	pr_emerg("%s\n", __func__);
+
+	/* phone power off */
+	gpio_direction_output(GPIO_QSC_PHONE_ON, GPIO_LEVEL_LOW);
+
+	/*  confirm phone off */
+	while (1) {
+		if (gpio_get_value(GPIO_QSC_PHONE_ACTIVE)) {
+			printk(KERN_ALERT"Try to Turn Phone Off by CP_RST\n");
+			gpio_set_value(GPIO_QSC_PHONE_RST, 0);
+			if (phone_wait_cnt > 10) {
+				pr_emerg("%s: PHONE OFF Failed\n", __func__);
+				break;
+			}
+			phone_wait_cnt++;
+			mdelay(100);
+		} else {
+			pr_emerg("%s: PHONE OFF Success\n", __func__);
+			break;
+		}
+	}
+}
+#endif
 static void sec_reboot(char str, const char *cmd)
 {
 	local_irq_disable();

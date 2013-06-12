@@ -44,6 +44,7 @@ enum {
 	POWER_SUPPLY_CHARGE_TYPE_NONE,
 	POWER_SUPPLY_CHARGE_TYPE_TRICKLE,
 	POWER_SUPPLY_CHARGE_TYPE_FAST,
+	POWER_SUPPLY_CHARGE_TYPE_SLOW,
 };
 
 enum {
@@ -128,17 +129,19 @@ enum power_supply_property {
 };
 
 enum power_supply_type {
-	POWER_SUPPLY_TYPE_BATTERY = 0,
+	POWER_SUPPLY_TYPE_UNKNOWN = 0,
+	POWER_SUPPLY_TYPE_BATTERY,
 	POWER_SUPPLY_TYPE_UPS,
 	POWER_SUPPLY_TYPE_MAINS,
 	POWER_SUPPLY_TYPE_USB,		/* Standard Downstream Port */
 	POWER_SUPPLY_TYPE_USB_DCP,	/* Dedicated Charging Port */
 	POWER_SUPPLY_TYPE_USB_CDP,	/* Charging Downstream Port */
 	POWER_SUPPLY_TYPE_USB_ACA,	/* Accessory Charger Adapters */
-	POWER_SUPPLY_TYPE_OTG,
 	POWER_SUPPLY_TYPE_DOCK,
 	POWER_SUPPLY_TYPE_MISC,
 	POWER_SUPPLY_TYPE_WIRELESS,
+	POWER_SUPPLY_TYPE_UARTOFF,
+	POWER_SUPPLY_TYPE_OTG,
 };
 
 enum {
@@ -255,6 +258,9 @@ extern struct power_supply *power_supply_get_by_name(char *name);
 extern void power_supply_changed(struct power_supply *psy);
 extern int power_supply_am_i_supplied(struct power_supply *psy);
 extern int power_supply_set_battery_charged(struct power_supply *psy);
+extern int power_supply_set_current_limit(struct power_supply *psy, int limit);
+extern int power_supply_set_online(struct power_supply *psy, bool enable);
+extern int power_supply_set_charge_type(struct power_supply *psy, int type);
 
 #if defined(CONFIG_POWER_SUPPLY) || defined(CONFIG_POWER_SUPPLY_MODULE)
 extern int power_supply_is_system_supplied(void);

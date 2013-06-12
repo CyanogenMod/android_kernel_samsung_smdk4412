@@ -89,6 +89,9 @@ struct s3c_sdhci_platdata {
 			    void __iomem *regbase,
 			    struct mmc_ios *ios,
 			    struct mmc_card *card);
+#ifdef CONFIG_WIMAX_CMC
+	int enable_intr_on_resume;
+#endif
 #ifdef CONFIG_MACH_PX
 	int (*ext_pdev)(struct platform_device *dev_id);
 #endif

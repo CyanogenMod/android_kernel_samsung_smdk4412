@@ -139,6 +139,7 @@ obj-$(CONFIG_ACCESSORY)		+= accessory/
 obj-$(CONFIG_IR_REMOCON)	+= irda/
 obj-$(CONFIG_BARCODE_EMUL)	+= barcode_emul/
 obj-$(CONFIG_EXTCON)		+= extcon/
+obj-$(CONFIG_SAMSUNG_PHONE_TTY)	+= dpram/
 # Secure OS Mobicore
 obj-$(CONFIG_MOBICORE_SUPPORT)	+= gud/
 

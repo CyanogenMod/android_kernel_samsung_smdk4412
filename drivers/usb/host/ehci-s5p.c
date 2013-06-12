@@ -375,6 +375,8 @@ static int s5p_ehci_runtime_resume(struct device *dev)
 		usb_root_hub_lost_power(hcd->self.root_hub);
 
 		ehci_writel(ehci, FLAG_CF, &ehci->regs->configured_flag);
+		ehci_writel(ehci, INTR_MASK, &ehci->regs->intr_enable);
+		(void)ehci_readl(ehci, &ehci->regs->intr_enable);
 
 		/* here we "know" root ports should always stay powered */
 		ehci_port_power(ehci, 1);

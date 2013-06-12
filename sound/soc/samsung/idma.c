@@ -523,6 +523,14 @@ void idma_init(void *regs)
 #endif
 }
 
+#ifdef CONFIG_SND_SAMSUNG_ALP
+int idma_is_running(void)
+{
+	return (idma.trigger_stat == LPAM_DMA_START) ? 1 : 0;
+}
+EXPORT_SYMBOL(idma_is_running);
+#endif
+
 #ifdef CONFIG_SND_SAMSUNG_RP
 int idma_irq_callback(void)
 {

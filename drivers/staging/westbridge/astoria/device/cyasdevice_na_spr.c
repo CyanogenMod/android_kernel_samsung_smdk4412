@@ -442,10 +442,40 @@ static ssize_t store_cyas_wbcid(struct device *dev,
 static DEVICE_ATTR(wbcid, S_IRUGO | S_IWUSR, show_cyas_wbcid, store_cyas_wbcid);
 
 #endif
+
+extern struct class *sec_class;
+static struct device *sd_detection_cmd_dev;
+static ssize_t sd_detection_cmd_show(struct device *dev,
+			struct device_attribute *attr, char *buf)
+{
+	unsigned int detect;
+	detect = cy_as_hal_detect_SD();
+	pr_info("%s : detect = %d.\n", __func__,  detect);
+	if (detect) {
+		pr_debug("sdhci: card inserted.\n");
+		return sprintf(buf, "Insert\n");
+	} else {
+		pr_debug("sdhci: card removed.\n");
+		return sprintf(buf, "Remove\n");
+	}
+}
+
+static DEVICE_ATTR(status, 0444, sd_detection_cmd_show, NULL);
 static struct platform_device *westbridge_pd;
 
 static int __devinit wb_probe(struct platform_device *devptr)
 {
+	if (sd_detection_cmd_dev == NULL) {
+		sd_detection_cmd_dev =
+			device_create(sec_class, NULL, 0,
+						NULL, "sdcard");
+	if (IS_ERR(sd_detection_cmd_dev))
+		pr_err("Fail to create sysfs dev\n");
+
+	if (device_create_file(sd_detection_cmd_dev,
+				&dev_attr_status) < 0)
+	pr_err("Fail to create sysfs file\n");
+	}
 	cy_as_hal_print_message("%s called\n", __func__);
 	return 0;
 }

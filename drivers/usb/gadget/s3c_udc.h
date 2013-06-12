@@ -92,7 +92,7 @@
  */
 
 typedef enum ep_type {
-	ep_control, ep_bulk_in, ep_bulk_out, ep_interrupt
+	ep_control, ep_bulk_in, ep_bulk_out, ep_interrupt, ep_iso_in
 } ep_type_t;
 
 struct s3c_ep {

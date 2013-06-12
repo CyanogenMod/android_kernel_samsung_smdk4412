@@ -5,6 +5,7 @@
  */
 #ifndef __WIMAX_I2C_H__
 #define __WIMAX_I2C_H__
+//#define DRIVER_BIT_BANG
 #include <linux/mutex.h>
 #define WIMAX_BOOTIMAGE_PATH	"/system/etc/wimax_boot.bin"
 

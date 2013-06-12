@@ -528,6 +528,12 @@ config LEDS_TRIGGER_SLEEP
 	help
 	  This turns LEDs on when the screen is off but the cpu still running.
 
+config LEDS_TRIGGER_NOTIFICATION
+	tristate "Notification LED Trigger"
+	help
+	  This allows LEDS to be controlled as a notification device.
+	  If unsure, say Y.
+
 comment "iptables trigger is under Netfilter config (LED target)"
 	depends on LEDS_TRIGGERS
 

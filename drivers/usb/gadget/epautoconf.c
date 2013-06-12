@@ -345,6 +345,11 @@ struct usb_ep *usb_ep_autoconfig (
 #endif
 			if (ep && ep_matches (gadget, ep, desc))
 				return ep;
+		} else if (USB_ENDPOINT_XFER_ISOC == type
+				&& (USB_DIR_IN & desc->bEndpointAddress)) {
+			ep = find_ep(gadget, "ep15-iso");
+			if (ep && ep_matches(gadget, ep, desc))
+				return ep;
 		}
 	}
 

@@ -608,6 +608,11 @@ static int __devinit sdhci_s3c_probe(struct platform_device *pdev)
 	 * transfers, not sure if this is a problem with this specific
 	 * SDHCI block, or a missing configuration that needs to be set. */
 	host->quirks |= SDHCI_QUIRK_NO_BUSY_IRQ;
+	
+#ifdef CONFIG_WIMAX_CMC
+	/* This host supports the Auto CMD12 */
+	host->quirks |= SDHCI_QUIRK_MULTIBLOCK_READ_ACMD12;
+#endif
 
 	if (pdata->cd_type == S3C_SDHCI_CD_NONE)
 		host->quirks |= SDHCI_QUIRK_BROKEN_CARD_DETECTION;
@@ -706,6 +711,10 @@ static int __devinit sdhci_s3c_probe(struct platform_device *pdev)
 			pdata->ext_pdev(pdev);
 #endif
 	}
+#ifdef CONFIG_MACH_U1_NA_SPR
+	if (pdata->cd_type == S3C_SDHCI_CD_GPIO && pdata->ext_cd_init)
+		pdata->ext_cd_init(&sdhci_s3c_notify_change);
+#endif
 	if (pdata->cd_type == S3C_SDHCI_CD_GPIO &&
 	    gpio_is_valid(pdata->ext_cd_gpio))
 		sdhci_s3c_setup_card_detect_gpio(sc);
@@ -742,6 +751,10 @@ static int __devexit sdhci_s3c_remove(struct platform_device *pdev)
 
 	if (pdata->cd_type == S3C_SDHCI_CD_EXTERNAL && pdata->ext_cd_cleanup)
 		pdata->ext_cd_cleanup(&sdhci_s3c_notify_change);
+#ifdef CONFIG_MACH_U1_NA_SPR
+	if (pdata->cd_type == S3C_SDHCI_CD_GPIO && pdata->ext_cd_cleanup)
+		pdata->ext_cd_cleanup(&sdhci_s3c_notify_change);
+#endif
 
 	if (sc->ext_cd_irq)
 		free_irq(sc->ext_cd_irq, sc);
@@ -792,9 +805,24 @@ static void sdhci_s3c_shutdown(struct platform_device *dev)
 static int sdhci_s3c_resume(struct platform_device *dev)
 {
 	struct sdhci_host *host = platform_get_drvdata(dev);
+#if defined(CONFIG_WIMAX_CMC)/* && defined(CONFIG_TARGET_LOCALE_NA)*/
+	struct s3c_sdhci_platdata *pdata = dev->dev.platform_data;
+	u32 ier;
+#endif
 	int ret = 0;
 
 	ret = sdhci_resume_host(host);
+	
+#if defined(CONFIG_WIMAX_CMC)/* && defined(CONFIG_TARGET_LOCALE_NA)*/
+
+
+	if (pdata->enable_intr_on_resume) {
+		ier = sdhci_readl(host, SDHCI_INT_ENABLE);
+		ier |= SDHCI_INT_CARD_INT;
+		sdhci_writel(host, ier, SDHCI_INT_ENABLE);
+		sdhci_writel(host, ier, SDHCI_SIGNAL_ENABLE);
+	}
+#endif
 	return ret;
 }
 
