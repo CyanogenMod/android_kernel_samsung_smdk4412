@@ -736,7 +736,13 @@ static int srp_release(struct inode *inode, struct file *file)
 static int srp_mmap(struct file *filep, struct vm_area_struct *vma)
 {
 	unsigned long size = vma->vm_end - vma->vm_start;
+	unsigned long size_max;
 	unsigned int pfn;
+
+	size_max = (srp.obuf_info.mmapped_size + PAGE_SIZE - 1) &
+			~(PAGE_SIZE - 1);
+	if (size > size_max)
+		return -EINVAL;
 
 	vma->vm_flags |= VM_IO;
 	vma->vm_flags |= VM_RESERVED;
