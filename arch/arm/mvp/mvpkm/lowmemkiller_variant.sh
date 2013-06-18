@@ -43,7 +43,7 @@ sed -i -e 's/.*\(intother_file.*other_file<\).*/;\1/' \
 
 # Detect MD5SUM executable
 HOST_OS=`uname -s`
-if [ "$HOST_OS" == "Darwin" ]
+if [ "$HOST_OS" = "Darwin" ]
 then
   MD5SUM_EXEC=md5
 else
