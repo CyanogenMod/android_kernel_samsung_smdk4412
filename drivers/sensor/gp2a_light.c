@@ -49,6 +49,7 @@
 
 #define SENSOR_NAME "light_sensor"
 #define SENSOR_MAX_DELAY	(2000)	/* 2000 ms */
+
 #define LIGHT_BUFFER_NUM	5
 
 struct sensor_data {
@@ -121,8 +122,11 @@ light_delay_store(struct device *dev, struct device_attribute *attr,
 
 	if (delay < 0)
 		return count;
-
 	delay = delay / 1000000;	/* ns to msec */
+#ifdef CONFIG_MACH_BAFFIN
+	delay = delay / 100;
+#endif
+
 
 	gprintk("new_delay = %d, old_delay = %d", delay, data->delay);
 
@@ -587,7 +591,8 @@ static void gp2a_work_func_light(struct work_struct *work)
 
 	if (data->light_buffer == i) {
 		if (data->light_count++ == LIGHT_BUFFER_NUM) {
-			input_report_rel(data->input_dev, REL_MISC, adc);
+			input_report_rel(data->input_dev, REL_MISC,
+			(adc ? adc : 1));
 			input_sync(data->input_dev);
 			data->light_count = 0;
 		}

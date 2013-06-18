@@ -27,7 +27,8 @@
 #include "ak8963-reg.h"
 #include <linux/sensor/sensors_core.h>
 
-#if defined(CONFIG_SLP) || defined(CONFIG_MACH_GC1)
+#if defined(CONFIG_SLP) || defined(CONFIG_MACH_GC1)\
+	|| defined(CONFIG_MACH_M3_USA_TMO)
 #define FACTORY_TEST
 #else
 #undef FACTORY_TEST
@@ -369,7 +370,9 @@ static int ak8963c_selftest(struct akm8963_data *ak_data, int *sf)
 {
 	u8 buf[6];
 	s16 x, y, z;
+	int retry_count = 0;
 
+retry:
 	/* read device info */
 	i2c_smbus_read_i2c_block_data(ak_data->this_client,
 					AK8963_REG_WIA, 2, buf);
@@ -437,10 +440,21 @@ static int ak8963c_selftest(struct akm8963_data *ak_data, int *sf)
 
 	if (((x >= -200) && (x <= 200)) &&
 		((y >= -200) && (y <= 200)) &&
-		((z >= -3200) && (z <= -800)))
+		((z >= -3200) && (z <= -800))) {
+		pr_info("%s, Selftest is successful.\n", __func__);
 		return 1;
-	else
-		return 0;
+	} else {
+		if (retry_count < 5) {
+			retry_count++;
+			pr_warn("############################################");
+			pr_warn("%s, retry_count=%d\n", __func__, retry_count);
+			pr_warn("############################################");
+			goto retry;
+		} else {
+			pr_err("%s, Selftest is failed.\n", __func__);
+			return 0;
+		}
+	}
 }
 
 static ssize_t ak8963c_get_asa(struct device *dev,

@@ -716,8 +716,12 @@ source "drivers/misc/ti-st/Kconfig"
 source "drivers/misc/lis3lv02d/Kconfig"
 source "drivers/misc/carma/Kconfig"
 source "drivers/misc/c2c/Kconfig"
+
 source "drivers/misc/modem_if/Kconfig"
 source "drivers/misc/modem_if_na/Kconfig"
+if MACH_U1
+source "drivers/misc/modem_if_u1/Kconfig"
+endif
 
 config SLP_LOWMEM_NOTIFY
 	bool "Driver for SLP Low Memory Notification"

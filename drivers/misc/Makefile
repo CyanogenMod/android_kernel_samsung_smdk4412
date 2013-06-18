@@ -60,7 +60,11 @@ obj-$(CONFIG_USBHUB_USB3803)	+= usb3803.o
 ifeq ($(CONFIG_SEC_MODEM_P8LTE),y)
 obj-$(CONFIG_SEC_MODEM)         += modem_if_na/
 else
+ifeq ($(CONFIG_MACH_U1),y)
+obj-$(CONFIG_SEC_MODEM)		+= modem_if_u1/
+else
 obj-$(CONFIG_SEC_MODEM)		+= modem_if/
+endif
 endif
 obj-$(CONFIG_MFD_MAX77693)	+= max77693-muic.o
 obj-$(CONFIG_STMPE811_ADC)	+= stmpe811-adc.o

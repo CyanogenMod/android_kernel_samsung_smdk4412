@@ -92,6 +92,7 @@ enum sipc_ver {
  *		If define multiple link_devices in @links,
  *		you can receive data from them. But, cannot send data to all.
  *		TX is only one link_device.
+ * @app:	the name of the application that will use this IO device
  *
  * This structure is used in board-*-modem.c
  */
@@ -102,7 +103,11 @@ struct modem_io_t {
 	enum modem_io io_type;
 	enum modem_link links;
 	enum modem_link tx_link;
+#ifdef CONFIG_MACH_U1
+	char *app;
+#else
 	bool rx_gather;
+#endif
 };
 
 struct modemlink_pm_data {
@@ -139,6 +144,13 @@ struct modemlink_pm_link_activectl {
 #define RES_DPRAM_MEM_ID	1
 #define RES_DPRAM_IRQ_ID	2
 #define RES_DPRAM_SFR_ID	3
+
+#ifdef CONFIG_MACH_U1
+#define STR_CP_ACTIVE_IRQ	"cp_active_irq"
+#define STR_DPRAM_BASE		"dpram_base"
+#define STR_DPRAM_IRQ		"dpram_irq"
+#define STR_DPRAM_SFR_BASE	"dpram_sfr_base"
+#endif
 
 enum dpram_type {
 	EXT_DPRAM,
@@ -219,6 +231,9 @@ struct modemlink_dpram_control {
 
 	enum dpram_type dp_type;	/* DPRAM type */
 	int aligned;			/* aligned access is required */
+#ifdef CONFIG_MACH_U1
+	bool disabled;			/* Disabled during phone booting */
+#endif
 	u8 __iomem *dp_base;
 	u32 dp_size;
 
