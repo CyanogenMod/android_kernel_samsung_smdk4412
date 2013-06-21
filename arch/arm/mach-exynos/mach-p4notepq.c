@@ -1028,6 +1028,10 @@ static void irda_device_init(void)
 	}
 	gpio_direction_output(GPIO_IRDA_WAKE, 0);
 
+	s3c_gpio_cfgpin(GPIO_IRDA_IRQ, S3C_GPIO_INPUT);
+	s3c_gpio_setpull(GPIO_IRDA_IRQ, S3C_GPIO_PULL_UP);
+	gpio_direction_input(GPIO_IRDA_IRQ);
+
 	return;
 }
 
@@ -1448,6 +1452,17 @@ static int check_sec_keyboard_dock(bool attached)
 	return 0;
 }
 
+/* call 30pin func. from sec_keyboard */
+static struct sec_30pin_callbacks *s30pin_callbacks;
+static int noti_sec_univ_kbd_dock(unsigned int code)
+{
+	if (s30pin_callbacks && s30pin_callbacks->noti_univ_kdb_dock)
+		return s30pin_callbacks->
+			noti_univ_kdb_dock(s30pin_callbacks, code);
+	return 0;
+}
+
+
 static void check_uart_path(bool en)
 {
 	int gpio_uart_sel;
@@ -1493,6 +1508,11 @@ static void check_uart_path(bool en)
 #endif
 }
 
+static void sec_30pin_register_cb(struct sec_30pin_callbacks *cb)
+{
+	s30pin_callbacks = cb;
+}
+
 static void sec_keyboard_register_cb(struct sec_keyboard_callbacks *cb)
 {
 	keyboard_callbacks = cb;
@@ -1503,6 +1523,7 @@ static struct sec_keyboard_platform_data kbd_pdata = {
 	.acc_power = smdk_accessory_power,
 	.check_uart_path = check_uart_path,
 	.register_cb = sec_keyboard_register_cb,
+	.noti_univ_kbd_dock = noti_sec_univ_kbd_dock,
 	.wakeup_key = NULL,
 };
 
@@ -1572,6 +1593,7 @@ struct acc_con_platform_data acc_con_pdata = {
 #ifdef CONFIG_SEC_KEYBOARD_DOCK
 	.check_keyboard = check_sec_keyboard_dock,
 #endif
+	.register_cb = sec_30pin_register_cb,
 	.accessory_irq_gpio = GPIO_ACCESSORY_INT,
 	.dock_irq_gpio = GPIO_DOCK_INT,
 #if defined(CONFIG_SAMSUNG_MHL_9290)
