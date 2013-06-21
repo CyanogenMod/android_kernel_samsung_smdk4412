@@ -16,6 +16,10 @@
 #define GET_FORCE_RAMDUMP	_IOW(CHARM_CODE, 11, int)
 #define WAIT_FOR_ERROR		_IOW(CHARM_CODE, 12, int)
 
+#ifdef CONFIG_SIM_DETECT
+#define GET_SIM_DETECT		_IOW(CHARM_CODE, 13, int)
+#endif
+
 enum charm_boot_type {
 	CHARM_NORMAL_BOOT = 0,
 	CHARM_RAM_DUMPS,
