@@ -430,10 +430,10 @@ static void init_gpio(void)
 
 	s3c_gpio_cfgpin(GPIO_USB_SEL1, S3C_GPIO_OUTPUT);
 	s3c_gpio_setpull(GPIO_USB_SEL1, S3C_GPIO_PULL_NONE);
-
+#if defined(GPIO_USB_SEL_CP)
 	s3c_gpio_cfgpin(GPIO_USB_SEL_CP, S3C_GPIO_OUTPUT);
 	s3c_gpio_setpull(GPIO_USB_SEL_CP, S3C_GPIO_PULL_NONE);
-
+#endif /* GPIO_USB_SEL_CP */
 	s3c_gpio_cfgpin(GPIO_UART_SEL, S3C_GPIO_OUTPUT);
 	s3c_gpio_setpull(GPIO_UART_SEL, S3C_GPIO_PULL_NONE);
 
@@ -518,7 +518,9 @@ static int __init usb_switch_init(void)
 #if defined(CONFIG_MACH_P4NOTE)
 	gpio_request(GPIO_USB_SEL0, "GPIO_USB_SEL0");
 	gpio_request(GPIO_USB_SEL1, "GPIO_USB_SEL1");
+#if defined(GPIO_USB_SEL_CP)
 	gpio_request(GPIO_USB_SEL_CP, "GPIO_USB_SEL_CP");
+#endif /* GPIO_USB_SEL_CP */
 #else
 	gpio_request(GPIO_USB_SEL1, "GPIO_USB_SEL1");
 	gpio_request(GPIO_USB_SEL2, "GPIO_USB_SEL2");
@@ -540,7 +542,9 @@ static int __init usb_switch_init(void)
 #if defined(CONFIG_MACH_P4NOTE)
 	gpio_export(GPIO_USB_SEL0, 1);
 	gpio_export(GPIO_USB_SEL1, 1);
+#if defined(GPIO_USB_SEL_CP)
 	gpio_export(GPIO_USB_SEL_CP, 1);
+#endif /* GPIO_USB_SEL_CP */
 #else
 	gpio_export(GPIO_USB_SEL1, 1);
 	gpio_export(GPIO_USB_SEL2, 1);
@@ -567,7 +571,9 @@ static int __init usb_switch_init(void)
 #if defined(CONFIG_MACH_P4NOTE)
 	gpio_export_link(sec_switch_dev, "GPIO_USB_SEL0", GPIO_USB_SEL0);
 	gpio_export_link(sec_switch_dev, "GPIO_USB_SEL1", GPIO_USB_SEL1);
+#if defined(GPIO_USB_SEL_CP)
 	gpio_export_link(sec_switch_dev, "GPIO_USB_SEL_CP", GPIO_USB_SEL_CP);
+#endif /* GPIO_USB_SEL_CP */
 #else
 	gpio_export_link(sec_switch_dev, "GPIO_USB_SEL1", GPIO_USB_SEL1);
 	gpio_export_link(sec_switch_dev, "GPIO_USB_SEL2", GPIO_USB_SEL2);

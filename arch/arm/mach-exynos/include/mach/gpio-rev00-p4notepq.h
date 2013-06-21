@@ -43,7 +43,7 @@ extern void midas_config_sleep_gpio_table(void);
 #define GPIO_CAM_EN1		EXYNOS4212_GPJ0(6)
 #define GPIO_5M_nSTBY		EXYNOS4212_GPJ0(7)
 #else
-#define GPIO_3M_nSTBY		EXYNOS4212_GPM0(6)
+//#define GPIO_3M_nSTBY		EXYNOS4212_GPM0(6)
 #endif
 #ifdef CONFIG_VIDEO_S5K5CCGX_COMMON
 #define GPIO_2M_nRST		EXYNOS4212_GPM1(6)
@@ -199,7 +199,7 @@ extern void midas_config_sleep_gpio_table(void);
 #define GPIO_IRDA_CONTROL	EXYNOS4_GPL0(3)
 #elif defined(CONFIG_IR_REMOCON_MC96)
 #define GPIO_IRDA_WAKE		EXYNOS4_GPL0(3)
-#define GPIO_IRDA_IRQ		EXYNOS4_GPM0(6)
+#define GPIO_IRDA_IRQ		EXYNOS4212_GPM0(6)
 #define GPIO_IRDA_SDA		EXYNOS4_GPY0(0)
 #define GPIO_IRDA_SCL		EXYNOS4_GPY0(1)
 #endif
@@ -377,6 +377,9 @@ extern void midas_config_sleep_gpio_table(void);
 #define GPIO_MDM2AP_ERR_FATAL		EXYNOS4_GPX1(2)
 #define GPIO_MDM_LTE_ACTIVE		EXYNOS4_GPX1(6)
 #define GPIO_AP2MDM_HSIC_PORT_ACTIVE	EXYNOS4_GPX3(2)	/* AP2MDM_IPC1 */
+#ifdef CONFIG_SIM_DETECT
+#define GPIO_SIM_DETECT			EXYNOS4_GPX1(7) /* sim detect */
+#endif
 #endif
 
 #endif /* __MACH_GPIO_MIDAS_H */
