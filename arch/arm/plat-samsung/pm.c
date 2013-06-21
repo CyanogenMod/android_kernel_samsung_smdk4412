@@ -320,9 +320,17 @@ static int s3c_pm_enter(suspend_state_t state)
 
 #ifdef CONFIG_FAST_BOOT
 	if (fake_shut_down) {
+#if defined(CONFIG_SEC_MODEM) || defined(CONFIG_QC_MODEM)
+		/* Masking external wake up source
+		 * only enable  power key, FUEL ALERT, AP/IF PMIC IRQ
+		 * and SIM Detect Irq
+		 */
+		__raw_writel(0xdf77df7f, S5P_EINT_WAKEUP_MASK);
+#else
 		/* Masking external wake up source
 		 * only enable  power key, FUEL ALERT, AP/IF PMIC IRQ */
 		__raw_writel(0xff77df7f, S5P_EINT_WAKEUP_MASK);
+#endif
 		/* disable all system int */
 		__raw_writel(0xffffffff, S5P_WAKEUP_MASK);
 	}

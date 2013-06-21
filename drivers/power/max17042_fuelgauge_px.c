@@ -387,6 +387,31 @@ static int fg_read_soc(void)
 	return soc;
 }
 
+static int fg_read_raw_soc(void)
+{
+	struct i2c_client *client = fg_i2c_client;
+	struct max17042_chip *chip = i2c_get_clientdata(client);
+	u8 data[2];
+	u32 soc_lsb = 0;
+	int psoc = 0;
+
+	if (fg_i2c_read(client, SOCREP_REG, data, 2) < 0) {
+		pr_err("%s: Failed to read SOCREP\n", __func__);
+		return -1;
+	}
+
+	soc_lsb = (data[0] * 100) / 256;
+	psoc = (data[1] * 100) + soc_lsb;
+	chip->info.psoc = psoc;
+
+	if (!(chip->info.pr_cnt % PRINT_COUNT))
+		pr_info("%s: psoc(%d), vfsoc(%d)\n", __func__,
+			 psoc, fg_read_vfsoc());
+
+	return psoc;
+}
+
+
 static int fg_read_current(void)
 {
 	struct i2c_client *client = fg_i2c_client;
@@ -906,6 +931,27 @@ void fg_check_vf_fullcap_range(void)
 			fg_read_register(DQACC_REG),
 			fg_read_register(DPACC_REG));
 }
+
+int fg_check_cap_corruption_p4(void)
+{
+
+	struct i2c_client *client = fg_i2c_client;
+	struct max17042_chip *chip = i2c_get_clientdata(client);
+
+	int designcap;
+
+	/* If usgin Jig or low batt compensation flag is set,
+	   then skip checking. */
+	if (chip->pdata->check_jig_status()) {
+		fg_write_register(DESIGNCAP_REG, chip->info.vfcapacity - 1);
+		designcap = fg_read_register(DESIGNCAP_REG);
+		pr_info("%s: return by jig, vfcap(0x%04x), designcap(0x%04x)\n",
+				__func__, chip->info.vfcapacity, designcap);
+		return 0;
+	} else
+		return 1;
+}
+
 
 int fg_check_cap_corruption(void)
 {
@@ -1621,6 +1667,9 @@ int get_fuelgauge_value(int data)
 		ret = fg_read_voltage_now();
 		break;
 
+	case FG_RAW_LEVEL:
+		ret = fg_read_raw_soc();
+		break;
 	default:
 		ret = -1;
 		break;
