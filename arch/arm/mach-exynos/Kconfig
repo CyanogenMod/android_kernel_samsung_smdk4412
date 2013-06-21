@@ -1774,6 +1774,9 @@ config MDM_HSIC_PM
 config EMI_ERROR_RECOVERY
 	bool "unsuspected emi error recovery on HUB"
 	default n
+config SIM_DETECT
+	bool "support sim detect"
+        default n
 
 if QC_MODEM
 choice
