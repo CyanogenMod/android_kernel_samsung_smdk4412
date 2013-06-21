@@ -44,7 +44,7 @@
 /* keep this value if you support double-pressed concept */
 #if defined(CONFIG_TARGET_LOCALE_KOR)
 #define SEND_KEY_CHECK_TIME_MS	20		/* 20ms - GB VOC in KOR*/
-#elif defined(CONFIG_MACH_Q1_BD)
+#elif defined(CONFIG_MACH_Q1_BD) || defined(CONFIG_MACH_P4NOTE)
 /* 27ms, total delay is approximately double more
    because hrtimer is called twice by gpio input driver,
    new sec spec total delay is 60ms +/-10ms */

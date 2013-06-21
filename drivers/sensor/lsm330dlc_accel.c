@@ -1045,15 +1045,25 @@ static int lsm330dlc_accel_probe(struct i2c_client *client,
 {
 	struct lsm330dlc_accel_data *data;
 	struct accel_platform_data *pdata;
-	int err = 0;
+	int err = 0, retry;
+	int probe_retry_max = 3;
 
 	accel_dbgmsg("is started\n");
-	if (!i2c_check_functionality(client->adapter,
-				     I2C_FUNC_SMBUS_WRITE_BYTE_DATA |
-				     I2C_FUNC_SMBUS_READ_I2C_BLOCK)) {
-		pr_err("%s: i2c functionality check failed!\n", __func__);
-		err = -ENODEV;
-		goto exit;
+probe_retry:
+	for (retry = 0; retry < 5; retry++) {
+		if (!i2c_check_functionality(client->adapter,
+					     I2C_FUNC_SMBUS_WRITE_BYTE_DATA |
+					     I2C_FUNC_SMBUS_READ_I2C_BLOCK)) {
+			pr_err("%s: i2c functionality failed!\n", __func__);
+
+			if (retry == 4) {
+				err = -ENODEV;
+				goto exit;
+			}
+			i2c_smbus_write_byte_data(client, CTRL_REG1, PM_OFF);
+			mdelay(2);
+		} else
+			break;
 	}
 
 	data = kzalloc(sizeof(struct lsm330dlc_accel_data), GFP_KERNEL);
@@ -1315,6 +1325,12 @@ err_misc_register:
 err_read_reg:
 	kfree(data);
 exit:
+	if (probe_retry_max > 0) {
+		pr_err("%s: Failed to probe..(%d try left)\n",
+			__func__, probe_retry_max);
+		probe_retry_max--;
+		goto probe_retry;
+	}
 	return err;
 }
 

@@ -56,6 +56,15 @@ static struct resource mdm_resources[] = {
 		.name	= "AP2MDM_WAKEUP",
 		.flags	= IORESOURCE_IO,
 	},
+#ifdef CONFIG_SIM_DETECT
+	{
+		.start	= GPIO_SIM_DETECT,
+		.end	= GPIO_SIM_DETECT,
+		.name	= "SIM_DETECT",
+		.flags	= IORESOURCE_IO,
+	},
+#endif
+
 };
 
 #ifdef CONFIG_MDM_HSIC_PM
@@ -99,7 +108,7 @@ struct platform_device mdm_pm_device = {
 
 static struct mdm_platform_data mdm_platform_data = {
 	.mdm_version = "3.0",
-	.ramdump_delay_ms = 2000,
+	.ramdump_delay_ms = 3000,
 	.early_power_on = 1,
 	.sfr_query = 0,
 	.vddmin_resource = NULL,
@@ -110,6 +119,10 @@ static struct mdm_platform_data mdm_platform_data = {
 	.peripheral_platform_device_ohci = &s5p_device_ohci,
 #endif
 	.ramdump_timeout_ms = 120000,
+#if defined(CONFIG_MACH_P4NOTE) && defined(CONFIG_QC_MODEM) \
+	&& defined(CONFIG_SIM_DETECT)
+	.sim_polarity = 0,
+#endif
 };
 
 static int exynos_frequency_lock(struct device *dev)
