@@ -61,6 +61,7 @@
 #define FG_CHECK_STATUS 6
 #define FG_VF_SOC 7
 #define FG_VOLTAGE_NOW 8
+#define FG_RAW_LEVEL 9
 
 #define LOW_BATT_COMP_RANGE_NUM	5
 #define LOW_BATT_COMP_LEVEL_NUM	2
@@ -375,6 +376,7 @@ extern int fg_alert_init(void);
 extern void fg_fullcharged_compensation(u32 is_recharging, u32 pre_update);
 extern void fg_check_vf_fullcap_range(void);
 extern int fg_check_cap_corruption(void);
+extern int fg_check_cap_corruption_p4(void);
 extern void fg_set_full_charged(void);
 extern void fg_reset_fullcap_in_fullcharge(void);
 #endif

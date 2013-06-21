@@ -36,7 +36,9 @@ struct mdm_modem_drv {
 	unsigned ap2mdm_soft_reset_gpio;
 	unsigned ap2mdm_pmic_pwr_en_gpio;
 	unsigned mdm2ap_pblrdy;
-
+#ifdef CONFIG_SIM_DETECT
+	unsigned sim_detect_gpio;
+#endif
 	int proto_is_dload;
 
 	int mdm_errfatal_irq;
@@ -47,9 +49,16 @@ struct mdm_modem_drv {
 	enum charm_boot_type boot_type;
 	int mdm_debug_on;
 	int mdm_unexpected_reset_occurred;
-
+#ifdef CONFIG_SIM_DETECT
+	int sim_state;
+	bool sim_changed;
+	wait_queue_head_t wq;
+#endif
 	struct mdm_ops *ops;
 	struct mdm_platform_data *pdata;
+
+	bool sim_shutdown_req;
+	bool sim_irq;
 };
 
 int mdm_common_create(struct platform_device  *pdev,
@@ -61,7 +70,10 @@ void mdm_peripheral_disconnect(struct mdm_modem_drv *mdm_drv);
 
 void notify_modem_fatal(void);
 void request_autopm_lock(int status);
-
+bool mdm_check_main_connect(const char *);
+#ifdef CONFIG_SIM_DETECT
+void get_sim_state_at_boot(void);
+#endif
 extern unsigned int lpcharge;
 extern void ctrl_bridge_stop_all(void);
 extern void rmnet_usb_ctrl_stop_all(void);

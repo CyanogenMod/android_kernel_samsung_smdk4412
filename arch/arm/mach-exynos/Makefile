@@ -160,11 +160,19 @@ obj-$(CONFIG_MIDAS_COMMON)		+= sec-common.o \
 obj-$(CONFIG_SEC_MODEM)			+= board-gps-bcm475x.o
 else
 ifeq ($(CONFIG_MACH_P4NOTE),y)
+ifeq ($(CONFIG_MACH_P4NOTELTE_USA_VZW),y)
+obj-$(CONFIG_MIDAS_COMMON)		+= sec-common.o\
+					   midas-tsp.o board-midas-wlan.o \
+					   midas-camera.o midas-thermistor.o \
+					   midas-mhl.o midas-lcd.o midas-sound.o
+else
 obj-$(CONFIG_MIDAS_COMMON)		+= sec-common.o\
 					   midas-tsp.o board-midas-wlan.o \
 					   midas-camera.o midas-thermistor.o \
 					   midas-mhl.o midas-lcd.o midas-sound.o \
-					   board-gps-bcm475x.o
+                                           board-gps-bcm475x.o
+endif #CONFIG_MACH_P4NOTELTE_USA_VZW
+obj-$(CONFIG_GPS_BRCM_475X)		+= board-gps-bcm475x.o
 else
 ifeq ($(CONFIG_MACH_SLP_T0_LTE),y)
 obj-$(CONFIG_MIDAS_COMMON)		+= sec-common.o \

@@ -1043,11 +1043,12 @@ static int sec_bat_get_charging_status(struct battery_data *battery)
 {
 	switch (battery->info.charging_source) {
 	case CHARGER_BATTERY:
-	case CHARGER_USB:
+	//case CHARGER_USB:
 		return POWER_SUPPLY_STATUS_DISCHARGING;
 	case CHARGER_AC:
 	case CHARGER_MISC:
 	case CHARGER_DOCK:
+	case CHARGER_USB:
 		if (battery->info.batt_is_full)
 			return POWER_SUPPLY_STATUS_FULL;
 		else if (battery->info.batt_improper_ta)
