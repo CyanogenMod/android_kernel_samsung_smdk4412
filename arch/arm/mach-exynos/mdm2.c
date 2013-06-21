@@ -289,8 +289,13 @@ static void mdm_status_changed(struct mdm_modem_drv *mdm_drv, int value)
 	if (value) {
 		mdm_peripheral_disconnect(mdm_drv);
 		mdm_peripheral_connect(mdm_drv);
-		if (mdm_drv->ap2mdm_wakeup_gpio > 0)
+		if (mdm_drv->ap2mdm_wakeup_gpio > 0) {
+			if (gpio_get_value(mdm_drv->ap2mdm_wakeup_gpio)) {
+				gpio_set_value(mdm_drv->ap2mdm_wakeup_gpio, 0);
+				mdelay(5);
+			}
 			gpio_direction_output(mdm_drv->ap2mdm_wakeup_gpio, 1);
+		}
 	}
 }
 
@@ -321,6 +326,25 @@ static void mdm_modem_shutdown(struct platform_device *pdev)
 	mdm_common_modem_shutdown(pdev);
 }
 
+#ifdef CONFIG_FAST_BOOT
+static void modem_complete(struct device *pdev)
+{
+	struct mdm_platform_data *pdata = pdev->platform_data;
+
+	if (!pdev || !pdata) {
+		pr_err("pdev or pdata is null!!\n");
+		return;
+	}
+
+	if (pdata->modem_complete)
+		pdata->modem_complete(pdev);
+}
+
+static const struct dev_pm_ops mdm2_pm_ops = {
+	.complete = modem_complete,
+};
+#endif
+
 static struct platform_driver mdm_modem_driver = {
 	.remove         = mdm_modem_remove,
 	/**
@@ -329,6 +353,9 @@ static struct platform_driver mdm_modem_driver = {
 	 */
 	.driver         = {
 		.name = "mdm2_modem",
+#ifdef CONFIG_FAST_BOOT
+		.pm = &mdm2_pm_ops,
+#endif
 		.owner = THIS_MODULE
 	},
 };

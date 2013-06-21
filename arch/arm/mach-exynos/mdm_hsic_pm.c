@@ -35,14 +35,11 @@
 #include <linux/usb.h>
 #include <linux/usb/hcd.h>
 #include <linux/usb/ehci_def.h>
-#include <mach/mdm2.h>
-#include <linux/kernel.h>
 
 #ifdef CONFIG_CPU_FREQ_TETHERING
+#include <linux/kernel.h>
 #include <linux/netdevice.h>
-#endif
-
-#ifdef CONFIG_USB_ANDROID_SAMSUNG_COMPOSITE
+#include <mach/mdm2.h>
 #include <linux/usb/android_composite.h>
 #endif
 
@@ -92,8 +89,6 @@ struct mdm_hsic_pm_data {
 	struct notifier_block pm_notifier;
 #ifdef CONFIG_CPU_FREQ_TETHERING
 	struct notifier_block netdev_notifier;
-#endif
-#ifdef CONFIG_USB_ANDROID_SAMSUNG_COMPOSITE
 	struct notifier_block usb_composite_notifier;
 #endif
 
@@ -124,8 +119,14 @@ struct mdm_hsic_pm_data {
 	struct delayed_work auto_rpm_restart_work;
 	struct delayed_work request_resume_work;
 	struct delayed_work fast_dormancy_work;
+	struct delayed_work rpm_state_check_work;
 
 	struct mdm_hsic_pm_platform_data *mdm_pdata;
+
+	/* QMICM mode value */
+	bool qmicm_mode;
+
+	int scc;
 };
 
 /* indicate wakeup from lpa state */
@@ -294,6 +295,7 @@ void notify_modem_fatal(void)
 				get_pm_data_by_dev_name("mdm_hsic_pm0");
 
 	pr_info("%s or shutdown\n", __func__);
+	print_mdm_gpio_state();
 
 	if (!pm_data || !pm_data->intf_cnt || !pm_data->udev)
 		return;
@@ -363,17 +365,22 @@ void request_active_lock_set(const char *name)
 {
 	struct mdm_hsic_pm_data *pm_data = get_pm_data_by_dev_name(name);
 	pr_info("%s\n", __func__);
-	if (pm_data)
+	if (pm_data) {
 		wake_lock(&pm_data->l2_wake);
+		pm_data->scc = 0;
+		queue_delayed_work(pm_data->wq, &pm_data->rpm_state_check_work,
+							msecs_to_jiffies(3000));
+	}
 }
 
 void request_active_lock_release(const char *name)
 {
 	struct mdm_hsic_pm_data *pm_data = get_pm_data_by_dev_name(name);
 	pr_info("%s\n", __func__);
-	if (pm_data)
+	if (pm_data) {
 		wake_unlock(&pm_data->l2_wake);
-
+		cancel_delayed_work(&pm_data->rpm_state_check_work);
+	}
 }
 
 void request_boot_lock_set(const char *name)
@@ -411,13 +418,22 @@ void set_host_stat(const char *name, enum pwr_stat status)
 		return;
 	}
 
+	/* crash during kernel suspend/resume, do not control host ready pin */
+	/* and it has to be controlled when host driver initialized again */
+	if (pm_data->block_request && pm_data->shutdown)
+		return;
+
 	if (pm_data->gpio_host_ready) {
 		pr_info("dev rdy val = %d\n",
 				gpio_get_value(pm_data->gpio_device_ready));
 		pr_info("%s:set host port power status to [%d]\n",
 							__func__, status);
 
-		/*10ms delay location moved*/
+		/*
+		 * need get some delay for MDM9x15 suspend
+		 * if L3 drive goes out to modem in suspending
+		 * modem goes to unstable PM state. now 10 ms is enough
+		 */
 		if(status == POWER_OFF)
 			mdelay(10);
 
@@ -438,6 +454,10 @@ int wait_dev_pwr_stat(const char *name, enum pwr_stat status)
 		return -ENODEV;
 	}
 
+	/* in shutdown(including modem fatal) do not need to wait dev ready */
+	if (pm_data->shutdown)
+		return 0;
+
 	pr_info("%s:[%s]...\n", __func__, status ? "PWR ON" : "PWR OFF");
 
 	if (pm_data->gpio_device_ready) {
@@ -452,8 +472,10 @@ int wait_dev_pwr_stat(const char *name, enum pwr_stat status)
 
 	if (gpio_get_value(pm_data->gpio_device_ready) == status)
 		pr_info(" done\n");
-	else
+	else {
 		subsystem_restart(EXTERNAL_MODEM);
+		return -ETIMEDOUT;
+	}
 	return 0;
 }
 
@@ -490,28 +512,19 @@ int set_hsic_lpa_states(int states)
 {
 	/* if modem need to check survive, get status in variable */
 	int val = 1;
+	int ret = 0;
 
 	/* set state for LPA enter */
 	if (val) {
 		switch (states) {
 		case STATE_HSIC_LPA_ENTER:
-			/*
-			 * need get some delay for MDM9x15 suspend
-			 * if L3 drive goes out to modem in suspending
-			 * modem goes to unstable PM state. now 10 ms is enough
-			 */
-			/*10ms delay location moved*/
-			//mdelay(10);
 			set_host_stat("mdm_hsic_pm0", POWER_OFF);
-			wait_dev_pwr_stat("mdm_hsic_pm0", POWER_OFF);
+			ret = wait_dev_pwr_stat("mdm_hsic_pm0", POWER_OFF);
+			if (ret)
+				return ret;
 			pr_info("set hsic lpa enter\n");
 			break;
 		case STATE_HSIC_LPA_WAKE:
-			/* host control is done by ehci runtime resume code */
-			#if 0
-			set_host_stat("mdm_hsic_pm0", POWER_ON);
-			wait_dev_pwr_stat("mdm_hsic_pm0", POWER_ON);
-			#endif
 			lpa_handling = true;
 			pr_info("%s: set lpa handling to true\n", __func__);
 			request_active_lock_set("mdm_hsic_pm0");
@@ -536,6 +549,24 @@ int set_hsic_lpa_states(int states)
 	return 0;
 }
 
+bool mdm_check_main_connect(const char *name)
+{
+	/* find pm device from list by name */
+	struct mdm_hsic_pm_data *pm_data = get_pm_data_by_dev_name(name);
+
+	if (!pm_data) {
+		pr_err("%s:no pm device(%s)\n", __func__, name);
+		return false;
+	}
+
+	print_pm_dev_info(pm_data);
+
+	if (pm_data->intf_cnt == 3)
+		return true;
+	else
+		return false;
+}
+
 #define PM_START_DELAY_MS 3000
 int register_udev_to_pm_dev(const char *name, struct usb_device *udev)
 {
@@ -556,6 +587,7 @@ int register_udev_to_pm_dev(const char *name, struct usb_device *udev)
 		pm_data->udev = udev;
 		atomic_set(&pm_data->pmlock_cnt, 0);
 		usb_disable_autosuspend(udev);
+		pm_data->shutdown = false;
 #ifdef CONFIG_SIM_DETECT
 		get_sim_state_at_boot();
 #endif
@@ -571,6 +603,22 @@ int register_udev_to_pm_dev(const char *name, struct usb_device *udev)
 
 	queue_delayed_work(pm_data->wq, &pm_data->auto_rpm_start_work,
 					msecs_to_jiffies(PM_START_DELAY_MS));
+	return 0;
+}
+
+int set_qmicm_mode(const char *name)
+{
+	/* find pm device from list by name */
+	struct mdm_hsic_pm_data *pm_data = get_pm_data_by_dev_name(name);
+
+	if (!pm_data) {
+		pr_err("%s:no pm device(%s) exist\n", __func__, name);
+		return -ENODEV;
+	}
+
+	pm_data->qmicm_mode = true;
+	pr_info("%s: set QMICM mode\n", __func__);
+
 	return 0;
 }
 
@@ -638,6 +686,11 @@ static void mdm_hsic_rpm_check(struct work_struct *work)
 		return;
 	}
 
+	if (pm_data->block_request) {
+		pr_info("ignore resume req, block_request\n");
+		return;
+	}
+
 	dev = &pm_data->udev->dev;
 
 	if (pm_runtime_resume(dev) < 0)
@@ -689,6 +742,26 @@ static void mdm_hsic_rpm_restart(struct work_struct *work)
 
 	dev = &pm_data->udev->dev;
 	pm_runtime_set_autosuspend_delay(dev, 500);
+}
+
+static void rpm_check_func(struct work_struct *work)
+{
+	struct mdm_hsic_pm_data *pm_data =
+			container_of(work, struct mdm_hsic_pm_data,
+					rpm_state_check_work.work);
+
+	if (!pm_data->udev || !pm_data->intf_cnt)
+		return;
+	if (pm_data->udev->dev.power.runtime_status == RPM_ACTIVE)
+		wake_up_all(&pm_data->udev->dev.power.wait_queue);
+	if (pm_data->scc &&
+		pm_data->udev->dev.power.runtime_status == RPM_SUSPENDED)
+		return;
+
+	pr_info("%s:%d\n", __func__, pm_data->scc);
+	pm_data->scc++;
+	queue_delayed_work(pm_data->wq, &pm_data->rpm_state_check_work,
+							msecs_to_jiffies(3000));
 }
 
 static void fast_dormancy_func(struct work_struct *work)
@@ -986,9 +1059,7 @@ static int link_pm_netdev_event(struct notifier_block *this,
 	}
 	return NOTIFY_DONE;
 }
-#endif
 
-#ifdef CONFIG_USB_ANDROID_SAMSUNG_COMPOSITE
 static int usb_composite_notifier_event(struct notifier_block *this,
 		unsigned long event, void *ptr)
 {
@@ -1068,6 +1139,7 @@ static int mdm_hsic_pm_probe(struct platform_device *pdev)
 							mdm_hsic_rpm_restart);
 	INIT_DELAYED_WORK(&pm_data->request_resume_work, mdm_hsic_rpm_check);
 	INIT_DELAYED_WORK(&pm_data->fast_dormancy_work, fast_dormancy_func);
+	INIT_DELAYED_WORK(&pm_data->rpm_state_check_work, rpm_check_func);
 	/* register notifier call */
 	pm_data->pm_notifier.notifier_call = mdm_hsic_pm_notify_event;
 	register_pm_notifier(&pm_data->pm_notifier);
@@ -1077,9 +1149,7 @@ static int mdm_hsic_pm_probe(struct platform_device *pdev)
 #ifdef CONFIG_CPU_FREQ_TETHERING
 	pm_data->netdev_notifier.notifier_call = link_pm_netdev_event;
 	register_netdevice_notifier(&pm_data->netdev_notifier);
-#endif
 
-#ifdef CONFIG_USB_ANDROID_SAMSUNG_COMPOSITE
 	pm_data->usb_composite_notifier.notifier_call =
 		usb_composite_notifier_event;
 	register_usb_composite_notifier(&pm_data->usb_composite_notifier);
@@ -1089,6 +1159,7 @@ static int mdm_hsic_pm_probe(struct platform_device *pdev)
 	wake_lock_init(&pm_data->boot_wake, WAKE_LOCK_SUSPEND, "mdm_boot");
 	wake_lock_init(&pm_data->fd_wake, WAKE_LOCK_SUSPEND, "fast_dormancy");
 	pm_data->fd_wake_time = DEFAULT_RAW_WAKE_TIME;
+	pm_data->qmicm_mode = false;
 
 	print_pm_dev_info(pm_data);
 	list_add(&pm_data->list, &hsic_pm_dev_list);

@@ -18,6 +18,7 @@
 #include <linux/slab.h>
 #include <linux/30pin_con.h>
 #include <linux/serio.h>
+#include <linux/power_supply.h>
 
 #define KEYBOARD_SIZE   128
 #define US_KEYBOARD     0xeb
@@ -51,6 +52,7 @@ struct sec_keyboard_drvdata {
 	struct device *keyboard_dev;
 	struct delayed_work remap_dwork;
 	struct delayed_work power_dwork;
+	struct delayed_work ack_dwork;
 	struct sec_keyboard_callbacks callbacks;
 	struct serio *serio;
 	struct serio_driver serio_driver;
@@ -59,16 +61,19 @@ struct sec_keyboard_drvdata {
 #endif
 	void	(*acc_power)(u8 token, bool active);
 	void (*check_uart_path)(bool en);
+	int (*noti_univ_kbd_dock)(unsigned int code);
 	bool led_on;
 	bool dockconnected;
 	bool pre_connected;
 	bool pressed[KEYBOARD_SIZE];
 	bool pre_uart_path;
 	bool tx_ready;
+	bool univ_kbd_dock;
 	int acc_int_gpio;
 	unsigned int remap_key;
 	unsigned int kl;
 	unsigned int pre_kl;
+	unsigned int ack_code;
 	unsigned short keycode[KEYBOARD_SIZE];
 	unsigned long connected_time;
 	unsigned long disconnected_time;
