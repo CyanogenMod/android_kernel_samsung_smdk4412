@@ -360,8 +360,14 @@ static struct s3cfb_lcd s6c1372 = {
 	.p_width = 217,
 	.p_height = 135,
 	.bpp = 24,
-
+#if defined(CONFIG_MACH_P4NOTELTE_USA_SPR) || \
+	defined(CONFIG_MACH_P4NOTELTE_USA_VZW) || \
+	defined(CONFIG_MACH_P4NOTELTE_USA_USCC)
+	.freq = 55,
+#else
 	.freq = 60,
+#endif
+
 	.timing = {
 		.h_fp = 18,
 		.h_bp = 36,
@@ -794,6 +800,7 @@ static struct s3cfb_lcd lms501xx = {
 #endif
 static int reset_lcd(void)
 {
+#if defined(GPIO_MLCD_RST)
 	int err;
 
 	err = gpio_request(GPIO_MLCD_RST, "MLCD_RST");
@@ -810,15 +817,18 @@ static int reset_lcd(void)
 	gpio_set_value(GPIO_MLCD_RST, 1);
 	usleep_range(5000, 5000);
 	gpio_free(GPIO_MLCD_RST);
+#endif
 	return 0;
 }
 
 static void lcd_cfg_gpio(void)
 {
+#if defined(GPIO_MLCD_RST)
+
 	/* MLCD_RST */
 	s3c_gpio_cfgpin(GPIO_MLCD_RST, S3C_GPIO_OUTPUT);
 	s3c_gpio_setpull(GPIO_MLCD_RST, S3C_GPIO_PULL_NONE);
-
+#endif
 #if defined(GPIO_LCD_22V_EN_00)
 	/* LCD_EN */
 	s3c_gpio_cfgpin(GPIO_LCD_22V_EN_00, S3C_GPIO_OUTPUT);

@@ -26,7 +26,6 @@ struct class *sensors_class;
 * sensors_classdev_register - create new sensor device in sensors_class.
 * @dev: The device to register.
 */
-
 static void set_sensor_attr(struct device *dev,
 			    struct device_attribute *attributes[])
 {
