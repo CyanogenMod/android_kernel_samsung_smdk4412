@@ -324,7 +324,7 @@ static inline pgoff_t basepage_index(struct page *page)
 	return __basepage_index(page);
 }
 
-#else
+#else	/* CONFIG_HUGETLB_PAGE */
 struct hstate {};
 #define alloc_huge_page_node(h, nid) NULL
 #define alloc_bootmem_huge_page(h) NULL
@@ -347,6 +347,6 @@ static inline pgoff_t basepage_index(struct page *page)
 {
 	return page->index;
 }
-#endif
+#endif	/* CONFIG_HUGETLB_PAGE */
 
 #endif /* _LINUX_HUGETLB_H */
