@@ -183,6 +183,31 @@ config MACH_M0_KOR_LGT
 endchoice
 
 choice
+        prompt "P4 LTE USA Target Carrier"
+        depends on MACH_P4NOTE && TARGET_LOCALE_USA
+        default MACH_P4NOTE_USA_ANY
+
+config MACH_P4NOTELTE_USA_VZW
+        bool "P4NOTE LTE USA VZW"
+
+config MACH_P4NOTELTE_USA_ATT
+        bool "P4NOTE LTE USA ATT"
+
+config MACH_P4NOTELTE_USA_TMO
+        bool "P4NOTE LTE USA TMO"
+
+config MACH_P4NOTELTE_USA_SPR
+        bool "P4NOTE LTE USA SPR"
+
+config MACH_P4NOTELTE_USA_USCC
+        bool "P4NOTE LTE USA USCC"
+
+config MACH_P4NOTELTE_USA_ANY
+        bool "P4NOTE LTE USA ANY"
+
+endchoice
+
+choice
 	prompt "P4 KOR Target Carrier"
 	depends on MACH_P4NOTE && TARGET_LOCALE_KOR
 	default MACH_P4NOTE_KOR_ANY

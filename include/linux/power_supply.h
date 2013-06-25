@@ -176,6 +176,7 @@ enum online_sub_type {
 	ONLINE_SUB_TYPE_DESK,
 	ONLINE_SUB_TYPE_SMART_NOTG,
 	ONLINE_SUB_TYPE_SMART_OTG,
+        ONLINE_SUB_TYPE_KBD,
 };
 
 enum online_power_type {
