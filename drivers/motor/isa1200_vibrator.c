@@ -36,6 +36,9 @@
 #include <linux/fs.h>
 #include <asm/uaccess.h>
 
+static unsigned long pwm_val = 50; /* duty in percent */
+static int isapwm_duty = 999; /* duty value, 1000=100%, 500=50%, 0=0% Default is 999*/
+
 #if 0
 #define MOTOR_DEBUG
 #endif
@@ -221,7 +224,7 @@ static void isa1200_vibrator_work(struct work_struct *_work)
 			return ;
 
 		data->running = true;
-		vibtonz_clk_config(999);
+		vibtonz_clk_config(isapwm_duty);
 		vibtonz_clk_enable(true);
 		mdelay(1);
 		isa1200_vibrator_on(data);
@@ -264,6 +267,65 @@ static void isa1200_vibrator_enable(struct timed_output_dev *_dev, int value)
 			HRTIMER_MODE_REL);
 	}
 	spin_unlock_irqrestore(&data->lock, flags);
+}
+
+static ssize_t pwm_val_show(struct device *dev,
+    struct device_attribute *attr, char *buf)
+{
+       int count;
+
+       pwm_val = ((isapwm_duty - 500) * 100) / 500;
+
+       count = sprintf(buf, "%lu\n", pwm_val);
+       pr_debug("[VIB] pwm_val: %lu\n", pwm_val);
+
+       return count;
+}
+
+ssize_t pwm_val_store(struct device *dev,
+    struct device_attribute *attr,
+    const char *buf, size_t size)
+{
+       if (kstrtoul(buf, 0, &pwm_val))
+          pr_err("[VIB] %s: error on storing pwm_val\n", __func__);
+
+       pr_info("[VIB] %s: pwm_val=%lu\n", __func__, pwm_val);
+
+       isapwm_duty = (pwm_val * 500) / 100 + 500;
+
+       /* make sure new pwm duty is in range */
+      if(isapwm_duty > 1000)
+      {
+         isapwm_duty = 1000;
+      }
+      else if (isapwm_duty < 500)
+      {
+        isapwm_duty = 500;
+      }
+
+      pr_info("[VIB] %s: isapwm_duty=%d\n", __func__, isapwm_duty);
+
+      return size;
+}
+static DEVICE_ATTR(pwm_val, S_IRUGO | S_IWUSR,
+    pwm_val_show, pwm_val_store);
+
+static int create_vibrator_sysfs(void)
+{
+      int ret;
+      struct kobject *vibrator_kobj;
+      vibrator_kobj = kobject_create_and_add("vibrator", NULL);
+      if (unlikely(!vibrator_kobj))
+         return -ENOMEM;
+
+      ret = sysfs_create_file(vibrator_kobj,
+         &dev_attr_pwm_val.attr);
+      if (unlikely(ret < 0)) {
+         pr_err("[VIB] sysfs_create_file failed: %d\n", ret);
+      return ret;
+      }
+
+      return 0;
 }
 
 static int __devinit isa1200_vibrator_i2c_probe(struct i2c_client *client,
@@ -314,6 +376,8 @@ static int __devinit isa1200_vibrator_i2c_probe(struct i2c_client *client,
 	ddata->dev.name = "vibrator";
 	ddata->dev.get_time = isa1200_vibrator_get_time;
 	ddata->dev.enable = isa1200_vibrator_enable;
+
+	create_vibrator_sysfs();
 
 	hrtimer_init(&ddata->timer, CLOCK_MONOTONIC, HRTIMER_MODE_REL);
 	ddata->timer.function = isa1200_vibrator_timer_func;
