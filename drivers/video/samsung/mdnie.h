@@ -14,7 +14,6 @@ enum MODE {
 };
 
 enum SCENARIO {
-	CYANOGENMOD_MODE,
 	UI_MODE,
 	VIDEO_MODE,
 	VIDEO_WARM_MODE,
@@ -24,22 +23,17 @@ enum SCENARIO {
 	GALLERY_MODE,
 	VT_MODE,
 	SCENARIO_MAX,
+	COLOR_TONE_1 = 40,
+	COLOR_TONE_2,
+	COLOR_TONE_3,
+	COLOR_TONE_MAX,
 };
 
-#if defined(CONFIG_TARGET_LOCALE_KOR) || defined(CONFIG_TARGET_LOCALE_NTT)
 enum SCENARIO_DMB {
 	DMB_NORMAL_MODE = 20,
 	DMB_WARM_MODE,
 	DMB_COLD_MODE,
 	DMB_MODE_MAX,
-};
-#endif
-
-enum SCENARIO_COLOR_TONE {
-	COLOR_TONE_1 = 40,
-	COLOR_TONE_2,
-	COLOR_TONE_3,
-	COLOR_TONE_MAX,
 };
 
 enum OUTDOOR {
@@ -82,15 +76,31 @@ enum NEGATIVE {
 	NEGATIVE_MAX,
 };
 
-struct mdnie_tunning_info {
-	char *name;
-	const unsigned short *seq;
+enum ACCESSIBILITY {
+	ACCESSIBILITY_OFF,
+	NEGATIVE,
+	COLOR_BLIND,
+	ACCESSIBILITY_MAX,
 };
 
-struct mdnie_tunning_info_cabc {
+#if defined(CONFIG_FB_EBOOK_PANEL_SCENARIO)
+enum EBOOK {
+	EBOOK_OFF,
+	EBOOK_ON,
+	EBOOK_MAX,
+};
+#endif
+
+struct mdnie_tuning_info {
 	char *name;
-	const unsigned short *seq;
-	unsigned int idx_lut;
+	unsigned short * const sequence;
+};
+
+struct mdnie_backlight_value {
+	const unsigned int max;
+	const unsigned int mid;
+	const unsigned char low;
+	const unsigned char dim;
 };
 
 struct mdnie_info {
@@ -101,6 +111,7 @@ struct mdnie_info {
 	unsigned int			bd_enable;
 	unsigned int			auto_brightness;
 	unsigned int			power_lut_idx;
+	struct mdnie_backlight_value	*backlight;
 #endif
 	struct mutex			lock;
 	struct mutex			dev_lock;
@@ -111,28 +122,26 @@ struct mdnie_info {
 	enum TONE tone;
 	enum OUTDOOR outdoor;
 	enum CABC cabc;
-	unsigned int tunning;
+	unsigned int tuning;
 	unsigned int negative;
+	unsigned int accessibility;
+	unsigned int color_correction;
+	char path[50];
+#if defined(CONFIG_FB_EBOOK_PANEL_SCENARIO)
+	unsigned int ebook;
+#endif
 #ifdef CONFIG_HAS_EARLYSUSPEND
-	struct early_suspend    early_suspend;
+	struct early_suspend		early_suspend;
 #endif
 };
 
 extern struct mdnie_info *g_mdnie;
 
-int mdnie_send_sequence(struct mdnie_info *mdnie, const unsigned short *seq);
-extern void set_mdnie_value(struct mdnie_info *mdnie, u8 force);
 #if defined(CONFIG_FB_MDNIE_PWM)
 extern void set_mdnie_pwm_value(struct mdnie_info *mdnie, int value);
 #endif
-extern int mdnie_txtbuf_to_parsing(char const *pFilepath);
-
-extern void check_lcd_type(void);
-struct mdnie_backlight_value {
-	unsigned int max;
-	unsigned int mid;
-	unsigned char low;
-	unsigned char 	dim;
-};
+extern int mdnie_calibration(unsigned short x, unsigned short y, int *r);
+extern int mdnie_request_firmware(const char *path, u16 **buf, char *name);
+extern int mdnie_open_file(const char *path, char **fp);
 
 #endif /* __MDNIE_H__ */

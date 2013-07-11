@@ -39,70 +39,43 @@
 static struct resource *s3c_ielcd_mem;
 static void __iomem *s3c_ielcd_base;
 
-#define s3c_ielcd_readl(addr)			__raw_readl((s3c_ielcd_base + addr))
-#define s3c_ielcd_writel(val, addr)		writel(val, (s3c_ielcd_base + addr))
+#define s3c_ielcd_readl(addr)			__raw_readl(s3c_ielcd_base + addr)
+#define s3c_ielcd_writel(addr, val)		writel(val, s3c_ielcd_base + addr)
 
 static struct s3cfb_global ielcd_fb;
 static struct s3cfb_global *ielcd_fbdev;
 
-int s3c_ielcd_hw_init(void)
+int ielcd_hw_init(void)
 {
 	s3c_ielcd_mem = request_mem_region(S3C_IELCD_PHY_BASE, S3C_IELCD_MAP_SIZE, "ielcd");
-	if (s3c_ielcd_mem == NULL) {
-		printk(KERN_ERR "IELCD: failed to reserved memory region\n");
+	if (IS_ERR_OR_NULL(s3c_ielcd_mem)) {
+		pr_err("%s: fail to request_mem_region\n", __func__);
 		return -ENOENT;
 	}
 
 	s3c_ielcd_base = ioremap(S3C_IELCD_PHY_BASE, S3C_IELCD_MAP_SIZE);
-	if (s3c_ielcd_base == NULL) {
-		printk(KERN_ERR "IELCD failed ioremap\n");
+	if (IS_ERR_OR_NULL(s3c_ielcd_base)) {
+		pr_err("%s: fail to ioremap\n", __func__);
 		return -ENOENT;
 	}
-
-	/* printk(KERN_INFO "%s : 0x%p\n", __func__, s3c_ielcd_base); */
 
 	ielcd_fbdev = &ielcd_fb;
 
 	return 0;
 }
 
-int s3c_ielcd_logic_start(void)
-{
-	s3c_ielcd_writel(S3C_IELCD_MAGIC_KEY, S3C_IELCD_GPOUTCON0);
-	return 0;
-}
-
-int s3c_ielcd_logic_stop(void)
-{
-	s3c_ielcd_writel(0, S3C_IELCD_GPOUTCON0);
-	return 0;
-}
-
-int s3c_ielcd_display_on(void)
+int ielcd_display_on(void)
 {
 	unsigned int cfg;
 
 	cfg = s3c_ielcd_readl(S3C_VIDCON0);
 	cfg |= (S3C_VIDCON0_ENVID_ENABLE | S3C_VIDCON0_ENVID_F_ENABLE);
-	s3c_ielcd_writel(cfg, S3C_VIDCON0);
+	s3c_ielcd_writel(S3C_VIDCON0, cfg);
 
 	return 0;
 }
 
-#if 0
-int s3c_ielcd_display_off(void)
-{
-	unsigned int cfg;
-
-	cfg = s3c_ielcd_readl(S3C_IELCD_VIDCON0);
-	/*cfg &= ~(S3C_VIDCON0_ENVID_ENABLE| S3C_VIDCON0_ENVID_F_ENABLE);*/
-	cfg &= ~(S3C_VIDCON0_ENVID_F_ENABLE);
-	s3c_ielcd_writel(cfg, S3C_IELCD_VIDCON0);
-
-	return 0;
-}
-#else
-int s3c_ielcd_display_off(void)
+int ielcd_display_off(void)
 {
 	unsigned int cfg, ielcd_count = 0;
 
@@ -110,7 +83,7 @@ int s3c_ielcd_display_off(void)
 	cfg |= S3C_VIDCON0_ENVID_ENABLE;
 	cfg &= ~(S3C_VIDCON0_ENVID_F_ENABLE);
 
-	s3c_ielcd_writel(cfg, S3C_VIDCON0);
+	s3c_ielcd_writel(S3C_VIDCON0, cfg);
 
 	do {
 		if (++ielcd_count > 2000000) {
@@ -122,14 +95,15 @@ int s3c_ielcd_display_off(void)
 			return 0;
 	} while (1);
 }
-#endif
 
-int s3c_ielcd_init_global(struct s3cfb_global *ctrl)
+void ielcd_init_global(struct s3cfb_global *ctrl)
 {
 	unsigned int cfg;
 
 	*ielcd_fbdev = *ctrl;
 	ctrl->ielcd_regs = ielcd_fbdev->regs = s3c_ielcd_base;
+
+	s3c_ielcd_writel(S3C_IELCD_GPOUTCON0, S3C_IELCD_MAGIC_KEY);
 
 	s3cfb_set_polarity_only(ielcd_fbdev);
 	s3cfb_set_timing(ielcd_fbdev);
@@ -140,25 +114,23 @@ int s3c_ielcd_init_global(struct s3cfb_global *ctrl)
 	cfg &= ~(S3C_VIDCON0_VIDOUT_MASK | S3C_VIDCON0_VCLKEN_MASK);
 	cfg |= S3C_VIDCON0_VIDOUT_RGB;
 	cfg |= S3C_VIDCON0_VCLKEN_NORMAL;
-	s3c_ielcd_writel(cfg, S3C_VIDCON0);
+	s3c_ielcd_writel(S3C_VIDCON0, cfg);
 
 	/* window0 position setting , fixed */
-	s3c_ielcd_writel(0, S3C_VIDOSD0A);
+	s3c_ielcd_writel(S3C_VIDOSD0A, 0);
 
 	/* window0 position setting */
 	cfg = S3C_VIDOSD_RIGHT_X(ctrl->lcd->width - 1);
 	cfg |= S3C_VIDOSD_BOTTOM_Y(ctrl->lcd->height - 1);
-	s3c_ielcd_writel(cfg, S3C_VIDOSD0B);
+	s3c_ielcd_writel(S3C_VIDOSD0B, cfg);
 
 	/* window0 osd size setting */
-	s3c_ielcd_writel((ctrl->lcd->width * ctrl->lcd->height), S3C_VIDOSD0C);
+	s3c_ielcd_writel(S3C_VIDOSD0C, ctrl->lcd->width * ctrl->lcd->height);
 
 	/* window0 setting , fixed */
 	cfg = S3C_WINCON_DATAPATH_LOCAL | S3C_WINCON_BPPMODE_32BPP | S3C_WINCON_INRGB_RGB;
-	s3c_ielcd_writel(cfg, S3C_WINCON0);
+	s3c_ielcd_writel(S3C_WINCON0, cfg);
 
 	s3cfb_window_on(ielcd_fbdev, 0);
-
-	return 0;
 }
 
