@@ -21,7 +21,7 @@
  * software in any way with any other Broadcom software provided under a license
  * other than the GPL, without Broadcom's express prior written consent.
  *
- * $Id: dhd_sdio.c 394690 2013-04-03 09:18:44Z $
+ * $Id: dhd_sdio.c 404381 2013-05-26 05:00:59Z $
  */
 
 #include <typedefs.h>
@@ -1837,7 +1837,7 @@ dhdsdio_txpkt(dhd_bus_t *bus, void *pkt, uint chan, bool free_pkt, bool queue_on
 	int ret;
 	osl_t *osh;
 	uint8 *frame;
-	uint16 len, pad1 = 0;
+	uint16 len, pad1 = 0, act_len = 0;
 	uint32 swheader;
 	uint retries = 0;
 	uint32 real_pad = 0;
@@ -1923,7 +1923,8 @@ dhdsdio_txpkt(dhd_bus_t *bus, void *pkt, uint chan, bool free_pkt, bool queue_on
 
 #ifdef BCMSDIOH_TXGLOM
 	if (bus->glom_enable) {
-		uint32 hwheader1 = 0, hwheader2 = 0, act_len = len;
+		uint32 hwheader1 = 0, hwheader2 = 0;
+		act_len = len;
 
 		/* Software tag: channel, sequence number, data offset */
 		swheader = ((chan << SDPCM_CHANNEL_SHIFT) & SDPCM_CHANNEL_MASK) |
@@ -2004,6 +2005,7 @@ dhdsdio_txpkt(dhd_bus_t *bus, void *pkt, uint chan, bool free_pkt, bool queue_on
 #ifdef BCMLXSDMMC
 				PKTSETLEN(osh, pkt, len);
 #endif /* BCMLXSDMMC */
+
 				/* Post the frame pointer to sdio glom array */
 				dhd_bcmsdh_glom_post(bus, frame, pkt, len);
 				/* Save the pkt pointer in bus glom array */
@@ -2019,7 +2021,7 @@ dhdsdio_txpkt(dhd_bus_t *bus, void *pkt, uint chan, bool free_pkt, bool queue_on
 	} else
 #endif /* BCMSDIOH_TXGLOM */
 	{
-	uint32 act_len = len;
+	act_len = len;
 	/* Software tag: channel, sequence number, data offset */
 	swheader = ((chan << SDPCM_CHANNEL_SHIFT) & SDPCM_CHANNEL_MASK) | bus->tx_seq |
 	        (((pad1 + SDPCM_HDRLEN) << SDPCM_DOFFSET_SHIFT) & SDPCM_DOFFSET_MASK);
@@ -2064,14 +2066,23 @@ dhdsdio_txpkt(dhd_bus_t *bus, void *pkt, uint chan, bool free_pkt, bool queue_on
 			DHD_ERROR(("%s: sending unrounded %d-byte packet\n", __FUNCTION__, len));
 #endif
 	}
-	real_pad = len - act_len;
-	if (PKTTAILROOM(osh, pkt) < real_pad) {
-		DHD_INFO(("%s 3: insufficient tailroom %d for %d real_pad\n",
-		__FUNCTION__, (int)PKTTAILROOM(osh, pkt), real_pad));
-		if (PKTPADTAILROOM(osh, pkt, real_pad)) {
-			DHD_ERROR(("padding error size %d\n", real_pad));
+		real_pad = len - act_len;
+		if (PKTTAILROOM(osh, pkt) < real_pad) {
+			DHD_INFO(("%s 3: insufficient tailroom %d for %d real_pad\n",
+				__FUNCTION__, (int)PKTTAILROOM(osh, pkt), real_pad));
+			if (PKTPADTAILROOM(osh, pkt, real_pad)) {
+				DHD_ERROR(("CHK3: padding error size %d\n", real_pad));
+				ret = BCME_NOMEM;
+				goto done;
+			}
+#ifndef BCMLXSDMMC
+			else
+				PKTSETLEN(osh, pkt, act_len);
+#endif
 		}
-	}
+#ifdef BCMLXSDMMC
+		PKTSETLEN(osh, pkt, len);
+#endif /* BCMLXSDMMC */
 	}
 	do {
 		ret = dhd_bcmsdh_send_buf(bus, bcmsdh_cur_sbwad(sdh), SDIO_FUNC_2, F2SYNC,
@@ -2150,7 +2161,11 @@ done:
 		} else
 #endif /* BCMSDIOH_TXGLOM */
 		{
-	PKTPULL(osh, pkt, SDPCM_HDRLEN + pad1);
+#ifdef BCMLXSDMMC
+			if (act_len > 0)
+				PKTSETLEN(osh, pkt, act_len);
+#endif /* BCMLXSDMMC */
+			PKTPULL(osh, pkt, SDPCM_HDRLEN + pad1);
 		}
 #ifdef PROP_TXSTATUS
 	if (bus->dhd->wlfc_state) {

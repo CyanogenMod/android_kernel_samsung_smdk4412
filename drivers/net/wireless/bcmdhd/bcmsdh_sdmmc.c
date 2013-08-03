@@ -21,7 +21,7 @@
  * software in any way with any other Broadcom software provided under a license
  * other than the GPL, without Broadcom's express prior written consent.
  *
- * $Id: bcmsdh_sdmmc.c 383350 2013-02-06 12:59:26Z $
+ * $Id: bcmsdh_sdmmc.c 401625 2013-05-13 03:24:35Z $
  */
 #include <typedefs.h>
 
@@ -896,9 +896,11 @@ sdioh_request_byte(sdioh_info_t *sd, uint rw, uint func, uint regaddr, uint8 *by
 	}
 
 	if (err_ret) {
-		if (regaddr != 0x1001F && err_ret != -110)
+		if ((regaddr == 0x1001F) && (err_ret == -110)) {
+		} else {
 			sd_err(("bcmsdh_sdmmc: Failed to %s byte F%d:@0x%05x=%02x, Err: %d\n",
 				rw ? "Write" : "Read", func, regaddr, *byte, err_ret));
+		}
 	}
 
 	return ((err_ret == 0) ? SDIOH_API_RC_SUCCESS : SDIOH_API_RC_FAIL);

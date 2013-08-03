@@ -24,7 +24,7 @@
  * software in any way with any other Broadcom software provided under a license
  * other than the GPL, without Broadcom's express prior written consent.
  *
- * $Id: dhd.h 393894 2013-03-29 07:14:35Z $
+ * $Id: dhd.h 406704 2013-06-10 09:42:09Z $
  */
 
 /****************
@@ -87,7 +87,8 @@ enum dhd_op_flags {
 	/* Current P2P mode for P2P connection */
 	DHD_FLAG_P2P_GC_MODE				= (1 << (5)),
 	DHD_FLAG_P2P_GO_MODE				= (1 << (6)),
-	DHD_FLAG_MBSS_MODE				= (1 << (7)) /* MBSS in future */
+	DHD_FLAG_MBSS_MODE				= (1 << (7)), /* MBSS in future */
+	DHD_FLAG_IBSS_MODE				= (1 << (8))
 };
 
 #define MANUFACTRING_FW 	"WLTEST"
