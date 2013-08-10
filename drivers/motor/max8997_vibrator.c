@@ -225,7 +225,7 @@ void vibtonz_pwm(int nForce)
 }
 EXPORT_SYMBOL(vibtonz_pwm);
 
-static ssize_t pwm_val_show(struct device *dev,
+static ssize_t pwm_value_show(struct device *dev,
 		struct device_attribute *attr, char *buf)
 {
 	int count;
@@ -233,19 +233,19 @@ static ssize_t pwm_val_show(struct device *dev,
 	pwm_val = ((pwm_duty - pwm_duty_min) * 100) / pwm_duty_min;
 
 	count = sprintf(buf, "%lu\n", pwm_val);
-	pr_debug("[VIB] pwm_val: %lu\n", pwm_val);
+	pr_debug("[VIB] pwm_value: %lu\n", pwm_val);
 
 	return count;
 }
 
-ssize_t pwm_val_store(struct device *dev,
+ssize_t pwm_value_store(struct device *dev,
 		struct device_attribute *attr,
 		const char *buf, size_t size)
 {
 	if (kstrtoul(buf, 0, &pwm_val))
-		pr_err("[VIB] %s: error on storing pwm_val\n", __func__); 
+		pr_err("[VIB] %s: error on storing pwm_value\n", __func__);
 
-	pr_info("[VIB] %s: pwm_val=%lu\n", __func__, pwm_val);
+	pr_info("[VIB] %s: pwm_value=%lu\n", __func__, pwm_val);
 
 	pwm_duty = (pwm_val * pwm_duty_min) / 100 + pwm_duty_min;
 
@@ -261,27 +261,9 @@ ssize_t pwm_val_store(struct device *dev,
 
 	return size;
 }
-static DEVICE_ATTR(pwm_val, S_IRUGO | S_IWUSR,
-		pwm_val_show, pwm_val_store);
+static DEVICE_ATTR(pwm_value, S_IRUGO | S_IWUSR,
+		pwm_value_show, pwm_value_store);
 #endif
-
-static int create_vibrator_sysfs(void)
-{
-	int ret;
-	struct kobject *vibrator_kobj;
-	vibrator_kobj = kobject_create_and_add("vibrator", NULL);
-	if (unlikely(!vibrator_kobj))
-		return -ENOMEM;
-
-	ret = sysfs_create_file(vibrator_kobj,
-			&dev_attr_pwm_val.attr);
-	if (unlikely(ret < 0)) {
-		pr_err("[VIB] sysfs_create_file failed: %d\n", ret);
-		return ret;
-	}
-
-	return 0;
-}
 
 static int __devinit vibrator_probe(struct platform_device *pdev)
 {
@@ -323,8 +305,6 @@ static int __devinit vibrator_probe(struct platform_device *pdev)
 	INIT_WORK(&ddata->work, vibrator_work);
 	spin_lock_init(&ddata->lock);
 
-	create_vibrator_sysfs();
-
 	ddata->pwm = pwm_request(pdata->pwm_id, "vibrator");
 	if (IS_ERR(ddata->pwm)) {
 		pr_err("[VIB] Failed to request pwm.\n");
@@ -341,6 +321,12 @@ static int __devinit vibrator_probe(struct platform_device *pdev)
 		pr_err("[VIB] Failed to register timed_output : %d\n", error);
 		error = -EFAULT;
 		goto err_timed_output_register;
+	}
+
+	/* User controllable pwm level */
+	error = device_create_file(ddata->dev.dev, &dev_attr_pwm_value);
+	if (error < 0) {
+		pr_err("[VIB] create sysfs fail: pwm_value\n");
 	}
 
 #ifdef CONFIG_VIBETONZ
