@@ -27,6 +27,8 @@
 #include <plat/sysmmu.h>
 #endif
 
+#include <linux/cma.h>
+
 #ifdef CONFIG_UMP_VCM_ALLOC
 #include "ump_kernel_interface.h"
 #endif
@@ -881,13 +883,24 @@ long s5p_tvout_tvif_ioctl(
 			goto end_tvif_ioctl;
 		}
 		for (i = 0; i < S5PTV_VP_BUFF_CNT; i++) {
-			s5ptv_vp_buff.vp_buffs[i].phy_base = buffs[i].phy_base;
-			s5ptv_vp_buff.vp_buffs[i].vir_base =
-				(unsigned int)phys_to_virt(buffs[i].phy_base);
-			s5ptv_vp_buff.vp_buffs[i].size = buffs[i].size;
-			tvout_dbg("s5ptv_vp_buff phy_base = 0x%x, vir_base = 0x%8x\n",
-				  s5ptv_vp_buff.vp_buffs[i].phy_base,
-				  s5ptv_vp_buff.vp_buffs[i].vir_base);
+			if (cma_is_registered_region(buffs[i].phy_base,
+							buffs[i].size)) {
+				s5ptv_vp_buff.vp_buffs[i].phy_base =
+							buffs[i].phy_base;
+				s5ptv_vp_buff.vp_buffs[i].vir_base =
+					(unsigned int)phys_to_virt(buffs[i].phy_base);
+				s5ptv_vp_buff.vp_buffs[i].size = buffs[i].size;
+				tvout_dbg("s5ptv_vp_buff phy_base = 0x%x, "
+						"vir_base = 0x%8x\n",
+					s5ptv_vp_buff.vp_buffs[i].phy_base,
+					s5ptv_vp_buff.vp_buffs[i].vir_base);
+			} else {
+				s5ptv_vp_buff.vp_buffs[i].phy_base = 0;
+				s5ptv_vp_buff.vp_buffs[i].vir_base = 0;
+				printk(KERN_ERR "Buffer for VP is not CMA region\n");
+				ret = -EINVAL;
+				goto end_tvif_ioctl;
+			}
 		}
 		goto end_tvif_ioctl;
 	}
@@ -1134,6 +1147,25 @@ static int s5p_tvout_vo_s_fmt_type_private(
 		pix_fmt->height, color, field);
 #else
 	if (pix_fmt->priv) {
+		if (pix_fmt->pixelformat == V4L2_PIX_FMT_NV12T
+			|| pix_fmt->pixelformat == V4L2_PIX_FMT_NV21T) {
+			y_size = ALIGN(ALIGN(pix_fmt->width, 128) *
+				ALIGN(pix_fmt->height, 32), SZ_8K);
+			cbcr_size = ALIGN(ALIGN(pix_fmt->width, 128) *
+				ALIGN(pix_fmt->height >> 1, 32), SZ_8K);
+		} else {
+			y_size = pix_fmt->width * pix_fmt->height;
+			cbcr_size = pix_fmt->width * (pix_fmt->height >> 1);
+		}
+		if (!cma_is_registered_region((unsigned int)vparam.base_y,
+								y_size) ||
+			!cma_is_registered_region((unsigned int)vparam.base_c,
+								cbcr_size)) {
+			printk(KERN_ERR "Source image for VP is not"
+					"CMA region\n");
+			goto error_on_s_fmt_type_private;
+		}
+
 		copy_buff_idx =
 			s5ptv_vp_buff.
 				copy_buff_idxs[s5ptv_vp_buff.curr_copy_idx];
@@ -1144,19 +1176,6 @@ static int s5p_tvout_vo_s_fmt_type_private(
 				(u32) vparam.base_y, (u32) vparam.base_c,
 				pix_fmt->width, pix_fmt->height, color, field);
 		} else {
-			if (pix_fmt->pixelformat ==
-				V4L2_PIX_FMT_NV12T
-				|| pix_fmt->pixelformat == V4L2_PIX_FMT_NV21T) {
-				y_size = ALIGN(ALIGN(pix_fmt->width, 128) *
-					ALIGN(pix_fmt->height, 32), SZ_8K);
-				cbcr_size = ALIGN(ALIGN(pix_fmt->width, 128) *
-					ALIGN(pix_fmt->height >> 1, 32), SZ_8K);
-			} else {
-				y_size = pix_fmt->width * pix_fmt->height;
-				cbcr_size =
-					pix_fmt->width * (pix_fmt->height >> 1);
-			}
-
 			src_vir_y_addr = (unsigned int)phys_to_virt(
 				(unsigned long)vparam.base_y);
 			src_vir_cb_addr = (unsigned int)phys_to_virt(
