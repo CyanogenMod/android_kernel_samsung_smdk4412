@@ -1135,6 +1135,7 @@ config IRON_BD
 config GRANDE_BD
 	bool "Grande common Board"
 
+
 config WRITEBACK_ENABLED
 	bool "Samsung Writeback Enable"
 	help
