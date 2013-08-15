@@ -76,7 +76,11 @@ int mali_dvfs_control=0;
 
 /*dvfs table*/
 mali_dvfs_table mali_dvfs[MALI_DVFS_STEPS]={
+#ifdef CONFIG_EXYNOS4210_1400MHZ_SUPPORT
+			/*step 0*/{134  ,1000000    , 950000},
+#else
 			/*step 0*/{100  ,1000000    , 950000},
+#endif
 			/*step 1*/{160  ,1000000    , 950000},
 			/*step 2*/{267  ,1000000    ,1000000} };
 
@@ -87,7 +91,7 @@ mali_dvfs_table mali_dvfs[MALI_DVFS_STEPS]={
 #define ASV_LEVEL_SUPPORT 0
 
 static unsigned int asv_3d_volt_5_table[ASV_5_LEVEL][MALI_DVFS_STEPS] = {
-	/* L3 (100MHz) L2(160MHz), L1(267MHz) */
+	/* L3 (100/134MHz) L2(160MHz), L1(267MHz) */
 	{1000000, 1000000, 1100000},	/* S */
 	{1000000, 1000000, 1100000},	/* A */
 	{ 950000,  950000, 1000000},	/* B */
@@ -96,7 +100,7 @@ static unsigned int asv_3d_volt_5_table[ASV_5_LEVEL][MALI_DVFS_STEPS] = {
 };
 
 static unsigned int asv_3d_volt_8_table[ASV_8_LEVEL][MALI_DVFS_STEPS] = {
-	/* L3 (100MHz) L2(160MHz), L1(267MHz) */
+	/* L3 (100/134MHz) L2(160MHz), L1(267MHz) */
 	{1000000, 1000000, 1100000},	/* SS */
 	{1000000, 1000000, 1100000},	/* A1 */
 	{1000000, 1000000, 1100000},	/* A2 */
