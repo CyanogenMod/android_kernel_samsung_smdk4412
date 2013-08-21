@@ -1078,6 +1078,17 @@ static ssize_t touch_update_read(struct device *dev,
 	return count;
 }
 
+static ssize_t touchkey_led_control_show(struct device *dev,
+        struct device_attribute *attr, char *buf)
+{
+    int ret;
+
+    ret = sprintf(buf, "%d\n", touchkey_led_status);
+    pr_info("[Touchkey] %s: touchkey_led_status=%d\n", __func__, touchkey_led_status);
+
+    return ret;
+}
+
 static ssize_t touchkey_led_control(struct device *dev,
 				 struct device_attribute *attr, const char *buf,
 				 size_t size)
@@ -1559,7 +1570,7 @@ static DEVICE_ATTR(recommended_version, S_IRUGO | S_IWUSR | S_IWGRP,
 		   touch_version_read, touch_version_write);
 static DEVICE_ATTR(updated_version, S_IRUGO | S_IWUSR | S_IWGRP,
 		   touch_update_read, touch_update_write);
-static DEVICE_ATTR(brightness, S_IRUGO | S_IWUSR | S_IWGRP, NULL,
+static DEVICE_ATTR(brightness, S_IRUGO | S_IWUSR | S_IWGRP, touchkey_led_control_show,
 		   touchkey_led_control);
 static DEVICE_ATTR(touchkey_menu, S_IRUGO | S_IWUSR | S_IWGRP,
 		   touchkey_menu_show, NULL);
