@@ -28,8 +28,6 @@
 #include <mach/cpufreq.h>
 #include <linux/input/mt.h>
 
-#include "../keyboard/cypress/cypress-touchkey.h"
-
 #define OBJECT_TABLE_START_ADDRESS	7
 #define OBJECT_TABLE_ELEMENT_SIZE	6
 
@@ -1339,10 +1337,6 @@ static void report_input_data(struct mxt224_data *data)
 			copy_data->lock_status = 1;
 		}
 	}
-
-    /* tell cypress keypad we had finger activity */
-    touchscreen_state_report(touch_is_pressed);
-
 }
 
 void palm_recovery(void)
