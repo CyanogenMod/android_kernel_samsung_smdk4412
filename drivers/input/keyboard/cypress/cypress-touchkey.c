@@ -324,7 +324,7 @@ static ssize_t set_touchkey_autocal_testmode(struct device *dev,
 			tkey_i2c->pdata->power_on(1);
 			msleep(50);
 #if defined(TK_HAS_AUTOCAL)
-			touchkey_autocalibration();
+			touchkey_autocalibration(tkey_i2c);
 #endif
 		}
 	} else {
