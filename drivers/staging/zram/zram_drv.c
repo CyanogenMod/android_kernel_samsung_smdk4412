@@ -457,11 +457,11 @@ static int zram_bvec_rw(struct zram *zram, struct bio_vec *bvec, u32 index,
 
 	if (rw == READ) {
 		down_read(&zram->lock);
-		ret = zram_bvec_read(zram, bvec, index, bio);
+		ret = zram_bvec_read(zram, bvec, index, offset, bio);
 		up_read(&zram->lock);
 	} else {
 		down_write(&zram->lock);
-		ret = zram_bvec_write(zram, bvec, index);
+		ret = zram_bvec_write(zram, bvec, index, offset);
 		up_write(&zram->lock);
 	}
 
