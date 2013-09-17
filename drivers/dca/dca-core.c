@@ -408,6 +408,11 @@ void unregister_dca_provider(struct dca_provider *dca, struct device *dev)
 				     DCA_PROVIDER_REMOVE, NULL);
 
 	spin_lock_irqsave(&dca_lock, flags);
+	
+	if (list_empty(&dca_domains)) {
+		raw_spin_unlock_irqrestore(&dca_lock, flags);
+		return;
+	}
 
 	list_del(&dca->node);
 
