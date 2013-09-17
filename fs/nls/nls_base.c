@@ -158,6 +158,7 @@ int utf8s_to_utf16s(const u8 *s, int len, enum utf16_endian endian,
 						endian);
 				maxlen -= 2;
 			} else {
+				*op++ = (wchar_t) u;
 				put_utf16(op++, u, endian);
 				maxlen--;
 			}
