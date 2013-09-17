@@ -129,6 +129,21 @@ static inline void put_utf16(wchar_t *s, unsigned c, enum utf16_endian endian)
 	}
 }
 
+static inline void put_utf16(wchar_t *s, unsigned c, enum utf16_endian endian)
+{
+	switch (endian) {
+	default:
+		*s = (wchar_t) c;
+		break;
+	case UTF16_LITTLE_ENDIAN:
+		*s = __cpu_to_le16(c);
+		break;
+	case UTF16_BIG_ENDIAN:
+		*s = __cpu_to_be16(c);
+		break;
+	}
+}
+
 int utf8s_to_utf16s(const u8 *s, int len, enum utf16_endian endian,
 		wchar_t *pwcs, int maxlen)
 {
@@ -158,6 +173,7 @@ int utf8s_to_utf16s(const u8 *s, int len, enum utf16_endian endian,
 						endian);
 				maxlen -= 2;
 			} else {
+				*op++ = (wchar_t) u;
 				put_utf16(op++, u, endian);
 				maxlen--;
 			}
