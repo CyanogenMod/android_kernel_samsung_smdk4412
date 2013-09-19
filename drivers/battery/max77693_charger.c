@@ -1376,10 +1376,6 @@ static int max77693_charger_get_property(struct power_supply *psy,
 		val->intval = max77693_get_online_type(chg_data);
 #else
 		val->intval = max77693_get_cable_type(chg_data);
-		if (val->intval == POWER_SUPPLY_TYPE_BATTERY) {
-			/* Userspace expects 0 for no-supply */
-			val->intval = 0;
-		}
 #endif
 		break;
 	case POWER_SUPPLY_PROP_CURRENT_MAX:
