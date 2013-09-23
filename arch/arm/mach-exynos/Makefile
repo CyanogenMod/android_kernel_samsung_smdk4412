@@ -336,3 +336,6 @@ obj-$(CONFIG_CORESIGHT_ETM) += coresight.o coresight-etb.o coresight-tpiu.o core
 
 # for audio platform data driver
 obj-$(CONFIG_EXYNOS_SOUND_PLATFORM_DATA)	+= exynos_sound_platform_data.o
+
+# for gps platform data driver
+obj-$(CONFIG_GPS_BRCM_475X)		+= board-gps-bcm475x.o
