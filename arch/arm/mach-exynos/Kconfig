@@ -1726,6 +1726,11 @@ endchoice
 
 endif
 
+comment "Connectivity Feature"
+config GPS_BRCM_475X
+	bool "BRCM_475X_CHIPSET"
+	default n
+
 if BT
 config BT_CSR8811
 	bool "Enable CSR8811 driver"
