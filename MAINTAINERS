@@ -6040,7 +6040,8 @@ F:	arch/alpha/kernel/srm_env.c
 STABLE BRANCH
 M:	Greg Kroah-Hartman <greg@kroah.com>
 L:	stable@vger.kernel.org
-S:	Maintained
+S:	Supported
+F:	Documentation/stable_kernel_rules.txt
 
 STAGING SUBSYSTEM
 M:	Greg Kroah-Hartman <gregkh@suse.de>
