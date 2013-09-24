@@ -1,11 +1,8 @@
 /*
  * linux/fs/nls/nls_base.c
- *
  * Native language support--charsets and unicode translations.
  * By Gordon Chaffee 1996, 1997
- *
  * Unicode based case conversion 1999 by Wolfram Pienkoss
- *
  */
 
 #include <linux/module.h>
