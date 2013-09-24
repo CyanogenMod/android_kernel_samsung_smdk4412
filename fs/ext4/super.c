@@ -5,11 +5,8 @@
  * Remy Card (card@masi.ibp.fr)
  * Laboratoire MASI - Institut Blaise Pascal
  * Universite Pierre et Marie Curie (Paris VI)
- *
  *  from
- *
  *  linux/fs/minix/inode.c
- *
  *  Copyright (C) 1991, 1992  Linus Torvalds
  *
  *  Big-endian to little-endian byte-swapping/bitmaps by
@@ -1992,8 +1989,8 @@ static int ext4_fill_flex_info(struct super_block *sb)
 		flex_group = ext4_flex_group(sbi, i);
 		atomic_add(ext4_free_inodes_count(sb, gdp),
 			   &sbi->s_flex_groups[flex_group].free_inodes);
-		atomic_add(ext4_free_blks_count(sb, gdp),
-			   &sbi->s_flex_groups[flex_group].free_blocks);
+		atomic64_add(ext4_free_blks_count(sb, gdp),
+			     &sbi->s_flex_groups[flex_group].free_blocks);
 		atomic_add(ext4_used_dirs_count(sb, gdp),
 			   &sbi->s_flex_groups[flex_group].used_dirs);
 	}
@@ -3681,22 +3678,19 @@ no_journal:
 	if (err) {
 		ext4_msg(sb, KERN_ERR, "failed to initialize mballoc (%d)",
 			 err);
-		goto failed_mount4;
+		goto failed_mount5;
 	}
 
 	err = ext4_register_li_request(sb, first_not_zeroed);
 	if (err)
-		goto failed_mount4;
+		goto failed_mount6;
 
 	sbi->s_kobj.kset = ext4_kset;
 	init_completion(&sbi->s_kobj_unregister);
 	err = kobject_init_and_add(&sbi->s_kobj, &ext4_ktype, NULL,
 				   "%s", sb->s_id);
-	if (err) {
-		ext4_mb_release(sb);
-		ext4_ext_release(sb);
-		goto failed_mount4;
-	};
+	if (err)
+		goto failed_mount7;
 
 	EXT4_SB(sb)->s_mount_state |= EXT4_ORPHAN_FS;
 	ext4_orphan_cleanup(sb, es);
@@ -3737,7 +3731,14 @@ cantfind_ext4:
 		ext4_msg(sb, KERN_ERR, "VFS: Can't find ext4 filesystem");
 
 	goto failed_mount;
-
+	
+failed_mount7:
+	ext4_unregister_li_request(sb);
+failed_mount6:
+	ext4_ext_release(sb);
+failed_mount5:
+	ext4_mb_release(sb);
+	ext4_release_system_zone(sb);
 failed_mount4:
 	iput(root);
 	sb->s_root = NULL;
