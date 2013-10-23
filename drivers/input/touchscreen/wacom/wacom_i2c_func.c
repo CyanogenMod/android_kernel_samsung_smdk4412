@@ -381,7 +381,8 @@ int wacom_i2c_query(struct wacom_i2c *wac_i2c)
 
 #if defined(CONFIG_MACH_Q1_BD)\
 	|| defined(CONFIG_MACH_P4NOTE)\
-	|| defined(CONFIG_MACH_T0)
+	|| defined(CONFIG_MACH_T0)\
+	|| defined(CONFIG_MACH_KONA)
 	wac_feature->x_max = (u16) WACOM_MAX_COORD_X;
 	wac_feature->y_max = (u16) WACOM_MAX_COORD_Y;
 #else
@@ -425,7 +426,7 @@ int wacom_i2c_query(struct wacom_i2c *wac_i2c)
 	}
 	wac_i2c->query_status = true;
 
-#if defined(CONFIG_MACH_P4NOTE)
+#if defined(CONFIG_MACH_P4NOTE) || defined(CONFIG_MACH_KONA)
 	wacom_checksum(wac_i2c);
 #endif
 
@@ -797,6 +798,9 @@ static bool wacom_i2c_coord_range(s16 *x, s16 *y)
 #if defined(CONFIG_MACH_T0)
 	if ((*x >= 0) && (*y >= 0) &&
 		(*x <= WACOM_POSX_MAX) && (*y <= WACOM_POSY_MAX - 50))
+#elif defined(CONFIG_MACH_KONA)
+	if ((*x >= WACOM_POSX_OFFSET) && (*y >= WACOM_POSX_OFFSET) &&
+		(*x <= WACOM_POSY_MAX) && (*y <= WACOM_POSX_MAX))
 #else
 	if ((*x <= WACOM_POSX_MAX) && (*y <= WACOM_POSY_MAX))
 #endif
@@ -804,6 +808,29 @@ static bool wacom_i2c_coord_range(s16 *x, s16 *y)
 
 	return false;
 }
+
+#ifdef WACOM_USE_SOFTKEY
+static int keycode[] = {
+	KEY_MENU, KEY_BACK,
+};
+void wacom_i2c_softkey(struct wacom_i2c *wac_i2c, s16 key, s16 pressed)
+{
+	if (gpio_get_value(wac_i2c->wac_pdata->gpio_pendct) && pressed)
+		forced_release(wac_i2c);
+
+		input_report_key(wac_i2c->input_dev,
+			keycode[key], pressed);
+		input_sync(wac_i2c->input_dev);
+
+#if !defined(CONFIG_SAMSUNG_PRODUCT_SHIP)
+		printk(KERN_DEBUG "[E-PEN] keycode:%d pressed:%d\n",
+			keycode[key], pressed);
+#else
+		printk(KERN_DEBUG "[E-PEN] pressed:%d\n",
+			pressed);
+#endif
+}
+#endif
 
 int wacom_i2c_coord(struct wacom_i2c *wac_i2c)
 {
@@ -817,6 +844,9 @@ int wacom_i2c_coord(struct wacom_i2c *wac_i2c)
 	u8 gain = 0;
 	u8 height = 0;
 	int aveStrength = 2;
+#ifdef WACOM_USE_SOFTKEY
+	static s16 softkey, pressed, keycode;
+#endif
 
 #ifdef WACOM_IRQ_WORK_AROUND
 	cancel_delayed_work(&wac_i2c->pendct_dwork);
@@ -854,6 +884,15 @@ int wacom_i2c_coord(struct wacom_i2c *wac_i2c)
 			pr_debug("[E-PEN] is in(%d)\n", wac_i2c->tool);
 #endif
 		}
+#ifdef WACOM_USE_SOFTKEY
+		softkey = !!(data[5] & 0x80);
+		if (softkey) {
+			pressed = !!(data[5] & 0x40);
+			keycode = (data[5] & 0x30) >> 4;
+			wacom_i2c_softkey(wac_i2c, keycode, pressed);
+			return 0;
+		}
+#endif
 
 		prox = !!(data[0] & 0x10);
 		stylus = !!(data[0] & 0x20);
@@ -976,9 +1015,16 @@ int wacom_i2c_coord(struct wacom_i2c *wac_i2c)
 			wac_i2c->side_pressed = stylus;
 		}
 #if defined(CONFIG_SAMSUNG_KERNEL_DEBUG_USER)
-		else
+		else {
 			printk(KERN_DEBUG "[E-PEN] raw data x=%d, y=%d\n",
 			x, y);
+#ifdef CONFIG_MACH_KONA
+			/* Pen should be released in the NOT AA area even if rdy value is 1. */
+			if (wac_i2c->pen_pressed || wac_i2c->side_pressed
+			|| wac_i2c->pen_prox)
+				forced_release(wac_i2c);
+#endif
+		}
 #endif
 	} else {
 

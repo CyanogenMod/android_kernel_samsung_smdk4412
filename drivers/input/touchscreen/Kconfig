@@ -958,6 +958,27 @@ config TOUCHSCREEN_SYNAPTICS_S7301
 		To compile this driver as a module, choose M here: the
 		module will be called melfas_ts.
 
+config TOUCHSCREEN_SYNAPTICS_S7301_KEYS
+	bool "S7301 touch key support"
+	default n
+	help
+		Say Y here if you want support for SYNAPTICS S7301
+		touchscreen controller Keys.
+
+config TOUCHSCREEN_SYNAPTICS_S7301_WORKAROUND
+	bool "S7301 touch key workaround"
+	default n
+	help 
+		Say Y here if you want support for SYNAPTICS S7301
+		touchscreen controller reset control
+
+config TOUCHSCREEN_SYNAPTICS_S7301_KEYLED
+	bool "S7301 touch keyled support"
+	default n
+	help
+		Say Y here if you want support for SYNAPTICS S7301
+		with GPIO led control
+
 config TOUCHSCREEN_CYTTSP4
 	tristate "Cypress GEN4 Touchscreen Interface"
 	depends on I2C
@@ -973,6 +994,11 @@ config SEC_TOUCHSCREEN_DVFS_LOCK
 	depends on CPU_FREQ
 	help
 		Say Y here if you want support for lock the cpu frequency.
+
+config SEC_TOUCHSCREEN_SURFACE_TOUCH
+	tristate "SEC surface touch"
+	help
+		Say Y here if you want support for surface touch.
 
 config KEYPAD_MELFAS_TOUCH
 	tristate "Melfas touch keypad support"

@@ -60,7 +60,7 @@ enum {
 #define P2_CHARGING_FEATURE_02	/* SMB136 + MAX17042, Cable detect by TA_nCon */
 #endif
 
-#if defined(CONFIG_MACH_P4NOTE)
+#if defined(CONFIG_MACH_P4NOTE) || defined(CONFIG_MACH_KONA)
 #define P4_CHARGING_FEATURE_01	/* SMB347 + MAX17042, use TA_nCON */
 #endif
 

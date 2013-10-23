@@ -185,6 +185,10 @@ struct battery_info {
 	unsigned int prev_battery_soc;
 	struct wake_lock update_wake_lock;
 #endif
+#if defined(CONFIG_MACH_KONA)
+	unsigned int is_comp_3;
+	unsigned int is_comp_1;
+#endif
 };
 
 /* jig state */

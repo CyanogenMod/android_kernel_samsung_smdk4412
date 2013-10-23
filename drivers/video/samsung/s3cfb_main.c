@@ -41,8 +41,13 @@
 #endif
 
 #ifdef CONFIG_FB_S5P_MDNIE
+#ifdef CONFIG_MACH_KONA
+#include "s3cfb_mdnie_kona.h"
+#include "mdnie_kona.h"
+#else
 #include "s3cfb_mdnie.h"
 #include "mdnie.h"
+#endif
 #endif
 #ifdef CONFIG_HAS_WAKELOCK
 #include <linux/wakelock.h>
@@ -604,7 +609,11 @@ static int s3cfb_probe(struct platform_device *pdev)
 #ifdef CONFIG_FB_S5P_MDNIE
 		/*  only FIMD0 is supported */
 		if (i == 0)
+#ifdef CONFIG_MACH_KONA
+			mdnie_setup();
+#else
 			s3c_mdnie_setup();
+#endif
 #endif
 		/* hw setting */
 		s3cfb_init_global(fbdev[i]);
@@ -636,8 +645,12 @@ static int s3cfb_probe(struct platform_device *pdev)
 				pdata->set_display_path();
 
 			s3cfb_set_dualrgb(fbdev[i], S3C_DUALRGB_MDNIE);
+#ifdef CONFIG_MACH_KONA
+			mdnie_display_on(fbdev[i]);
+#else
 			s3c_mdnie_init_global(fbdev[i]);
 			s3c_mdnie_display_on(fbdev[i]);
+#endif
 		}
 #endif
 		s3cfb_enable_window(fbdev[0], pdata->default_win);
@@ -916,7 +929,11 @@ void s3cfb_early_suspend(struct early_suspend *h)
 		ret = s3cfb_display_off(fbdev[i]);
 
 #ifdef CONFIG_FB_S5P_MDNIE
+#ifdef CONFIG_MACH_KONA
+		ret += mdnie_display_off();
+#else
 		ret += s3c_mdnie_display_off();
+#endif
 #endif
 
 		if (ret > 0)
@@ -1023,9 +1040,13 @@ void s3cfb_late_resume(struct early_suspend *h)
 #if defined(CONFIG_FB_S5P_S6C1372) || defined(CONFIG_FB_S5P_S6F1202A)
 		s5c1372_ldi_enable();
 #endif
+#ifdef CONFIG_MACH_KONA
+		mdnie_display_on(fbdev[i]);
+#else
 		s3c_mdnie_init_global(fbdev[i]);
 		set_mdnie_value(g_mdnie, 1);
 		s3c_mdnie_display_on(fbdev[i]);
+#endif
 #endif
 		s3cfb_display_on(fbdev[i]);
 

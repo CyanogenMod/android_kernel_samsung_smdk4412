@@ -112,12 +112,34 @@ config SENSORS_AL3201
 
 	  Say N here if you do not use AL3201.
 
+config SENSORS_K2DH
+	tristate "K2DH acceleration sensor support"
+	depends on I2C
+        default n
+	help
+	  Say Y here if you use K2DH.
+	  This option enables accelerometer sensors using
+	  STM K2DH in K2DH device driver.
+
+	  Say N here if you do not use K2DH.
+
 config SENSORS_K3DH
 	tristate "K3DH acceleration sensor support"
 	depends on I2C
         default n
 	help
 	  Driver for STMicroelectronic K3DH accelerometer.
+
+config SENSOR_K3DH_INPUTDEV
+	bool "K3DH acceleration sensor input dev support"
+	depends on SENSORS_K3DH
+        default n
+	help
+	  Say Y here if you use K3DH.
+	  This option enables accelerometer sensor using
+	  K3DH device driver.
+
+	  Say N here if you do not use K3DH.
 
 config SENSORS_K3G
 	tristate "K3G driver for s5pc210"
@@ -139,4 +161,36 @@ config SENSORS_LPS331
 	depends on I2C
 	help
 	  Driver for STMicro LPS331
+
+config SENSORS_YAS532
+	depends on I2C
+	tristate "yas532 Sensor Support"
+	default n
+	help
+	  Say Y to enable YAS532 Magnetic Sensor support.
+	  This allows control of supported Magnetic Sensor.
+
+config SENSORS_YAS_ORI
+	depends on I2C
+	tristate "yas orientation Sensor Support"
+	default n
+	help
+	  Say Y to enable YAS532 Magnetic Sensor support.
+	  This allows control of supported Magnetic Sensor.
+
+config INPUT_YAS_MAGNETOMETER_POSITION
+         int "YAS Geomagnetic Sensor Mounting Position on Board"
+         depends on I2C
+         default "0"
+         help
+           Chip mounting position (pin 1).
+              0: top, upper-left
+              1: top, upper-right
+              2: top, lower-right
+              3: top, lower-left
+              4: bottom, upper-left
+              5: bottom, upper-right
+              6: bottom, lower-right
+              7: bottom, lower-left
+
 endif

@@ -652,6 +652,15 @@ config VIDEO_SLP_S5C73M3
 	---help---
 	  This driver supports s5c73m3 ISP camera module with MIPI CSI-2 as well
 
+config VIDEO_SR130PC20
+	tristate "SR130PC20 camera driver"
+	depends on I2C && VIDEO_V4L2
+	---help---
+	  This driver supports SR130PC20 SoC camera module.
+	  The SR130PC20 camera module uses siliconfile camera sensor
+	  supporting 1.3M capture with MIPI interface. And also, It support
+	  VGA recording with 25fps.
+
 config VIDEO_IMPROVE_STREAMOFF
 	bool "Improve shtter lag"
 	depends on VIDEO_FIMC_MIPI

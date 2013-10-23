@@ -304,10 +304,35 @@ static ssize_t get_chip_name(struct device *dev,
 {
 	return sprintf(buf, "%s\n", CHIP_NAME);
 }
+#if defined(CONFIG_MACH_KONA)
+static ssize_t al3201_lux_show(struct device *dev,
+		struct device_attribute *attr, char *buf)
+{
+	int result;
+	struct input_dev *input = to_input_dev(dev);
+	struct al3201_data *data = input_get_drvdata(input);
+
+	/* No LUX data if not operational */
+	if (data->state == OFF) {
+		al3201_set_power_state(data->client, ON);
+		msleep(180);
+	}
+
+	result = al3201_get_adc_value(data->client);
+
+	if (data->state == OFF)
+		al3201_set_power_state(data->client, OFF);
+
+	return sprintf(buf, "%d\n", result);
+}
+#endif
 
 static DEVICE_ATTR(raw_data, 0644, al3201_raw_data_show, NULL);
 static DEVICE_ATTR(vendor, 0644, get_vendor_name, NULL);
 static DEVICE_ATTR(name, 0644, get_chip_name, NULL);
+#if defined(CONFIG_MACH_KONA)
+static DEVICE_ATTR(lux, 0644, al3201_lux_show, NULL);
+#endif
 
 /* factory test*/
 #ifdef LSC_DBG
@@ -582,26 +607,38 @@ static int __devinit al3201_probe(struct i2c_client *client,
 		       dev_attr_name.attr.name);
 		goto err_light_device_create_file3;
 	}
+	
+#if defined(CONFIG_MACH_KONA)
+	if (device_create_file(data->light_dev, &dev_attr_lux) < 0) {
+		pr_err("%s: could not create device file(%s)!\n", __func__,
+		       dev_attr_lux.attr.name);
+		goto err_light_device_create_file4;
+	}
+#endif
 
 	dev_set_drvdata(data->light_dev, data);
 	pr_info("%s: success!\n", __func__);
 	goto done;
 
- err_light_device_create_file3:
+#if defined(CONFIG_MACH_KONA)
+err_light_device_create_file4:
+	device_remove_file(data->light_dev, &dev_attr_lux);
+#endif
+err_light_device_create_file3:
 	device_remove_file(data->light_dev, &dev_attr_vendor);
 err_light_device_create_file2:
 	device_remove_file(data->light_dev, &dev_attr_raw_data);
 err_light_device_create_file1:
 	sensors_classdev_unregister(data->light_dev);
- err_light_device_create:
+err_light_device_create:
 	sysfs_remove_group(&data->input->dev.kobj, &al3201_attribute_group);
- err_sysfs_create_group_light:
+err_sysfs_create_group_light:
 	input_unregister_device(data->input);
- err_input_register_device_light:
- err_input_allocate_device_light:
+err_input_register_device_light:
+err_input_allocate_device_light:
 	destroy_workqueue(data->wq);
- err_create_workqueue:
- err_initializ_chip:
+err_create_workqueue:
+err_initializ_chip:
 	mutex_destroy(&data->lock);
 	kfree(data);
  done:

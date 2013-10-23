@@ -71,6 +71,13 @@ char Firmware_checksum[] = { 0x1F, 0x27, 0x85, 0x8B, 0xFB, };
 const char B713X_checksum[] = { 0x1F, 0xB5, 0x84, 0x38, 0x34, };
 /*checksum for 0x16*/
 const char B660X_checksum[] = { 0x1F, 0x83, 0x88, 0xD4, 0x67, };
+#elif defined(CONFIG_MACH_KONA)
+const unsigned int Binary_nLength = 0xCBCB;
+const unsigned char Mpu_type = 0x00;
+unsigned int Firmware_version_of_file = 0x65D;
+unsigned char *firmware_name = "epen/W9002_B781.bin";
+
+char Firmware_checksum[] = { 0x1F, 0x72, 0xCD, 0x6E, 0xE3, };
 #endif
 
 void wacom_i2c_set_firm_data(unsigned char *Binary_new)

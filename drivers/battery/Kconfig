@@ -45,6 +45,15 @@ config BATTERY_MAX17047_FUELGAUGE
 	  in handheld and portable equipment. The MAX17047 is configured
 	  to operate with a single lithium cell
 
+config BATTERY_MAX17047_C_FUELGAUGE
+	tristate "Maxim MAX17047 Fuel Gauge - COULOMB_COUNTING"
+	depends on I2C
+	help
+	  MAX17047 is fuel-gauge systems for lithium-ion (Li+) batteries
+	  in handheld and portable equipment. The MAX17047 is configured
+	  to operate with a single lithium cell
+
+
 config BATTERY_SMB136_CHARGER
 	tristate "SMB136 battery charger support"
 	depends on I2C

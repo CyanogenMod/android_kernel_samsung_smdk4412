@@ -22,6 +22,15 @@
 #ifndef _LINUX_EXYNOS_T0_SOUND_H
 #define _LINUX_EXYNOS_T0_SOUND_H
 
+#ifdef CONFIG_USE_ADC_DET
+struct jack_zone {
+	unsigned int adc_high;
+	unsigned int delay_ms;
+	unsigned int check_count;
+	unsigned int jack_type;
+};
+#endif
+
 struct exynos_sound_platform_data {
 	void (*set_lineout_switch) (int on);
 	void (*set_ext_main_mic) (int on);
@@ -33,6 +42,11 @@ struct exynos_sound_platform_data {
 #endif
 	int dcs_offset_l;
 	int dcs_offset_r;
+#ifdef CONFIG_USE_ADC_DET
+	struct jack_zone *zones;
+	int	num_zones;
+	int use_jackdet_type;
+#endif
 };
 
 #ifdef CONFIG_EXYNOS_SOUND_PLATFORM_DATA

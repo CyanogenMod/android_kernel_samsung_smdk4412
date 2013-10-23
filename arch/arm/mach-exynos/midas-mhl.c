@@ -54,7 +54,8 @@ static void sii9234_cfg_gpio(void)
 
 #if !defined(CONFIG_MACH_C1_KOR_LGT) && !defined(CONFIG_SAMSUNG_MHL_9290)
 #if !defined(CONFIG_MACH_P4NOTE) && !defined(CONFIG_MACH_T0) && \
-	!defined(CONFIG_MACH_M3) && !defined(CONFIG_MACH_SLP_T0_LTE)
+	!defined(CONFIG_MACH_M3) && !defined(CONFIG_MACH_SLP_T0_LTE) && \
+	!defined(CONFIG_MACH_KONA)
 	s3c_gpio_cfgpin(GPIO_MHL_SEL, S3C_GPIO_OUTPUT);
 	s3c_gpio_setpull(GPIO_MHL_SEL, S3C_GPIO_PULL_NONE);
 	gpio_set_value(GPIO_MHL_SEL, GPIO_LEVEL_LOW);
@@ -181,7 +182,8 @@ static void sii9234_reset(void)
 }
 
 #ifndef CONFIG_SAMSUNG_USE_11PIN_CONNECTOR
-#ifndef CONFIG_MACH_P4NOTE
+#if defined(CONFIG_MACH_P4NOTE) || defined(CONFIG_MACH_KONA)
+#else
 static void mhl_usb_switch_control(bool on)
 {
 	printk(KERN_INFO "%s() [MHL] USB path change : %s\n",
@@ -204,7 +206,7 @@ static void mhl_usb_switch_control(bool on)
 static struct sii9234_platform_data sii9234_pdata = {
 	.init = sii9234_cfg_gpio,
 #if defined(CONFIG_SAMSUNG_USE_11PIN_CONNECTOR) || \
-		defined(CONFIG_MACH_P4NOTE)
+		defined(CONFIG_MACH_P4NOTE) || defined(CONFIG_MACH_KONA)
 	.mhl_sel = NULL,
 #else
 	.mhl_sel = mhl_usb_switch_control,
@@ -258,7 +260,8 @@ static int __init midas_mhl_init(void)
 	}
 #if defined(CONFIG_MACH_T0_EUR_OPEN) || defined(CONFIG_MACH_T0_CHN_OPEN)
 	sii9234_pdata.ddc_i2c_num = 6;
-#elif defined(CONFIG_MACH_P4NOTE) || defined(CONFIG_MACH_T0)
+#elif defined(CONFIG_MACH_P4NOTE) || defined(CONFIG_MACH_T0) \
+	 || defined(CONFIG_MACH_KONA)
 	sii9234_pdata.ddc_i2c_num = 5;
 #else
 	sii9234_pdata.ddc_i2c_num = (system_rev == 3 ? 16 : 5);
