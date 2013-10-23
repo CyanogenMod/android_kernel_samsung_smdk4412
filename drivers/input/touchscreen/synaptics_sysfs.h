@@ -15,6 +15,7 @@
 #include <linux/wakelock.h>
 
 #define SYNAPTICS_FW "/sdcard/firmware/synaptics_fw"
+#define SYNAPTICS_FW2 "/sdcard/synaptics_fw.img"
 #define FULL_RAW_CAP_LOWER_LIMIT	1000
 #define FULL_RAW_CAP_UPPER_LIMIT	3000
 #define MAX_RX_SIZE		45

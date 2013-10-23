@@ -399,39 +399,79 @@ int synaptics_fw_updater(struct synaptics_drv_data *data, u8 *fw_data)
 {
 	struct synaptics_ts_fw_block *fw;
 	int irq = gpio_to_irq(data->gpio);
-	bool update = true;
+	bool update = false;
 
 	fw = kzalloc(sizeof(struct synaptics_ts_fw_block), GFP_KERNEL);
 	data->fw = fw;
 
 	if (NULL == fw_data) {
-		u8 *buf, *fw_version;
-		buf = kzalloc(4, GFP_KERNEL);
-		fw_version = kzalloc(4, GFP_KERNEL);
+		u8 buf[5] = {0, };
+#if defined(CONFIG_TOUCHSCREEN_SYNAPTICS_S7301_KEYS)
+		if (data->pdata->support_extend_button) {
+			fw->fw_data = (u8 *)rmi_fw_button;
+
+			/* set firmware data */
+			data->firm_version[0] = rmi_fw_button[0xb100];
+			data->firm_version[1] = rmi_fw_button[0xb101];
+			data->firm_version[2] = rmi_fw_button[0xb102];
+			data->firm_version[3] = rmi_fw_button[0xb103];
+			data->firm_version[4] = '\0';
+
+			strncpy(data->firm_config, rmi_config_ver_button,
+				sizeof(data->firm_config));
+		} else {
+			fw->fw_data = (u8 *)rmi_fw;
+
+			data->firm_version[0] = rmi_fw[0xb100];
+			data->firm_version[1] = rmi_fw[0xb101];
+			data->firm_version[2] = rmi_fw[0xb102];
+			data->firm_version[3] = rmi_fw[0xb103];
+			data->firm_version[4] = '\0';
+
+			strncpy(data->firm_config, rmi_config_ver,
+				sizeof(data->firm_config));
+		}
+#else
 		fw->fw_data = (u8 *)rmi_fw;
-		strncpy(fw_version, &rmi_fw[0xb100],
-			sizeof(fw_version));
-		strncpy(data->firm_version, fw_version,
-			sizeof(data->firm_version));
+
+		data->firm_version[0] = rmi_fw[0xb100];
+		data->firm_version[1] = rmi_fw[0xb101];
+		data->firm_version[2] = rmi_fw[0xb102];
+		data->firm_version[3] = rmi_fw[0xb103];
+		data->firm_version[4] = '\0';
+
 		strncpy(data->firm_config, rmi_config_ver,
 			sizeof(data->firm_config));
-		synaptics_ts_read_block(data,
+#endif
+		if (synaptics_ts_read_block(data,
 			data->f34.control_base_addr,
-			buf, 4);
+			buf, 4) > 0)
+			printk(KERN_DEBUG "[TSP] block read success!\n");
+		else
+			printk(KERN_DEBUG "[TSP] block read failed!\n");
 
-		printk(KERN_DEBUG "[TSP] IC FW. : [%s], new FW. : [%s]\n",
-			buf, fw_version);
+		printk(KERN_DEBUG "[TSP] IC FW. : [%c%c%.2d%.2d00], new FW. : [%c%c%.2d%.2d00]\n",
+			buf[0],buf[1],buf[2],buf[3],
+			data->firm_version[0],data->firm_version[1],
+			data->firm_version[2],data->firm_version[3]);
 
-		if (strncmp((char *)fw_version, (char *)buf, 4) == 0)
-			update = false;
-
-		kfree(buf);
-		kfree(fw_version);
-
-	} else
+		/* update firm > tsp */
+		/*
+		if (strcmp(data->firm_version, buf) > 0) {
+			printk(KERN_DEBUG "[TSP] update!\n");
+			update = true;
+		}
+		*/
+		/* update if firm != tsp */
+		if (strncmp(data->firm_version, buf, 4) != 0)
+			update = true;
+	} else {
 		fw->fw_data = fw_data;
-
+        update = true;
+    }
+	
 	if (update) {
+		printk(KERN_DEBUG "[TSP] tsp update!!\n");
 		disable_irq(irq);
 		wake_lock(&data->wakelock);
 		synaptics_fw_initialize(data);
@@ -463,6 +503,13 @@ int synaptics_fw_updater(struct synaptics_drv_data *data, u8 *fw_data)
 
 void forced_fw_update(struct synaptics_drv_data *data)
 {
+#if defined(CONFIG_TOUCHSCREEN_SYNAPTICS_S7301_KEYS)
+	if (data->pdata->support_extend_button)
+		synaptics_fw_updater(data, (u8 *)rmi_fw_button);
+	else
+		synaptics_fw_updater(data, (u8 *)rmi_fw);
+#else
 	synaptics_fw_updater(data, (u8 *)rmi_fw);
+#endif
 }
 

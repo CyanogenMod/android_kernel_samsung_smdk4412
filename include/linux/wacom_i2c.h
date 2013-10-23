@@ -47,7 +47,11 @@
 #define COM_CHECKSUM       0x63
 
 /*I2C address for digitizer and its boot loader*/
-#define WACOM_I2C_ADDR 0x56
+#ifdef CONFIG_EPEN_WACOM_G9PL
+#define WACOM_I2C_BOOT 0x09
+#else
+#define WACOM_I2C_BOOT 0x57
+#endif
 #define WACOM_I2C_BOOT 0x57
 
 /*Information for input_dev*/
@@ -73,7 +77,11 @@
 #define PDCT_NOSIGNAL 1
 #define PDCT_DETECT_PEN 0
 
+#ifdef CONFIG_MACH_KONA
+#define WACOM_PRESSURE_MAX 1024
+#else
 #define WACOM_PRESSURE_MAX 255
+#endif
 
 /*Digitizer Type*/
 #define EPEN_DTYPE_B660	1
@@ -272,6 +280,31 @@
 
 #endif
 
+#elif defined(CONFIG_MACH_KONA)
+
+#define WACOM_DVFS_LOCK_FREQ 800000
+#ifdef CONFIG_SEC_TOUCHSCREEN_DVFS_LOCK
+#define SEC_BUS_LOCK
+#endif
+#define WACOM_HAVE_FWE_PIN
+#define WACOM_USE_SOFTKEY
+
+#define BATTERY_SAVING_MODE
+#define WACOM_CONNECTION_CHECK
+
+#define WACOM_MAX_COORD_X 10804
+#define WACOM_MAX_COORD_Y 17322
+#define WACOM_POSX_OFFSET 100
+#define WACOM_POSY_OFFSET 100
+#define WACOM_MAX_PRESSURE 1023
+
+#define WACOM_IRQ_WORK_AROUND
+#define WACOM_PEN_DETECT
+/* For Android origin */
+#define WACOM_POSX_MAX WACOM_MAX_COORD_Y
+#define WACOM_POSY_MAX WACOM_MAX_COORD_X
+
+#define COOR_WORK_AROUND
 
 #endif /*End of Model config*/
 
@@ -309,9 +342,9 @@ static struct wacom_features wacom_feature_EMR = {
 	.y_max = 0x34F8,
 	.pressure_max = 0xFF,
 #else
-	.x_max = 16128,
-	.y_max = 8448,
-	.pressure_max = 256,
+	.x_max = WACOM_MAX_COORD_X,
+	.y_max = WACOM_MAX_COORD_Y,
+	.pressure_max = WACOM_MAX_PRESSURE,
 #endif
 	.comstat = COM_QUERY,
 	.data = {0, 0, 0, 0, 0, 0, 0},

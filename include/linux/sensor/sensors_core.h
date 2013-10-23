@@ -13,6 +13,9 @@
 
 extern struct device *sensors_classdev_register(char *sensors_name);
 extern void sensors_classdev_unregister(struct device *dev);
+extern int sensors_register(struct device *dev,
+	void *drvdata, struct device_attribute *attributes[], char *name);
+extern void sensors_unregister(struct device *dev);
 
 struct accel_platform_data {
 	int (*accel_get_position) (void);

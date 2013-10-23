@@ -38,9 +38,9 @@
 /* #define CONFIG_DEBUG_NO_FRAME */
 
 /** Debuging Feature **/
-/* #define CONFIG_CAM_DEBUG */
-/* #define CONFIG_CAM_TRACE */ /* Enable it with CONFIG_CAM_DEBUG */
-/* #define CONFIG_CAM_AF_DEBUG *//* Enable it with CONFIG_CAM_DEBUG */
+#define CONFIG_CAM_DEBUG
+#define CONFIG_CAM_TRACE /* Enable it with CONFIG_CAM_DEBUG */
+#define CONFIG_CAM_AF_DEBUG //* Enable it with CONFIG_CAM_DEBUG */
 /* #define DEBUG_WRITE_REGS */
 /***********************************/
 
@@ -193,6 +193,11 @@ enum isx012_preview_frame_size {
 	PREVIEW_SZ_320x240,	/* 320x240 */
 	PREVIEW_SZ_CIF,		/* 352x288 */
 	PREVIEW_SZ_528x432,	/* 528x432 */
+#if defined(CONFIG_MACH_P4NOTELTE_KOR_SKT) \
+	|| defined(CONFIG_MACH_P4NOTELTE_KOR_KT) \
+	|| defined(CONFIG_MACH_P4NOTELTE_KOR_LGT) /*For 4G VT call in Domestic*/
+	PREVIEW_SZ_VERTICAL_VGA,	/* 480x640 */
+#endif
 	PREVIEW_SZ_VGA,		/* 640x480 */
 	PREVIEW_SZ_D1,		/* 720x480 */
 	PREVIEW_SZ_880x720,	/* 880x720 */
@@ -458,12 +463,12 @@ struct regset_table {
 	const char	*const name;
 };
 
-#define ISX012_REGSET(x, y)		\
+#define ISX012_REGSET(x, y, z)		\
 	[(x)] = {			\
 		.name		= #y,	\
 	}
 
-#define ISX012_REGSET_TABLE(y)	\
+#define ISX012_REGSET_TABLE(y, z)	\
 	{				\
 		.name		= #y,	\
 	}
@@ -476,31 +481,36 @@ struct regset_table {
 #ifdef DEBUG_WRITE_REGS
 	const char	* const name;
 #endif
+	const u32	burst;	/* on/off */
 };
 
 #ifdef DEBUG_WRITE_REGS
-#define ISX012_REGSET(x, y)		\
+#define ISX012_REGSET(x, y, z)		\
 	[(x)] = {					\
 		.reg		= (y),			\
 		.array_size	= ARRAY_SIZE((y)),	\
 		.name		= #y,			\
+		.burst		= z,			\
 	}
-#define ISX012_REGSET_TABLE(y)		\
+#define ISX012_REGSET_TABLE(y, z)		\
 	{					\
 		.reg		= (y),			\
 		.array_size	= ARRAY_SIZE((y)),	\
 		.name		= #y,			\
+		.burst		= z,			\
 	}
 #else /* !DEBUG_WRITE_REGS */
-#define ISX012_REGSET(x, y)		\
+#define ISX012_REGSET(x, y, z)		\
 	[(x)] = {					\
 		.reg		= (y),			\
 		.array_size	= ARRAY_SIZE((y)),	\
+		.burst		= z,			\
 	}
-#define ISX012_REGSET_TABLE(y)		\
+#define ISX012_REGSET_TABLE(y, z)		\
 	{					\
 		.reg		= (y),			\
 		.array_size	= ARRAY_SIZE((y)),	\
+		.burst		= z,			\
 	}
 #endif /* DEBUG_WRITE_REGS */
 
@@ -558,6 +568,11 @@ struct isx012_regs {
 
 	struct regset_table init_reg;
 	struct regset_table set_pll_4;
+	struct regset_table shading_0;
+	struct regset_table shading_1;
+	struct regset_table shading_2;
+	struct regset_table shading_nocal;
+
 #ifdef CONFIG_VIDEO_ISX012_P8
 	struct regset_table antibanding;
 #endif /* CONFIG_VIDEO_ISX012_P8 */
@@ -658,7 +673,7 @@ extern int isx012_create_file(struct class *cls);
 #define ISX012_CNT_CM_CHECK		280 /* 160 -> 180 */
 #define ISX012_CNT_STREAMOFF		300
 
-#define AF_SEARCH_COUNT			200
+#define AF_SEARCH_COUNT			550 /* about 6s */
 #define AE_STABLE_SEARCH_COUNT		7
 
 /* Sensor AF first,second window size.
@@ -736,6 +751,10 @@ extern int isx012_create_file(struct class *cls);
 #define TUNING_FILE_PATH "/mnt/sdcard/isx012_regs.h"
 #endif /* CONFIG_LOAD_FILE*/
 
+#ifdef CONFIG_MACH_KONA
+#include "isx012_regs_kona.h"
+#else /* P4NOTE */
 #include "isx012_regs.h"
+#endif
 
 #endif /* __ISX012_H__ */

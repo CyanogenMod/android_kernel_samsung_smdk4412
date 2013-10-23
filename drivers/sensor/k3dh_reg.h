@@ -102,6 +102,7 @@
 #define I1_OVERRUN		(1 << 1)
 
 /* CTRL_REG4 */
+#define CTRL_REG4_BDU		(1 << 7)
 #define CTRL_REG4_BLE		(1 << 6)
 #define CTRL_REG4_FS1		(1 << 5)
 #define CTRL_REG4_FS0		(1 << 4)

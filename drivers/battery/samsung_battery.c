@@ -2007,6 +2007,14 @@ static int samsung_battery_set_property(struct power_supply *ps,
 		case POWER_SUPPLY_PROP_VOLTAGE_MIN_DESIGN:
 			info->pdata->voltage_min = val->intval;
 			break;
+#if defined(CONFIG_MACH_KONA)
+		case POWER_SUPPLY_PROP_COMPENSATION_3:
+			info->is_comp_3 = val->intval;
+			break;
+		case POWER_SUPPLY_PROP_COMPENSATION_1:	
+			info->is_comp_1 = val->intval;
+			break;			
+#endif
 		default:
 			return -EINVAL;
 		}
@@ -2037,12 +2045,19 @@ static int samsung_usb_get_property(struct power_supply *ps,
 		return -EINVAL;
 
 	/* Set enable=1 only if the USB charger is connected */
-	val->intval = ((info->charge_virt_state !=
-				POWER_SUPPLY_STATUS_DISCHARGING) &&
-			((info->cable_type == POWER_SUPPLY_TYPE_USB) ||
+#if defined(CONFIG_MACH_KONA)
+	val->intval = (((info->cable_type == POWER_SUPPLY_TYPE_USB) ||
 			(info->cable_type == POWER_SUPPLY_TYPE_USB_CDP) ||
 			((info->cable_type == POWER_SUPPLY_TYPE_DOCK) &&
 				(info->online_prop == ONLINE_PROP_USB))));
+#else
+	val->intval = ((info->charge_virt_state !=
+			POWER_SUPPLY_STATUS_DISCHARGING) &&
+		((info->cable_type == POWER_SUPPLY_TYPE_USB) ||
+		(info->cable_type == POWER_SUPPLY_TYPE_USB_CDP) ||
+		((info->cable_type == POWER_SUPPLY_TYPE_DOCK) &&
+			(info->online_prop == ONLINE_PROP_USB))));
+#endif
 
 	return 0;
 }
@@ -2161,9 +2176,11 @@ static __devinit int samsung_battery_probe(struct platform_device *pdev)
 	pr_info("%s: VF detect source: %s\n", __func__,
 		vf_src_name[info->pdata->vf_det_src]);
 
+#if !defined(CONFIG_MACH_KONA)
 	/* recalculate recharge voltage, it depends on max voltage value */
 	info->pdata->recharge_voltage = info->pdata->voltage_max -
 							RECHG_DROP_VALUE;
+#endif
 	pr_info("%s: Recharge voltage: %d\n", __func__,
 				info->pdata->recharge_voltage);
 

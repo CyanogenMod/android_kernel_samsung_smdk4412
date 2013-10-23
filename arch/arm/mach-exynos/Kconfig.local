@@ -271,6 +271,28 @@ config MACH_BAFFIN_KOR_LGT
 	bool "LG U+"
 endchoice
 
+choice
+	prompt "KONA Note8 Target Carrier"
+	depends on MACH_KONA &&\
+	(TARGET_LOCALE_EUR || TARGET_LOCALE_USA || TARGET_LOCALE_KOR)
+	default MACH_KONA_EUR_OPEN
+
+config MACH_KONA_EUR_OPEN
+	bool "KONA Note8 EUR OPEN 3G"
+
+config MACH_KONA_EUR_WIFI
+	bool "KONA Note8 EUR wifi"
+
+config MACH_KONA_EUR_LTE
+	bool "KONA Note8 EUR LTE"
+
+config MACH_KONALTE_USA_ATT
+	bool "ATT"
+
+config MACH_KONA_KOR_WIFI
+	bool "KONA Note8 KOR ANY"
+endchoice
+
 menu "M0 CTC based models"
 	depends on MACH_M0_CTC && TARGET_LOCALE_CHN
 

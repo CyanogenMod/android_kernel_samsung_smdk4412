@@ -15,11 +15,16 @@ obj-$(CONFIG_FB_S5P_WA101S)	+= s3cfb_wa101s.o
 obj-$(CONFIG_FB_S5P_AMS369FG06)	+= s3cfb_ams369fg06.o
 obj-$(CONFIG_FB_S5P_LD9040)	+= ld9040.o smart_dimming_ld9042.o
 obj-$(CONFIG_FB_S5P_NT35560)	+= nt35560.o
+ifeq ($(CONFIG_MACH_KONA),y)
+obj-$(CONFIG_FB_S5P_MDNIE)      += s3cfb_mdnie_kona.o s3cfb_ielcd_kona.o mdnie_kona.o mdnie_tuning_kona.o
+else
 obj-$(CONFIG_FB_S5P_MDNIE)      += s3cfb_mdnie.o s3cfb_ielcd.o mdnie.o mdnie_tunning.o
+endif
 obj-$(CONFIG_FB_S5P_LMS501KF03)	+= s3cfb_lms501kf03.o
 obj-$(CONFIG_FB_S5P_LMS501XX)	+= s3cfb_lms501xx.o
 obj-$(CONFIG_FB_S5P_DUMMY_MIPI_LCD)	+= s3cfb_dummymipilcd.o
 obj-$(CONFIG_FB_S5P_S6E8AA0)	+= s3cfb_s6e8aa0.o smart_dimming.o
+obj-$(CONFIG_FB_S5P_NT71391)	+= s3cfb_nt71391.o
 obj-$(CONFIG_FB_S5P_EA8061)	+= s3cfb_ea8061.o smart_dimming_ea8061.o
 obj-$(CONFIG_FB_S5P_S6EVR02)	+= s3cfb_s6evr02.o smart_dimming_s6evr02.o s3cfb_ea8061.o smart_dimming_ea8061.o
 obj-$(CONFIG_FB_S5P_S6E8AB0)	+= s3cfb_s6e8ab0.o smart_dimming_s6e8ab0.o

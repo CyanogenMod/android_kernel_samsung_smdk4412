@@ -424,6 +424,13 @@ config BACKLIGHT_SMART_DIMMING
 	help
 	  Say Y to enable the Smart Dimming Feature.
 
+config BACKLIGHT_LP855X
+	tristate "Backlight driver for TI LP855X"
+	depends on BACKLIGHT_CLASS_DEVICE && I2C
+	help
+	  This supports TI LP8550, LP8551, LP8552, LP8553 and LP8556
+	  backlight driver.
+
 endif # BACKLIGHT_CLASS_DEVICE
 
 endif # BACKLIGHT_LCD_SUPPORT

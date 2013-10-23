@@ -407,6 +407,7 @@ static inline void exynos4_default_sdhci3(void) { }
 #endif /* CONFIG_EXYNOS4_SETUP_SDHCI */
 
 extern void mmc_force_presence_change(struct platform_device *pdev);
+extern void mmc_force_presence_change_onoff(struct platform_device *pdev, int val);
 
 /* EXYNOS5 SDHCI setup */
 #ifdef CONFIG_EXYNOS4_SETUP_SDHCI
