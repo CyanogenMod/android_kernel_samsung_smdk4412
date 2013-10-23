@@ -25,7 +25,11 @@
 #include <linux/uaccess.h>
 #include <linux/firmware.h>
 #include "wacom_i2c_func.h"
+#ifdef CONFIG_EPEN_WACOM_G9PL
+#include "w9002_flash.h"
+#else
 #include "wacom_i2c_flash.h"
+#endif
 #ifdef WACOM_IMPORT_FW_ALGO
 #include "wacom_i2c_coord_tables.h"
 #endif
@@ -151,19 +155,29 @@ int wacom_i2c_get_ums_data(struct wacom_i2c *wac_i2c, u8 **ums_data)
 		"[E-PEN] start, file path %s, size %ld Bytes\n",
 		WACOM_FW_PATH, fsize);
 
+#ifndef CONFIG_MACH_KONA
 	if (fsize != nSize) {
 		printk(KERN_ERR "[E-PEN] UMS firmware size is different\n");
 		ret = -EFBIG;
 		goto size_error;
 	}
+#endif
 
+#ifdef CONFIG_MACH_KONA
+	*ums_data = kmalloc(65536*2, GFP_KERNEL);
+#else
 	*ums_data = kmalloc(fsize, GFP_KERNEL);
+#endif
 	if (IS_ERR(*ums_data)) {
 		printk(KERN_ERR
 			"[E-PEN] %s, kmalloc failed\n", __func__);
 		ret = -EFAULT;
 		goto malloc_error;
 	}
+
+#ifdef CONFIG_MACH_KONA
+	memset((void *)*ums_data, 0xff, 65536*2);
+#endif
 
 	nread = vfs_read(fp, (char __user *)*ums_data,
 		fsize, &fp->f_pos);
@@ -223,12 +237,25 @@ int wacom_i2c_fw_update_UMS(struct wacom_i2c *wac_i2c)
 	return 0;
 }
 
-#if defined(CONFIG_MACH_Q1_BD) || defined(CONFIG_MACH_T0)
+#if defined(CONFIG_MACH_Q1_BD) || defined(CONFIG_MACH_T0)\
+	|| defined(CONFIG_MACH_KONA)
 int wacom_i2c_firm_update(struct wacom_i2c *wac_i2c)
 {
 	int ret;
 	int retry = 3;
 	const struct firmware *firm_data = NULL;
+	
+#if defined(CONFIG_MACH_KONA)
+	u8 *flash_data;
+
+	flash_data = kmalloc(65536*2, GFP_KERNEL);
+	if (IS_ERR(flash_data)) {
+		printk(KERN_ERR
+			"[E-PEN] %s, kmalloc failed\n", __func__);
+		return -1;
+	}
+	memset((void *)flash_data, 0xff, 65536*2);
+#endif
 
 	firmware_updating_state = true;
 
@@ -242,8 +269,14 @@ int wacom_i2c_firm_update(struct wacom_i2c *wac_i2c)
 			       ret, retry);
 			continue;
 		}
+#if defined(CONFIG_MACH_KONA)
+		memcpy((void *)flash_data,
+				(const void *)firm_data->data,
+				firm_data->size);
+		wacom_i2c_set_firm_data((unsigned char *)flash_data);
+#else
 		wacom_i2c_set_firm_data((unsigned char *)firm_data->data);
-
+#endif
 		ret = wacom_i2c_flash(wac_i2c);
 
 		if (ret == 0) {
@@ -259,6 +292,10 @@ int wacom_i2c_firm_update(struct wacom_i2c *wac_i2c)
 	}
 
 	firmware_updating_state = false;
+	
+#if defined(CONFIG_MACH_KONA)
+	kfree(flash_data);
+#endif
 
 	if (ret < 0)
 		return -1;
@@ -535,6 +572,14 @@ static void wacom_i2c_set_input_values(struct i2c_client *client,
 
 	/*  __set_bit(BTN_STYLUS2, input_dev->keybit); */
 	/*  __set_bit(ABS_MISC, input_dev->absbit); */
+	
+	/*softkey*/
+#ifdef WACOM_USE_SOFTKEY
+	__set_bit(EV_LED, input_dev->evbit);
+	__set_bit(LED_MISC, input_dev->ledbit);
+	__set_bit(KEY_MENU, input_dev->keybit);
+	__set_bit(KEY_BACK, input_dev->keybit);
+#endif
 }
 
 static int wacom_check_emr_prox(struct wacom_g5_callbacks *cb)
@@ -1349,6 +1394,9 @@ static int wacom_i2c_probe(struct i2c_client *client,
 
 	/*Set switch type*/
 	wac_i2c->invert_pen_insert = wacom_i2c_invert_by_switch_type();
+#elif defined(CONFIG_MACH_KONA)
+	wac_i2c->wac_pdata->late_resume_platform_hw();
+	msleep(200);
 #endif
 #ifdef WACOM_PDCT_WORK_AROUND
 	wac_i2c->pen_pdct = PDCT_NOSIGNAL;
@@ -1447,7 +1495,7 @@ static int wacom_i2c_probe(struct i2c_client *client,
 		printk(KERN_ERR "[E-PEN] exynos_cpufreq_get_level Error\n");
 #ifdef SEC_BUS_LOCK
 	wac_i2c->dvfs_lock_status = false;
-#if defined(CONFIG_MACH_P4NOTE)
+#if defined(CONFIG_MACH_P4NOTE) || defined(CONFIG_MACH_KONA)
 	wac_i2c->bus_dev = dev_get("exynos-busfreq");
 #endif	/* CONFIG_MACH_P4NOTE */
 #endif	/* SEC_BUS_LOCK */

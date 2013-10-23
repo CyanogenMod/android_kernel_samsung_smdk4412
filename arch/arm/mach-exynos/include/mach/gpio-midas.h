@@ -39,6 +39,10 @@
 #include "gpio-rev00-naples.h"
 #elif defined(CONFIG_MACH_P4NOTE)
 #include "gpio-rev00-p4notepq.h"
+#elif defined(CONFIG_MACH_KONA) && defined(CONFIG_KONA_00_BD)
+#include "gpio-rev00-kona.h"
+#elif defined(CONFIG_MACH_KONA) && defined(CONFIG_KONA_01_BD)
+#include "gpio-rev01-kona.h"
 #elif defined(CONFIG_MACH_GC1)
 #include "gpio-rev00-gc1.h"
 #elif defined(CONFIG_MACH_T0_CHN_CTC)

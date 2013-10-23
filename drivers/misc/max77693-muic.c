@@ -473,7 +473,7 @@ static ssize_t max77693_muic_show_manualsw(struct device *dev,
 	struct max77693_muic_info *info = dev_get_drvdata(dev);
 
 #if !defined(CONFIG_MACH_T0) && !defined(CONFIG_MACH_M3) \
-	&& !defined(CONFIG_MACH_SLP_T0_LTE)
+	&& !defined(CONFIG_MACH_SLP_T0_LTE) && !defined(CONFIG_MACH_KONA)
 	dev_info(info->dev, "func:%s ap(0),cp(1),vps(2)sw_path:%d(%d)\n",
 		 __func__, info->muic_data->sw_path,
 			gpio_get_value(GPIO_USB_SEL));/*For debuging*/
@@ -716,7 +716,7 @@ static ssize_t max77693_muic_set_uart_sel(struct device *dev,
 
 	if (info->max77693->pmic_rev < MAX77693_REV_PASS2) {
 #if !defined(CONFIG_MACH_T0) && !defined(CONFIG_MACH_M3) \
-	&& !defined(CONFIG_MACH_SLP_T0_LTE)
+	&& !defined(CONFIG_MACH_SLP_T0_LTE) && !defined(CONFIG_MACH_KONA)
 		if (!strncasecmp(buf, "AP", 2)) {
 			info->muic_data->uart_path = UART_PATH_AP;
 			if (gpio_is_valid(GPIO_UART_SEL)) {
@@ -845,7 +845,7 @@ static ssize_t max77693_muic_show_uart_sel(struct device *dev,
 	struct max77693_muic_info *info = dev_get_drvdata(dev);
 	if (info->max77693->pmic_rev < MAX77693_REV_PASS2) {
 #if !defined(CONFIG_MACH_T0) && !defined(CONFIG_MACH_M3) \
-	&& !defined(CONFIG_MACH_SLP_T0_LTE)
+	&& !defined(CONFIG_MACH_SLP_T0_LTE) && !defined(CONFIG_MACH_KONA)
 		switch (info->muic_data->uart_path) {
 		case UART_PATH_AP:
 			if (gpio_get_value(GPIO_UART_SEL) == GPIO_LEVEL_HIGH)
@@ -3112,7 +3112,7 @@ static int uart_switch_init(struct max77693_muic_info *info)
 	int ret, val;
 
 #if !defined(CONFIG_MACH_T0) && !defined(CONFIG_MACH_M3) \
-	&& !defined(CONFIG_MACH_SLP_T0_LTE)
+	&& !defined(CONFIG_MACH_SLP_T0_LTE) && !defined(CONFIG_MACH_KONA)
 	if (info->max77693->pmic_rev < MAX77693_REV_PASS2) {
 		ret = gpio_request(GPIO_UART_SEL, "UART_SEL");
 		if (ret < 0) {

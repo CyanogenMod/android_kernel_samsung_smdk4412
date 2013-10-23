@@ -449,6 +449,11 @@ struct input_keymap_entry {
 #define KEY_FOLDER_CLOSE	252  /*only use Grande CHN CTC */
 #define KEY_3G	253  /*only use Grande CHN CTC */
 
+/* kona dummy touchkey */
+#define KEY_DUMMY_1     251
+#define KEY_DUMMY_2     252
+#define KEY_DUMMY_3     253
+
 /* Code 255 is reserved for special needs of AT keyboard driver */
 
 #define BTN_MISC		0x100
@@ -836,7 +841,14 @@ struct input_keymap_entry {
 #define SW_FRONT_PROXIMITY	0x0b  /* set = front proximity sensor active */
 #define SW_ROTATE_LOCK		0x0c  /* set = rotate locked/disabled */
 #define SW_PEN_INSERT			0x0e	/* set = pen out */
-#define SW_MAX			0x0f
+#define SW_STROBE_INSERT		0x0f	/* set = strobe out */
+//#ifdef CONFIG_SENSORS_HALL
+//#define SW_FLIP			0x10  /* set = flip cover... */
+//#define SW_MAX			0x17
+//#else
+#define SW_MAX			0x10
+//#endif
+
 #define SW_CNT			(SW_MAX+1)
 
 /*

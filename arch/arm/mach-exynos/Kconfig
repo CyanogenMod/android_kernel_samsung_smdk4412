@@ -956,7 +956,7 @@ config PANEL_U1_NA_SPR
 
 endchoice
 
-if MACH_U1 || MACH_C1 || MACH_M3 || MACH_M0 || MACH_P4 || MACH_P2 || MACH_P4NOTE || MACH_T0 || MACH_TRATS || MACH_GRANDE || MACH_GC1 || MACH_BAFFIN
+if MACH_U1 || MACH_C1 || MACH_M3 || MACH_M0 || MACH_P4 || MACH_P2 || MACH_P4NOTE || MACH_T0 || MACH_TRATS || MACH_GRANDE || MACH_GC1 || MACH_BAFFIN || MACH_KONA
 source "arch/arm/mach-exynos/Kconfig.local"
 endif
 
@@ -1090,6 +1090,11 @@ config MACH_T0
 	select S3C_DEV_I2C4
 	select S3C_DEV_I2C5
 
+config MACH_KONA
+        bool "KONA Note8 board"
+        select S3C_DEV_I2C4
+        select S3C_DEV_I2C5
+
 config MACH_IRON
 	bool "Iron board"
 	select S3C_DEV_I2C4
@@ -1129,6 +1134,14 @@ config T0_04_BD
 	bool "T0 Revison 04 board"
 	default n
 
+config KONA_00_BD
+        bool "KONA note8 rev00 common Board"
+        default n
+
+config KONA_01_BD
+        bool "KONA note8 rev01 common Board"
+        default n
+
 config IRON_BD
 	bool "Iron common Board"
 
@@ -1151,6 +1164,9 @@ config JACK_FET
 
 config JACK_GROUND_DET
 	bool "Ear Ground Detection Enable"
+
+config USE_ADC_DET
+        bool "Jack Detection with ADC IC"
 
 config SAMSUNG_ANALOG_UART_SWITCH
 	int "SAMSUNG analog switch for UART"
@@ -1599,6 +1615,16 @@ config EHCI_IRQ_DISTRIBUTION
 	bool "ehci irq distribution"
 	default n
 
+if (LINK_DEVICE_USB || LINK_DEVICE_HSIC)
+config EHCI_MODEM_PORTNUM
+        int "EHCI port number of modem connection"
+        default 2
+config CMC_MODEM_HSIC_SYSREV
+        int "System revision number which CMC modem support HSIC i/f"
+        depends on LTE_MODEM_CMC221
+        default 9
+endif
+
 if SEC_MODEM
 comment "Samsung Modem Feature"
 
@@ -1822,3 +1848,13 @@ config CORESIGHT_ETM_DEFAULT_ENABLE
 	help
 	  Turns on ETM tracing by default. Otherwise, tracing is
 	  disabled by default but can be enabled by other means.
+
+
+config MACH_KONA_SENSOR
+        bool "KONA Sensor Enable"
+        help
+          Support sensors of KONA boards
+
+          BMA254 / BOSCH
+          YAS532 / YAMAHA
+          GP2A030A / SHARP

@@ -165,8 +165,11 @@ fw-shipped-$(CONFIG_VIDEO_CPIA2) += cpia2/stv0672_vp4.bin
 fw-shipped-$(CONFIG_YAM) += yam/1200.bin yam/9600.bin
 fw-shipped-$(CONFIG_EPEN_WACOM_G5SP) += epen/W8501.bin epen/W8501_P48.bin
 fw-shipped-$(CONFIG_EPEN_WACOM_G9PM) += epen/W9001_B746.bin epen/W9001_B713.bin epen/W9001_B660.bin \
-			epen/W9001_B746S.bin epen/W9001_B746K.bin epen/W9001_B746L.bin \
-			epen/W9001_B746JD.bin
+			epen/W9001_B746S.bin epen/W9001_B746L.bin \
+			epen/W9001_B746JD.bin \
+			epen/W9001_B746VZW.bin epen/W9001_B746USC.bin \
+			epen/W9001_0700.bin
+fw-shipped-$(CONFIG_EPEN_WACOM_G9PL) += epen/W9002_B781.bin
 
 #for sensorhub
 fw-shipped-$(CONFIG_SENSORS_SSP) += ssp.fw

@@ -28,7 +28,7 @@
 /* change 4129 to 4802 */
 #define AE_SCL_SUBRACT_VALUE		4802
 
-const uint16_t aeoffset_table[] = { // normal 4.6times
+static const uint16_t aeoffset_table[] = { /* normal 4.6times */
 	0, 35, 70, 103, 136, 167, 198, 228, 257, 285,
 	313, 339, 366, 391, 416, 441, 465, 488, 511, 533,
 	555, 576, 597, 618, 638, 657, 677, 696, 714, 732,
@@ -4760,7 +4760,6 @@ static const isx012_regset_t isx012_720_Preview[] =
 {
 {0x0090,0x02D0,0x02},	 //HSIZE_MONI : 720
 {0x0096,0x01E0,0x02},	 //VSIZE_MONI : 480
-
 };
 
 static const isx012_regset_t isx012_640_Preview[] =
@@ -4768,6 +4767,15 @@ static const isx012_regset_t isx012_640_Preview[] =
 {0x0090,0x0280,0x02},	 //HSIZE_MONI : 640
 {0x0096,0x01E0,0x02},	 //VSIZE_MONI : 480
 };
+
+#if defined(CONFIG_MACH_P4NOTELTE_KOR_SKT) \
+	|| defined(CONFIG_MACH_P4NOTELTE_KOR_KT) \
+	|| defined(CONFIG_MACH_P4NOTELTE_KOR_LGT) /*For 4G VT call in Domestic*/
+static const isx012_regset_t isx012_480_Preview[] = {
+{0x0090, 0x01E0, 0x02},		/* HSIZE_MONI : 480 */
+{0x0096, 0x0280, 0x02},		/* VSIZE_MONI : 640 */
+};
+#endif
 
 static const isx012_regset_t isx012_320_Preview[] =
 {
@@ -11223,7 +11231,7 @@ static const isx012_regset_t ISX012_ae_manual_mode[] =
 static const isx012_regset_t ISX012_flash_fast_ae_awb[] =
 {
 {0x5E32,0x0A,0x01},
-{0x5E3D,0x05,0x01},
+{0x5E3D,0x05,0x01}, /* Don't fix me. 0x05 */
 
 {0x0181,0x01,0x01},    // CAP_HALF_AE_CTRL
 {0x00B2,0x03,0x01},    //AFMODE_MONI : AF OFF

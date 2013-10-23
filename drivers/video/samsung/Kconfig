@@ -273,6 +273,12 @@ config FB_S5P_S6E63M0
        ---help---
          This enables support for Samsung S6E63M0 MIPI LCD
 
+config FB_S5P_NT71391
+	bool "NT71391 MIPI LCD"
+	depends on FB_S5P_MIPI_DSIM
+	---help---
+	  This enables support for Novatek NT71391 MIPI LCD
+
 endchoice
 
 choice
