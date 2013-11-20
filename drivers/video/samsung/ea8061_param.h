@@ -58,6 +58,16 @@ static const unsigned char SEQ_APPLY_LEVEL_3_KEY[] = {
 	0x5A, 0x5A
 };
 
+static const unsigned char SEQ_MAGNA_GP[] = {
+	0xB0,
+	0x0E,
+};
+
+static const unsigned char SEQ_MAGNA_REFRESH_DISABLE[] = {
+	0xDD,
+	0x00, 0x00,
+};
+
 static const unsigned char SEQ_FRAME_GAMMA_UPDATE_KEY[] = {
 	0xF7,
 	0x5A, 0x5A

@@ -3,7 +3,19 @@
 
 #include "mdnie.h"
 
-static const unsigned short tune_color_tone_1[] = {
+static const unsigned short tune_scr_setting[9][3] = {
+	{0xff, 0xf9, 0xf9},
+	{0xff, 0xf9, 0xfe},
+	{0xfc, 0xfa, 0xff},
+	{0xff, 0xfc, 0xf8},
+	{0xff, 0xff, 0xff},
+	{0xfb, 0xfb, 0xff},
+	{0xfb, 0xff, 0xf5},
+	{0xfa, 0xff, 0xf9},
+	{0xf8, 0xff, 0xfc},
+};
+
+static unsigned short tune_color_tone_1[] = {
 	/*start */
 	0x0001, 0x0040,	/*SCR HDTR */
 	0x002c, 0x0fff,	/*DNR bypass 0x003C */
@@ -51,10 +63,10 @@ static const unsigned short tune_color_tone_1[] = {
 	0x00d5, 0x0001,
 	0x0028, 0x0000,	/*Register Mask */
 	/*end */
-	END_SEQ, 0x0000,
+	END_SEQ, 0x0000
 };
 
-static const unsigned short tune_color_tone_2[] = {
+static unsigned short tune_color_tone_2[] = {
 	/*start */
 	0x0001, 0x0040,	/*SCR HDTR */
 	0x002c, 0x0fff,	/*DNR bypass 0x003C */
@@ -102,10 +114,10 @@ static const unsigned short tune_color_tone_2[] = {
 	0x00d5, 0x0001,
 	0x0028, 0x0000,	/*Register Mask */
 	/*end */
-	END_SEQ, 0x0000,
+	END_SEQ, 0x0000
 };
 
-static const unsigned short tune_color_tone_3[] = {
+static unsigned short tune_color_tone_3[] = {
 	/*start */
 	0x0001, 0x0040,	/*SCR HDTR */
 	0x002c, 0x0fff,	/*DNR bypass 0x003C */
@@ -153,10 +165,39 @@ static const unsigned short tune_color_tone_3[] = {
 	0x00d5, 0x0001,
 	0x0028, 0x0000,	/*Register Mask */
 	/*end */
-	END_SEQ, 0x0000,
+	END_SEQ, 0x0000
 };
 
-static const unsigned short tune_negative_cabc[] = {
+#if defined(CONFIG_FB_MDNIE_PWM)
+static unsigned short tune_negative[] = {
+	/*start p4 note negative cabcoff*/
+	0x0001, 0x0060,	/*SCR LABC HDTR*/
+	0x002c, 0x0fff,	/*DNR bypass*/
+	0x002d, 0x1900,	/*DNR bypass*/
+	0x002e, 0x0000,	/*DNR bypass*/
+	0x002f, 0x0fff,	/*DNR bypass*/
+	0x003a, 0x0009,	/*HDTR CS*/
+	0x003f, 0x0000,	/*CS GAIN*/
+	/*0x00b4, 0x4640,	Count PWM*/
+	0x00c8, 0xffff,	/*kb R	SCR*/
+	0x00c9, 0xffff,	/*gc R*/
+	0x00ca, 0x0000,	/*rm R*/
+	0x00cb, 0x0000,	/*yw R*/
+	0x00cc, 0xffff,	/*kb G*/
+	0x00cd, 0x0000,	/*gc G*/
+	0x00ce, 0xffff,	/*rm G*/
+	0x00cf, 0x0000,	/*yw G*/
+	0x00d0, 0xff00,	/*kb B*/
+	0x00d1, 0xff00,	/*gc B*/
+	0x00d2, 0xff00,	/*rm B*/
+	0x00d3, 0xff00,	/*yw B*/
+	0x00d5, 0x0000,	/*GAMMA off*/
+	0x0028, 0x0000,	/*Register Mask*/
+	/*end*/
+	END_SEQ, 0x0000
+};
+
+static unsigned short tune_negative_cabc[] = {
 	/*start p4 note negative cabcon*/
 	0x0001, 0x0070,	/*SCR LABC CABC HDTR*/
 	0x002c, 0x0fff,	/*DNR bypass*/
@@ -170,7 +211,7 @@ static const unsigned short tune_negative_cabc[] = {
 	0x0074, 0x0000,
 	0x0075, 0x0000,
 	0x007c, 0x0002,	/*Dynamic LCD*/
-	/*0x00b4,0x5640,	CABC PWM*/
+	/*0x00b4, 0x5640,	CABC PWM*/
 	0x00c8, 0xffff,	/*kb R	SCR*/
 	0x00c9, 0xffff,	/*gc R*/
 	0x00ca, 0x0000,	/*rm R*/
@@ -186,41 +227,70 @@ static const unsigned short tune_negative_cabc[] = {
 	0x00d5, 0x0000,	/*GAMMA off*/
 	0x0028, 0x0000,	/*Register Mask*/
 	/*end*/
-	END_SEQ, 0x0000,
+	END_SEQ, 0x0000
 
 };
 
-#if defined(CONFIG_FB_MDNIE_PWM)
-static const unsigned short tune_negative[] = {
-	/*start p4 note negative cabcoff*/
-	0x0001, 0x0060,	/*SCR LABC HDTR*/
-	0x002c, 0x0fff,	/*DNR bypass*/
-	0x002d, 0x1900,	/*DNR bypass*/
-	0x002e, 0x0000,	/*DNR bypass*/
-	0x002f, 0x0fff,	/*DNR bypass*/
-	0x003a, 0x0009,	/*HDTR CS*/
-	0x003f, 0x0000,	/*CS GAIN*/
-	/*0x00b4,0x4640,	Count PWM*/
-	0x00c8, 0xffff,	/*kb R	SCR*/
-	0x00c9, 0xffff,	/*gc R*/
-	0x00ca, 0x0000,	/*rm R*/
-	0x00cb, 0x0000,	/*yw R*/
-	0x00cc, 0xffff,	/*kb G*/
-	0x00cd, 0x0000,	/*gc G*/
-	0x00ce, 0xffff,	/*rm G*/
-	0x00cf, 0x0000,	/*yw G*/
-	0x00d0, 0xff00,	/*kb B*/
-	0x00d1, 0xff00,	/*gc B*/
-	0x00d2, 0xff00,	/*rm B*/
-	0x00d3, 0xff00,	/*yw B*/
-	0x00d5, 0x0000,	/*GAMMA off*/
-	0x0028, 0x0000,	/*Register Mask*/
-	/*end*/
-	END_SEQ, 0x0000,
+static unsigned short tune_color_blind[] = {
+	/* start C210 LCD Color Blind cabcoff */
+	0x0001, 0x0060,	/* SCR HDTR */
+	0x002c, 0x0fff,	/* DNR bypass 0x003C */
+	0x002d, 0x1900,	/* DNR bypass 0x0a08 */
+	0x002e, 0x0000,	/* DNR bypass 0x1010 */
+	0x002f, 0x0fff,	/* DNR bypass 0x0400 */
+	0x003a, 0x0009,	/* HDTR CS */
+	0x003f, 0x0000,	/* CS GAIN */
+	0x00c8, 0x0000,	/* kb R	SCR */
+	0x00c9, 0x0000,	/* gc R */
+	0x00ca, 0xffff,	/* rm R */
+	0x00cb, 0xffff,	/* yw R */
+	0x00cc, 0x0000,	/* kb G */
+	0x00cd, 0xffff,	/* gc G */
+	0x00ce, 0x0000,	/* rm G */
+	0x00cf, 0xffff,	/* yw G */
+	0x00d0, 0x00ff,	/* kb B */
+	0x00d1, 0x00ff,	/* gc B */
+	0x00d2, 0x00ff,	/* rm B */
+	0x00d3, 0x00ff,	/* yw B */
+	0x00d5, 0x0000,	/* GAMMA off */
+	0x0028, 0x0000,	/* Register Mask */
+	/* end */
+	END_SEQ, 0x0000
+};
+
+static unsigned short tune_color_blind_cabc[] = {
+	/* start C210 LCD Color Blind cabcon */
+	0x0001, 0x0070,	/* SCR HDTR */
+	0x002c, 0x0fff,	/* DNR bypass 0x003C */
+	0x002d, 0x1900,	/* DNR bypass 0x0a08 */
+	0x002e, 0x0000,	/* DNR bypass 0x1010 */
+	0x002f, 0x0fff,	/* DNR bypass 0x0400 */
+	0x003a, 0x0009,	/* HDTR CS */
+	0x003f, 0x0000,	/* CS GAIN */
+	0x0072, 0x0000,	/* CABC Dgain */
+	0x0073, 0x0000,
+	0x0074, 0x0000,
+	0x0075, 0x0000,
+	0x007C, 0x0002,	/* Dynamic LCD */
+	0x00c8, 0x0000,	/* kb R	SCR */
+	0x00c9, 0x0000,	/* gc R */
+	0x00ca, 0xffff,	/* rm R */
+	0x00cb, 0xffff,	/* yw R */
+	0x00cc, 0x0000,	/* kb G */
+	0x00cd, 0xffff,	/* gc G */
+	0x00ce, 0x0000,	/* rm G */
+	0x00cf, 0xffff,	/* yw G */
+	0x00d0, 0x00ff,	/* kb B */
+	0x00d1, 0x00ff,	/* gc B */
+	0x00d2, 0x00ff,	/* rm B */
+	0x00d3, 0x00ff,	/* yw B */
+	0x00d5, 0x0000,	/* GAMMA off */
+	0x0028, 0x0000,	/* Register Mask */
+	/* end */
+	END_SEQ, 0x0000
 };
 #else
-static const unsigned short tune_negative[] = {
-	/*start Q1 negative*/
+static unsigned short tune_negative[] = {
 	0x0001, 0x0040,	/*SCR HDTR*/
 	0x002c, 0x0fff,	/*DNR bypass 0x003C*/
 	0x002d, 0x1900,	/*DNR bypass 0x0a08*/
@@ -243,24 +313,63 @@ static const unsigned short tune_negative[] = {
 	0x00d5, 0x0000,	/*GAMMA off*/
 	0x0028, 0x0000,	/*Register Mask*/
 	/*end*/
-	END_SEQ, 0x0000,
+	END_SEQ, 0x0000
+};
+
+static unsigned short tune_color_blind[] = {
+	/* start C210 AMOLED Color Blind */
+	0x0001, 0x0040,	/* SCR HDTR */
+	0x002c, 0x0fff,	/* DNR bypass 0x003C */
+	0x002d, 0x1900,	/* DNR bypass 0x0a08 */
+	0x002e, 0x0000,	/* DNR bypass 0x1010 */
+	0x002f, 0x0fff,	/* DNR bypass 0x0400 */
+	0x003a, 0x0009,	/* HDTR CS */
+	0x003f, 0x0000,	/* CS GAIN */
+	0x00c8, 0x0000,	/* kb R	SCR */
+	0x00c9, 0x0000,	/* gc R */
+	0x00ca, 0xffff,	/* rm R */
+	0x00cb, 0xffff,	/* yw R */
+	0x00cc, 0x0000,	/* kb G */
+	0x00cd, 0xffff,	/* gc G */
+	0x00ce, 0x0000,	/* rm G */
+	0x00cf, 0xffff,	/* yw G */
+	0x00d0, 0x00ff,	/* kb B */
+	0x00d1, 0x00ff,	/* gc B */
+	0x00d2, 0x00ff,	/* rm B */
+	0x00d3, 0x00ff,	/* yw B */
+	0x00d5, 0x0000,	/* GAMMA off */
+	0x0028, 0x0000,	/* Register Mask */
+	/* end */
+	END_SEQ, 0x0000
 };
 #endif
 
-struct mdnie_tunning_info negative_table[CABC_MAX] = {
+struct mdnie_tuning_info negative_table[CABC_MAX] = {
+	{"negative",		tune_negative},
 #if defined(CONFIG_FB_MDNIE_PWM)
-	{"NEGATIVE",		tune_negative},
-	{"NEGATIVE_CABC",	tune_negative_cabc},
-#else
-	{"NEGATIVE",		tune_negative},
+	{"negative_cabc",	tune_negative_cabc},
 #endif
 };
 
-struct mdnie_tunning_info color_tone_table[COLOR_TONE_MAX - COLOR_TONE_1] = {
-	{"COLOR_TONE_1",	tune_color_tone_1},
-	{"COLOR_TONE_2",	tune_color_tone_2},
-	{"COLOR_TONE_3",	tune_color_tone_3},
+struct mdnie_tuning_info accessibility_table[CABC_MAX][ACCESSIBILITY_MAX] = {
+	{
+		{NULL,			NULL},
+		{"negative",		tune_negative},
+		{"color_blind",		tune_color_blind}
+	},
+#if defined(CONFIG_FB_MDNIE_PWM)
+	{
+		{NULL,			NULL},
+		{"negative_cabc",	tune_negative_cabc},
+		{"color_blind_cabc",	tune_color_blind_cabc}
+	}
+#endif
 };
 
+struct mdnie_tuning_info color_tone_table[COLOR_TONE_MAX - COLOR_TONE_1] = {
+	{"color_tone_1",	tune_color_tone_1},
+	{"color_tone_2",	tune_color_tone_2},
+	{"color_tone_3",	tune_color_tone_3},
+};
 
 #endif /* __MDNIE_COLOR_TONE_H__ */

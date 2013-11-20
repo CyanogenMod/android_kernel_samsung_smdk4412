@@ -106,7 +106,7 @@ struct class *mdnie_class;
 
 struct mdnie_info *g_mdnie;
 
-#ifdef CONFIG_MACH_P4NOTE
+#if defined(CONFIG_MACH_P4NOTE) || defined(CONFIG_MACH_SP7160LTE) || defined(CONFIG_MACH_TAB3)
 static struct mdnie_backlight_value b_value;
 #endif
 
@@ -218,7 +218,7 @@ exit:
 }
 
 #if defined(CONFIG_FB_MDNIE_PWM)
-#ifdef CONFIG_MACH_P4NOTE
+#if defined(CONFIG_MACH_P4NOTE) || defined(CONFIG_MACH_SP7160LTE) || defined(CONFIG_MACH_TAB3)
 static int get_backlight_level_from_brightness(unsigned int brightness)
 {
 	unsigned int value;

@@ -452,8 +452,7 @@ void max77693_muic_init_cb(void)
 }
 
 #if !defined(CONFIG_MACH_GC1) && !defined(CONFIG_MACH_T0) && \
-!defined(CONFIG_MACH_M3) && !defined(CONFIG_MACH_SLP_T0_LTE) && \
-!defined(CONFIG_MACH_KONA)
+!defined(CONFIG_MACH_M3) && !defined(CONFIG_MACH_SLP_T0_LTE)
 int max77693_muic_cfg_uart_gpio(void)
 {
 	int uart_val, path;
@@ -473,8 +472,7 @@ int max77693_muic_cfg_uart_gpio(void)
 #endif
 
 #if !defined(CONFIG_MACH_GC1) && !defined(CONFIG_MACH_T0) && \
-!defined(CONFIG_MACH_M3) && !defined(CONFIG_MACH_SLP_T0_LTE) && \
-!defined(CONFIG_MACH_KONA)
+!defined(CONFIG_MACH_M3) && !defined(CONFIG_MACH_SLP_T0_LTE)
 void max77693_muic_jig_uart_cb(int path)
 {
 	pr_info("func:%s : (path=%d\n", __func__, path);
@@ -585,8 +583,7 @@ struct max77693_muic_data max77693_muic = {
 	.init_cb = max77693_muic_init_cb,
 	.dock_cb = max77693_muic_dock_cb,
 #if !defined(CONFIG_MACH_GC1) && !defined(CONFIG_MACH_T0) && \
-!defined(CONFIG_MACH_M3) && !defined(CONFIG_MACH_SLP_T0_LTE) && \
-	!defined(CONFIG_MACH_KONA)
+!defined(CONFIG_MACH_M3) && !defined(CONFIG_MACH_SLP_T0_LTE)
 	.cfg_uart_gpio = max77693_muic_cfg_uart_gpio,
 	.jig_uart_cb = max77693_muic_jig_uart_cb,
 #endif /* CONFIG_MACH_GC1 */
@@ -600,8 +597,7 @@ struct max77693_muic_data max77693_muic = {
 	.host_notify_cb = NULL,
 #endif
 #if !defined(CONFIG_MACH_GC1) && !defined(CONFIG_MACH_T0) && \
-!defined(CONFIG_MACH_M3) && !defined(CONFIG_MACH_SLP_T0_LTE) && \
-	!defined(CONFIG_MACH_KONA)
+!defined(CONFIG_MACH_M3) && !defined(CONFIG_MACH_SLP_T0_LTE)
 	.gpio_usb_sel = GPIO_USB_SEL,
 #else
 	.gpio_usb_sel = -1,

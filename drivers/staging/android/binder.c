@@ -1543,7 +1543,7 @@ static void binder_transaction(struct binder_proc *proc,
 		t->from = thread;
 	else
 		t->from = NULL;
-#if defined(CONFIG_MACH_P4NOTE) || defined(CONFIG_MACH_KONA)
+#ifdef CONFIG_MACH_P4NOTE
 	/* workaround code for invalid binder proc */
 	if (!proc->tsk) {
 		binder_debug(BINDER_DEBUG_FAILED_TRANSACTION,

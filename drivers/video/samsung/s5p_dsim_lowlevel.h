@@ -19,8 +19,8 @@ extern void s5p_dsim_set_interrupt_mask(unsigned int dsim_base, unsigned int mod
 	unsigned char mask);
 extern void s5p_dsim_set_data_lane_number(unsigned int dsim_base, unsigned char count);
 extern void s5p_dsim_init_fifo_pointer(unsigned int dsim_base, unsigned char cfg);
-extern void s5p_dsim_set_phy_tunning(unsigned int dsim_base, unsigned int value);
-extern void s5p_dsim_set_phy_tunning(unsigned int dsim_base, unsigned int value);
+extern void s5p_dsim_set_phy_tuning(unsigned int dsim_base, unsigned int value);
+extern void s5p_dsim_set_phy_tuning(unsigned int dsim_base, unsigned int value);
 extern void s5p_dsim_set_main_disp_resol(unsigned int dsim_base, unsigned short vert_resol,
 	unsigned short hori_resol);
 extern void s5p_dsim_set_main_disp_vporch(unsigned int dsim_base, unsigned short cmd_allow,
