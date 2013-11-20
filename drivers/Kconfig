@@ -1,5 +1,7 @@
 menu "Device Drivers"
 
+source "drivers/gpu/mali400/Kconfig"
+
 source "drivers/base/Kconfig"
 
 source "drivers/connector/Kconfig"
