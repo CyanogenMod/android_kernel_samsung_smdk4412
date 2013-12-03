@@ -202,7 +202,7 @@ static struct wm8994_pdata wm1811_pdata = {
 	.jd_ext_cap = 1,
 
 	/* Regulated mode at highest output voltage */
-	.micbias = {0x2f, 0x27},
+	.micbias = {0x2f, 0x2b},
 
 	.micd_lvl_sel = 0xFF,
 
@@ -377,9 +377,6 @@ static void t0_set_ext_main_mic(int on)
 	/* Main Microphone BIAS */
 	gpio_set_value(GPIO_MIC_BIAS_EN, on);
 
-	if (on)
-		msleep(100);
-
 	pr_info("%s: main_mic bias on = %d\n", __func__, on);
 #endif
 }
@@ -389,9 +386,6 @@ static void t0_set_ext_sub_mic(int on)
 #ifdef CONFIG_SND_USE_SUB_MIC
 	/* Sub Microphone BIAS */
 	gpio_set_value(GPIO_SUB_MIC_BIAS_EN, on);
-
-	if (on)
-		msleep(100);
 
 	pr_info("%s: sub_mic bias on = %d\n", __func__, on);
 #endif
