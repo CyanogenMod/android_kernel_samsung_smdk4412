@@ -22,7 +22,7 @@
  * software in any way with any other Broadcom software provided under a license
  * other than the GPL, without Broadcom's express prior written consent.
  *
- * $Id: dhd_linux.c 394719 2013-04-03 13:22:12Z $
+ * $Id: dhd_linux.c 407072 2013-06-11 15:54:35Z $
  */
 
 #include <typedefs.h>
@@ -705,6 +705,22 @@ static inline void* dhd_rxf_dequeue(dhd_pub_t *dhdp)
 }
 #endif /* defined(DHDTHREAD) && defined(RXFRAME_THREAD) */
 
+#if defined(PASS_ARP_PACKET) || defined(SUPPORT_IBSS)
+static int
+check_pass(int op_mode)
+{
+#if defined(SUPPORT_IBSS)
+	if (op_mode & DHD_FLAG_IBSS_MODE)
+		return 0;
+#endif
+#if defined(PASS_ARP_PACKET)
+	if (!(dhd->op_mode && (DHD_FLAG_P2P_GC_MODE | DHD_FLAG_P2P_GO_MODE)))
+		return 1;
+#endif
+	return 1;
+}
+#endif /* defined(PASS_ARP_PACKET) || defined(SUPPORT_IBSS) */
+
 void dhd_set_packet_filter(dhd_pub_t *dhd)
 {
 #ifdef PKT_FILTER_SUPPORT
@@ -731,9 +747,11 @@ void dhd_enable_packet_filter(int value, dhd_pub_t *dhd)
 	    (dhd_support_sta_mode(dhd) && !dhd->dhcp_in_progress)))
 	    {
 		for (i = 0; i < dhd->pktfilter_count; i++) {
-#ifdef PASS_ARP_PACKET
+
+#if !defined(GAN_LITE_NAT_KEEPALIVE_FILTER) && (defined(PASS_ARP_PACKET) || \
+	defined(SUPPORT_IBSS))
 			if (value && (i == dhd->pktfilter_count -1) &&
-				!(dhd->op_mode & (DHD_FLAG_P2P_GC_MODE | DHD_FLAG_P2P_GO_MODE))) {
+				check_pass(dhd->op_mode)) {
 				DHD_TRACE_HW4(("Do not turn on ARP white list pkt filter:"
 					"val %d, cnt %d, op_mode 0x%x\n",
 					value, i, dhd->op_mode));
@@ -747,8 +765,12 @@ void dhd_enable_packet_filter(int value, dhd_pub_t *dhd)
 #endif /* PKT_FILTER_SUPPORT */
 }
 
+bool wifi_pm = true;
+module_param(wifi_pm, bool, 0755);
+
 static int dhd_set_suspend(int value, dhd_pub_t *dhd)
 {
+
 #ifndef SUPPORT_PM2_ONLY
 	int power_mode = PM_MAX;
 #endif /* SUPPORT_PM2_ONLY */
@@ -832,7 +854,10 @@ static int dhd_set_suspend(int value, dhd_pub_t *dhd)
 				DHD_ERROR(("%s: Remove extra suspend setting \n", __FUNCTION__));
 
 #ifndef SUPPORT_PM2_ONLY
-				power_mode = PM_FAST;
+        		   if (wifi_pm)
+		          	power_mode = PM_FAST;
+		           else
+		         	power_mode = PM_OFF;
 				dhd_wl_ioctl_cmd(dhd, WLC_SET_PM, (char *)&power_mode,
 				                 sizeof(power_mode), TRUE, 0);
 #endif /* SUPPORT_PM2_ONLY */
@@ -3064,6 +3089,8 @@ exit:
 	dhd->pub.rxcnt_timeout = 0;
 	dhd->pub.txcnt_timeout = 0;
 
+	dhd->pub.hang_was_sent = 0;
+
 	DHD_OS_WAKE_UNLOCK(&dhd->pub);
 	return 0;
 }
@@ -3923,7 +3950,7 @@ dhd_preinit_ioctls(dhd_pub_t *dhd)
 	uint32 ampdu_ba_wsize = CUSTOM_AMPDU_BA_WSIZE;
 #endif /* CUSTOM_AMPDU_BA_WSIZE */
 	uint32 lpc = 1;
-	uint power_mode = PM_FAST;
+	uint power_mode;
 	uint32 dongle_align = DHD_SDALIGN;
 	uint32 glom = CUSTOM_GLOM_SETTING;
 #if (defined(CUSTOMER_HW4) || defined(BOARD_PANDA)) && (defined(VSDB) || \
@@ -4029,6 +4056,10 @@ dhd_preinit_ioctls(dhd_pub_t *dhd)
 	dhd->suspend_bcn_li_dtim = CUSTOM_SUSPEND_BCN_LI_DTIM;
 	DHD_TRACE(("Enter %s\n", __FUNCTION__));
 	dhd->op_mode = 0;
+  	if (wifi_pm)
+	   power_mode = PM_FAST;
+	else
+	   power_mode = PM_OFF;
 #ifdef GET_CUSTOM_MAC_ENABLE
 	ret = dhd_custom_get_mac_address(ea_addr.octet);
 	if (!ret) {
@@ -4108,11 +4139,15 @@ dhd_preinit_ioctls(dhd_pub_t *dhd)
 			dhd_pkt_filter_enable = FALSE;
 #endif
 			dhd->op_mode = DHD_FLAG_P2P_MODE;
-		}
-		else
+		} else if (op_mode == DHD_FLAG_IBSS_MODE ||
+			(!op_mode && strstr(fw_path, "_ibss") != NULL)) {
+			dhd->op_mode = DHD_FLAG_IBSS_MODE;
+		} else {
 			dhd->op_mode = DHD_FLAG_STA_MODE;
+		}
 #if !defined(AP) && defined(WLP2P)
-		if ((concurrent_mode = dhd_get_concurrent_capabilites(dhd))) {
+		if (dhd->op_mode != DHD_FLAG_IBSS_MODE &&
+			(concurrent_mode = dhd_get_concurrent_capabilites(dhd))) {
 #if defined(ARP_OFFLOAD_SUPPORT)
 			arpoe = 1;
 #endif
@@ -4290,7 +4325,14 @@ dhd_preinit_ioctls(dhd_pub_t *dhd)
 
 #ifdef USE_WL_FRAMEBURST
 #if defined(CUSTOMER_HW4)
+#if defined(BCM4330_CHIP) || defined(BCM4334_CHIP)
+	if (dhd->op_mode & DHD_FLAG_HOSTAP_MODE)
+#endif /* BCM4330_CHIP || BCM4334_CHIP */
 	frameburst = sec_control_frameburst();
+#if defined(BCM4330_CHIP) || defined(BCM4334_CHIP)
+	else
+		frameburst = 0;
+#endif /* BCM4330_CHIP || BCM4334_CHIP */
 #endif /* CUSTOMER_HW4 */
 	/* Set frameburst to value */
 	if ((ret = dhd_wl_ioctl_cmd(dhd, WLC_SET_FAKEFRAG, (char *)&frameburst,
@@ -4355,6 +4397,7 @@ dhd_preinit_ioctls(dhd_pub_t *dhd)
 	setbit(eventmask, WLC_E_DISASSOC_IND);
 	setbit(eventmask, WLC_E_DISASSOC);
 	setbit(eventmask, WLC_E_JOIN);
+	setbit(eventmask, WLC_E_START);
 	setbit(eventmask, WLC_E_ASSOC_IND);
 	setbit(eventmask, WLC_E_PSK_SUP);
 	setbit(eventmask, WLC_E_LINK);
@@ -4458,6 +4501,9 @@ dhd_preinit_ioctls(dhd_pub_t *dhd)
 	dhd->pktfilter_count = 5;
 	dhd->pktfilter[4] = "104 0 0 0 0xFFFFFF 0x01005E";
 #endif /* PASS_IPV4_SUSPEND && CUSTOMER_HW4 */
+#if defined(PASS_ARP_PACKET) || defined(SUPPORT_IBSS)
+	dhd->pktfilter[dhd->pktfilter_count++] = "105 0 0 12 0xFFFF 0x0806";
+#endif
 #endif /* GAN_LITE_NAT_KEEPALIVE_FILTER  && CUSTOMER_HW4 */
 
 #if defined(SOFTAP)

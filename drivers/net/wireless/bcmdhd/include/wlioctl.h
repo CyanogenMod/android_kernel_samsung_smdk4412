@@ -1819,7 +1819,6 @@ typedef struct {
 #else
 #define WL_AUTH_OPEN_SHARED		3	/* BCM4334(Phoenix branch) value changed to 3 */
 #endif
-
 #endif /* LINUX_POSTMOGRIFY_REMOVAL */
 
 /* Bit masks for radio disabled status - returned by WL_GET_RADIO */

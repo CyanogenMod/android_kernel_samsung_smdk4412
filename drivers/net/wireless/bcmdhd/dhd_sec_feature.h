@@ -49,8 +49,7 @@
 #define READ_MACADDR
 #endif /* CONFIG_ARCH_MSM7X30 */
 
-#if defined(CONFIG_MACH_GC1) || defined(CONFIG_MACH_U1_NA_SPR) || defined(CONFIG_MACH_V1)\
-  || defined(CONFIG_MACH_KONA)
+#if defined(CONFIG_MACH_GC1) || defined(CONFIG_MACH_U1_NA_SPR) || defined(CONFIG_MACH_V1)
 #undef USE_CID_CHECK
 #define READ_MACADDR
 #endif /* CONFIG_MACH_GC1 || CONFIG_MACH_U1_NA_SPR || CONFIG_MACH_V1 */
