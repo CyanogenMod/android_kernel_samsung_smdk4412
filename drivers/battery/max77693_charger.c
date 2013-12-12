@@ -109,10 +109,12 @@
 /* MAX77693_CHG_REG_CHG_CNFG_04 */
 #define MAX77693_CHG_MINVSYS_MASK	0xE0
 #define MAX77693_CHG_MINVSYS_SHIFT	5
+#define MAX77693_CHG_MINVSYS_3_4V	0x04
 #define MAX77693_CHG_MINVSYS_3_6V	0x06
 #define MAX77693_CHG_CV_PRM_MASK		0x1F
 #define MAX77693_CHG_CV_PRM_SHIFT		0
 #define MAX77693_CHG_CV_PRM_4_20V		0x16
+#define MAX77693_CHG_CV_PRM_4_30V		0x1A
 #define MAX77693_CHG_CV_PRM_4_35V		0x1D
 #define MAX77693_CHG_CV_PRM_4_40V		0x1F
 
@@ -149,7 +151,11 @@
 #define STABLE_POWER_DELAY	500
 
 /* charger type detection */
+#if defined(CONFIG_MACH_KONA)
+#define DET_ERR_RETRY	7
+#else
 #define DET_ERR_RETRY	5
+#endif
 #define DET_ERR_DELAY	200
 
 /* soft charging */
@@ -855,7 +861,12 @@ chg_det_err:
 		chg_data->reg_loop_deted = false;
 		state = POWER_SUPPLY_TYPE_BATTERY;
 		break;
-	case 0x1:		/* USB cabled */
+	case 0x1:               /* USB cabled */
+#if defined(CONFIG_MACH_KONA)
+		if(mu_adc1k == 0x80) //MHL charging
+			state = POWER_SUPPLY_TYPE_MAINS;
+		else
+#endif
 		state = POWER_SUPPLY_TYPE_USB;
 #ifdef CONFIG_BATTERY_WPC_CHARGER
 		wc_state = max77693_get_wc_state(chg_data);
@@ -1101,8 +1112,14 @@ static void max77693_charger_reg_init(struct max77693_charger_data *chg_data)
 		reg_data |= (0x00 << 3);	/* 0min */
 	} else {
 #if defined(USE_2STEP_TERM)	/* now only T0 */
+#if defined(CONFIG_MACH_KONA)
+		reg_data = (0x05 << 0);		/* 250mA */
+		reg_data |= (0x04 << 3);	/* 40min */
+#else
+
 		reg_data = (0x04 << 0);		/* 200mA */
 		reg_data |= (0x04 << 3);	/* 40min */
+#endif
 #else
 #if defined(CONFIG_MACH_GC1)
 		reg_data = (0x02 << 0);		/* 150mA */
@@ -1121,13 +1138,19 @@ static void max77693_charger_reg_init(struct max77693_charger_data *chg_data)
 	 */
 	max77693_read_reg(i2c, MAX77693_CHG_REG_CHG_CNFG_04, &reg_data);
 	reg_data &= (~MAX77693_CHG_MINVSYS_MASK);
+#if defined(CONFIG_MACH_KONA)
+	reg_data |= (MAX77693_CHG_MINVSYS_3_4V << MAX77693_CHG_MINVSYS_SHIFT);
+#else
 	reg_data |= (MAX77693_CHG_MINVSYS_3_6V << MAX77693_CHG_MINVSYS_SHIFT);
+#endif
 	reg_data &= (~MAX77693_CHG_CV_PRM_MASK);
 #if defined(CONFIG_MACH_M0)
 	if ((system_rev != 3) && (system_rev >= 1))
 		reg_data |= (MAX77693_CHG_CV_PRM_4_35V << 0);
 	else
 		reg_data |= (MAX77693_CHG_CV_PRM_4_20V << 0);
+#elif defined(CONFIG_MACH_KONA)
+		reg_data |= (MAX77693_CHG_CV_PRM_4_30V << 0);
 #else	/* C1, C2, M3, T0, ... */
 		reg_data |= (MAX77693_CHG_CV_PRM_4_35V << 0);
 #endif
