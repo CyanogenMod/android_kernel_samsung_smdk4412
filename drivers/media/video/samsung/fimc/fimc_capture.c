@@ -1927,7 +1927,6 @@ int fimc_reqbufs_capture_mmap(void *fh, struct v4l2_requestbuffers *b)
 	case V4L2_PIX_FMT_YVYU:		/* fall through */
 	case V4L2_PIX_FMT_NV16:		/* fall through */
 	case V4L2_PIX_FMT_NV61:		/* fall through */
-	        fimc_err("%s : V4L2_PIX_FMT_YUYV - SBRISSEN\n", __func__);
 		fimc_err("%s : w %d h %d \n",__func__,
 				cap->fmt.width, cap->fmt.height);
 		fimc_info1("%s : 1plane\n", __func__);
@@ -1936,7 +1935,6 @@ int fimc_reqbufs_capture_mmap(void *fh, struct v4l2_requestbuffers *b)
 		break;
 
 	case V4L2_PIX_FMT_NV21:
-	        fimc_err("%s : V4L2_PIX_FMT_NV12 - SBRISSEN\n", __func__);
 		fimc_info1("%s : 2plane for NV21 w %d h %d\n", __func__,
 				cap->fmt.width, cap->fmt.height);
 		ret = fimc_alloc_buffers(ctrl, 2,
@@ -1966,21 +1964,18 @@ int fimc_reqbufs_capture_mmap(void *fh, struct v4l2_requestbuffers *b)
 		break;
 
 	case V4L2_PIX_FMT_JPEG:
-	        fimc_err("%s : V4L2_PIX_FMT_JPEG - SBRISSEN\n", __func__);
 		fimc_info1("%s : JPEG 1plane\n", __func__);
 		size = fimc_camera_get_jpeg_memsize(ctrl);
 		fimc_info2("%s : JPEG 1plane size = %x\n", __func__, size);
 		ret = fimc_alloc_buffers(ctrl, 1, size, 0, 8, cap->pktdata_enable, cap->pktdata_size);
 		break;
 	case V4L2_PIX_FMT_INTERLEAVED:
-	        fimc_err("%s : V4L2_PIX_FMT_INTERLEAVED - SBRISSEN\n", __func__);
 		fimc_info1("%s : Interleaved Format\n", __func__);
 		size = fimc_camera_get_jpeg_memsize(ctrl); /*0xA00000*/
 		fimc_info2("%s : Interleaved size = %x\n", __func__, size);
 		ret = fimc_alloc_buffers(ctrl, 1, size, 0, 8, cap->pktdata_enable, cap->pktdata_size);
 		break;
 	default:
-	        fimc_err("%s : default - SBRISSEN\n", __func__);
 		break;
 	}
 
@@ -1990,7 +1985,6 @@ int fimc_reqbufs_capture_mmap(void *fh, struct v4l2_requestbuffers *b)
 		return -ENOMEM;
 	}
 
-	fimc_err("%s : SBRISSEN - done\n", __func__);
 	mutex_unlock(&ctrl->v4l2_lock);
 
 	return 0;

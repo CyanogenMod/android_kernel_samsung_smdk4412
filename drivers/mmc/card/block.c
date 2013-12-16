@@ -2020,7 +2020,6 @@ static int mmc_blk_issue_rw_rq(struct mmc_queue *mq, struct request *rqc)
 						mq_rq->packed_num -= idx;
 #ifdef CONFIG_WIMAX_CMC
 						if (mq_rq->packed_num == 1) {
-						printk(KERN_ERR "SBRISSEN - I AM HERE\n");
 							mq_rq->packed_cmd = MMC_PACKED_NONE;
 							mq_rq->packed_num = 0;
 						}
