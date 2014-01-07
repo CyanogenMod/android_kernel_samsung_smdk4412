@@ -108,7 +108,7 @@ static inline void set_cold_files(struct f2fs_sb_info *sbi, struct inode *inode,
 	}
 }
 
-static int f2fs_create(struct inode *dir, struct dentry *dentry, umode_t mode,
+static int f2fs_create(struct inode *dir, struct dentry *dentry, int mode,
 		       struct nameidata *nd)
 {
 	struct super_block *sb = dir->i_sb;
@@ -155,9 +155,15 @@ static int f2fs_link(struct dentry *old_dentry, struct inode *dir,
 		struct dentry *dentry)
 {
 	struct inode *inode = old_dentry->d_inode;
-	struct super_block *sb = dir->i_sb;
-	struct f2fs_sb_info *sbi = F2FS_SB(sb);
+	struct super_block *sb;
+	struct f2fs_sb_info *sbi;
 	int err;
+
+	if (inode->i_nlink >= F2FS_LINK_MAX)
+		return -EMLINK;
+
+	sb = dir->i_sb;
+	sbi = F2FS_SB(sb);
 
 	f2fs_balance_fs(sbi);
 
@@ -285,11 +291,16 @@ out:
 	return err;
 }
 
-static int f2fs_mkdir(struct inode *dir, struct dentry *dentry, umode_t mode)
+static int f2fs_mkdir(struct inode *dir, struct dentry *dentry, int mode)
 {
-	struct f2fs_sb_info *sbi = F2FS_SB(dir->i_sb);
+	struct f2fs_sb_info *sbi;
 	struct inode *inode;
 	int err;
+
+	if (dir->i_nlink >= F2FS_LINK_MAX)
+		return -EMLINK;
+
+	sbi = F2FS_SB(dir->i_sb);
 
 	f2fs_balance_fs(sbi);
 
@@ -335,7 +346,7 @@ static int f2fs_rmdir(struct inode *dir, struct dentry *dentry)
 }
 
 static int f2fs_mknod(struct inode *dir, struct dentry *dentry,
-				umode_t mode, dev_t rdev)
+				int mode, dev_t rdev)
 {
 	struct super_block *sb = dir->i_sb;
 	struct f2fs_sb_info *sbi = F2FS_SB(sb);
@@ -439,6 +450,12 @@ static int f2fs_rename(struct inode *old_dir, struct dentry *old_dentry,
 		update_inode_page(old_inode);
 		update_inode_page(new_inode);
 	} else {
+		if (old_dir_entry) {
+			err = -EMLINK;
+			if (new_dir->i_nlink >= F2FS_LINK_MAX)
+				goto out_dir;
+		}
+
 		err = f2fs_add_link(new_dentry, old_inode);
 		if (err)
 			goto out_dir;
@@ -497,7 +514,7 @@ const struct inode_operations f2fs_dir_inode_operations = {
 	.rename		= f2fs_rename,
 	.getattr	= f2fs_getattr,
 	.setattr	= f2fs_setattr,
-	.get_acl	= f2fs_get_acl,
+	.check_acl	= f2fs_check_acl,
 #ifdef CONFIG_F2FS_FS_XATTR
 	.setxattr	= generic_setxattr,
 	.getxattr	= generic_getxattr,
@@ -523,7 +540,7 @@ const struct inode_operations f2fs_symlink_inode_operations = {
 const struct inode_operations f2fs_special_inode_operations = {
 	.getattr	= f2fs_getattr,
 	.setattr        = f2fs_setattr,
-	.get_acl	= f2fs_get_acl,
+	.check_acl	= f2fs_check_acl,
 #ifdef CONFIG_F2FS_FS_XATTR
 	.setxattr       = generic_setxattr,
 	.getxattr       = generic_getxattr,
