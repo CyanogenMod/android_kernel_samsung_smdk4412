@@ -176,7 +176,7 @@ static int f2fs_initxattrs(struct inode *inode, const struct xattr *xattr_array,
 int f2fs_init_security(struct inode *inode, struct inode *dir,
 				const struct qstr *qstr, struct page *ipage)
 {
-	return security_inode_init_security(inode, dir, qstr,
+	return security_new_inode_init_security(inode, dir, qstr,
 				&f2fs_initxattrs, ipage);
 }
 #endif

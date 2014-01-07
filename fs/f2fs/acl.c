@@ -149,7 +149,7 @@ fail:
 	return ERR_PTR(-EINVAL);
 }
 
-struct posix_acl *f2fs_get_acl(struct inode *inode, int type)
+static struct posix_acl *f2fs_get_acl(struct inode *inode, int type)
 {
 	struct f2fs_sb_info *sbi = F2FS_SB(inode->i_sb);
 	int name_index = F2FS_XATTR_INDEX_POSIX_ACL_DEFAULT;
@@ -189,6 +189,28 @@ struct posix_acl *f2fs_get_acl(struct inode *inode, int type)
 	return acl;
 }
 
+int f2fs_check_acl(struct inode *inode, int mask, unsigned int flags)
+{
+	int error = -EAGAIN;
+
+	if (flags & IPERM_FLAG_RCU) {
+		if (!negative_cached_acl(inode, ACL_TYPE_ACCESS))
+			error = -ECHILD;
+	} else {
+		struct posix_acl *acl;
+
+		acl = f2fs_get_acl(inode, ACL_TYPE_ACCESS);
+		if (IS_ERR(acl))
+			return PTR_ERR(acl);
+		if (acl) {
+			error = posix_acl_permission(inode, acl, mask);
+			posix_acl_release(acl);
+		}
+	}
+
+	return error;
+}
+
 static int f2fs_set_acl(struct inode *inode, int type,
 			struct posix_acl *acl, struct page *ipage)
 {
@@ -208,9 +230,11 @@ static int f2fs_set_acl(struct inode *inode, int type,
 	case ACL_TYPE_ACCESS:
 		name_index = F2FS_XATTR_INDEX_POSIX_ACL_ACCESS;
 		if (acl) {
-			error = posix_acl_equiv_mode(acl, &inode->i_mode);
+			mode_t mode = inode->i_mode;
+			error = posix_acl_equiv_mode(acl, &mode);
 			if (error < 0)
 				return error;
+			inode->i_mode = mode;
 			set_acl_inode(fi, inode->i_mode);
 			if (error == 0)
 				acl = NULL;
@@ -264,14 +288,17 @@ int f2fs_init_acl(struct inode *inode, struct inode *dir, struct page *ipage)
 	if (!test_opt(sbi, POSIX_ACL) || !acl)
 		goto cleanup;
 
+	mode_t mode = inode->i_mode;
+
 	if (S_ISDIR(inode->i_mode)) {
 		error = f2fs_set_acl(inode, ACL_TYPE_DEFAULT, acl, ipage);
 		if (error)
 			goto cleanup;
 	}
-	error = posix_acl_create(&acl, GFP_KERNEL, &inode->i_mode);
+	error = posix_acl_create(&acl, GFP_KERNEL, &mode);
 	if (error < 0)
 		return error;
+	inode->i_mode = mode;
 	if (error > 0)
 		error = f2fs_set_acl(inode, ACL_TYPE_ACCESS, acl, ipage);
 cleanup:
@@ -284,7 +311,7 @@ int f2fs_acl_chmod(struct inode *inode)
 	struct f2fs_sb_info *sbi = F2FS_SB(inode->i_sb);
 	struct posix_acl *acl;
 	int error;
-	umode_t mode = get_inode_mode(inode);
+	mode_t mode = get_inode_mode(inode);
 
 	if (!test_opt(sbi, POSIX_ACL))
 		return 0;
