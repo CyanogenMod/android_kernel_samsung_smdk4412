@@ -124,7 +124,7 @@ int f2fs_sync_file(struct file *file, int datasync)
 	int ret = 0;
 	bool need_cp = false;
 	struct writeback_control wbc = {
-		.sync_mode = WB_SYNC_ALL,
+		.sync_mode = WB_SYNC_NONE,
 		.nr_to_write = LONG_MAX,
 		.for_reclaim = 0,
 	};
