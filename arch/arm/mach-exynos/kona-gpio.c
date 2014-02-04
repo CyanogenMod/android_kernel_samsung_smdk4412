@@ -44,10 +44,12 @@ extern int s3c_gpio_slp_setpull_updown(unsigned int pin, unsigned int config);
  */
 static struct gpio_init_data kona_init_gpios[] = {
 
-/*
-   temporarily disabled set GPA0(4) ~ GPA0(7) to support UART1 as serial
-   need to be checked by IF team
-*/
+#if defined(CONFIG_QC_MODEM)
+	{EXYNOS4_GPA1(0), S3C_GPIO_INPUT, S3C_GPIO_SETPIN_NONE,
+		S3C_GPIO_PULL_DOWN, S5P_GPIO_DRVSTR_LV1},
+	{EXYNOS4_GPA1(1), S3C_GPIO_INPUT, S3C_GPIO_SETPIN_NONE,
+		S3C_GPIO_PULL_DOWN, S5P_GPIO_DRVSTR_LV1},
+#endif
 
 	{EXYNOS4_GPD0(2), S3C_GPIO_INPUT, S3C_GPIO_SETPIN_NONE,
 		S3C_GPIO_PULL_NONE, S5P_GPIO_DRVSTR_LV1},

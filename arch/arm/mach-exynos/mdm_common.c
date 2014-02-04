@@ -797,9 +797,15 @@ static void mdm_modem_initialize_data(struct platform_device  *pdev,
 	if (pres)
 		mdm_drv->ap2mdm_pmic_pwr_en_gpio = pres->start;
 
+#ifdef CONFIG_HSIC_EURONLY_APPLY
+	/* MDM2AP_HSIC_READY */
+	pres = platform_get_resource_byname(pdev, IORESOURCE_IO,
+							"MDM2AP_HSIC_READY");
+#else
 	/* MDM2AP_PBLRDY */
 	pres = platform_get_resource_byname(pdev, IORESOURCE_IO,
 							"MDM2AP_PBLRDY");
+#endif
 	if (pres)
 		mdm_drv->mdm2ap_pblrdy = pres->start;
 #ifdef CONFIG_SIM_DETECT
@@ -847,8 +853,12 @@ int mdm_common_create(struct platform_device  *pdev,
 #ifdef CONFIG_SIM_DETECT
 	gpio_request(mdm_drv->sim_detect_gpio, "SIM_DETECT");
 #endif
+#ifdef CONFIG_HSIC_EURONLY_APPLY
+	gpio_request(mdm_drv->mdm2ap_pblrdy, "MDM2AP_HSIC_READY");
+#else
 	if (mdm_drv->mdm2ap_pblrdy > 0)
 		gpio_request(mdm_drv->mdm2ap_pblrdy, "MDM2AP_PBLRDY");
+#endif
 
 	if (mdm_drv->ap2mdm_pmic_pwr_en_gpio > 0) {
 		gpio_request(mdm_drv->ap2mdm_pmic_pwr_en_gpio,
@@ -1019,7 +1029,11 @@ status_err:
 simdetect_err:
 #endif
 
-	if (mdm_drv->mdm2ap_pblrdy > 0) {
+#ifndef CONFIG_HSIC_EURONLY_APPLY
+	if (mdm_drv->mdm2ap_pblrdy > 0)
+#endif
+	{
+
 #ifdef CONFIG_ARCH_EXYNOS
 		s3c_gpio_cfgpin(mdm_drv->mdm2ap_pblrdy, S3C_GPIO_SFN(0xf));
 		s3c_gpio_setpull(mdm_drv->mdm2ap_pblrdy, S3C_GPIO_PULL_NONE);
