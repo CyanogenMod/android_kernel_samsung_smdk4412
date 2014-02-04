@@ -483,10 +483,14 @@ static void s3c24xx_serial_set_mctrl(struct uart_port *port, unsigned int mctrl)
 		} else {
 			umcon &= ~S3C2410_UMCOM_AFC;
 		}
-
-	} else if (port->line == CONFIG_GPS_S3C_UART) {
+	}
+#if !defined(CONFIG_MACH_KONA_EUR_LTE) && !defined(CONFIG_MACH_KONALTE_USA_ATT)
+	else if (port->line == CONFIG_GPS_S3C_UART) {
 		umcon |= S3C2410_UMCOM_AFC;
-	} else {
+	} 
+#endif
+	else {
+
 		umcon &= ~S3C2410_UMCOM_AFC;
 	}
 

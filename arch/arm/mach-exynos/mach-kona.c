@@ -385,6 +385,17 @@ static void __init smdk4212_usbgadget_init(void)
 				__func__);
 	}
 
+#if defined(CONFIG_MACH_KONA_EUR_LTE) || defined(CONFIG_MACH_KONALTE_USA_ATT)
+	s5p_usbgadget_set_platdata(pdata);
+	pdata = s3c_device_usbgadget.dev.platform_data;
+	if (pdata) {
+		/* Squelch Threshold Tune [13:11] (110 : -15%) */
+		pdata->phy_tune_mask |= (0x7 << 11);
+		pdata->phy_tune |= (0x6 << 11);
+		printk(KERN_DEBUG "usb: %s tune_mask=0x%x, tune=0x%x\n",
+			__func__, pdata->phy_tune_mask, pdata->phy_tune);
+	}
+#else
 	s5p_usbgadget_set_platdata(pdata);
 	pdata = s3c_device_usbgadget.dev.platform_data;
 	if (pdata) {
@@ -394,6 +405,7 @@ static void __init smdk4212_usbgadget_init(void)
 		printk(KERN_DEBUG "usb: %s tune_mask=0x%x, tune=0x%x\n",
 			__func__, pdata->phy_tune_mask, pdata->phy_tune);
 	}
+#endif
 }
 #endif
 
