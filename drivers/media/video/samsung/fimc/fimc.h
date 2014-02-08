@@ -469,6 +469,7 @@ struct fimc_control {
 	struct mutex			lock;		/* controller lock */
 	struct mutex			v4l2_lock;
 	spinlock_t			outq_lock;
+        spinlock_t			inq_lock;
 	wait_queue_head_t		wq;
 	struct device			*dev;
 #if defined(CONFIG_BUSFREQ_OPP) || defined(CONFIG_BUSFREQ_LOCK_WRAPPER)

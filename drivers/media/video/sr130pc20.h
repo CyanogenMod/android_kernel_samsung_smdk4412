@@ -547,6 +547,7 @@ struct sr130pc20_state {
 	s32 vt_mode;
 	s32 req_fps;
 	s32 fps;
+        s32 write_fps;
 	s32 freq;		/* MCLK in Hz */
 	u32 one_frame_delay_ms;
 	u32 light_level;	/* light level */
@@ -638,9 +639,17 @@ extern int sr130pc20_create_file(struct class *cls);
 #include <linux/slab.h>
 #include <linux/uaccess.h>
 
+#ifdef CONFIG_MACH_KONA
+#define TUNING_FILE_PATH "/mnt/sdcard/sr130pc20_regs_kona.h"
+#else
 #define TUNING_FILE_PATH "/mnt/sdcard/sr130pc20_regs.h"
+#endif /* CONFIG_MACH_KONA */
 #endif /* CONFIG_LOAD_FILE*/
 
+#ifdef CONFIG_MACH_KONA
+#include "sr130pc20_regs_kona.h"
+#else
 #include "sr130pc20_regs.h"
+#endif
 
 #endif /* __SR130PC20_H__ */
