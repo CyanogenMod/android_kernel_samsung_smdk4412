@@ -32,6 +32,9 @@
 #define sr130pc20_writew(sd, addr, data) i2c_write_nop()
 #define sr130pc20_writel(sd, addr, data) i2c_write_nop()
 
+int fimc_is;
+EXPORT(fimc_is);
+
 static int dbg_level;
 
 static const struct sr130pc20_fps sr130pc20_framerates[] = {
@@ -1284,10 +1287,11 @@ static int sr130pc20_s_mbus_fmt(struct v4l2_subdev *sd,
 		__func__, fmt->code, fmt->colorspace, fmt->width, fmt->height);
 
 	v4l2_fill_pix_format(&state->req_fmt, fmt);
-	if (fmt->field < IS_MODE_CAPTURE_STILL)
-		state->format_mode = V4L2_PIX_FMT_MODE_PREVIEW;
-	else
+	if ((IS_MODE_CAPTURE_STILL == fmt->field)
+	    && (SENSOR_CAMERA == state->sensor_mode))
 		state->format_mode = V4L2_PIX_FMT_MODE_CAPTURE;
+	else
+		state->format_mode = V4L2_PIX_FMT_MODE_PREVIEW;
 
 	if (state->format_mode != V4L2_PIX_FMT_MODE_CAPTURE) {
 		previous_index = state->preview.frmsize ?
@@ -1407,10 +1411,14 @@ static int sr130pc20_s_parm(struct v4l2_subdev *sd,
 	cam_dbg("s_parm state->fps=%d, state->req_fps=%d\n",
 		state->fps, state->req_fps);
 
-	if ((state->req_fps < 0) || (state->req_fps > 30)) {
-		cam_err("%s: error, invalid frame rate %d. we'll set to 30\n",
+	if (state->req_fps < 0) {
+		cam_err("%s: error, invalid frame rate %d. we'll set to 0\n",
 				__func__, state->req_fps);
 		state->req_fps = 0;
+	} else if (state->req_fps > 25) {
+		cam_err("%s: error, invalid frame rate %d. we'll set to 25\n",
+				__func__, state->req_fps);
+		state->req_fps = 25;
 	}
 
 	return sr130pc20_set_frame_rate(sd, state->req_fps);
@@ -1626,7 +1634,10 @@ static int sr130pc20_s_stream(struct v4l2_subdev *sd, int enable)
 
 	cam_info("stream mode = %d\n", enable);
 
-	BUG_ON(!state->initialized);
+	if (unlikely(!state->initialized)) {
+		WARN(1, "s_stream, not initialized\n");
+		return -EPERM;
+	}
 
 	switch (enable) {
 	case STREAM_MODE_CAM_OFF:
@@ -1635,22 +1646,11 @@ static int sr130pc20_s_stream(struct v4l2_subdev *sd, int enable)
 		break;
 
 	case STREAM_MODE_CAM_ON:
-		switch (state->sensor_mode) {
-		case SENSOR_CAMERA:
 			if (state->format_mode == V4L2_PIX_FMT_MODE_CAPTURE)
 				err = sr130pc20_start_capture(sd);
 			else
 				err = sr130pc20_start_preview(sd);
 			break;
-
-		case SENSOR_MOVIE:
-			err = sr130pc20_start_preview(sd);
-			break;
-
-		default:
-			break;
-		}
-		break;
 
 	case STREAM_MODE_MOVIE_OFF:
 		cam_info("movie off");
@@ -1674,14 +1674,6 @@ static int sr130pc20_s_stream(struct v4l2_subdev *sd, int enable)
 
 static inline int sr130pc20_check_i2c(struct v4l2_subdev *sd, u16 data)
 {
-	int err;
-	u32 val = 0;
-
-	err = sr130pc20_readw(sd, 0x0000, &val);
-	if (unlikely(err))
-		return err;
-
-	cam_dbg("version: 0x%04X is 0x6017?\n", val);
 	return 0;
 }
 
@@ -1727,6 +1719,7 @@ static int sr130pc20_init(struct v4l2_subdev *sd, u32 val)
 	CHECK_ERR_MSG(err, "failed to initialize camera device\n");
 	sr130pc20_init_parameter(sd);
 	state->initialized = 1;
+	fimc_is = 1;
 
 	return 0;
 }
@@ -1775,6 +1768,7 @@ static int sr130pc20_s_config(struct v4l2_subdev *sd,
 	state->format_mode = V4L2_PIX_FMT_MODE_PREVIEW;
 	state->fps = 0;
 	state->req_fps = -1;
+        state->write_fps = 0;
 
 	/* Initialize the independant HW module like flash here */
 	state->flash.mode = FLASH_MODE_OFF;
@@ -1880,6 +1874,7 @@ static int sr130pc20_remove(struct i2c_client *client)
 	v4l2_device_unregister_subdev(sd);
 	mutex_destroy(&state->ctrl_lock);
 	kfree(state);
+	fimc_is = 0;
 
 	printk(KERN_DEBUG "%s %s: driver removed!!\n",
 		dev_driver_string(&client->dev), dev_name(&client->dev));
