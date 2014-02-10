@@ -1059,7 +1059,7 @@ void get_monotonic_boottime(struct timespec *ts)
 	} while (read_seqretry(&xtime_lock, seq));
 
 	set_normalized_timespec(ts, ts->tv_sec + tomono.tv_sec + sleep.tv_sec,
-			nsecs + ts->tv_nsec + tomono.tv_nsec + sleep.tv_nsec);
+		(s64)nsecs + ts->tv_nsec + tomono.tv_nsec + sleep.tv_nsec);
 }
 EXPORT_SYMBOL_GPL(get_monotonic_boottime);
 
