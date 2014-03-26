@@ -591,6 +591,10 @@ static void synaptics_ts_read_points(struct synaptics_drv_data *data,
 #endif
 	u16 addr = data->f11.data_base_addr + 3;
 	u16 x = 0, y = 0;
+
+	if (!atomic_read(&data->keypad_enable)) {
+		return;
+	}
 	
 #if defined(CONFIG_SEC_TOUCHSCREEN_SURFACE_TOUCH)
 	ret = synaptics_ts_read_block(data,
@@ -1076,6 +1080,8 @@ static int __init synaptics_ts_probe(struct i2c_client *client,
 	__set_bit(EV_KEY, input->evbit);
 	__set_bit(MT_TOOL_FINGER, input->keybit);
 	__set_bit(INPUT_PROP_DIRECT, input->propbit);
+
+	atomic_set(&ddata->keypad_enable, 1);
 	
 #if defined(CONFIG_TOUCHSCREEN_SYNAPTICS_S7301_KEYLED)
 	if (pdata->led_event) {
