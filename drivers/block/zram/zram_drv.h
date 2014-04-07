@@ -100,7 +100,7 @@ struct zram {
 	 * we can store in a disk.
 	 */
 	u64 disksize;	/* bytes */
-
+	int max_comp_streams;
 	struct zram_stats stats;
 };
 #endif
