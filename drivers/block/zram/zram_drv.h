@@ -102,5 +102,6 @@ struct zram {
 	u64 disksize;	/* bytes */
 	int max_comp_streams;
 	struct zram_stats stats;
+	char compressor[10];
 };
 #endif
