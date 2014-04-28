@@ -165,7 +165,7 @@ static unsigned int get_nr_run_avg(void)
 #define DEF_START_DELAY				(0)
 
 #define UP_THRESHOLD_AT_MIN_FREQ		(40)
-#define FREQ_FOR_RESPONSIVENESS			(400000)
+#define FREQ_FOR_RESPONSIVENESS			(500000)
 
 #define HOTPLUG_DOWN_INDEX			(0)
 #define HOTPLUG_UP_INDEX			(1)
@@ -306,7 +306,7 @@ static void apply_hotplug_lock(void)
 	lock = atomic_read(&g_hotplug_lock);
 	flag = lock - online;
 
-	if (flag == 0)
+	if (lock == 0 || flag == 0)
 		return;
 
 	work = flag > 0 ? &dbs_info->up_work : &dbs_info->down_work;
@@ -380,6 +380,13 @@ void cpufreq_pegasusq_min_cpu_unlock(void)
 	lock = atomic_read(&g_hotplug_lock);
 	if (lock == 0)
 		return;
+#if defined(CONFIG_HAS_EARLYSUSPEND) && EARLYSUSPEND_HOTPLUGLOCK
+	if (dbs_tuners_ins.early_suspend >= 0) { /* if LCD is off-state */
+		atomic_set(&g_hotplug_lock, 1);
+		apply_hotplug_lock();
+		return;
+	}
+#endif
 	flag = lock - online;
 	if (flag >= 0)
 		return;
@@ -483,6 +490,21 @@ static ssize_t show_hotplug_lock(struct kobject *kobj,
 {
 	return sprintf(buf, "%d\n", atomic_read(&g_hotplug_lock));
 }
+
+static ssize_t show_cpucore_table(struct kobject *kobj,
+				struct attribute *attr, char *buf)
+{
+	ssize_t count = 0;
+	int i;
+	
+	for (i = CONFIG_NR_CPUS; i > 0; i--) {
+		count += sprintf(&buf[count], "%d ", i);
+	}
+	count += sprintf(&buf[count], "\n");
+
+	return count;
+}
+
 
 #define show_hotplug_param(file_name, num_core, up_down)		\
 static ssize_t show_##file_name##_##num_core##_##up_down		\
@@ -813,6 +835,7 @@ define_one_global_rw(max_cpu_lock);
 define_one_global_rw(min_cpu_lock);
 define_one_global_rw(hotplug_lock);
 define_one_global_rw(dvfs_debug);
+define_one_global_ro(cpucore_table);
 
 static struct attribute *dbs_attributes[] = {
 	&sampling_rate_min.attr,
@@ -846,6 +869,7 @@ static struct attribute *dbs_attributes[] = {
 	&hotplug_rq_3_0.attr,
 	&hotplug_rq_3_1.attr,
 	&hotplug_rq_4_0.attr,
+	&cpucore_table.attr,
 	NULL
 };
 

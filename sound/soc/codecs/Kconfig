@@ -389,3 +389,4 @@ config SND_SOC_WM9090
 	tristate
 
 source "sound/soc/codecs/mc1n2/Kconfig"
+source "sound/soc/codecs/ymu831/Kconfig"

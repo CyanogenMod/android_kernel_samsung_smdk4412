@@ -97,6 +97,10 @@ const char *modem_mode_text[] = {
 	"CP1", "CP2"
 };
 
+static int aif2_digital_mute;
+const char *switch_mode_text[] = {
+	"Off", "On"
+};
 
 #ifndef CONFIG_SEC_DEV_JACK
 /* To support PBA function test */
@@ -219,6 +223,43 @@ static int set_modem_mode(struct snd_kcontrol *kcontrol,
 	return 0;
 
 }
+
+static const struct soc_enum switch_mode_enum[] = {
+	SOC_ENUM_SINGLE_EXT(ARRAY_SIZE(switch_mode_text), switch_mode_text),
+};
+
+static int get_aif2_mute_status(struct snd_kcontrol *kcontrol,
+	struct snd_ctl_elem_value *ucontrol)
+{
+	ucontrol->value.integer.value[0] = aif2_digital_mute;
+	return 0;
+}
+
+static int set_aif2_mute_status(struct snd_kcontrol *kcontrol,
+	struct snd_ctl_elem_value *ucontrol)
+{
+	struct snd_soc_codec *codec = snd_kcontrol_chip(kcontrol);
+	int reg;
+
+	aif2_digital_mute = ucontrol->value.integer.value[0];
+
+	if (snd_soc_read(codec, WM8994_POWER_MANAGEMENT_6)
+		& WM8994_AIF2_DACDAT_SRC)
+		aif2_digital_mute = 0;
+
+	if (aif2_digital_mute)
+		reg = WM8994_AIF1DAC1_MUTE;
+	else
+		reg = 0;
+
+	snd_soc_update_bits(codec, WM8994_AIF2_DAC_FILTERS_1,
+		WM8994_AIF1DAC1_MUTE, reg);
+
+	pr_info("aif2_digit_mute: %s\n", switch_mode_text[aif2_digital_mute]);
+
+	return 0;
+}
+
 
 static const struct soc_enum lineout_mode_enum[] = {
 	SOC_ENUM_SINGLE_EXT(ARRAY_SIZE(lineout_mode_text), lineout_mode_text),
@@ -979,6 +1020,10 @@ static const struct snd_kcontrol_new midas_controls[] = {
 
 	SOC_ENUM_EXT("ModemSwitch Mode", modem_mode_enum[0],
 		get_modem_mode, set_modem_mode),
+
+	SOC_ENUM_EXT("AIF2 digital mute", switch_mode_enum[0],
+		get_aif2_mute_status, set_aif2_mute_status),
+
 };
 
 const struct snd_soc_dapm_widget midas_dapm_widgets[] = {

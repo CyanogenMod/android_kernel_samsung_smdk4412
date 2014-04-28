@@ -1,0 +1,1074 @@
+/****************************************************************************
+ *
+ *	Copyright(c) 2012 Yamaha Corporation. All rights reserved.
+ *
+ *	Module		: mcdriver.h
+ *
+ *	Description	: MC Driver header
+ *
+ *	Version		: 1.0.2	2012.12.27
+ *
+ * This software is provided 'as-is', without any express or implied
+ * warranty.	In no event will the authors be held liable for any damages
+ * arising from the use of this software.
+ *
+ * Permission is granted to anyone to use this software for any purpose,
+ * including commercial applications, and to alter it and redistribute it
+ * freely, subject to the following restrictions:
+ *
+ * 1. The origin of this software must not be misrepresented; you must not
+ *	claim that you wrote the original software. If you use this software
+ *	in a product, an acknowledgment in the product documentation would be
+ *	appreciated but is not required.
+ * 2. Altered source versions must be plainly marked as such, and must not be
+ *	misrepresented as being the original software.
+ * 3. This notice may not be removed or altered from any source distribution.
+ *
+ ****************************************************************************/
+
+#ifndef _MCDRIVER_H_
+#define _MCDRIVER_H_
+
+#include "mctypedef.h"
+
+
+
+SINT32	McDrv_Ctrl(UINT32 dCmd, void *pvPrm1, void *pvPrm2, UINT32 dPrm);
+
+
+
+
+/*	return value	*/
+#define	MCDRV_SUCCESS			((SINT32)0)
+#define	MCDRV_ERROR_ARGUMENT		(-1)
+#define	MCDRV_ERROR_TIMEOUT		(-2)
+#define	MCDRV_ERROR_INIT		(-3)
+#define	MCDRV_ERROR_RESOURCEOVER	(-4)
+#define	MCDRV_ERROR_STATE		(-5)
+
+#define	MCDRV_ERROR			(-10)
+
+
+/*	dCmd	*/
+#define	MCDRV_INIT			(0)
+#define	MCDRV_TERM			(1)
+
+#define	MCDRV_READ_REG			(2)
+#define	MCDRV_WRITE_REG			(3)
+
+#define	MCDRV_GET_CLOCKSW		(4)
+#define	MCDRV_SET_CLOCKSW		(5)
+
+#define	MCDRV_GET_PATH			(6)
+#define	MCDRV_SET_PATH			(7)
+
+#define	MCDRV_GET_VOLUME		(8)
+#define	MCDRV_SET_VOLUME		(9)
+
+#define	MCDRV_GET_DIGITALIO		(10)
+#define	MCDRV_SET_DIGITALIO		(11)
+
+#define	MCDRV_GET_DIGITALIO_PATH	(12)
+#define	MCDRV_SET_DIGITALIO_PATH	(13)
+
+#define	MCDRV_GET_SWAP			(14)
+#define	MCDRV_SET_SWAP			(15)
+
+#define	MCDRV_SET_DSP			(16)
+#define	MCDRV_GET_DSP			(17)
+#define	MCDRV_GET_DSP_DATA		(18)
+#define	MCDRV_SET_DSP_DATA		(19)
+#define	MCDRV_REGISTER_DSP_CB		(20)
+#define	MCDRV_GET_DSP_TRANSITION	(21)
+
+#define	MCDRV_IRQ			(22)
+
+#define	MCDRV_GET_HSDET			(23)
+#define	MCDRV_SET_HSDET			(24)
+
+#define	MCDRV_CONFIG_GP			(25)
+#define	MCDRV_MASK_GP			(26)
+#define	MCDRV_GETSET_GP			(27)
+
+/*	pvPrm	*/
+/*	init	*/
+/*	MCDRV_INIT_INFO bCkSel setting	*/
+#define	MCDRV_CKSEL_CMOS_CMOS		(0x00)
+#define	MCDRV_CKSEL_TCXO_TCXO		(0x03)
+#define	MCDRV_CKSEL_CMOS_TCXO		(0x02)
+#define	MCDRV_CKSEL_TCXO_CMOS		(0x01)
+
+/*	MCDRV_INIT_INFO bCkInput setting	*/
+#define	MCDRV_CKINPUT_CLKI0_CLKI1	(0x04)
+#define	MCDRV_CKINPUT_CLKI0_RTCK	(0x08)
+#define	MCDRV_CKINPUT_CLKI0_SBCK	(0x0C)
+#define	MCDRV_CKINPUT_CLKI1_CLKI0	(0x01)
+#define	MCDRV_CKINPUT_CLKI1_RTCK	(0x09)
+#define	MCDRV_CKINPUT_CLKI1_SBCK	(0x0D)
+#define	MCDRV_CKINPUT_RTC_CLKI0		(0x02)
+#define	MCDRV_CKINPUT_RTC_CLKI1		(0x06)
+#define	MCDRV_CKINPUT_RTC_SBCK		(0x0E)
+#define	MCDRV_CKINPUT_SBCK_CLKI0	(0x03)
+#define	MCDRV_CKINPUT_SBCK_CLKI1	(0x07)
+#define	MCDRV_CKINPUT_SBCK_RTC		(0x0B)
+#define	MCDRV_CKINPUT_CLKI0_CLKI0	(0x00)
+#define	MCDRV_CKINPUT_CLKI1_CLKI1	(0x05)
+#define	MCDRV_CKINPUT_RTC_RTC		(0x0A)
+#define	MCDRV_CKINPUT_SBCK_SBCK		(0x0F)
+
+/*	MCDRV_INIT_INFO bPllFreqX setting	*/
+#define	MCDRV_PLLFREQ_73		(0)
+#define	MCDRV_PLLFREQ_147		(1)
+
+/*	MCDRV_INIT_INFO bHsdetClk setting	*/
+#define	MCDRV_HSDETCLK_RTC		(0)
+#define	MCDRV_HSDETCLK_OSC		(1)
+
+/*	MCDRV_INIT_INFO bXXXHiz setting	*/
+#define	MCDRV_DAHIZ_LOW			(0)
+#define	MCDRV_DAHIZ_HIZ			(1)
+
+/*	CDRV_INIT_INFO bPcmHiz setting	*/
+#define	MCDRV_PCMHIZ_LOW		(0)
+#define	MCDRV_PCMHIZ_HIZ		(1)
+
+/*	MCDRV_INIT_INFO bPowerMode setting	*/
+#define	MCDRV_POWMODE_FULL		(0)
+#define	MCDRV_POWMODE_CDSPDEBUG		(255)
+
+/*	MCDRV_INIT_INFO bPaxFunc setting	*/
+#define	MCDRV_PA_GPIO			(0)
+#define	MCDRV_PA_PDMCK			(1)
+#define	MCDRV_PA_PDMDI			(1)
+
+/*	MCDRV_INIT_INFO bMbSel setting	*/
+#define	MCDRV_MBSEL_20			(0)
+#define	MCDRV_MBSEL_21			(1)
+#define	MCDRV_MBSEL_22			(2)
+#define	MCDRV_MBSEL_23			(3)
+
+/*	MCDRV_INIT_INFO bMbsDisch setting	*/
+#define	MCDRV_MBSDISCH_0000		(0)
+#define	MCDRV_MBSDISCH_0001		(1)
+#define	MCDRV_MBSDISCH_0010		(2)
+#define	MCDRV_MBSDISCH_0011		(3)
+#define	MCDRV_MBSDISCH_0100		(4)
+#define	MCDRV_MBSDISCH_0101		(5)
+#define	MCDRV_MBSDISCH_0110		(6)
+#define	MCDRV_MBSDISCH_0111		(7)
+#define	MCDRV_MBSDISCH_1000		(8)
+#define	MCDRV_MBSDISCH_1001		(9)
+#define	MCDRV_MBSDISCH_1010		(10)
+#define	MCDRV_MBSDISCH_1011		(11)
+#define	MCDRV_MBSDISCH_1100		(12)
+#define	MCDRV_MBSDISCH_1101		(13)
+#define	MCDRV_MBSDISCH_1110		(14)
+#define	MCDRV_MBSDISCH_1111		(15)
+
+/*	MCDRV_INIT_INFO bNonClip setting	*/
+#define	MCDRV_NONCLIP_OFF		(0)
+#define	MCDRV_NONCLIP_ON		(1)
+
+/*	MCDRV_INIT_INFO bLineIn1Dif/bLineOutxDif setting	*/
+#define	MCDRV_LINE_STEREO		(0)
+#define	MCDRV_LINE_DIF			(1)
+
+/*	MCDRV_INIT_INFO bMicxSng setting	*/
+#define	MCDRV_MIC_DIF			(0)
+#define	MCDRV_MIC_SINGLE		(1)
+
+/*	MCDRV_INIT_INFO bZcLineOutx/bZcRc/bZcSp/bZcHp setting	*/
+#define	MCDRV_ZC_ON			(0)
+#define	MCDRV_ZC_OFF			(1)
+
+/*	MCDRV_INIT_INFO bSvolLineOutx/bSvolRc/bSvolSp/bSvolHp setting	*/
+#define	MCDRV_SVOL_OFF			(0)
+#define	MCDRV_SVOL_ON			(1)
+
+/*	MCDRV_INIT_INFO bRcHiz setting	*/
+#define	MCDRV_RCIMP_FIXLOW		(0)
+#define	MCDRV_RCIMP_WL			(1)
+
+/*	MCDRV_INIT_INFO bSpHiz setting	*/
+#define	MCDRV_WL_LOFF_ROFF		(0)
+#define	MCDRV_WL_LON_ROFF		(1)
+#define	MCDRV_WL_LOFF_RON		(2)
+#define	MCDRV_WL_LON_RON		(3)
+
+/*	MCDRV_INIT_INFO bHpHiz/bLineOutxHiz setting	*/
+#define	MCDRV_IMP_LFIXLOW_RFIXLOW	(0)
+#define	MCDRV_IMP_LWL_RFIXLOW		(1)
+#define	MCDRV_IMP_LFIXLOW_RWL		(2)
+#define	MCDRV_IMP_LWL_RWL		(3)
+
+/*	MCDRV_INIT_INFO bCpMod setting	*/
+#define	MCDRV_CPMOD_HI			(0)
+#define	MCDRV_CPMOD_MID			(1)
+
+/*	MCDRV_INIT_INFO bRbSel setting	*/
+#define	MCDRV_RBSEL_2_2K		(0)
+#define	MCDRV_RBSEL_50			(1)
+
+/*	MCDRV_INIT_INFO bPlugSel setting	*/
+#define	MCDRV_PLUG_LRGM			(0)
+#define	MCDRV_PLUG_LRMG			(1)
+
+/*	MCDRV_INIT_INFO bGndDet setting	*/
+#define	MCDRV_GNDDET_OFF		(0)
+#define	MCDRV_GNDDET_ON			(1)
+
+/*	MCDRV_INIT_INFO bPpdRc/bPpdSp/bPpdHp/bPpdLineOut1/bPpdLineOut2
+	setting	*/
+#define	MCDRV_PPD_OFF			(0)
+#define	MCDRV_PPD_ON			(1)
+
+struct MCDRV_WAIT_TIME {
+	UINT32	dWaitTime[20];
+	UINT32	dPollInterval[20];
+	UINT32	dPollTimeOut[20];
+};
+
+struct MCDRV_INIT_INFO {
+	UINT8			bCkSel;
+	UINT8			bCkInput;
+	UINT8			bPllModeA;
+	UINT8			bPllPrevDivA;
+	UINT16			wPllFbDivA;
+	UINT16			wPllFracA;
+	UINT8			bPllFreqA;
+	UINT8			bPllModeB;
+	UINT8			bPllPrevDivB;
+	UINT16			wPllFbDivB;
+	UINT16			wPllFracB;
+	UINT8			bPllFreqB;
+	UINT8			bHsdetClk;
+	UINT8			bDio0SdoHiz;
+	UINT8			bDio1SdoHiz;
+	UINT8			bDio2SdoHiz;
+	UINT8			bDio0ClkHiz;
+	UINT8			bDio1ClkHiz;
+	UINT8			bDio2ClkHiz;
+	UINT8			bDio0PcmHiz;
+	UINT8			bDio1PcmHiz;
+	UINT8			bDio2PcmHiz;
+	UINT8			bPa0Func;
+	UINT8			bPa1Func;
+	UINT8			bPa2Func;
+	UINT8			bPowerMode;
+	UINT8			bMbSel1;
+	UINT8			bMbSel2;
+	UINT8			bMbSel3;
+	UINT8			bMbSel4;
+	UINT8			bMbsDisch;
+	UINT8			bNonClip;
+	UINT8			bLineIn1Dif;
+	UINT8			bLineOut1Dif;
+	UINT8			bLineOut2Dif;
+	UINT8			bMic1Sng;
+	UINT8			bMic2Sng;
+	UINT8			bMic3Sng;
+	UINT8			bMic4Sng;
+	UINT8			bZcLineOut1;
+	UINT8			bZcLineOut2;
+	UINT8			bZcRc;
+	UINT8			bZcSp;
+	UINT8			bZcHp;
+	UINT8			bSvolLineOut1;
+	UINT8			bSvolLineOut2;
+	UINT8			bSvolRc;
+	UINT8			bSvolSp;
+	UINT8			bSvolHp;
+	UINT8			bRcHiz;
+	UINT8			bSpHiz;
+	UINT8			bHpHiz;
+	UINT8			bLineOut1Hiz;
+	UINT8			bLineOut2Hiz;
+	UINT8			bCpMod;
+	UINT8			bRbSel;
+	UINT8			bPlugSel;
+	UINT8			bGndDet;
+	UINT8			bPpdRc;
+	UINT8			bPpdSp;
+	UINT8			bPpdHp;
+	UINT8			bPpdLineOut1;
+	UINT8			bPpdLineOut2;
+	struct MCDRV_WAIT_TIME	sWaitTime;
+};
+
+/*	MCDRV_INIT2_INFO bOption[0] setting	*/
+#define	MCDRV_DOA_DRV_LOW		(0)
+#define	MCDRV_DOA_DRV_HIGH		(1)
+
+/*	MCDRV_INIT2_INFO bOption[1] setting	*/
+#define	MCDRV_SCKMSK_OFF		(0)
+#define	MCDRV_SCKMSK_ON			(1)
+
+/*	MCDRV_INIT2_INFO bOption[2] setting	*/
+#define	MCDRV_SPMN_8_9_10		(0)
+#define	MCDRV_SPMN_5_6_7		(1)
+#define	MCDRV_SPMN_4_5_6		(2)
+#define	MCDRV_SPMN_OFF_9		(3)
+#define	MCDRV_SPMN_OFF_6		(4)
+
+struct MCDRV_INIT2_INFO {
+	UINT8	bOption[20];
+};
+
+/*	set/get clock switch	*/
+/*	MCDRV_CLOCKSW_INFO bClkSrc setting	*/
+#define	MCDRV_CLKSW_CLKA	(0)
+#define	MCDRV_CLKSW_CLKB	(1)
+
+struct	MCDRV_CLOCKSW_INFO {
+	UINT8	bClkSrc;
+};
+
+/*	set/get path	*/
+#define	MCDRV_D1SRC_MUSICIN_ON		(0x00000001)
+#define	MCDRV_D1SRC_MUSICIN_OFF		(0x00000002)
+#define	MCDRV_D1SRC_EXTIN_ON		(0x00000004)
+#define	MCDRV_D1SRC_EXTIN_OFF		(0x00000008)
+#define	MCDRV_D1SRC_VBOXOUT_ON		(0x00000010)
+#define	MCDRV_D1SRC_VBOXOUT_OFF		(0x00000020)
+#define	MCDRV_D1SRC_VBOXREFOUT_ON	(0x00000040)
+#define	MCDRV_D1SRC_VBOXREFOUT_OFF	(0x00000080)
+#define	MCDRV_D1SRC_AE0_ON		(0x00000100)
+#define	MCDRV_D1SRC_AE0_OFF		(0x00000200)
+#define	MCDRV_D1SRC_AE1_ON		(0x00000400)
+#define	MCDRV_D1SRC_AE1_OFF		(0x00000800)
+#define	MCDRV_D1SRC_AE2_ON		(0x00001000)
+#define	MCDRV_D1SRC_AE2_OFF		(0x00002000)
+#define	MCDRV_D1SRC_AE3_ON		(0x00004000)
+#define	MCDRV_D1SRC_AE3_OFF		(0x00008000)
+#define	MCDRV_D1SRC_ADIF0_ON		(0x00010000)
+#define	MCDRV_D1SRC_ADIF0_OFF		(0x00020000)
+#define	MCDRV_D1SRC_ADIF1_ON		(0x00040000)
+#define	MCDRV_D1SRC_ADIF1_OFF		(0x00080000)
+#define	MCDRV_D1SRC_ADIF2_ON		(0x00100000)
+#define	MCDRV_D1SRC_ADIF2_OFF		(0x00200000)
+#define	MCDRV_D1SRC_HIFIIN_ON		(0x00400000)
+#define	MCDRV_D1SRC_HIFIIN_OFF		(0x00800000)
+struct MCDRV_D1_CHANNEL {
+	UINT32	dSrcOnOff;
+};
+
+#define	MCDRV_D2SRC_VOICEIN_ON		(0x00000001)
+#define	MCDRV_D2SRC_VOICEIN_OFF		(0x00000002)
+#define	MCDRV_D2SRC_VBOXIOOUT_ON	(0x00000004)
+#define	MCDRV_D2SRC_VBOXIOOUT_OFF	(0x00000008)
+#define	MCDRV_D2SRC_VBOXHOSTOUT_ON	(0x00000010)
+#define	MCDRV_D2SRC_VBOXHOSTOUT_OFF	(0x00000020)
+#define	MCDRV_D2SRC_ADC0_L_ON		(0x00000040)
+#define	MCDRV_D2SRC_ADC0_L_OFF		(0x00000080)
+#define	MCDRV_D2SRC_ADC0_R_ON		(0x00000100)
+#define	MCDRV_D2SRC_ADC0_R_OFF		(0x00000200)
+#define	MCDRV_D2SRC_ADC1_ON		(0x00000400)
+#define	MCDRV_D2SRC_ADC1_OFF		(0x00000800)
+#define	MCDRV_D2SRC_PDM0_L_ON		(0x00001000)
+#define	MCDRV_D2SRC_PDM0_L_OFF		(0x00002000)
+#define	MCDRV_D2SRC_PDM0_R_ON		(0x00004000)
+#define	MCDRV_D2SRC_PDM0_R_OFF		(0x00008000)
+#define	MCDRV_D2SRC_PDM1_L_ON		(0x00010000)
+#define	MCDRV_D2SRC_PDM1_L_OFF		(0x00020000)
+#define	MCDRV_D2SRC_PDM1_R_ON		(0x00040000)
+#define	MCDRV_D2SRC_PDM1_R_OFF		(0x00080000)
+#define	MCDRV_D2SRC_DAC0REF_ON		(0x00100000)
+#define	MCDRV_D2SRC_DAC0REF_OFF		(0x00200000)
+#define	MCDRV_D2SRC_DAC1REF_ON		(0x00400000)
+#define	MCDRV_D2SRC_DAC1REF_OFF		(0x00800000)
+
+struct MCDRV_D2_CHANNEL {
+	UINT32	dSrcOnOff;
+};
+
+#define	MCDRV_ASRC_DAC0_L_ON		(0x00000001)
+#define	MCDRV_ASRC_DAC0_L_OFF		(0x00000002)
+#define	MCDRV_ASRC_DAC0_R_ON		(0x00000004)
+#define	MCDRV_ASRC_DAC0_R_OFF		(0x00000008)
+#define	MCDRV_ASRC_DAC1_L_ON		(0x00000010)
+#define	MCDRV_ASRC_DAC1_L_OFF		(0x00000020)
+#define	MCDRV_ASRC_DAC1_R_ON		(0x00000040)
+#define	MCDRV_ASRC_DAC1_R_OFF		(0x00000080)
+#define	MCDRV_ASRC_MIC1_ON		(0x00000100)
+#define	MCDRV_ASRC_MIC1_OFF		(0x00000200)
+#define	MCDRV_ASRC_MIC2_ON		(0x00000400)
+#define	MCDRV_ASRC_MIC2_OFF		(0x00000800)
+#define	MCDRV_ASRC_MIC3_ON		(0x00001000)
+#define	MCDRV_ASRC_MIC3_OFF		(0x00002000)
+#define	MCDRV_ASRC_MIC4_ON		(0x00004000)
+#define	MCDRV_ASRC_MIC4_OFF		(0x00008000)
+#define	MCDRV_ASRC_LINEIN1_L_ON		(0x00010000)
+#define	MCDRV_ASRC_LINEIN1_L_OFF	(0x00020000)
+#define	MCDRV_ASRC_LINEIN1_R_ON		(0x00040000)
+#define	MCDRV_ASRC_LINEIN1_R_OFF	(0x00080000)
+#define	MCDRV_ASRC_LINEIN1_M_ON		(0x00100000)
+#define	MCDRV_ASRC_LINEIN1_M_OFF	(0x00200000)
+
+struct MCDRV_A_CHANNEL {
+	UINT32	dSrcOnOff;
+};
+
+#define	MUSICOUT_PATH_CHANNELS		(2)
+#define	EXTOUT_PATH_CHANNELS		(2)
+#define	HIFIOUT_PATH_CHANNELS		(1)
+#define	VBOXMIXIN_PATH_CHANNELS		(4)
+#define	AE_PATH_CHANNELS		(2)
+#define	DAC0_PATH_CHANNELS		(2)
+#define	DAC1_PATH_CHANNELS		(2)
+#define	VOICEOUT_PATH_CHANNELS		(1)
+#define	VBOXIOIN_PATH_CHANNELS		(1)
+#define	VBOXHOSTIN_PATH_CHANNELS	(1)
+#define	HOSTOUT_PATH_CHANNELS		(1)
+#define	ADIF0_PATH_CHANNELS		(2)
+#define	ADIF1_PATH_CHANNELS		(2)
+#define	ADIF2_PATH_CHANNELS		(2)
+#define	ADC0_PATH_CHANNELS		(2)
+#define	ADC1_PATH_CHANNELS		(1)
+#define	SP_PATH_CHANNELS		(2)
+#define	HP_PATH_CHANNELS		(2)
+#define	RC_PATH_CHANNELS		(1)
+#define	LOUT1_PATH_CHANNELS		(2)
+#define	LOUT2_PATH_CHANNELS		(2)
+#define	BIAS_PATH_CHANNELS		(4)
+
+struct MCDRV_PATH_INFO {
+	struct MCDRV_D1_CHANNEL	asMusicOut[MUSICOUT_PATH_CHANNELS];
+	struct MCDRV_D1_CHANNEL	asExtOut[EXTOUT_PATH_CHANNELS];
+	struct MCDRV_D1_CHANNEL	asHifiOut[HIFIOUT_PATH_CHANNELS];
+	struct MCDRV_D1_CHANNEL	asVboxMixIn[VBOXMIXIN_PATH_CHANNELS];
+	struct MCDRV_D1_CHANNEL	asAe0[AE_PATH_CHANNELS];
+	struct MCDRV_D1_CHANNEL	asAe1[AE_PATH_CHANNELS];
+	struct MCDRV_D1_CHANNEL	asAe2[AE_PATH_CHANNELS];
+	struct MCDRV_D1_CHANNEL	asAe3[AE_PATH_CHANNELS];
+	struct MCDRV_D1_CHANNEL	asDac0[DAC0_PATH_CHANNELS];
+	struct MCDRV_D1_CHANNEL	asDac1[DAC1_PATH_CHANNELS];
+	struct MCDRV_D2_CHANNEL	asVoiceOut[VOICEOUT_PATH_CHANNELS];
+	struct MCDRV_D2_CHANNEL	asVboxIoIn[VBOXIOIN_PATH_CHANNELS];
+	struct MCDRV_D2_CHANNEL	asVboxHostIn[VBOXHOSTIN_PATH_CHANNELS];
+	struct MCDRV_D2_CHANNEL	asHostOut[HOSTOUT_PATH_CHANNELS];
+	struct MCDRV_D2_CHANNEL	asAdif0[ADIF0_PATH_CHANNELS];
+	struct MCDRV_D2_CHANNEL	asAdif1[ADIF1_PATH_CHANNELS];
+	struct MCDRV_D2_CHANNEL	asAdif2[ADIF2_PATH_CHANNELS];
+	struct MCDRV_A_CHANNEL	asAdc0[ADC0_PATH_CHANNELS];
+	struct MCDRV_A_CHANNEL	asAdc1[ADC1_PATH_CHANNELS];
+	struct MCDRV_A_CHANNEL	asSp[SP_PATH_CHANNELS];
+	struct MCDRV_A_CHANNEL	asHp[HP_PATH_CHANNELS];
+	struct MCDRV_A_CHANNEL	asRc[RC_PATH_CHANNELS];
+	struct MCDRV_A_CHANNEL	asLout1[LOUT1_PATH_CHANNELS];
+	struct MCDRV_A_CHANNEL	asLout2[LOUT2_PATH_CHANNELS];
+	struct MCDRV_A_CHANNEL	asBias[BIAS_PATH_CHANNELS];
+};
+
+/*	set/get vol	*/
+#define	MCDRV_VOL_UPDATE		(0x0001)
+
+#define	MUSICIN_VOL_CHANNELS		(2)
+#define	EXTIN_VOL_CHANNELS		(2)
+#define	VOICEIN_VOL_CHANNELS		(2)
+#define	REFIN_VOL_CHANNELS		(2)
+#define	ADIF0IN_VOL_CHANNELS		(2)
+#define	ADIF1IN_VOL_CHANNELS		(2)
+#define	ADIF2IN_VOL_CHANNELS		(2)
+#define	MUSICOUT_VOL_CHANNELS		(2)
+#define	EXTOUT_VOL_CHANNELS		(2)
+#define	VOICEOUT_VOL_CHANNELS		(2)
+#define	REFOUT_VOL_CHANNELS		(2)
+#define	DAC0OUT_VOL_CHANNELS		(2)
+#define	DAC1OUT_VOL_CHANNELS		(2)
+#define	DPATH_VOL_CHANNELS		(2)
+#define	LINEIN1_VOL_CHANNELS		(2)
+#define	MIC1_VOL_CHANNELS		(1)
+#define	MIC2_VOL_CHANNELS		(1)
+#define	MIC3_VOL_CHANNELS		(1)
+#define	MIC4_VOL_CHANNELS		(1)
+#define	HP_VOL_CHANNELS			(2)
+#define	SP_VOL_CHANNELS			(2)
+#define	RC_VOL_CHANNELS			(1)
+#define	LINEOUT1_VOL_CHANNELS		(2)
+#define	LINEOUT2_VOL_CHANNELS		(2)
+#define	HPDET_VOL_CHANNELS		(1)
+
+struct MCDRV_VOL_INFO {
+	SINT16	aswD_MusicIn[MUSICIN_VOL_CHANNELS];
+	SINT16	aswD_ExtIn[EXTIN_VOL_CHANNELS];
+	SINT16	aswD_VoiceIn[VOICEIN_VOL_CHANNELS];
+	SINT16	aswD_RefIn[REFIN_VOL_CHANNELS];
+	SINT16	aswD_Adif0In[ADIF0IN_VOL_CHANNELS];
+	SINT16	aswD_Adif1In[ADIF1IN_VOL_CHANNELS];
+	SINT16	aswD_Adif2In[ADIF2IN_VOL_CHANNELS];
+	SINT16	aswD_MusicOut[MUSICOUT_VOL_CHANNELS];
+	SINT16	aswD_ExtOut[EXTOUT_VOL_CHANNELS];
+	SINT16	aswD_VoiceOut[VOICEOUT_VOL_CHANNELS];
+	SINT16	aswD_RefOut[REFOUT_VOL_CHANNELS];
+	SINT16	aswD_Dac0Out[DAC0OUT_VOL_CHANNELS];
+	SINT16	aswD_Dac1Out[DAC1OUT_VOL_CHANNELS];
+	SINT16	aswD_DpathDa[DPATH_VOL_CHANNELS];
+	SINT16	aswD_DpathAd[DPATH_VOL_CHANNELS];
+	SINT16	aswA_LineIn1[LINEIN1_VOL_CHANNELS];
+	SINT16	aswA_Mic1[MIC1_VOL_CHANNELS];
+	SINT16	aswA_Mic2[MIC2_VOL_CHANNELS];
+	SINT16	aswA_Mic3[MIC3_VOL_CHANNELS];
+	SINT16	aswA_Mic4[MIC4_VOL_CHANNELS];
+	SINT16	aswA_Hp[HP_VOL_CHANNELS];
+	SINT16	aswA_Sp[SP_VOL_CHANNELS];
+	SINT16	aswA_Rc[RC_VOL_CHANNELS];
+	SINT16	aswA_LineOut1[LINEOUT1_VOL_CHANNELS];
+	SINT16	aswA_LineOut2[LINEOUT2_VOL_CHANNELS];
+	SINT16	aswA_HpDet[HPDET_VOL_CHANNELS];
+};
+
+/*	set/get digitalio	*/
+#define	MCDRV_MUSIC_COM_UPDATE_FLAG	((UINT32)0x00000001)
+#define	MCDRV_MUSIC_DIR_UPDATE_FLAG	((UINT32)0x00000002)
+#define	MCDRV_MUSIC_DIT_UPDATE_FLAG	((UINT32)0x00000004)
+#define	MCDRV_EXT_COM_UPDATE_FLAG	((UINT32)0x00000008)
+#define	MCDRV_EXT_DIR_UPDATE_FLAG	((UINT32)0x00000010)
+#define	MCDRV_EXT_DIT_UPDATE_FLAG	((UINT32)0x00000020)
+#define	MCDRV_VOICE_COM_UPDATE_FLAG	((UINT32)0x00000040)
+#define	MCDRV_VOICE_DIR_UPDATE_FLAG	((UINT32)0x00000080)
+#define	MCDRV_VOICE_DIT_UPDATE_FLAG	((UINT32)0x00000100)
+#define	MCDRV_HIFI_COM_UPDATE_FLAG	((UINT32)0x00000200)
+#define	MCDRV_HIFI_DIR_UPDATE_FLAG	((UINT32)0x00000400)
+#define	MCDRV_HIFI_DIT_UPDATE_FLAG	((UINT32)0x00000800)
+
+/*	MCDRV_DIO_COMMON bMasterSlave setting	*/
+#define	MCDRV_DIO_SLAVE			(0)
+#define	MCDRV_DIO_MASTER		(1)
+
+/*	MCDRV_DIO_COMMON bDigitalAutoFs setting	*/
+#define	MCDRV_AUTOFS_OFF		(0)
+#define	MCDRV_AUTOFS_ON			(1)
+
+/*	MCDRV_DIO_COMMON bFs setting	*/
+#define	MCDRV_FS_48000			(0)
+#define	MCDRV_FS_44100			(1)
+#define	MCDRV_FS_32000			(2)
+#define	MCDRV_FS_24000			(4)
+#define	MCDRV_FS_22050			(5)
+#define	MCDRV_FS_16000			(6)
+#define	MCDRV_FS_12000			(8)
+#define	MCDRV_FS_11025			(9)
+#define	MCDRV_FS_8000			(10)
+#define	MCDRV_FS_192000			(12)
+#define	MCDRV_FS_96000			(13)
+
+/*	MCDRV_DIO_COMMON bBckFs setting	*/
+#define	MCDRV_BCKFS_64			(0)
+#define	MCDRV_BCKFS_48			(1)
+#define	MCDRV_BCKFS_32			(2)
+#define	MCDRV_BCKFS_512			(4)
+#define	MCDRV_BCKFS_256			(5)
+#define	MCDRV_BCKFS_192			(6)
+#define	MCDRV_BCKFS_128			(7)
+#define	MCDRV_BCKFS_96			(8)
+#define	MCDRV_BCKFS_24			(9)
+#define	MCDRV_BCKFS_16			(10)
+#define	MCDRV_BCKFS_8			(11)
+#define	MCDRV_BCKFS_SLAVE		(15)
+
+/*	MCDRV_DIO_COMMON bInterface setting	*/
+#define	MCDRV_DIO_DA			(0)
+#define	MCDRV_DIO_PCM			(1)
+
+/*	MCDRV_DIO_COMMON bBckInvert setting	*/
+#define	MCDRV_BCLK_NORMAL		(0)
+#define	MCDRV_BCLK_INVERT		(1)
+
+/*	MCDRV_DIO_COMMON bSrcThru setting	*/
+#define	MCDRV_SRC_NOT_THRU		(0)
+#define	MCDRV_SRC_THRU			(1)
+
+/*	MCDRV_DIO_COMMON bPcmHizTim setting	*/
+#define	MCDRV_PCMHIZTIM_FALLING		(0)
+#define	MCDRV_PCMHIZTIM_RISING		(1)
+
+/*	MCDRV_DIO_COMMON bPcmFrame setting	*/
+#define	MCDRV_PCM_SHORTFRAME		(0)
+#define	MCDRV_PCM_LONGFRAME		(1)
+
+struct MCDRV_DIO_COMMON {
+	UINT8	bMasterSlave;
+	UINT8	bAutoFs;
+	UINT8	bFs;
+	UINT8	bBckFs;
+	UINT8	bInterface;
+	UINT8	bBckInvert;
+	UINT8	bSrcThru;
+	UINT8	bPcmHizTim;
+	UINT8	bPcmFrame;
+	UINT8	bPcmHighPeriod;
+};
+
+/*	MCDRV_DA_FORMAT bBitSel setting	*/
+#define	MCDRV_BITSEL_16			(0)
+#define	MCDRV_BITSEL_20			(1)
+#define	MCDRV_BITSEL_24			(2)
+#define	MCDRV_BITSEL_32			(3)
+
+/*	MCDRV_DA_FORMAT bMode setting	*/
+#define	MCDRV_DAMODE_HEADALIGN		(0)
+#define	MCDRV_DAMODE_I2S		(1)
+#define	MCDRV_DAMODE_TAILALIGN		(2)
+
+struct MCDRV_DA_FORMAT {
+	UINT8	bBitSel;
+	UINT8	bMode;
+};
+
+/*	MCDRV_PCM_FORMAT bMono setting	*/
+#define	MCDRV_PCM_STEREO		(0)
+#define	MCDRV_PCM_MONO			(1)
+
+/*	MCDRV_PCM_FORMAT bOrder setting	*/
+#define	MCDRV_PCM_MSB_FIRST		(0)
+#define	MCDRV_PCM_LSB_FIRST		(1)
+
+/*	MCDRV_PCM_FORMAT bLaw setting	*/
+#define	MCDRV_PCM_LINEAR		(0)
+#define	MCDRV_PCM_ALAW			(1)
+#define	MCDRV_PCM_MULAW			(2)
+
+/*	MCDRV_PCM_FORMAT bBitSel setting	*/
+#define	MCDRV_PCM_BITSEL_8		(0)
+#define	MCDRV_PCM_BITSEL_16		(1)
+#define	MCDRV_PCM_BITSEL_24		(2)
+
+struct MCDRV_PCM_FORMAT {
+	UINT8	bMono;
+	UINT8	bOrder;
+	UINT8	bLaw;
+	UINT8	bBitSel;
+};
+
+struct MCDRV_DIO_DIR {
+	struct MCDRV_DA_FORMAT	sDaFormat;
+	struct MCDRV_PCM_FORMAT	sPcmFormat;
+};
+
+/*	MCDRV_DIO_DIT bStMode setting	*/
+#define	MCDRV_STMODE_ZERO		(0)
+#define	MCDRV_STMODE_HOLD		(1)
+
+/*	MCDRV_DIO_DIT bEdge setting	*/
+#define	MCDRV_SDOUT_NORMAL		(0)
+#define	MCDRV_SDOUT_AHEAD		(1)
+
+struct MCDRV_DIO_DIT {
+	UINT8	bStMode;
+	UINT8	bEdge;
+	struct MCDRV_DA_FORMAT	sDaFormat;
+	struct MCDRV_PCM_FORMAT	sPcmFormat;
+};
+
+struct MCDRV_DIO_PORT {
+	struct MCDRV_DIO_COMMON	sDioCommon;
+	struct MCDRV_DIO_DIR	sDir;
+	struct MCDRV_DIO_DIT	sDit;
+};
+
+struct MCDRV_DIO_INFO {
+	struct MCDRV_DIO_PORT	asPortInfo[4];
+};
+
+/*	set/get digitalio_path	*/
+#define	MCDRV_PHYS0_UPDATE_FLAG		((UINT32)0x00000001)
+#define	MCDRV_PHYS1_UPDATE_FLAG		((UINT32)0x00000002)
+#define	MCDRV_PHYS2_UPDATE_FLAG		((UINT32)0x00000004)
+#define	MCDRV_PHYS3_UPDATE_FLAG		((UINT32)0x00000008)
+#define	MCDRV_MUSICNUM_UPDATE_FLAG	((UINT32)0x00000010)
+#define	MCDRV_DIR0SLOT_UPDATE_FLAG	((UINT32)0x00000020)
+#define	MCDRV_DIR1SLOT_UPDATE_FLAG	((UINT32)0x00000040)
+#define	MCDRV_DIR2SLOT_UPDATE_FLAG	((UINT32)0x00000080)
+#define	MCDRV_DIT0SLOT_UPDATE_FLAG	((UINT32)0x00000100)
+#define	MCDRV_DIT1SLOT_UPDATE_FLAG	((UINT32)0x00000200)
+#define	MCDRV_DIT2SLOT_UPDATE_FLAG	((UINT32)0x00000400)
+
+/*	MCDRV_DIOPATH_INFO abPhysPort setting	*/
+#define	MCDRV_PHYSPORT_DIO0		(0)
+#define	MCDRV_PHYSPORT_DIO1		(1)
+#define	MCDRV_PHYSPORT_DIO2		(2)
+#define	MCDRV_PHYSPORT_NONE		(3)
+#define	MCDRV_PHYSPORT_SLIM0		(4)
+#define	MCDRV_PHYSPORT_SLIM1		(5)
+#define	MCDRV_PHYSPORT_SLIM2		(6)
+
+/*	MCDRV_DIOPATH_INFO bMusicCh setting	*/
+#define	MCDRV_MUSIC_2CH			(0)
+#define	MCDRV_MUSIC_4CH			(1)
+#define	MCDRV_MUSIC_6CH			(2)
+
+struct MCDRV_DIOPATH_INFO {
+	UINT8	abPhysPort[4];
+	UINT8	bMusicCh;
+	UINT8	abMusicRSlot[3];
+	UINT8	abMusicTSlot[3];
+};
+
+/*	set/get swap	*/
+#define	MCDRV_SWAP_ADIF0_UPDATE_FLAG		((UINT32)0x00000001)
+#define	MCDRV_SWAP_ADIF1_UPDATE_FLAG		((UINT32)0x00000002)
+#define	MCDRV_SWAP_ADIF2_UPDATE_FLAG		((UINT32)0x00000004)
+#define	MCDRV_SWAP_DAC0_UPDATE_FLAG		((UINT32)0x00000008)
+#define	MCDRV_SWAP_DAC1_UPDATE_FLAG		((UINT32)0x00000010)
+#define	MCDRV_SWAP_MUSICIN0_UPDATE_FLAG		((UINT32)0x00000020)
+#define	MCDRV_SWAP_MUSICIN1_UPDATE_FLAG		((UINT32)0x00000040)
+#define	MCDRV_SWAP_MUSICIN2_UPDATE_FLAG		((UINT32)0x00000080)
+#define	MCDRV_SWAP_EXTIN_UPDATE_FLAG		((UINT32)0x00000100)
+#define	MCDRV_SWAP_VOICEIN_UPDATE_FLAG		((UINT32)0x00000200)
+#define	MCDRV_SWAP_HIFIIN_UPDATE_FLAG		((UINT32)0x00000400)
+#define	MCDRV_SWAP_MUSICOUT0_UPDATE_FLAG	((UINT32)0x00000800)
+#define	MCDRV_SWAP_MUSICOUT1_UPDATE_FLAG	((UINT32)0x00001000)
+#define	MCDRV_SWAP_MUSICOUT2_UPDATE_FLAG	((UINT32)0x00002000)
+#define	MCDRV_SWAP_EXTOUT_UPDATE_FLAG		((UINT32)0x00004000)
+#define	MCDRV_SWAP_VOICEOUT_UPDATE_FLAG		((UINT32)0x00008000)
+#define	MCDRV_SWAP_HIFIOUT_UPDATE_FLAG		((UINT32)0x00010000)
+
+/*	MCDRV_SWAP_INFO bAdif/bDac setting	*/
+#define	MCDRV_SWAP_NORMAL		(0)
+#define	MCDRV_SWAP_SWAP			(1)
+#define	MCDRV_SWAP_MUTE			(2)
+#define	MCDRV_SWAP_CENTER		(3)
+#define	MCDRV_SWAP_MIX			(4)
+#define	MCDRV_SWAP_MONOMIX		(5)
+#define	MCDRV_SWAP_BOTHL		(6)
+#define	MCDRV_SWAP_BOTHR		(7)
+
+/*	MCDRV_SWAP_INFO
+	bMusicIn/bExtIn/bVoiceIn/bHifiIn/bMusicOut/bExtOut/bVoiceOut/bHifiOut
+	setting	*/
+#define	MCDRV_SWSWAP_NORMAL		(0)
+#define	MCDRV_SWSWAP_BOTH1		(1)
+#define	MCDRV_SWSWAP_BOTH0		(2)
+#define	MCDRV_SWSWAP_SWAP		(3)
+
+struct MCDRV_SWAP_INFO {
+	UINT8	bAdif0;
+	UINT8	bAdif1;
+	UINT8	bAdif2;
+	UINT8	bDac0;
+	UINT8	bDac1;
+	UINT8	bMusicIn0;
+	UINT8	bMusicIn1;
+	UINT8	bMusicIn2;
+	UINT8	bExtIn;
+	UINT8	bVoiceIn;
+	UINT8	bHifiIn;
+	UINT8	bMusicOut0;
+	UINT8	bMusicOut1;
+	UINT8	bMusicOut2;
+	UINT8	bExtOut;
+	UINT8	bVoiceOut;
+	UINT8	bHifiOut;
+};
+
+/*	get dsp	*/
+#define	MCDRV_DSP_PARAM_CDSP_INPOS		(0x00000001UL)
+#define	MCDRV_DSP_PARAM_CDSP_OUTPOS		(0x00000002UL)
+#define	MCDRV_DSP_PARAM_CDSP_DFIFO_REMAIN	(0x00000003UL)
+#define	MCDRV_DSP_PARAM_CDSP_RFIFO_REMAIN	(0x00000004UL)
+#define	MCDRV_DSP_PARAM_FDSP_DXRAM		(0x10000001UL)
+#define	MCDRV_DSP_PARAM_FDSP_DYRAM		(0x10000002UL)
+#define	MCDRV_DSP_PARAM_FDSP_IRAM		(0x10000003UL)
+#define	MCDRV_DSP_PARAM_EDSP_E2RES		(0x20000001UL)
+
+struct MCDRV_DSP_PARAM {
+	UINT32	dType;
+	UINT32	dInfo;
+};
+
+/*	get transition	*/
+#define	MCDRV_DSPTYPE_FDSP		(0)
+#define	MCDRV_DSPTYPE_BDSP		(1)
+
+/*	register dsp cb	*/
+#define	MCDRV_AE_EVT_STOP		(1)
+#define	MCDRV_AE_EVT_APPSTOP		(2)
+#define	MCDRV_AE_EVT_APPREQ		(3)
+#define	MCDRV_AE_EVT_COEFDONE		(4)
+#define	MCDRV_AE_EVT_ERROR		(5)
+#define	MCDRV_CDSP_EVT_ERROR		(11)
+#define	MCDRV_CDSP_EVT_PARAM		(12)
+#define	MCDRV_CDSP_ENV_END		(13)
+#define	MCDRV_CDSP_EVT_FIFO		(14)
+#define	MCDRV_EDSP_EVT_E2PARAM		(21)
+
+/*	set/get hsdet	*/
+#define	MCDRV_ENPLUGDET_UPDATE_FLAG	(0x00000001UL)
+#define	MCDRV_ENPLUGDETDB_UPDATE_FLAG	(0x00000002UL)
+#define	MCDRV_ENDLYKEYOFF_UPDATE_FLAG	(0x00000004UL)
+#define	MCDRV_ENDLYKEYON_UPDATE_FLAG	(0x00000008UL)
+#define	MCDRV_ENMICDET_UPDATE_FLAG	(0x00000010UL)
+#define	MCDRV_ENKEYOFF_UPDATE_FLAG	(0x00000020UL)
+#define	MCDRV_ENKEYON_UPDATE_FLAG	(0x00000040UL)
+#define	MCDRV_HSDETDBNC_UPDATE_FLAG	(0x00000080UL)
+#define	MCDRV_KEYOFFMTIM_UPDATE_FLAG	(0x00000100UL)
+#define	MCDRV_KEYONMTIM_UPDATE_FLAG	(0x00000200UL)
+#define	MCDRV_KEY0OFFDLYTIM_UPDATE_FLAG	(0x00000400UL)
+#define	MCDRV_KEY1OFFDLYTIM_UPDATE_FLAG	(0x00000800UL)
+#define	MCDRV_KEY2OFFDLYTIM_UPDATE_FLAG	(0x00001000UL)
+#define	MCDRV_KEY0ONDLYTIM_UPDATE_FLAG	(0x00002000UL)
+#define	MCDRV_KEY1ONDLYTIM_UPDATE_FLAG	(0x00004000UL)
+#define	MCDRV_KEY2ONDLYTIM_UPDATE_FLAG	(0x00008000UL)
+#define	MCDRV_KEY0ONDLYTIM2_UPDATE_FLAG	(0x00010000UL)
+#define	MCDRV_KEY1ONDLYTIM2_UPDATE_FLAG	(0x00020000UL)
+#define	MCDRV_KEY2ONDLYTIM2_UPDATE_FLAG	(0x00040000UL)
+#define	MCDRV_IRQTYPE_UPDATE_FLAG	(0x00080000UL)
+#define	MCDRV_DETINV_UPDATE_FLAG	(0x00100000UL)
+#define	MCDRV_HSDETMODE_UPDATE_FLAG	(0x00200000UL)
+#define	MCDRV_SPERIOD_UPDATE_FLAG	(0x00400000UL)
+#define	MCDRV_LPERIOD_UPDATE_FLAG	(0x00800000UL)
+#define	MCDRV_DBNCNUMPLUG_UPDATE_FLAG	(0x01000000UL)
+#define	MCDRV_DBNCNUMMIC_UPDATE_FLAG	(0x02000000UL)
+#define	MCDRV_DBNCNUMKEY_UPDATE_FLAG	(0x04000000UL)
+#define	MCDRV_SGNL_UPDATE_FLAG		(0x08000000UL)
+#define	MCDRV_IMPSEL_UPDATE_FLAG	(0x10000000UL)
+#define	MCDRV_DLYIRQSTOP_UPDATE_FLAG	(0x20000000UL)
+#define	MCDRV_CBFUNC_UPDATE_FLAG	(0x40000000UL)
+
+/*	MCDRV_HSDET_INFO bEnPlugDet setting	*/
+#define	MCDRV_PLUGDET_DISABLE		(0)
+#define	MCDRV_PLUGDET_ENABLE		(1)
+
+/*	MCDRV_HSDET_INFO bEnPlugDetDb setting	*/
+#define	MCDRV_PLUGDETDB_DISABLE		(0)
+#define	MCDRV_PLUGDETDB_DET_ENABLE	(1)
+#define	MCDRV_PLUGDETDB_UNDET_ENABLE	(2)
+#define	MCDRV_PLUGDETDB_BOTH_ENABLE	(3)
+
+/*	MCDRV_HSDET_INFO
+	bEnDlyKeyOff/bEnDlyKeyOn/bEnKeyOff/bEnKeyOn setting	*/
+#define	MCDRV_KEYEN_D_D_D		(0)
+#define	MCDRV_KEYEN_D_D_E		(1)
+#define	MCDRV_KEYEN_D_E_D		(2)
+#define	MCDRV_KEYEN_D_E_E		(3)
+#define	MCDRV_KEYEN_E_D_D		(4)
+#define	MCDRV_KEYEN_E_D_E		(5)
+#define	MCDRV_KEYEN_E_E_D		(6)
+#define	MCDRV_KEYEN_E_E_E		(7)
+
+/*	MCDRV_HSDET_INFO bEnMicDet setting	*/
+#define	MCDRV_MICDET_DISABLE		(0)
+#define	MCDRV_MICDET_ENABLE		(1)
+
+/*	MCDRV_HSDET_INFO bHsDetDbnc setting	*/
+#define	MCDRV_DETDBNC_27		(0)
+#define	MCDRV_DETDBNC_55		(1)
+#define	MCDRV_DETDBNC_109		(2)
+#define	MCDRV_DETDBNC_219		(3)
+#define	MCDRV_DETDBNC_438		(4)
+#define	MCDRV_DETDBNC_875		(5)
+#define	MCDRV_DETDBNC_1313		(6)
+#define	MCDRV_DETDBNC_1750		(7)
+
+/*	MCDRV_HSDET_INFO bKeyOffMtim setting	*/
+#define	MCDRV_KEYOFF_MTIM_63		(0)
+#define	MCDRV_KEYOFF_MTIM_16		(1)
+
+/*	MCDRV_HSDET_INFO bKeyOnMtim setting	*/
+#define	MCDRV_KEYON_MTIM_63		(0)
+#define	MCDRV_KEYON_MTIM_250		(1)
+
+/*	MCDRV_HSDET_INFO bKeyOffDlyTim setting	*/
+#define	MC_DRV_KEYOFFDLYTIM_MAX		(15)
+
+/*	MCDRV_HSDET_INFO bKeyOnDlyTim setting	*/
+#define	MC_DRV_KEYONDLYTIM_MAX		(15)
+
+/*	MCDRV_HSDET_INFO bKeyOnDlyTim2 setting	*/
+#define	MC_DRV_KEYONDLYTIM2_MAX		(15)
+
+/*	MCDRV_HSDET_INFO bIrqType setting	*/
+#define	MCDRV_IRQTYPE_NORMAL		(0)
+#define	MCDRV_IRQTYPE_REF		(1)
+#define	MCDRV_IRQTYPE_EX		(2)
+
+/*	MCDRV_HSDET_INFO bDetInInv setting	*/
+#define	MCDRV_DET_IN_NORMAL		(0)
+#define	MCDRV_DET_IN_INV		(1)
+#define	MCDRV_DET_IN_NORMAL_NORMAL	(4)
+#define	MCDRV_DET_IN_INV_NORMAL		(5)
+#define	MCDRV_DET_IN_NORMAL_INV		(6)
+#define	MCDRV_DET_IN_INV_INV		(7)
+
+/*	MCDRV_HSDET_INFO bHsDetMode setting	*/
+#define	MCDRV_HSDET_MODE_DETIN_A	(4)
+#define	MCDRV_HSDET_MODE_DETIN_B	(6)
+
+/*	MCDRV_HSDET_INFO bSperiod setting	*/
+#define	MCDRV_SPERIOD_244		(0)
+#define	MCDRV_SPERIOD_488		(1)
+#define	MCDRV_SPERIOD_977		(2)
+#define	MCDRV_SPERIOD_1953		(3)
+#define	MCDRV_SPERIOD_3906		(4)
+#define	MCDRV_SPERIOD_7813		(5)
+#define	MCDRV_SPERIOD_15625		(6)
+#define	MCDRV_SPERIOD_31250		(7)
+
+/*	MCDRV_HSDET_INFO bLperiod setting	*/
+#define	MCDRV_LPERIOD_3906		(0)
+#define	MCDRV_LPERIOD_62500		(1)
+#define	MCDRV_LPERIOD_125000		(2)
+#define	MCDRV_LPERIOD_250000		(3)
+
+/*	MCDRV_HSDET_INFO bDbncNum setting	*/
+#define	MCDRV_DBNC_NUM_2		(0)
+#define	MCDRV_DBNC_NUM_3		(1)
+#define	MCDRV_DBNC_NUM_4		(2)
+#define	MCDRV_DBNC_NUM_7		(3)
+
+/*	MCDRV_HSDET_INFO bSgnlPeriod setting	*/
+#define	MCDRV_SGNLPERIOD_61		(0)
+#define	MCDRV_SGNLPERIOD_79		(1)
+#define	MCDRV_SGNLPERIOD_97		(2)
+#define	MCDRV_SGNLPERIOD_151		(3)
+
+/*	MCDRV_HSDET_INFO bSgnlNum setting	*/
+#define	MCDRV_SGNLNUM_1			(0)
+#define	MCDRV_SGNLNUM_4			(1)
+#define	MCDRV_SGNLNUM_6			(2)
+#define	MCDRV_SGNLNUM_8			(3)
+#define	MCDRV_SGNLNUM_NONE		(255)
+
+/*	MCDRV_HSDET_INFO bSgnlPeak setting	*/
+#define	MCDRV_SGNLPEAK_500		(0)
+#define	MCDRV_SGNLPEAK_730		(1)
+#define	MCDRV_SGNLPEAK_960		(2)
+#define	MCDRV_SGNLPEAK_1182		(3)
+
+/*	MCDRV_HSDET_INFO bImpSel setting	*/
+#define	MCDRV_IMPSEL_MOSTFREQ		(0)
+#define	MCDRV_IMPSEL_MIN		(1)
+
+/*	MCDRV_HSDET_INFO bDlyIrqStop setting	*/
+#define	MCDRV_DLYIRQ_DONTCARE		(0)
+#define	MCDRV_DLYIRQ_STOP		(1)
+
+
+#define	MCDRV_HSDET_EVT_PLUGDET_DB_FLAG		(0x00000001)
+#define	MCDRV_HSDET_EVT_PLUGUNDET_DB_FLAG	(0x00000002)
+#define	MCDRV_HSDET_EVT_PLUGDET_FLAG		(0x00000080)
+#define	MCDRV_HSDET_EVT_DLYKEYON0_FLAG		(0x00000100)
+#define	MCDRV_HSDET_EVT_DLYKEYON1_FLAG		(0x00000200)
+#define	MCDRV_HSDET_EVT_DLYKEYON2_FLAG		(0x00000400)
+#define	MCDRV_HSDET_EVT_DLYKEYOFF0_FLAG		(0x00000800)
+#define	MCDRV_HSDET_EVT_DLYKEYOFF1_FLAG		(0x00001000)
+#define	MCDRV_HSDET_EVT_DLYKEYOFF2_FLAG		(0x00002000)
+#define	MCDRV_HSDET_EVT_KEYON0_FLAG		(0x00010000)
+#define	MCDRV_HSDET_EVT_KEYON1_FLAG		(0x00020000)
+#define	MCDRV_HSDET_EVT_KEYON2_FLAG		(0x00040000)
+#define	MCDRV_HSDET_EVT_KEYOFF0_FLAG		(0x00080000)
+#define	MCDRV_HSDET_EVT_KEYOFF1_FLAG		(0x00100000)
+#define	MCDRV_HSDET_EVT_KEYOFF2_FLAG		(0x00200000)
+#define	MCDRV_HSDET_EVT_MICDET_FLAG		(0x00400000)
+#define	MCDRV_HSDET_EVT_SENSEFIN_FLAG		(0x80000000)
+
+struct MCDRV_HSDET_RES {
+	UINT8	bKeyCnt0;
+	UINT8	bKeyCnt1;
+	UINT8	bKeyCnt2;
+	UINT8	bPlugRev;
+	UINT8	bHpImpClass;
+	UINT16	wHpImp;
+};
+typedef void	(*CBFUNC)(UINT32 dFlags, struct MCDRV_HSDET_RES *psRes);
+
+struct MCDRV_HSDET_INFO {
+	UINT8	bEnPlugDet;
+	UINT8	bEnPlugDetDb;
+	UINT8	bEnDlyKeyOff;
+	UINT8	bEnDlyKeyOn;
+	UINT8	bEnMicDet;
+	UINT8	bEnKeyOff;
+	UINT8	bEnKeyOn;
+	UINT8	bHsDetDbnc;
+	UINT8	bKeyOffMtim;
+	UINT8	bKeyOnMtim;
+	UINT8	bKey0OffDlyTim;
+	UINT8	bKey1OffDlyTim;
+	UINT8	bKey2OffDlyTim;
+	UINT8	bKey0OnDlyTim;
+	UINT8	bKey1OnDlyTim;
+	UINT8	bKey2OnDlyTim;
+	UINT8	bKey0OnDlyTim2;
+	UINT8	bKey1OnDlyTim2;
+	UINT8	bKey2OnDlyTim2;
+	UINT8	bIrqType;
+	UINT8	bDetInInv;
+	UINT8	bHsDetMode;
+	UINT8	bSperiod;
+	UINT8	bLperiod;
+	UINT8	bDbncNumPlug;
+	UINT8	bDbncNumMic;
+	UINT8	bDbncNumKey;
+	UINT8	bSgnlPeriod;
+	UINT8	bSgnlNum;
+	UINT8	bSgnlPeak;
+	UINT8	bImpSel;
+	UINT8	bDlyIrqStop;
+	CBFUNC	cbfunc;
+};
+
+struct MCDRV_HSDET2_INFO {
+	UINT8	bPlugDetDbIrqType;
+	UINT8	bPlugUndetDbIrqType;
+	UINT8	bMicDetIrqType;
+	UINT8	bPlugDetIrqType;
+	UINT8	bKey0OnIrqType;
+	UINT8	bKey1OnIrqType;
+	UINT8	bKey2OnIrqType;
+	UINT8	bKey0OffIrqType;
+	UINT8	bKey1OffIrqType;
+	UINT8	bKey2OffIrqType;
+};
+
+/*	config gp	*/
+/*	MCDRV_GP_MODE abGpDdr setting	*/
+#define	MCDRV_GPDDR_IN		(0)
+#define	MCDRV_GPDDR_OUT		(1)
+
+/*	MCDRV_GP_MODE abGpHost setting	*/
+#define	MCDRV_GPHOST_CPU	(0)
+#define	MCDRV_GPHOST_CDSP	(1)
+
+/*	MCDRV_GP_MODE abGpInvert setting	*/
+#define	MCDRV_GPINV_NORMAL	(0)
+#define	MCDRV_GPINV_INVERT	(1)
+
+struct MCDRV_GP_MODE {
+	UINT8	abGpDdr[3];
+	UINT8	abGpHost[3];
+	UINT8	abGpInvert[3];
+};
+
+/*	mask gp	*/
+#define	MCDRV_GPMASK_OFF	(0)
+#define	MCDRV_GPMASK_ON		(1)
+
+#define	MCDRV_GP_PAD0		((UINT32)0)
+#define	MCDRV_GP_PAD1		((UINT32)1)
+#define	MCDRV_GP_PAD2		((UINT32)2)
+
+/*	getset gp	*/
+#define	MCDRV_GP_LOW		(0)
+#define	MCDRV_GP_HIGH		(1)
+
+/*	read/write reg	*/
+#define	MCDRV_REGTYPE_IF	(0)
+#define	MCDRV_REGTYPE_A		(1)
+#define	MCDRV_REGTYPE_MA	(2)
+#define	MCDRV_REGTYPE_MB	(3)
+#define	MCDRV_REGTYPE_B		(4)
+#define	MCDRV_REGTYPE_E		(5)
+#define	MCDRV_REGTYPE_C		(6)
+#define	MCDRV_REGTYPE_F		(7)
+#define	MCDRV_REGTYPE_ANA	(8)
+#define	MCDRV_REGTYPE_CD	(9)
+
+struct MCDRV_REG_INFO {
+	UINT8	bRegType;
+	UINT8	bAddress;
+	UINT8	bData;
+};
+
+
+#endif /* _MCDRIVER_H_ */
