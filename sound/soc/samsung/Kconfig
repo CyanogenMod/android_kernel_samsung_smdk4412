@@ -85,7 +85,7 @@ config SND_SOC_SAMSUNG_GRANDE_WM1811
 
 config SND_SOC_SAMSUNG_T0_WM1811
 	tristate "SoC I2S Audio support for WM1811 on T0"
-	depends on SND_SOC_SAMSUNG && MACH_T0
+	depends on SND_SOC_SAMSUNG && (MACH_T0 || MACH_M3_USA_TMO)
 	select SND_SOC_WM8994
 	select SND_SAMSUNG_I2S
 	help
@@ -125,11 +125,37 @@ config SND_SOC_SAMSUNG_SLP_NAPLES_WM1811
 
 config SND_SOC_SAMSUNG_LUNGO_WM1811
 	tristate "SoC I2S Audio support for WM1811 on LUNGO"
-	depends on SND_SOC_SAMSUNG && (MACH_P10 ||MACH_P11 || MACH_P4NOTE)
+	depends on SND_SOC_SAMSUNG && (MACH_P10 || MACH_P11 || MACH_P4NOTE)
 	select SND_SOC_WM8994
 	select SND_SAMSUNG_I2S
 	help
 	  Say Y if you want to add support for SoC audio on the LUNGO.
+
+config SND_SOC_SAMSUNG_TAB3_WM1811
+	tristate "SoC I2S Audio support for WM1811 on TAB3"
+	depends on SND_SOC_SAMSUNG && MACH_TAB3
+	select SND_SOC_WM8994
+	select SND_SAMSUNG_I2S
+
+config SND_SOC_SAMSUNG_ZEST_WM1811
+	tristate "SoC I2S Audio support for WM1811 on ZEST"
+	depends on SND_SOC_SAMSUNG && MACH_ZEST
+	select SND_SOC_WM8994
+	select SND_SAMSUNG_I2S
+
+config SND_SOC_SAMSUNG_GD2_WM1811
+	tristate "SoC I2S Audio support for WM1811 on ZEST"
+	depends on SND_SOC_SAMSUNG && MACH_GD2
+	select SND_SOC_WM8994
+	select SND_SAMSUNG_I2S
+
+config SND_SOC_SAMSUNG_GC2PD_WM1811
+	tristate "SoC I2S Audio support for WM1811 on GC2PD"
+	depends on SND_SOC_SAMSUNG && (MACH_GC2PD || MACH_IPCAM)
+	select SND_SOC_WM8994
+	select SND_SAMSUNG_I2S
+	help
+	  Say Y if you want to add support for SoC audio on the GC2PD.
 
 config SND_SOC_U1_MC1N2
 	tristate "SoC I2S Audio support for MC1N2 on U1"
@@ -149,6 +175,19 @@ config SND_SOC_SLP_TRATS_MC1N2
 	  This uses
 	  Samsung Exynos-4210 audio subsystem
 	  and Yamaha MC1N2 codec.
+
+config SND_SOC_SAMSUNG_WATCH_YMU831
+	tristate "SoC I2S Audio support for WATCH - YMU831"
+	depends on SND_SOC_SAMSUNG && MACH_WATCH
+	select SND_SAMSUNG_I2S
+	select SND_SOC_YAMAHA_YMU831
+	help
+	   Say Y if you want to add support for SoC audio on WATCH Board
+	   with the YMU831
+
+config SND_USE_YMU831_LDODE_GPIO
+	bool "Use YMU831_LDODE_GPIO"
+	depends on SND_SOC_SAMSUNG && SND_SOC_YAMAHA_YMU831
 
 config SND_SOC_SAMSUNG_USE_DMA_WRAPPER
 	bool "DMA wrapper for ALSA Platform(DMA)"

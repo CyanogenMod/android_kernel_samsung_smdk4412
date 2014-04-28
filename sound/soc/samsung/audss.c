@@ -138,9 +138,9 @@ void audss_reg_restore(void)
 	if (!audss.reg_saved)
 		return;
 
-	writel(audss.suspend_audss_clksrc, S5P_CLKSRC_AUDSS);
-	writel(audss.suspend_audss_clkdiv, S5P_CLKDIV_AUDSS);
 	writel(audss.suspend_audss_clkgate, S5P_CLKGATE_AUDSS);
+	writel(audss.suspend_audss_clkdiv, S5P_CLKDIV_AUDSS);
+	writel(audss.suspend_audss_clksrc, S5P_CLKSRC_AUDSS);
 	audss.reg_saved = false;
 
 	pr_debug("%s: Successfully restored audss reg\n", __func__);

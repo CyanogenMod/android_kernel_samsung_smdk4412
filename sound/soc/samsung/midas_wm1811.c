@@ -173,7 +173,7 @@ struct snd_soc_dai *midas_aif1_dai;
 
 static struct platform_device *midas_snd_device;
 
-#ifdef CONFIG_MACH_GC1
+#if defined(CONFIG_MACH_GC1) || defined(CONFIG_MACH_GC2PD)
 static struct snd_soc_codec *wm1811_codec;
 
 void set_wm1811_micbias2(bool on)
@@ -395,6 +395,7 @@ static int set_aif2_mute_status(struct snd_kcontrol *kcontrol,
 	return 0;
 }
 
+
 static int midas_ext_micbias(struct snd_soc_dapm_widget *w,
 			     struct snd_kcontrol *kcontrol, int event)
 {
@@ -592,6 +593,7 @@ static void midas_start_fll1(struct snd_soc_dai *aif1_dai)
 	midas_fll1_active = true;
 }
 #endif
+
 #ifdef CONFIG_USE_ADC_DET
 static int jack_get_adc_data(struct s3c_adc_client *padc)
 {
@@ -748,6 +750,7 @@ static void midas_micdet(void *data)
 
 	determine_jack_type(wm1811);
 }
+#endif
 
 static void midas_mic_id(void *data, u16 status)
 {
@@ -825,104 +828,6 @@ static void midas_mic_id(void *data, u16 status)
 		}
 	}
 }
-#else
-static void midas_micdet(u16 status, void *data)
-{
-	struct wm1811_machine_priv *wm1811 = data;
-	struct wm8994_priv *wm8994 = snd_soc_codec_get_drvdata(wm1811->codec);
-	int report;
-
-
-	wake_lock_timeout(&wm1811->jackdet_wake_lock, 5 * HZ);
-
-	/* Either nothing present or just starting detection */
-	if (!(status & WM8958_MICD_STS)) {
-		if (!wm8994->jackdet) {
-			/* If nothing present then clear our statuses */
-			dev_dbg(wm1811->codec->dev, "Detected open circuit\n");
-			wm8994->jack_mic = false;
-			wm8994->mic_detecting = true;
-
-			midas_micd_set_rate(wm1811->codec);
-
-			snd_soc_jack_report(wm8994->micdet[0].jack, 0,
-					    wm8994->btn_mask |
-					     SND_JACK_HEADSET);
-		}
-		/*ToDo*/
-		/*return;*/
-	}
-
-	/* If the measurement is showing a high impedence we've got a
-	 * microphone.
-	 */
-	if (wm8994->mic_detecting && (status & 0x400)) {
-		dev_info(wm1811->codec->dev, "Detected microphone\n");
-
-		wm8994->mic_detecting = false;
-		wm8994->jack_mic = true;
-
-		midas_micd_set_rate(wm1811->codec);
-
-		snd_soc_jack_report(wm8994->micdet[0].jack, SND_JACK_HEADSET,
-				    SND_JACK_HEADSET);
-	}
-
-	if (wm8994->mic_detecting && status & 0x4) {
-		dev_info(wm1811->codec->dev, "Detected headphone\n");
-		wm8994->mic_detecting = false;
-
-		midas_micd_set_rate(wm1811->codec);
-
-		snd_soc_jack_report(wm8994->micdet[0].jack, SND_JACK_HEADPHONE,
-				    SND_JACK_HEADSET);
-
-		/* If we have jackdet that will detect removal */
-		if (wm8994->jackdet) {
-			mutex_lock(&wm8994->accdet_lock);
-
-			snd_soc_update_bits(wm1811->codec, WM8958_MIC_DETECT_1,
-					    WM8958_MICD_ENA, 0);
-
-			if (wm8994->active_refcount) {
-				snd_soc_update_bits(wm1811->codec,
-					WM8994_ANTIPOP_2,
-					WM1811_JACKDET_MODE_MASK,
-					WM1811_JACKDET_MODE_AUDIO);
-			}
-
-			mutex_unlock(&wm8994->accdet_lock);
-
-			if (wm8994->pdata->jd_ext_cap) {
-				mutex_lock(&wm1811->codec->mutex);
-				snd_soc_dapm_disable_pin(&wm1811->codec->dapm,
-							 "MICBIAS2");
-				snd_soc_dapm_sync(&wm1811->codec->dapm);
-				mutex_unlock(&wm1811->codec->mutex);
-			}
-		}
-	}
-
-	/* Report short circuit as a button */
-	if (wm8994->jack_mic) {
-		report = 0;
-		if (status & WM1811_JACKDET_BTN0)
-			report |= SND_JACK_BTN_0;
-
-		if (status & WM1811_JACKDET_BTN1)
-			report |= SND_JACK_BTN_1;
-
-		if (status & WM1811_JACKDET_BTN2)
-			report |= SND_JACK_BTN_2;
-
-		dev_dbg(wm1811->codec->dev, "Detected Button: %08x (%08X)\n",
-			report, status);
-
-		snd_soc_jack_report(wm8994->micdet[0].jack, report,
-				    wm8994->btn_mask);
-	}
-}
-#endif
 
 #ifdef CONFIG_SND_SAMSUNG_I2S_MASTER
 static int set_epll_rate(unsigned long rate)
@@ -1133,6 +1038,9 @@ static int midas_wm1811_aif2_hw_params(struct snd_pcm_substream *substream,
 					struct snd_pcm_hw_params *params)
 {
 	struct snd_soc_pcm_runtime *rtd = substream->private_data;
+#ifndef CONFIG_MACH_BAFFIN
+	struct snd_soc_codec *codec = rtd->codec;
+#endif
 	struct snd_soc_dai *codec_dai = rtd->codec_dai;
 	int ret;
 	int prate;
@@ -1151,7 +1059,7 @@ static int midas_wm1811_aif2_hw_params(struct snd_pcm_substream *substream,
 	}
 
 #if defined(CONFIG_LTE_MODEM_CMC221) || defined(CONFIG_MACH_M0_CTC)
-#if defined(CONFIG_MACH_C1_KOR_LGT)
+#if defined(CONFIG_MACH_C1_KOR_LGT) || defined(CONFIG_MACH_BAFFIN_KOR_LGT)
 	/* Set the codec DAI configuration */
 	if (aif2_mode == 0) {
 		if (kpcs_mode == 1)
@@ -1164,9 +1072,15 @@ static int midas_wm1811_aif2_hw_params(struct snd_pcm_substream *substream,
 				| SND_SOC_DAIFMT_IB_NF
 				| SND_SOC_DAIFMT_CBS_CFS);
 	} else
+#if defined(CONFIG_MACH_C1_KOR_LGT) || defined(CONFIG_MACH_BAFFIN_KOR_LGT)
+		ret = snd_soc_dai_set_fmt(codec_dai, SND_SOC_DAIFMT_DSP_A
+				| SND_SOC_DAIFMT_IB_NF
+				| SND_SOC_DAIFMT_CBM_CFM);
+#else
 		ret = snd_soc_dai_set_fmt(codec_dai, SND_SOC_DAIFMT_I2S
 				| SND_SOC_DAIFMT_NB_NF
 				| SND_SOC_DAIFMT_CBM_CFM);
+#endif
 #else
 	if (aif2_mode == 0)
 		/* Set the codec DAI configuration */
@@ -1246,6 +1160,16 @@ static int midas_wm1811_aif2_hw_params(struct snd_pcm_substream *substream,
 	if (ret < 0)
 		dev_err(codec_dai->dev, "Unable to switch to FLL2: %d\n", ret);
 
+#ifndef CONFIG_MACH_BAFFIN
+	if (!(snd_soc_read(codec, WM8994_INTERRUPT_RAW_STATUS_2)
+		& WM8994_FLL2_LOCK_STS)) {
+		dev_info(codec_dai->dev, "%s: use mclk1 for FLL2\n", __func__);
+		ret = snd_soc_dai_set_pll(codec_dai, WM8994_FLL2,
+			WM8994_FLL_SRC_MCLK1,
+			MIDAS_DEFAULT_MCLK1, prate * 256);
+	}
+#endif
+
 	dev_info(codec_dai->dev, "%s --\n", __func__);
 	return 0;
 }
@@ -1288,7 +1212,7 @@ static const struct snd_kcontrol_new midas_controls[] = {
 
 	SOC_ENUM_EXT("LineoutSwitch Mode", lineout_mode_enum[0],
 		get_lineout_mode, set_lineout_mode),
-		
+
 	SOC_ENUM_EXT("AIF2 digital mute", switch_mode_enum[0],
 		get_aif2_mute_status, set_aif2_mute_status),
 
@@ -1321,10 +1245,14 @@ const struct snd_soc_dapm_route midas_dapm_routes[] = {
 
 	{ "RCV", NULL, "HPOUT2N" },
 	{ "RCV", NULL, "HPOUT2P" },
-
+#if defined(CONFIG_MACH_BAFFIN_KOR_SKT) || defined(CONFIG_MACH_BAFFIN_KOR_KT) \
+	|| defined(CONFIG_MACH_BAFFIN_KOR_LGT)
+	{ "LINE", NULL, "HPOUT1L" },
+	{ "LINE", NULL, "HPOUT1R" },
+#else
 	{ "LINE", NULL, "LINEOUT2N" },
 	{ "LINE", NULL, "LINEOUT2P" },
-
+#endif
 	{ "HDMI", NULL, "LINEOUT1N" },
 	{ "HDMI", NULL, "LINEOUT1P" },
 
@@ -1550,7 +1478,7 @@ static int midas_wm1811_init_paiftx(struct snd_soc_pcm_runtime *rtd)
 	midas_aif1_dai = aif1_dai;
 #endif
 
-#ifdef CONFIG_MACH_GC1
+#if defined(CONFIG_MACH_GC1) || defined(CONFIG_MACH_GC2PD)
 	wm1811_codec = codec;
 #endif
 
@@ -1630,12 +1558,12 @@ static int midas_wm1811_init_paiftx(struct snd_soc_pcm_runtime *rtd)
 		dev_err(codec->dev, "Failed to set KEY_MEDIA: %d\n", ret);
 
 	ret = snd_jack_set_key(wm1811->jack.jack, SND_JACK_BTN_1,
-							KEY_VOLUMEDOWN);
+							KEY_VOLUMEUP);
 	if (ret < 0)
 		dev_err(codec->dev, "Failed to set KEY_VOLUMEUP: %d\n", ret);
 
 	ret = snd_jack_set_key(wm1811->jack.jack, SND_JACK_BTN_2,
-							KEY_VOLUMEUP);
+							KEY_VOLUMEDOWN);
 
 	if (ret < 0)
 		dev_err(codec->dev, "Failed to set KEY_VOLUMEDOWN: %d\n", ret);
@@ -1643,7 +1571,7 @@ static int midas_wm1811_init_paiftx(struct snd_soc_pcm_runtime *rtd)
 	if (wm8994->revision > 1) {
 		dev_info(codec->dev, "wm1811: Rev %c support mic detection\n",
 			'A' + wm8994->revision);
-
+#ifdef CONFIG_EXYNOS_SOUND_PLATFORM_DATA
 #ifdef CONFIG_USE_ADC_DET
 		if (sound_pdata->use_jackdet_type) {
 			ret = wm8958_mic_detect(codec, &wm1811->jack,
@@ -1653,8 +1581,12 @@ static int midas_wm1811_init_paiftx(struct snd_soc_pcm_runtime *rtd)
 				NULL, midas_mic_id, wm1811);
 		}
 #else
-		ret = wm8958_mic_detect(codec, &wm1811->jack, midas_micdet,
-			wm1811);
+	ret = wm8958_mic_detect(codec, &wm1811->jack, NULL,
+				NULL, midas_mic_id, wm1811);
+#endif
+#else
+	ret = wm8958_mic_detect(codec, &wm1811->jack, NULL,
+				NULL, midas_mic_id, wm1811);
 #endif
 
 		if (ret < 0)
@@ -1696,7 +1628,7 @@ static int midas_wm1811_init_paiftx(struct snd_soc_pcm_runtime *rtd)
 			dev_attr_reselect_jack.attr.name);
 
 #endif /* CONFIG_SEC_DEV_JACK */
-		
+
 #ifdef CONFIG_USE_ADC_DET
 	pr_info("%s: register adc client\n", __func__);
 	wm1811->padc = s3c_adc_register(midas_snd_device, NULL, NULL, 0);
@@ -1973,12 +1905,10 @@ static struct snd_soc_card midas = {
 	.resume_post = midas_card_resume_post
 };
 
-static struct platform_device *midas_snd_device;
-
 static int __init midas_audio_init(void)
 {
 	struct wm1811_machine_priv *wm1811;
-#ifdef CONFIG_USE_ADC_DET
+#ifdef CONFIG_EXYNOS_SOUND_PLATFORM_DATA
 	const struct exynos_sound_platform_data *sound_pdata;
 #endif
 	int ret;
@@ -2008,11 +1938,11 @@ static int __init midas_audio_init(void)
 	if (ret)
 		platform_device_put(midas_snd_device);
 
-#ifdef CONFIG_USE_ADC_DET
+#ifdef CONFIG_EXYNOS_SOUND_PLATFORM_DATA
 	sound_pdata = exynos_sound_get_platform_data();
 	if (!sound_pdata)
 		pr_info("%s: don't use sound pdata\n", __func__);
-
+#ifdef CONFIG_USE_ADC_DET
 	if (sound_pdata->zones) {
 		wm1811->zones = sound_pdata->zones;
 		wm1811->num_zones = sound_pdata->num_zones;
@@ -2020,6 +1950,7 @@ static int __init midas_audio_init(void)
 	pr_info("%s:use_jackdet_type = %d\n", __func__,
 			sound_pdata->use_jackdet_type);
 	wm1811->use_jackdet_type = sound_pdata->use_jackdet_type;
+#endif
 #endif
 
 	midas_gpio_init();

@@ -37,23 +37,14 @@ enum wm8994_vmid_mode {
 	WM8994_VMID_FORCE,
 };
 
-#ifdef CONFIG_USE_ADC_DET
 typedef void (*wm1811_micdet_cb)(void *data);
 typedef void (*wm1811_mic_id_cb)(void *data, u16 status);
-#else
-typedef void (*wm8958_micdet_cb)(u16 status, void *data);
-#endif
 
 int wm8994_mic_detect(struct snd_soc_codec *codec, struct snd_soc_jack *jack,
 		      int micbias, int det, int shrt);
-#ifdef CONFIG_USE_ADC_DET
 int wm8958_mic_detect(struct snd_soc_codec *codec, struct snd_soc_jack *jack,
 			wm1811_micdet_cb cb, void *det_cb_data,
 			wm1811_mic_id_cb id_cb, void *id_cb_data);
-#else
-int wm8958_mic_detect(struct snd_soc_codec *codec, struct snd_soc_jack *jack,
-		      wm8958_micdet_cb cb, void *cb_data);
-#endif
 
 #define WM8994_CACHE_SIZE 1570
 
@@ -155,17 +146,11 @@ struct wm8994_priv {
 	bool jackdet;
 	int jackdet_mode;
 
-#ifndef CONFIG_USE_ADC_DET
-	wm8958_micdet_cb jack_cb;
-#endif
-	void *jack_cb_data;
 	int micdet_irq;
-#ifdef CONFIG_USE_ADC_DET
 	wm1811_micdet_cb micd_cb;
 	void *micd_cb_data;
 	wm1811_mic_id_cb mic_id_cb;
 	void *mic_id_cb_data;
-#endif
 
 	int revision;
 	struct wm8994_pdata *pdata;

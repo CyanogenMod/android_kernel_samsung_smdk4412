@@ -63,6 +63,11 @@
 #define WM1811_MIC_IRQ_NUM	(IRQ_BOARD_CODEC_START + WM8994_IRQ_MIC1_DET)
 #define WM1811_JACKDET_IRQ_NUM	(IRQ_BOARD_CODEC_START + WM8994_IRQ_GPIO(6))
 
+#define MIC_DISABLE	0
+#define MIC_ENABLE	1
+#define MIC_FORCE_DISABLE	2
+#define MIC_FORCE_ENABLE	3
+
 static struct wm8958_micd_rate t0_det_rates[] = {
 	{ MIDAS_DEFAULT_MCLK2,     true,  0,  0 },
 	{ MIDAS_DEFAULT_MCLK2,    false,  0,  0 },
@@ -82,15 +87,19 @@ const char *aif2_mode_text[] = {
 	"Slave", "Master"
 };
 
-static int input_clamp;
-const char *input_clamp_text[] = {
+const char *switch_mode_text[] = {
 	"Off", "On"
 };
 
-static int lineout_mode;
-const char *lineout_mode_text[] = {
-	"Off", "On"
+const char *mic_bias_mode_text[] = {
+	"Disable", "Force Disable", "Enable", "Force Enable"
 };
+
+static int input_clamp;
+static int lineout_mode;
+static int aif2_digital_mute;
+static int main_mic_bias_mode;
+static int sub_mic_bias_mode;
 
 #if defined(CONFIG_SND_DUOS_MODEM_SWITCH)
 static int modem_mode;
@@ -155,8 +164,20 @@ static int set_modem_mode(struct snd_kcontrol *kcontrol,
 }
 #endif
 
-static const struct soc_enum lineout_mode_enum[] = {
-	SOC_ENUM_SINGLE_EXT(ARRAY_SIZE(lineout_mode_text), lineout_mode_text),
+static const struct soc_enum switch_mode_enum[] = {
+	SOC_ENUM_SINGLE_EXT(ARRAY_SIZE(switch_mode_text), switch_mode_text),
+};
+
+static const struct soc_enum aif2_mode_enum[] = {
+	SOC_ENUM_SINGLE_EXT(ARRAY_SIZE(aif2_mode_text), aif2_mode_text),
+};
+
+static const struct soc_enum mic_bias_mode_enum[] = {
+	SOC_ENUM_SINGLE_EXT(ARRAY_SIZE(mic_bias_mode_text), mic_bias_mode_text),
+};
+
+static const struct soc_enum sub_bias_mode_enum[] = {
+	SOC_ENUM_SINGLE_EXT(ARRAY_SIZE(mic_bias_mode_text), mic_bias_mode_text),
 };
 
 static int get_lineout_mode(struct snd_kcontrol *kcontrol,
@@ -186,17 +207,10 @@ static int set_lineout_mode(struct snd_kcontrol *kcontrol,
 	}
 
 	dev_info(codec->dev, "set lineout mode : %s\n",
-		lineout_mode_text[lineout_mode]);
+		switch_mode_text[lineout_mode]);
 	return 0;
 
 }
-static const struct soc_enum aif2_mode_enum[] = {
-	SOC_ENUM_SINGLE_EXT(ARRAY_SIZE(aif2_mode_text), aif2_mode_text),
-};
-
-static const struct soc_enum input_clamp_enum[] = {
-	SOC_ENUM_SINGLE_EXT(ARRAY_SIZE(input_clamp_text), input_clamp_text),
-};
 
 static int get_aif2_mode(struct snd_kcontrol *kcontrol,
 	struct snd_ctl_elem_value *ucontrol)
@@ -240,11 +254,161 @@ static int set_input_clamp(struct snd_kcontrol *kcontrol,
 		snd_soc_update_bits(codec, WM8994_INPUT_MIXER_1,
 				WM8994_INPUTS_CLAMP, 0);
 	}
-	pr_info("set fm input_clamp : %s\n", input_clamp_text[input_clamp]);
+	pr_info("set fm input_clamp : %s\n", switch_mode_text[input_clamp]);
 
 	return 0;
 }
 
+static int get_aif2_mute_status(struct snd_kcontrol *kcontrol,
+	struct snd_ctl_elem_value *ucontrol)
+{
+	ucontrol->value.integer.value[0] = aif2_digital_mute;
+	return 0;
+}
+
+static int set_aif2_mute_status(struct snd_kcontrol *kcontrol,
+	struct snd_ctl_elem_value *ucontrol)
+{
+	struct snd_soc_codec *codec = snd_kcontrol_chip(kcontrol);
+	int reg;
+
+	aif2_digital_mute = ucontrol->value.integer.value[0];
+
+	if (snd_soc_read(codec, WM8994_POWER_MANAGEMENT_6)
+		& WM8994_AIF2_DACDAT_SRC)
+		aif2_digital_mute = 0;
+
+	if (aif2_digital_mute)
+		reg = WM8994_AIF1DAC1_MUTE;
+	else
+		reg = 0;
+
+	snd_soc_update_bits(codec, WM8994_AIF2_DAC_FILTERS_1,
+				WM8994_AIF1DAC1_MUTE, reg);
+
+	pr_info("set aif2_digital_mute : %s\n",
+			switch_mode_text[aif2_digital_mute]);
+
+	return 0;
+}
+
+static int get_sub_mic_bias_mode(struct snd_kcontrol *kcontrol,
+	struct snd_ctl_elem_value *ucontrol)
+{
+	ucontrol->value.integer.value[0] = sub_mic_bias_mode;
+	return 0;
+}
+
+static int set_sub_mic_bias_mode(struct snd_kcontrol *kcontrol,
+	struct snd_ctl_elem_value *ucontrol)
+{
+	struct snd_soc_codec *codec = snd_kcontrol_chip(kcontrol);
+	struct wm1811_machine_priv *wm1811
+		= snd_soc_card_get_drvdata(codec->card);
+	int status = 0;
+
+	status = ucontrol->value.integer.value[0];
+
+	switch (status) {
+	case MIC_FORCE_ENABLE:
+		sub_mic_bias_mode = status;
+		snd_soc_update_bits(codec, WM8994_POWER_MANAGEMENT_1,
+				WM8994_MICB1_ENA, WM8994_MICB1_ENA);
+
+		if (wm1811->set_sub_mic_f)
+			wm1811->set_sub_mic_f(1);
+		break;
+	case MIC_ENABLE:
+		snd_soc_update_bits(codec, WM8994_POWER_MANAGEMENT_1,
+				WM8994_MICB1_ENA, WM8994_MICB1_ENA);
+		if (wm1811->set_sub_mic_f)
+			wm1811->set_sub_mic_f(1);
+		if (sub_mic_bias_mode != MIC_FORCE_ENABLE)
+			msleep(100);
+		break;
+	case MIC_FORCE_DISABLE:
+		sub_mic_bias_mode = status;
+		snd_soc_update_bits(codec, WM8994_POWER_MANAGEMENT_1,
+				WM8994_MICB1_ENA, 0);
+
+		if (wm1811->set_sub_mic_f)
+			wm1811->set_sub_mic_f(0);
+		break;
+	case MIC_DISABLE:
+		if (sub_mic_bias_mode != MIC_FORCE_ENABLE) {
+			snd_soc_update_bits(codec, WM8994_POWER_MANAGEMENT_1,
+					WM8994_MICB1_ENA, 0);
+			if (wm1811->set_sub_mic_f)
+				wm1811->set_sub_mic_f(0);
+		} else
+			dev_info(codec->dev,
+				"SKIP submic disable=%d\n", status);
+		break;
+	default:
+		break;
+	}
+
+	dev_info(codec->dev, "sub_mic_bias_mod=%d: status=%d\n",
+				sub_mic_bias_mode, status);
+
+	return 0;
+
+}
+
+static int get_main_mic_bias_mode(struct snd_kcontrol *kcontrol,
+	struct snd_ctl_elem_value *ucontrol)
+{
+	ucontrol->value.integer.value[0] = main_mic_bias_mode;
+	return 0;
+}
+
+static int set_main_mic_bias_mode(struct snd_kcontrol *kcontrol,
+	struct snd_ctl_elem_value *ucontrol)
+{
+	struct snd_soc_codec *codec = snd_kcontrol_chip(kcontrol);
+	struct wm1811_machine_priv *wm1811
+		= snd_soc_card_get_drvdata(codec->card);
+	int status = 0;
+
+	status = ucontrol->value.integer.value[0];
+
+	switch (status) {
+	case MIC_FORCE_ENABLE:
+		main_mic_bias_mode = status;
+
+		if (wm1811->set_main_mic_f)
+			wm1811->set_main_mic_f(1);
+		break;
+	case MIC_ENABLE:
+		if (wm1811->set_main_mic_f)
+			wm1811->set_main_mic_f(1);
+		if (main_mic_bias_mode != MIC_FORCE_ENABLE)
+			msleep(100);
+		break;
+	case MIC_FORCE_DISABLE:
+		main_mic_bias_mode = status;
+
+		if (wm1811->set_main_mic_f)
+			wm1811->set_main_mic_f(0);
+		break;
+	case MIC_DISABLE:
+		if (main_mic_bias_mode != MIC_FORCE_ENABLE) {
+			if (wm1811->set_main_mic_f)
+				wm1811->set_main_mic_f(0);
+		} else
+			dev_info(codec->dev,
+				"SKIP mainmic disable=%d\n", status);
+		break;
+	default:
+		break;
+	}
+
+	dev_info(codec->dev, "main_mic_bias_mod=%d: status=%d\n",
+				main_mic_bias_mode, status);
+
+	return 0;
+
+}
 
 static int set_ext_micbias(struct snd_soc_dapm_widget *w,
 			     struct snd_kcontrol *kcontrol, int event)
@@ -361,11 +525,13 @@ static void t0_micd_set_rate(struct snd_soc_codec *codec)
 			    WM8958_MICD_RATE_MASK, val);
 }
 
-static void t0_micdet(u16 status, void *data)
+static void t0_micdet(void *data, u16 status)
 {
 	struct wm1811_machine_priv *wm1811 = data;
 	struct wm8994_priv *wm8994 = snd_soc_codec_get_drvdata(wm1811->codec);
 	int report;
+	int reg;
+	bool present;
 
 	/*
 	 * If the jack is inserted abnormally,
@@ -462,6 +628,22 @@ static void t0_micdet(u16 status, void *data)
 
 		if (status & WM1811_JACKDET_BTN2)
 			report |= SND_JACK_BTN_2;
+
+		reg = snd_soc_read(wm1811->codec, WM1811_JACKDET_CTRL);
+		if (reg < 0) {
+			pr_err("%s: Failed to read jack status: %d\n",
+				__func__, reg);
+			return;
+		}
+
+		pr_err("%s: JACKDET %x\n", __func__, reg);
+
+		present = reg & WM1811_JACKDET_LVL;
+
+		if (!present) {
+			pr_err("%s: button is ignored!!!\n", __func__);
+			return;
+		}
 
 		dev_info(wm1811->codec->dev, "Detected Button: %08x (%08X)\n",
 			report, status);
@@ -609,7 +791,8 @@ static int t0_wm1811_aif2_hw_params(struct snd_pcm_substream *substream,
 		return -EINVAL;
 	}
 
-#if defined(CONFIG_MACH_T0_CHN_CU_DUOS)
+#if defined(CONFIG_MACH_T0_CHN_CU_DUOS) \
+	|| defined(CONFIG_MACH_T0_CHN_OPEN_DUOS)
 	if (modem_mode == 1)
 		bclk = 2048000;
 #endif
@@ -727,11 +910,21 @@ static const struct snd_kcontrol_new t0_controls[] = {
 	SOC_ENUM_EXT("AIF2 Mode", aif2_mode_enum[0],
 		get_aif2_mode, set_aif2_mode),
 
-	SOC_ENUM_EXT("Input Clamp", input_clamp_enum[0],
+	SOC_ENUM_EXT("Input Clamp", switch_mode_enum[0],
 		get_input_clamp, set_input_clamp),
 
-	SOC_ENUM_EXT("LineoutSwitch Mode", lineout_mode_enum[0],
+	SOC_ENUM_EXT("LineoutSwitch Mode", switch_mode_enum[0],
 		get_lineout_mode, set_lineout_mode),
+
+	SOC_ENUM_EXT("MainMicBias Mode", mic_bias_mode_enum[0],
+		get_main_mic_bias_mode, set_main_mic_bias_mode),
+
+	SOC_ENUM_EXT("SubMicBias Mode", mic_bias_mode_enum[0],
+		get_sub_mic_bias_mode, set_sub_mic_bias_mode),
+
+	SOC_ENUM_EXT("AIF2 digital mute", switch_mode_enum[0],
+		get_aif2_mute_status, set_aif2_mute_status),
+
 #if defined(CONFIG_SND_DUOS_MODEM_SWITCH)
 	SOC_ENUM_EXT("ModemSwitch Mode", modem_mode_enum[0],
 		get_modem_mode, set_modem_mode),
@@ -746,8 +939,8 @@ const struct snd_soc_dapm_widget t0_dapm_widgets[] = {
 	SND_SOC_DAPM_LINE("HDMI", NULL),
 
 	SND_SOC_DAPM_MIC("Headset Mic", NULL),
-	SND_SOC_DAPM_MIC("Main Mic", set_ext_micbias),
-	SND_SOC_DAPM_MIC("Sub Mic", set_ext_submicbias),
+	SND_SOC_DAPM_MIC("Main Mic", NULL),
+	SND_SOC_DAPM_MIC("Sub Mic", NULL),
 	SND_SOC_DAPM_LINE("FM In", NULL),
 
 	SND_SOC_DAPM_INPUT("S5P RP"),
@@ -772,9 +965,8 @@ const struct snd_soc_dapm_route t0_dapm_routes[] = {
 	{ "IN2LP:VXRN", NULL, "Main Mic" },
 	{ "IN2LN", NULL, "Main Mic" },
 
-	{ "IN1RP", NULL, "MICBIAS1" },
-	{ "IN1RN", NULL, "MICBIAS1" },
-	{ "MICBIAS1", NULL, "Sub Mic" },
+	{ "IN1RP", NULL, "Sub Mic" },
+	{ "IN1RN", NULL, "Sub Mic" },
 
 	{ "IN1LP", NULL, "MICBIAS2" },
 	{ "MICBIAS2", NULL, "Headset Mic" },
@@ -919,41 +1111,7 @@ static ssize_t reselect_jack_show(struct device *dev,
 static ssize_t reselect_jack_store(struct device *dev,
 	struct device_attribute *attr, const char *buf, size_t size)
 {
-	struct snd_soc_codec *codec = dev_get_drvdata(dev);
-	struct wm8994_priv *wm8994 = snd_soc_codec_get_drvdata(codec);
-	int reg = 0;
-
-	reg = snd_soc_read(codec, WM8958_MIC_DETECT_3);
-	if (reg == 0x402) {
-		dev_info(codec->dev, "Detected open circuit\n");
-
-		snd_soc_update_bits(codec, WM8958_MICBIAS2,
-				    WM8958_MICB2_DISCH, WM8958_MICB2_DISCH);
-		/* Enable debounce while removed */
-		snd_soc_update_bits(codec, WM1811_JACKDET_CTRL,
-				    WM1811_JACKDET_DB, WM1811_JACKDET_DB);
-
-		wm8994->mic_detecting = false;
-		wm8994->jack_mic = false;
-		snd_soc_update_bits(codec, WM8958_MIC_DETECT_1,
-				    WM8958_MICD_ENA, 0);
-
-		if (wm8994->active_refcount) {
-			snd_soc_update_bits(codec,
-				WM8994_ANTIPOP_2,
-				WM1811_JACKDET_MODE_MASK,
-				WM1811_JACKDET_MODE_AUDIO);
-		} else {
-			snd_soc_update_bits(codec,
-				WM8994_ANTIPOP_2,
-				WM1811_JACKDET_MODE_MASK,
-				WM1811_JACKDET_MODE_JACK);
-		}
-
-		snd_soc_jack_report(wm8994->micdet[0].jack, 0,
-				    SND_JACK_MECHANICAL | SND_JACK_HEADSET |
-				    wm8994->btn_mask);
-	}
+	pr_info("%s : operate nothing\n", __func__);
 	return size;
 }
 
@@ -978,6 +1136,7 @@ static int t0_wm1811_init_paiftx(struct snd_soc_pcm_runtime *rtd)
 	struct snd_soc_dai *aif1_dai = rtd->codec_dai;
 	struct wm8994 *control = codec->control_data;
 	struct wm8994_priv *wm8994 = snd_soc_codec_get_drvdata(codec);
+	const struct exynos_sound_platform_data *sound_pdata;
 	int ret;
 
 	midas_snd_set_mclk(true, false);
@@ -1068,8 +1227,8 @@ static int t0_wm1811_init_paiftx(struct snd_soc_pcm_runtime *rtd)
 	if (wm8994->revision > 1) {
 		dev_info(codec->dev, "wm1811: Rev %c support mic detection\n",
 			'A' + wm8994->revision);
-		ret = wm8958_mic_detect(codec, &wm1811->jack, t0_micdet,
-			wm1811);
+		ret = wm8958_mic_detect(codec, &wm1811->jack, NULL,
+				NULL, t0_micdet, wm1811);
 
 		if (ret < 0)
 			dev_err(codec->dev, "Failed start detection: %d\n",
@@ -1110,6 +1269,13 @@ static int t0_wm1811_init_paiftx(struct snd_soc_pcm_runtime *rtd)
 			dev_attr_reselect_jack.attr.name);
 
 #endif /* CONFIG_SEC_DEV_JACK */
+	sound_pdata = exynos_sound_get_platform_data();
+
+	if (sound_pdata) {
+		wm8994->hubs.dcs_codes_l = sound_pdata->dcs_offset_l;
+		wm8994->hubs.dcs_codes_r = sound_pdata->dcs_offset_r;
+	}
+
 	return snd_soc_dapm_sync(&codec->dapm);
 }
 
@@ -1315,7 +1481,7 @@ static void t0_jackdet_set_mode(struct snd_soc_codec *codec, u16 mode)
 {
 	struct wm8994_priv *wm8994 = snd_soc_codec_get_drvdata(codec);
 
-	if (!wm8994->jackdet || !wm8994->jack_cb)
+	if (!wm8994->jackdet || !wm8994->micdet[0].jack)
 		return;
 
 	if (wm8994->active_refcount)

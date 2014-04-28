@@ -55,6 +55,11 @@ snd-soc-slp-exynos-wm1811-objs := slp_exynos_wm1811.o
 snd-soc-slp-naples-wm1811-objs := slp_naples_wm1811.o
 snd-soc-lungo-wm1811-objs := lungo_wm1811.o
 snd-soc-grande-wm1811-objs := grande_wm1811.o
+snd-soc-tab3-wm1811-objs := tab3_wm1811.o
+snd-soc-zest-wm1811-objs := zest_wm1811.o
+snd-soc-gd2-wm1811-objs := gd2_wm1811.o
+snd-soc-gc2pd-wm1811-objs := gc2pd_wm1811.o
+snd-soc-watch-ymu831-objs := watch_ymu831.o
 
 obj-$(CONFIG_SND_SOC_SAMSUNG_JIVE_WM8750) += snd-soc-jive-wm8750.o
 obj-$(CONFIG_SND_SOC_SAMSUNG_NEO1973_WM8753) += snd-soc-neo1973-wm8753.o
@@ -87,6 +92,11 @@ obj-$(CONFIG_SND_SOC_SAMSUNG_SLP_EXYNOS_WM1811) += snd-soc-slp-exynos-wm1811.o
 obj-$(CONFIG_SND_SOC_SAMSUNG_SLP_NAPLES_WM1811) += snd-soc-slp-naples-wm1811.o
 obj-$(CONFIG_SND_SOC_SAMSUNG_LUNGO_WM1811) += snd-soc-midas-wm1811.o
 obj-$(CONFIG_SND_SOC_SAMSUNG_GRANDE_WM1811) += snd-soc-grande-wm1811.o
+obj-$(CONFIG_SND_SOC_SAMSUNG_TAB3_WM1811) += snd-soc-tab3-wm1811.o
+obj-$(CONFIG_SND_SOC_SAMSUNG_ZEST_WM1811) += snd-soc-zest-wm1811.o
+obj-$(CONFIG_SND_SOC_SAMSUNG_GD2_WM1811) += snd-soc-gd2-wm1811.o
+obj-$(CONFIG_SND_SOC_SAMSUNG_GC2PD_WM1811) += snd-soc-gc2pd-wm1811.o
+obj-$(CONFIG_SND_SOC_SAMSUNG_WATCH_YMU831) += snd-soc-watch-ymu831.o
 
 obj-$(CONFIG_SND_SAMSUNG_RP)   += srp_ulp/
 obj-$(CONFIG_SND_SAMSUNG_ALP)   += srp_alp/

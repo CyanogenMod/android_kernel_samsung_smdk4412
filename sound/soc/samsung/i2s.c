@@ -977,28 +977,30 @@ static int i2s_trigger(struct snd_pcm_substream *substream,
 				goto exit_err;
 		}
 
-		local_irq_save(flags);
+		spin_lock_irqsave(&lock, flags);
 
 		if (config_setup(i2s)) {
-			local_irq_restore(flags);
+			spin_unlock_irqrestore(&lock, flags);
 			return -EINVAL;
 		}
 
 		if (capture)
 			i2s_rxctrl(i2s, 1);
 		else
+		printk(KERN_DEBUG "%s:MXS 3\n", __func__);
 			i2s_txctrl(i2s, 1, substream->stream);
 
-		local_irq_restore(flags);
+		spin_unlock_irqrestore(&lock, flags);
 		break;
 	case SNDRV_PCM_TRIGGER_STOP:
 	case SNDRV_PCM_TRIGGER_SUSPEND:
 	case SNDRV_PCM_TRIGGER_PAUSE_PUSH:
-		local_irq_save(flags);
+		spin_lock_irqsave(&lock, flags);
 
 		if (capture)
 			i2s_rxctrl(i2s, 0);
 		else
+		printk(KERN_DEBUG "%s:MXS 2\n", __func__);
 			i2s_txctrl(i2s, 0, substream->stream);
 
 		if (capture)
@@ -1007,7 +1009,7 @@ static int i2s_trigger(struct snd_pcm_substream *substream,
 			if (!srp_active(i2s, IS_RUNNING))
 				i2s_fifo(i2s, FIC_TXFLUSH, substream->stream);
 		}
-		local_irq_restore(flags);
+		spin_unlock_irqrestore(&lock, flags);
 		break;
 	}
 
@@ -1121,6 +1123,7 @@ static int samsung_i2s_dai_probe(struct snd_soc_dai *dai)
 	/* Reset any constraint on RFS and BFS */
 	i2s->rfs = 0;
 	i2s->bfs = 0;
+		printk(KERN_DEBUG "%s:MXS A\n", __func__);
 	i2s_txctrl(i2s, 0, 0);
 	i2s_fifo(i2s, FIC_TXFLUSH, 0);
 
