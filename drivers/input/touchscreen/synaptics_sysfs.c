@@ -1204,6 +1204,37 @@ static ssize_t sec_extra_button_store(struct device *dev,
 	return size;
 }
 
+static ssize_t sec_keypad_enable_show(struct device *dev,
+		struct device_attribute *attr, char *buf)
+{
+	struct synaptics_drv_data *data = dev_get_drvdata(dev);
+
+	return sprintf(buf, "%d\n", atomic_read(&data->keypad_enable));
+}
+
+static ssize_t sec_keypad_enable_store(struct device *dev,
+		struct device_attribute *attr, const char *buf, size_t count)
+{
+	struct synaptics_drv_data *data = dev_get_drvdata(dev);
+
+	unsigned int val = 0;
+	sscanf(buf, "%d", &val);
+	val = (val == 0 ? 0 : 1);
+	atomic_set(&data->keypad_enable, val);
+	if (val) {
+		set_bit(KEY_BACK, data->input->keybit);
+		set_bit(KEY_MENU, data->input->keybit);
+		set_bit(KEY_HOME, data->input->keybit);
+	} else {
+		clear_bit(KEY_BACK, data->input->keybit);
+		clear_bit(KEY_MENU, data->input->keybit);
+		clear_bit(KEY_HOME, data->input->keybit);
+	}
+	input_sync(data->input);
+
+	return count;
+}
+
 static DEVICE_ATTR(touch_sensitivity, S_IRUGO | S_IWUSR,
 	NULL, sec_touchkey_sensitivity_store);
 static DEVICE_ATTR(touchkey_back, S_IRUGO | S_IWUSR,
@@ -1226,6 +1257,8 @@ static DEVICE_ATTR(extra_button_event, S_IRUGO | S_IWUSR,
 	NULL, sec_extra_button_store);
 static DEVICE_ATTR(touchkey_button_status, S_IRUGO | S_IWUSR,
 	sec_touchkey_button_status_show, NULL);
+static DEVICE_ATTR(keypad_enable, S_IRUGO|S_IWUSR,
+	sec_keypad_enable_show, sec_keypad_enable_store);
 
 static struct attribute *sec_touchkey_sysfs_attributes[] = {
 	&dev_attr_touch_sensitivity.attr,
@@ -1239,6 +1272,7 @@ static struct attribute *sec_touchkey_sysfs_attributes[] = {
 	&dev_attr_brightness.attr,
 	&dev_attr_extra_button_event.attr,
 	&dev_attr_touchkey_button_status.attr,
+	&dev_attr_keypad_enable.attr,
 	NULL,
 };
 

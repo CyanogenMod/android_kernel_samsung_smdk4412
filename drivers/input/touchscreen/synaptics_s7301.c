@@ -591,7 +591,7 @@ static void synaptics_ts_read_points(struct synaptics_drv_data *data,
 #endif
 	u16 addr = data->f11.data_base_addr + 3;
 	u16 x = 0, y = 0;
-	
+
 #if defined(CONFIG_SEC_TOUCHSCREEN_SURFACE_TOUCH)
 	ret = synaptics_ts_read_block(data,
 		palm_addr, &palm, 1);
@@ -1076,9 +1076,11 @@ static int __init synaptics_ts_probe(struct i2c_client *client,
 	__set_bit(EV_KEY, input->evbit);
 	__set_bit(MT_TOOL_FINGER, input->keybit);
 	__set_bit(INPUT_PROP_DIRECT, input->propbit);
+
+	atomic_set(&ddata->keypad_enable, 1);
 	
 #if defined(CONFIG_TOUCHSCREEN_SYNAPTICS_S7301_KEYLED)
-	if (pdata->led_event) {
+	if (pdata->led_event && atomic_read(&ddata->keypad_enable)) {
 		__set_bit(EV_LED, input->evbit);
 		__set_bit(LED_MISC, input->ledbit);
 	}
@@ -1106,17 +1108,19 @@ static int __init synaptics_ts_probe(struct i2c_client *client,
 		0, 1, 0, 0);
 #endif
 #if defined (CONFIG_TOUCHSCREEN_SYNAPTICS_S7301_KEYS)
-	if (pdata->support_extend_button) {
-		for (ret = 0; ret < pdata->extend_button_map->nbuttons; ret++) {
-			if (pdata->extend_button_map->map[ret] != KEY_RESERVED)
-				input_set_capability(input, EV_KEY,
-					pdata->extend_button_map->map[ret]);
-		}
-	} else {
-		for (ret = 0; ret < pdata->button_map->nbuttons; ret++)
-			input_set_capability(input, EV_KEY,
-				pdata->button_map->map[ret]);
-	}
+    if(atomic_read(&ddata->keypad_enable)){
+	    if (pdata->support_extend_button) {
+		    for (ret = 0; ret < pdata->extend_button_map->nbuttons; ret++) {
+			    if (pdata->extend_button_map->map[ret] != KEY_RESERVED)
+				    input_set_capability(input, EV_KEY,
+					    pdata->extend_button_map->map[ret]);
+		    }
+	    } else {
+		    for (ret = 0; ret < pdata->button_map->nbuttons; ret++)
+			    input_set_capability(input, EV_KEY,
+				    pdata->button_map->map[ret]);
+	    }
+    }
 #endif
 
 	ret = input_register_device(input);
