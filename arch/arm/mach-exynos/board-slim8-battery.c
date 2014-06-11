@@ -91,6 +91,18 @@ static int battery_get_lpm_state(char *str)
 }
 __setup("androidboot.mode=", battery_get_lpm_state);
 
+/* For JB bootloader compatibility */
+static int bootloader_get_lpm_state(char *str)
+{
+	if (strncmp(str, "1", 1) == 0)
+		lpcharge = 1;
+
+	pr_info("%s: Low power charging mode: %d\n", __func__, lpcharge);
+
+	return lpcharge;
+}
+__setup("lpcharge=", bootloader_get_lpm_state);
+
 static bool sec_bat_is_lpm(void)
 {
 	return lpcharge == 1 ? true : false;
