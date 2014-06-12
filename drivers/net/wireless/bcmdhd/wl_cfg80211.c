@@ -8427,14 +8427,16 @@ wl_bss_roaming_done(struct bcm_cfg80211 *cfg, struct net_device *ndev,
 #endif /* WLFBT */
 	printk("wl_bss_roaming_done succeeded to " MACDBG "\n",
 		MAC2STRDBG((u8*)(&e->addr)));
-
-	cfg80211_roamed(ndev,
-#if (LINUX_VERSION_CODE > KERNEL_VERSION(2, 6, 39)) || defined(WL_COMPAT_WIRELESS)
-		notify_channel,
+	if (memcmp(curbssid, connect_req_bssid, ETHER_ADDR_LEN) != 0) {
+		WL_DBG(("BSSID Mismatch, so indicate roam to cfg80211\n"));
+		cfg80211_roamed(ndev,
+#if (LINUX_VERSION_CODE > KERNEL_VERSION(2, 6, 39))
+			notify_channel,
 #endif
-		curbssid,
-		conn_info->req_ie, conn_info->req_ie_len,
-		conn_info->resp_ie, conn_info->resp_ie_len, GFP_KERNEL);
+			curbssid,
+			conn_info->req_ie, conn_info->req_ie_len,
+			conn_info->resp_ie, conn_info->resp_ie_len, GFP_KERNEL);
+	}
 	WL_DBG(("Report roaming result\n"));
 
 	wl_set_drv_status(cfg, CONNECTED, ndev);
