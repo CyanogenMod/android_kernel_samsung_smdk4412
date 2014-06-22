@@ -19,11 +19,10 @@ nod /dev/block/cyasblkdevblk0p1 600 0 0 b 253 1
 slink /init /stage1/init 777 0 0
 dir /proc 755 0 0
 dir /stage1 755 0 0
-file /stage1/busybox source/usr/d710_initramfs_files/busybox 755 0 0
-file /stage1/init source/usr/d710_initramfs_files/init 755 0 0
-file /stage1/read_boot_headers source/usr/d710_initramfs_files/read_boot_headers 755 0 0
+file /stage1/busybox source/usr/galaxys2_initramfs_files/busybox 755 0 0
+file /stage1/init source/usr/galaxys2_initramfs_files/init 755 0 0
 dir /sys 755 0 0
 dir /mnt 755 0 0
 dir /mnt/.lfs 755 0 0
-dir /lib 755 0 0
-dir /lib/modules 755 0 0
+file /stage1/boot.cpio ../../ramdisk.cpio 644 0 0
+file /stage1/recovery.cpio ../../ramdisk-recovery.cpio 644 0 0
