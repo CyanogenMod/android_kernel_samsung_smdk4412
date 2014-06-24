@@ -37,10 +37,10 @@
 
 #include <linux/workqueue.h>
 
-#ifdef CONFIG_CPU_EXYNOS4210
-#define MALI_DVFS_STEPS 2
-#define MALI_DVFS_WATING 10 /* msec */
-#define MALI_DVFS_DEFAULT_STEP 0
+#ifdef CONFIG_CPU_EXYNOS4210		
+#define MALI_DVFS_STEPS 2		
+#define MALI_DVFS_WATING 10 /* msec */		
+#define MALI_DVFS_DEFAULT_STEP 0		
 #else
 #define MALI_DVFS_STEPS 5
 #define MALI_DVFS_WATING 10 /* msec */
@@ -106,10 +106,10 @@ mali_dvfs_table mali_dvfs[MALI_DVFS_STEPS]={
 #define ASV_LEVEL     12	/* ASV0, 1, 11 is reserved */
 #define ASV_LEVEL_PRIME     13	/* ASV0, 1, 12 is reserved */
 #define ASV_LEVEL_PD	13
-#define ASV_LEVEL_4210_12	8
-#define ASV_LEVEL_4210_14	5
+#define ASV_LEVEL_4210_12»       8
+#define ASV_LEVEL_4210_14»       5
 
-#if defined(CONFIG_CPU_EXYNOS4212) || defined(CONFIG_CPU_EXYNOS4412)
+if defined(CONFIG_CPU_EXYNOS4212) || defined(CONFIG_CPU_EXYNOS4412)
 static unsigned int asv_3d_volt_9_table_1ghz_type[MALI_DVFS_STEPS-1][ASV_LEVEL] = {
 	{  975000,  950000,  950000,  950000,  925000,  925000,  925000,  900000,  900000,  900000,  900000,  875000},  /* L3(160Mhz) */
 #if (MALI_DVFS_STEPS > 1)
@@ -163,22 +163,22 @@ static unsigned int asv_3d_volt_4212_9_table[MALI_DVFS_STEPS][ASV_LEVEL_PD] = {
 #endif
 #endif
 };
-
-#else
-
-static unsigned int asv_3d_volt_4210_12_table[MALI_DVFS_STEPS][ASV_LEVEL_4210_12] = {
-	{  1000000,  1000000,  1000000,   950000,   950000,   950000,   950000,   950000},	/* L1(134Mhz) */
-#if (MALI_DVFS_STEPS > 1)
-	{  1100000,  1100000,  1100000,  1000000,  1000000,  1000000,  1000000,   950000},	/* L0(266Mhz) */
-#endif
-};
-
-static unsigned int asv_3d_volt_4210_14_table[MALI_DVFS_STEPS][ASV_LEVEL_4210_14] = {
-	{  1000000,  1000000,   950000,   950000,   950000},	/* L1(134Mhz) */
-#if (MALI_DVFS_STEPS > 1)
-	{  1100000,  1100000,  1000000,  1000000,   950000},	/* L0(266Mhz) */
-#endif
-};
+#else		
+static unsigned int asv_3d_volt_4210_12_table[MALI_DVFS_STEPS][ASV_LEVEL_4210_12] = {		
+    {  1000000,  1000000,  1000000,   950000,   950000,   950000,   950000,   950000},»       /*
+ L1(134Mhz) */		
+#if (MALI_DVFS_STEPS > 1) 		
+    {  1100000,  1100000,  1100000,  1000000,  1000000,  1000000,  1000000,   950000},»       /*
+ L0(266Mhz) */		
+#endif		
+};		
+		
+static unsigned int asv_3d_volt_4210_14_table[MALI_DVFS_STEPS][ASV_LEVEL_4210_14] = {		
+    {  1000000,  1000000,   950000,   950000,   950000},»       /* L1(134Mhz) */		
+#if (MALI_DVFS_STEPS > 1) 		
+    {  1100000,  1100000,  1000000,  1000000,   950000},»       /* L0(266Mhz) */		
+#endif		
+};		
 #endif
 #endif /* ASV_LEVEL */
 
@@ -481,6 +481,9 @@ void mali_clk_set_rate(unsigned int clk, unsigned int mhz)
 	
 	if (bis_vpll)
 	{
+		/* in Pega-prime, vpll_src_clock means ext_xtal_clock!! */
+		clk_set_parent(sclk_vpll_clock, vpll_src_clock);
+
 		clk_set_rate(fout_vpll_clock, (unsigned int)clk * GPU_MHZ);
 		clk_set_parent(vpll_src_clock, ext_xtal_clock);
 		clk_set_parent(sclk_vpll_clock, fout_vpll_clock);
@@ -634,7 +637,7 @@ static mali_bool mali_dvfs_table_update(void)
 {
 	unsigned int step_num = MALI_DVFS_STEPS;
 
-#if defined(CONFIG_CPU_EXYNOS4212) || defined(CONFIG_CPU_EXYNOS4412)
+#if defined(CONFIG_CPU_EXYNOS4212) || defined(CONFIG_CPU_EXYNOS4412) 
 	unsigned int i, tmp, g3d_lock_volt = 0;
 	bool lock_flag_g3d = false;
 
@@ -1258,7 +1261,7 @@ int mali_dvfs_bottom_lock_pop(void)
 	if (prev_status <= 0) {
 		MALI_PRINT(("gpu bottom lock status is not valid for pop\n"));
 		return -1;
-	} else if (prev_status == 1) {
+	} else if (prev_status >= 1) {
 		bottom_lock_step = 0;
 		MALI_PRINT(("gpu bottom lock release\n"));
 	}

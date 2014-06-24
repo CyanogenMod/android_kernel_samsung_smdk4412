@@ -185,6 +185,8 @@ static int os_allocate(void* ctx, ump_dd_mem * descriptor)
 	if (left)
 	{
 		DBG_MSG(1, ("Failed to allocate needed pages\n"));
+		printk(KERN_ALERT"UMP::Failed to allocated pages, totally pages  = %d, allocated pages = %d, currently requested pages = %d \n",
+			(int)info->num_pages_max, (int)info->num_pages_allocated, left + pages_allocated);
 		/* MALI_SEC */
 		DBG_MSG(1, ("UMP memory allocated: %d kB  Configured maximum OS memory usage: %d kB\n",
 				 (pages_allocated * _MALI_OSK_CPU_PAGE_SIZE)/1024, (info->num_pages_max* _MALI_OSK_CPU_PAGE_SIZE)/1024));
