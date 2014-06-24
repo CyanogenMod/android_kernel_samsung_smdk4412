@@ -13,7 +13,7 @@
 #include "mali_kernel_common.h"
 /* MALI_SEC */
 #if defined(CONFIG_CPU_EXYNOS4212) || defined(CONFIG_CPU_EXYNOS4412)
-//#define MALI_SEC_MEM_VALIDATION
+#define MALI_SEC_MEM_VALIDATION
 #include <linux/cma.h>
 #include <plat/pd.h>
 #include <linux/platform_device.h>

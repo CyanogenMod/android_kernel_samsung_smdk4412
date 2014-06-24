@@ -38,7 +38,7 @@
 #include "mali_profiling_internal.h"
 #endif
 /* MALI_SEC */
-#if defined(CONFIG_CPU_EXYNOS4212) || defined(CONFIG_CPU_EXYNOS4412) || defined(CONFIG_CPU_EXYNOS4210)
+#if defined(CONFIG_CPU_EXYNOS4212) || defined(CONFIG_CPU_EXYNOS4412)
 #include "../platform/pegasus-m400/exynos4_pmm.h"
 #elif defined(CONFIG_SOC_EXYNOS3470)
 #include "../platform/exynos4270/exynos4_pmm.h"
