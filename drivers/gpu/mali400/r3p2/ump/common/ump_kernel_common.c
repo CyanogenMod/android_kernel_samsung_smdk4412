@@ -339,6 +339,7 @@ _mali_osk_errcode_t _ump_ukk_map_mem( _ump_uk_map_mem_s *args )
 		if (_MALI_OSK_ERR_OK != _ump_osk_mem_mapregion_map(descriptor, offset, (u32 *)&(mem->block_array[block].addr), size_to_map ) )
 		{
 			DBG_MSG(1, ("WARNING: _ump_ukk_map_mem failed to map memory into userspace\n"));
+			printk(KERN_ALERT"UMP:_ump_ukk_map_mem failed to map memory into userspace\n");
 			ump_descriptor_mapping_free( session_data->cookies_map, map_id );
 			ump_dd_reference_release(mem);
 			_ump_osk_mem_mapregion_term( descriptor );
