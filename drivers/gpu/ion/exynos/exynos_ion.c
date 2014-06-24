@@ -487,8 +487,10 @@ static int ion_exynos_contig_heap_allocate(struct ion_heap *heap,
 	}
 
 	buffer->flags = flags;
+#ifdef CONFIG_ION_EXYNOS_CONTIGHEAP_DEBUG
 	printk(KERN_INFO "[ION] alloc: 0x%x\n",
 		(unsigned int)buffer->priv_phys);
+#endif
 
 	return 0;
 }
@@ -503,8 +505,10 @@ static void ion_exynos_contig_heap_free(struct ion_buffer *buffer)
 #endif
 
 	ret = cma_free(buffer->priv_phys);
+#ifdef CONFIG_ION_EXYNOS_CONTIGHEAP_DEBUG
 	printk(KERN_INFO "[ION] free: 0x%x, [0x%x]\n",
 		(unsigned int)buffer->priv_phys, ret);
+#endif
 }
 
 static int ion_exynos_contig_heap_phys(struct ion_heap *heap,
@@ -544,6 +548,8 @@ static int ion_exynos_contig_heap_map_user(struct ion_heap *heap,
 	if (buffer->flags & ION_EXYNOS_NONCACHE_MASK)
 		vma->vm_page_prot = pgprot_writecombine(vma->vm_page_prot);
 
+	/* Set User Permission */
+	vma->vm_page_prot = pte_mkdirty(vma->vm_page_prot);
 	return remap_pfn_range(vma, vma->vm_start, pfn + vma->vm_pgoff,
 			       vma->vm_end - vma->vm_start,
 			       vma->vm_page_prot);
