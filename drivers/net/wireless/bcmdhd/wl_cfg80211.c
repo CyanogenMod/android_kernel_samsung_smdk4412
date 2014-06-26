@@ -115,10 +115,12 @@
 static struct device *cfg80211_parent_dev = NULL;
 /* g_bcm_cfg should be static. Do not change */
 static struct bcm_cfg80211 *g_bcm_cfg = NULL;
+#ifdef DEBUGFS_CFG80211
 #ifdef CUSTOMER_HW4
 u32 wl_dbg_level = WL_DBG_ERR | WL_DBG_P2P_ACTION;
 #else
 u32 wl_dbg_level = WL_DBG_ERR;
+#endif
 #endif
 
 #define MAX_WAIT_TIME 1500
@@ -486,7 +488,7 @@ static void wl_ch_to_chanspec(int ch,
  * information element utilities
  */
 static void wl_rst_ie(struct bcm_cfg80211 *cfg);
-static __used s32 wl_add_ie(struct bcm_cfg80211 *cfg, u8 t, u8 l, u8 *v);
+static __maybe_unused s32 wl_add_ie(struct bcm_cfg80211 *cfg, u8 t, u8 l, u8 *v);
 static void wl_update_hidden_ap_ie(struct wl_bss_info *bi, u8 *ie_stream, u32 *ie_size);
 static s32 wl_mrg_ie(struct bcm_cfg80211 *cfg, u8 *ie_stream, u16 ie_size);
 static s32 wl_cp_ie(struct bcm_cfg80211 *cfg, u8 *dst, u16 dst_size);
@@ -535,7 +537,7 @@ static void wl_delay(u32 ms);
  * ibss mode utilities
  */
 static bool wl_is_ibssmode(struct bcm_cfg80211 *cfg, struct net_device *ndev);
-static __used bool wl_is_ibssstarter(struct bcm_cfg80211 *cfg);
+static __maybe_unused bool wl_is_ibssstarter(struct bcm_cfg80211 *cfg);
 
 /*
  * link up/down , default configuration utilities
@@ -558,7 +560,7 @@ int wl_cfg80211_get_ioctl_version(void);
 /*
  * find most significant bit set
  */
-static __used u32 wl_find_msb(u16 bit16);
+static __maybe_unused u32 wl_find_msb(u16 bit16);
 
 /*
  * rfkill support
@@ -4677,7 +4679,7 @@ void wl_cfg80211_update_power_mode(struct net_device *dev)
 		dev->ieee80211_ptr->ps = (pm == PM_OFF) ? false : true;
 }
 
-static __used u32 wl_find_msb(u16 bit16)
+static __maybe_unused u32 wl_find_msb(u16 bit16)
 {
 	u32 ret = 0;
 
@@ -11320,7 +11322,7 @@ static bool wl_is_ibssmode(struct bcm_cfg80211 *cfg, struct net_device *ndev)
 	return wl_get_mode_by_netdev(cfg, ndev) == WL_MODE_IBSS;
 }
 
-static __used bool wl_is_ibssstarter(struct bcm_cfg80211 *cfg)
+static __maybe_unused bool wl_is_ibssstarter(struct bcm_cfg80211 *cfg)
 {
 	return cfg->ibss_starter;
 }
@@ -11332,7 +11334,7 @@ static void wl_rst_ie(struct bcm_cfg80211 *cfg)
 	ie->offset = 0;
 }
 
-static __used s32 wl_add_ie(struct bcm_cfg80211 *cfg, u8 t, u8 l, u8 *v)
+static __maybe_unused s32 wl_add_ie(struct bcm_cfg80211 *cfg, u8 t, u8 l, u8 *v)
 {
 	struct wl_ie *ie = wl_to_ie(cfg);
 	s32 err = 0;
@@ -12206,6 +12208,7 @@ int wl_cfg80211_do_driver_init(struct net_device *net)
 	return 0;
 }
 
+#ifdef DEBUGFS_CFG80211
 void wl_cfg80211_enable_trace(bool set, u32 level)
 {
 	if (set)
@@ -12213,6 +12216,7 @@ void wl_cfg80211_enable_trace(bool set, u32 level)
 	else
 		wl_dbg_level |= (WL_DBG_LEVEL & level);
 }
+#endif
 #if defined(WL_SUPPORT_BACKPORTED_KPATCHES) || (LINUX_VERSION_CODE >= KERNEL_VERSION(3, \
 	2, 0))
 static s32

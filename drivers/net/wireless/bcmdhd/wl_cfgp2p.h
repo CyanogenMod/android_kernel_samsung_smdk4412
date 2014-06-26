@@ -29,7 +29,11 @@
 #include <proto/p2p.h>
 
 struct bcm_cfg80211;
+#ifdef DEBUGFS_CFG80211
 extern u32 wl_dbg_level;
+#else
+#define wl_dbg_level (0)
+#endif
 
 typedef struct wifi_p2p_ie wifi_wfd_ie_t;
 /* Enumeration of the usages of the BSSCFGs used by the P2P Library.  Do not
@@ -239,8 +243,8 @@ wl_cfgp2p_find_gas_subtype(u8 subtype, u8* data, u32 len);
 extern bool
 wl_cfgp2p_is_p2p_gas_action(void *frame, u32 frame_len);
 #endif /* CUSTOMER_HW4 */
-extern void
-wl_cfgp2p_print_actframe(bool tx, void *frame, u32 frame_len, u32 channel);
+static inline void wl_cfgp2p_print_actframe(bool tx, void *frame,
+	u32 frame_len, u32 channel) { }
 extern s32
 wl_cfgp2p_init_priv(struct bcm_cfg80211 *cfg);
 extern void

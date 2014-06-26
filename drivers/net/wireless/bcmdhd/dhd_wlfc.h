@@ -64,8 +64,7 @@ typedef enum ewlfc_mac_entry_action {
 typedef struct wlfc_hanger_item {
 	uint8	state;
 	uint8   gen;
-	uint8	pad[2];
-	uint32	identifier;
+	uint16	identifier;
 	void*	pkt;
 #ifdef PROP_TXSTATUS_DEBUG
 	uint32	push_time;
@@ -74,18 +73,18 @@ typedef struct wlfc_hanger_item {
 } wlfc_hanger_item_t;
 
 typedef struct wlfc_hanger {
-	int max_items;
+	uint16 max_items;
+	uint16 slot_pos;
 	uint32 pushed;
 	uint32 popped;
 	uint32 failed_to_push;
 	uint32 failed_to_pop;
 	uint32 failed_slotfind;
-	uint32 slot_pos;
-	wlfc_hanger_item_t items[1];
+	wlfc_hanger_item_t items[0];
 } wlfc_hanger_t;
 
-#define WLFC_HANGER_SIZE(n)	((sizeof(wlfc_hanger_t) - \
-	sizeof(wlfc_hanger_item_t)) + ((n)*sizeof(wlfc_hanger_item_t)))
+#define WLFC_HANGER_SIZE(n)	(sizeof(wlfc_hanger_t) + \
+	(n)*sizeof(wlfc_hanger_item_t))
 
 #define WLFC_STATE_OPEN		1
 #define WLFC_STATE_CLOSE	2

@@ -127,7 +127,11 @@
 #define DHD_BLOG(cp, size)
 
 #define DHD_NONE(args)
+#ifdef DHD_DEBUG
 extern int dhd_msg_level;
+#else
+#define dhd_msg_level (0)
+#endif
 
 /* Defines msg bits */
 #include <dhdioctl.h>

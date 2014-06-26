@@ -411,14 +411,86 @@ int dhd_pno_clean(dhd_pub_t *dhd);
  *  Wake locks are an Android power management concept. They are used by applications and services
  *  to request CPU resources.
  */
-extern int dhd_os_wake_lock(dhd_pub_t *pub);
-extern int dhd_os_wake_unlock(dhd_pub_t *pub);
-extern int dhd_os_wake_lock_timeout(dhd_pub_t *pub);
-extern int dhd_os_wake_lock_rx_timeout_enable(dhd_pub_t *pub, int val);
-extern int dhd_os_wake_lock_ctrl_timeout_enable(dhd_pub_t *pub, int val);
-extern int dhd_os_wake_lock_ctrl_timeout_cancel(dhd_pub_t *pub);
-extern int dhd_os_wd_wake_lock(dhd_pub_t *pub);
-extern int dhd_os_wd_wake_unlock(dhd_pub_t *pub);
+#ifdef CONFIG_HAS_WAKELOCK
+struct dhd_info;
+#define dhd_info_t struct dhd_info
+
+enum {
+	DHD_WL_rx = 0,
+	DHD_WL_ctrl,
+};
+
+#define dhd_wake_func(fn) \
+	extern int dhd_int_wake_##fn (dhd_info_t *dhd); \
+	static inline int dhd_os_wake_##fn (dhd_pub_t *pub) \
+	{ return dhd_int_wake_##fn ((dhd_info_t *)pub->info); }
+
+extern int dhd_int_wake_timeout_enable(dhd_info_t *dhd, int val, int wl);
+extern int dhd_int_wake_timeout_cancel(dhd_info_t *dhd, int wl);
+#define dhd_tmout_func(fn) \
+	static inline int dhd_os_wake_lock_##fn##_timeout_enable \
+		(dhd_pub_t *pub, int val) \
+	{ return dhd_int_wake_timeout_enable((dhd_info_t *)pub->info, val, \
+		DHD_WL_##fn ); } \
+	static inline int dhd_os_wake_lock_##fn##_timeout_cancel \
+		(dhd_pub_t *pub) \
+	{ return dhd_int_wake_timeout_cancel((dhd_info_t *)pub->info, \
+		DHD_WL_##fn ); }
+
+#define net_wake_func(fn) \
+	static inline int net_os_wake_##fn (struct net_device *dev) \
+	{ \
+		dhd_info_t *dhd = *(dhd_info_t **)netdev_priv(dev); \
+		return dhd?dhd_int_wake_##fn (dhd):0; \
+	}
+
+#define net_tmout_func(fn) \
+	static inline int net_os_wake_lock_##fn##_timeout_enable \
+		(struct net_device *dev, int val) \
+	{ \
+		dhd_info_t *dhd = *(dhd_info_t **)netdev_priv(dev); \
+		return dhd ? dhd_int_wake_timeout_enable(dhd, val, \
+			DHD_WL_##fn ) : 0; \
+	} \
+	static inline int net_os_wake_lock_##fn##_timeout_cancel \
+		(struct net_device *dev) \
+	{ \
+		dhd_info_t *dhd = *(dhd_info_t **)netdev_priv(dev); \
+		return dhd ? dhd_int_wake_timeout_cancel(dhd, \
+			DHD_WL_##fn ) : 0; \
+	} \
+
+/* Core wake functions */
+dhd_wake_func(lock);
+dhd_wake_func(unlock);
+dhd_wake_func(lock_timeout);
+dhd_tmout_func(rx);
+dhd_tmout_func(ctrl);
+
+/* struct net_device wrappers */
+net_wake_func(lock);
+net_wake_func(unlock);
+net_wake_func(lock_timeout);
+net_tmout_func(rx);
+net_tmout_func(ctrl);
+
+#define DHD_WD_LOCK  (1)
+#define DHD_WD_WAIVE (2)
+extern int dhd_int_wd_wake_lock(dhd_info_t *dhd);
+extern int dhd_int_wd_wake_unlock(dhd_info_t *dhd);
+static inline int dhd_os_wd_wake_lock(dhd_pub_t *pub)
+{ return (pub && pub->info) ? dhd_int_wd_wake_lock(pub->info) : 0; }
+static inline int dhd_os_wd_wake_unlock(dhd_pub_t *pub)
+{ return (pub && pub->info) ? dhd_int_wd_wake_unlock(pub->info) : 0; }
+
+#undef dhd_wake_func
+#undef dhd_tmount_func
+#undef net_wake_func
+#undef net_tmout_func
+#undef dhd_info_t
+#else
+#error CONFIG_HAS_WAKELOCK is required
+#endif
 
 inline static void MUTEX_LOCK_SOFTAP_SET_INIT(dhd_pub_t * dhdp)
 {

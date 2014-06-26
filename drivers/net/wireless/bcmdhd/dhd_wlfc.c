@@ -174,7 +174,7 @@ _dhd_wlfc_hanger_create(osl_t *osh, int max_items)
 	wlfc_hanger_t* hanger;
 
 	/* allow only up to a specific size for now */
-	ASSERT(max_items == WLFC_HANGER_MAXITEMS);
+	ASSERT(max_items <= WLFC_HANGER_MAXITEMS);
 
 	if ((hanger = (wlfc_hanger_t*)MALLOC(osh, WLFC_HANGER_SIZE(max_items))) == NULL)
 		return NULL;

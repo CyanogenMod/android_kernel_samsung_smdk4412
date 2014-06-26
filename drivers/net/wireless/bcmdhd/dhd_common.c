@@ -72,7 +72,9 @@
 #ifdef WLMEDIA_HTSF
 extern void htsf_update(struct dhd_info *dhd, void *data);
 #endif
+#ifdef DHD_DEBUG
 int dhd_msg_level = DHD_ERROR_VAL;
+#endif
 
 
 #include <wl_iw.h>
@@ -359,7 +361,9 @@ dhd_doiovar(dhd_pub_t *dhd_pub, const bcm_iovar_t *vi, uint32 actionid, const ch
 			wl_cfg80211_enable_trace(FALSE, WL_DBG_DBG);
 		if (!(int_val & DHD_WL_VAL2))
 #endif /* WL_CFG80211 */
+#ifdef DHD_DEBUG
 		dhd_msg_level = int_val;
+#endif
 		break;
 	case IOV_GVAL(IOV_BCMERRORSTR):
 		bcm_strncpy_s((char *)arg, len, bcmerrorstr(dhd_pub->bcmerror), BCME_STRLEN);
