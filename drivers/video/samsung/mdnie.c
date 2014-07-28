@@ -10,7 +10,6 @@
  * published by the Free Software Foundation.
 */
 
-#include <mach/gpio.h>
 #include <linux/module.h>
 #include <linux/kernel.h>
 #include <linux/errno.h>
@@ -19,13 +18,12 @@
 #include <linux/device.h>
 #include <linux/backlight.h>
 #include <linux/platform_device.h>
-#include <linux/mdnie.h>
-#ifdef CONFIG_HAS_EARLYSUSPEND
-#include <linux/earlysuspend.h>
-#endif
 #include <linux/delay.h>
 #include <linux/lcd.h>
-#include <linux/rtc.h>
+#include <linux/mdnie.h>
+#include <linux/fb.h>
+#include <linux/pm_runtime.h>
+#include <linux/clk.h>
 
 #include "s3cfb.h"
 #include "s3cfb_mdnie.h"
@@ -38,7 +36,7 @@
 #elif defined(CONFIG_FB_S5P_S6E8AB0)
 #include "mdnie_table_p8.h"
 #elif defined(CONFIG_FB_S5P_S6F1202A)
-#include "mdnie_table.h"
+#include "mdnie_table_4210.h"
 #include "mdnie_table_p2_boe.h"
 #include "mdnie_table_p2_hydis.h"
 #include "mdnie_table_p2_sec.h"
@@ -47,88 +45,92 @@
 #endif
 #include "mdnie_color_tone_4210.h"
 #else	/* CONFIG_CPU_EXYNOS4210 */
-#if defined(CONFIG_FB_S5P_S6E8AA0)
-#include "mdnie_table_c1m0.h"
+#if defined(CONFIG_FB_S5P_S6E8AA0) && defined(CONFIG_S6E8AA0_AMS465XX)
+#include "mdnie_table_superior.h"
+#elif defined(CONFIG_FB_S5P_S6E8AA0)
+#include "mdnie_table_m0.h"
 #elif defined(CONFIG_FB_S5P_EA8061) || defined(CONFIG_FB_S5P_S6EVR02)
 #include "mdnie_table_t0.h"
 #elif defined(CONFIG_FB_S5P_S6E63M0)
-#include "mdnie_table_c1m0.h"
+#include "mdnie_table_m0.h"
+#elif defined(CONFIG_FB_S5P_S6C1372) && defined(CONFIG_MACH_TAB3)
+#include "mdnie_table_santos10.h"
 #elif defined(CONFIG_FB_S5P_S6C1372)
 #include "mdnie_table_p4note.h"
+#elif defined(CONFIG_FB_S5P_S6D6AA1) && defined(CONFIG_MACH_GD2)
+#include "mdnie_table_gd2.h"
+#elif defined(CONFIG_FB_S5P_S6D6AA1) && defined(CONFIG_MACH_SF2)
+#include "mdnie_table_sf2.h"
 #elif defined(CONFIG_FB_S5P_S6D6AA1)
 #include "mdnie_table_gc1.h"
 #elif defined(CONFIG_FB_S5P_LMS501XX)
 #include "mdnie_table_baffin.h"
-#else
-#include "mdnie_table_4412.h"
+#elif defined(CONFIG_FB_S5P_NT71391)
+#include "mdnie_table_kona.h"
+#elif defined(CONFIG_FB_S5P_S6D7AA0) && defined(CONFIG_S6D7AA0_LSL080AL02)
+#include "mdnie_table_lt01.h"
+#elif defined(CONFIG_FB_S5P_S6D7AA0)
+#include "mdnie_table_santos7.h"
+#elif defined(CONFIG_FB_S5P_S6E88A0)
+#include "mdnie_table_m.h"
+#elif defined(CONFIG_FB_S5P_HX8369B)
+#include "mdnie_table_p4note.h"
 #endif
-#include "mdnie_color_tone.h"	/* sholud be added for 4212, 4412 */
+#include "mdnie_color_tone_4412.h"
 #endif
-
-#if defined(CONFIG_TDMB) || defined(CONFIG_TARGET_LOCALE_NTT)
+#if defined(CONFIG_FB_S5P_LMS501XX)
+#include "mdnie_dmb_baffin.h"
+#elif defined(CONFIG_TDMB)
 #include "mdnie_dmb.h"
 #endif
 
 #if defined(CONFIG_FB_MDNIE_PWM)
 #define MIN_BRIGHTNESS		0
-#define DEFAULT_BRIGHTNESS		150
-#if defined(CONFIG_FB_S5P_S6F1202A)
-#define MAX_BACKLIGHT_VALUE		1424	/* 1504(94%) -> 1424(89%) */
-#define MID_BACKLIGHT_VALUE		544	/*  784(49%) ->  544(34%) */
-#define LOW_BACKLIGHT_VALUE		16
-#define DIM_BACKLIGHT_VALUE		16
-#define CABC_CUTOFF_BACKLIGHT_VALUE	40	/* 2.5% */
-#elif defined(CONFIG_FB_S5P_S6C1372)
-#define MAX_BACKLIGHT_VALUE		1441	/* 90% */
-#define MID_BACKLIGHT_VALUE		784
-#define LOW_BACKLIGHT_VALUE		16
-#define DIM_BACKLIGHT_VALUE		16
-#define CABC_CUTOFF_BACKLIGHT_VALUE	34
-#endif
 #define MAX_BRIGHTNESS_LEVEL		255
 #define MID_BRIGHTNESS_LEVEL		150
 #define LOW_BRIGHTNESS_LEVEL		30
 #define DIM_BRIGHTNESS_LEVEL		20
+#define DEFAULT_BRIGHTNESS		MID_BRIGHTNESS_LEVEL
+#if defined(CONFIG_FB_S5P_S6F1202A)
+#define CABC_OFF_BRIGHTNESS_VALUE	40	/* 2.5% */
+#elif defined(CONFIG_FB_S5P_S6C1372)
+#define CABC_OFF_BRIGHTNESS_VALUE	34
+#elif defined(CONFIG_FB_S5P_NT71391)
+#define CABC_OFF_BRIGHTNESS_VALUE	31
+#elif defined(CONFIG_FB_S5P_S6D7AA0)
+#define CABC_OFF_BRIGHTNESS_VALUE	19
+#elif defined(CONFIG_FB_S5P_HX8369B)
+#define CABC_OFF_BRIGHTNESS_VALUE	34
+#endif
 #endif
 
-#define SCENARIO_IS_COLOR(scenario)	\
-	((scenario >= COLOR_TONE_1) && (scenario < COLOR_TONE_MAX))
+#define MDNIE_SYSFS_PREFIX		"/sdcard/mdnie/"
+#define PANEL_COORDINATE_PATH	"/sys/class/lcd/panel/color_coordinate"
 
-#if defined(CONFIG_TDMB) || defined(CONFIG_TARGET_LOCALE_NTT)
-#define SCENARIO_IS_DMB(scenario)	\
-	((scenario >= DMB_NORMAL_MODE) && (scenario < DMB_MODE_MAX))
-#define SCENARIO_IS_VALID(scenario)	\
-	((SCENARIO_IS_COLOR(scenario)) || SCENARIO_IS_DMB(scenario) || \
-	(scenario < SCENARIO_MAX))
+#if defined(CONFIG_TDMB)
+#define SCENARIO_IS_DMB(scenario)	(scenario == DMB_NORMAL_MODE)
 #else
-#define SCENARIO_IS_VALID(scenario)	\
-	((SCENARIO_IS_COLOR(scenario)) || (scenario < SCENARIO_MAX))
+#define SCENARIO_IS_DMB(scenario)	NULL
 #endif
 
-static char tuning_file_name[50];
+#define SCENARIO_IS_COLOR(scenario)			((scenario >= COLOR_TONE_1) && (scenario < COLOR_TONE_MAX))
+#define SCENARIO_IS_VIDEO(scenario)			(scenario == VIDEO_MODE)
+#define SCENARIO_IS_VALID(scenario)			(SCENARIO_IS_COLOR(scenario) || SCENARIO_IS_DMB(scenario) || scenario < SCENARIO_MAX)
 
-struct class *mdnie_class;
+#define ACCESSIBILITY_IS_VALID(accessibility)	(accessibility && (accessibility < ACCESSIBILITY_MAX))
 
+#define ADDRESS_IS_SCR_WHITE(address)		(address >= MDNIE_REG_WHITE_R && address <= MDNIE_REG_WHITE_B)
+#define ADDRESS_IS_SCR_RGB(address)			(address >= MDNIE_REG_RED_R && address <= MDNIE_REG_GREEN_B)
+
+#define SCR_RGB_MASK(value)				(value % MDNIE_REG_RED_R)
+
+static struct class *mdnie_class;
 struct mdnie_info *g_mdnie;
 
-#ifdef CONFIG_MACH_P4NOTE
-static struct mdnie_backlight_value b_value;
-#endif
-
-struct sysfs_debug_info {
-	u8 enable;
-	pid_t pid;
-	char comm[TASK_COMM_LEN];
-	char time[128];
-};
-
-static struct sysfs_debug_info negative[5];
-static u8 negative_idx;
-
-int mdnie_send_sequence(struct mdnie_info *mdnie, const unsigned short *seq)
+static int mdnie_send_sequence(struct mdnie_info *mdnie, const unsigned short *seq)
 {
 	int ret = 0, i = 0;
-	const unsigned short *wbuf;
+	const unsigned short *wbuf = NULL;
 
 	if (IS_ERR_OR_NULL(seq)) {
 		dev_err(mdnie->dev, "mdnie sequence is null\n");
@@ -139,111 +141,101 @@ int mdnie_send_sequence(struct mdnie_info *mdnie, const unsigned short *seq)
 
 	wbuf = seq;
 
-	s3c_mdnie_mask();
+	mdnie_mask();
 
 	while (wbuf[i] != END_SEQ) {
-		mdnie_write(wbuf[i], wbuf[i+1]);
+		ret += mdnie_write(wbuf[i], wbuf[i+1]);
 		i += 2;
 	}
 
-	s3c_mdnie_unmask();
+	mdnie_unmask();
 
 	mutex_unlock(&mdnie->dev_lock);
 
 	return ret;
 }
 
-void set_mdnie_value(struct mdnie_info *mdnie, u8 force)
+static struct mdnie_tuning_info *mdnie_request_table(struct mdnie_info *mdnie)
 {
-	u8 idx;
-
-	if ((!mdnie->enable) && (!force)) {
-		dev_err(mdnie->dev, "mdnie states is off\n");
-		return;
-	}
-
-	if (mdnie->scenario == VIDEO_WARM_MODE)
-		mdnie->tone = TONE_WARM;
-	else if (mdnie->scenario == VIDEO_COLD_MODE)
-		mdnie->tone = TONE_COLD;
-	else
-		mdnie->tone = TONE_NORMAL;
-
-	if (mdnie->tunning) {
-		dev_info(mdnie->dev, "mdnie tunning mode is enabled\n");
-		return;
-	}
+	struct mdnie_tuning_info *table = NULL;
 
 	mutex_lock(&mdnie->lock);
 
-	if (mdnie->negative == NEGATIVE_ON) {
-		dev_info(mdnie->dev, "NEGATIVE_ON\n");
-		mdnie_send_sequence(mdnie, negative_table[mdnie->cabc].seq);
+	if (ACCESSIBILITY_IS_VALID(mdnie->accessibility)) {
+		table = &accessibility_table[mdnie->cabc][mdnie->accessibility];
 		goto exit;
-	}
-
-#if defined(CONFIG_TDMB) || defined(CONFIG_TARGET_LOCALE_NTT)
-	if (SCENARIO_IS_DMB(mdnie->scenario)) {
-		idx = mdnie->scenario - DMB_NORMAL_MODE;
-		mdnie->tone = idx;
-
-		mdnie_send_sequence(mdnie, tune_dmb[mdnie->mode].seq);
-		dev_info(mdnie->dev, "mode=%d, scenario=%d, outdoor=%d, cabc=%d, %s\n",
-			mdnie->mode, mdnie->scenario, mdnie->outdoor,
-			mdnie->cabc, tune_dmb[mdnie->mode].name);
-		goto etc;
-	}
+	} else if (SCENARIO_IS_DMB(mdnie->scenario)) {
+#if defined(CONFIG_TDMB)
+		table = &tune_dmb[mdnie->mode];
 #endif
-
-	if (SCENARIO_IS_COLOR(mdnie->scenario)) {
-		idx = mdnie->scenario - COLOR_TONE_1;
-		mdnie_send_sequence(mdnie, color_tone_table[idx].seq);
-		dev_info(mdnie->dev, "mode=%d, scenario=%d, outdoor=%d, cabc=%d, %s\n",
-			mdnie->mode, mdnie->scenario, mdnie->outdoor, mdnie->cabc,
-			color_tone_table[idx].name);
-
 		goto exit;
-	} else if (mdnie->scenario == CAMERA_MODE) {
-		mdnie_send_sequence(mdnie, camera_table[mdnie->outdoor].seq);
-		dev_info(mdnie->dev, "%s\n", camera_table[mdnie->outdoor].name);
-
+	} else if (SCENARIO_IS_COLOR(mdnie->scenario)) {
+		table = &color_tone_table[mdnie->scenario % COLOR_TONE_1];
 		goto exit;
-	} else {
-		mdnie_send_sequence(mdnie, tunning_table[mdnie->cabc][mdnie->mode][mdnie->scenario].seq);
-		dev_info(mdnie->dev, "mode=%d, scenario=%d, outdoor=%d, cabc=%d, %s\n",
-			mdnie->mode, mdnie->scenario, mdnie->outdoor, mdnie->cabc,
-			tunning_table[mdnie->cabc][mdnie->mode][mdnie->scenario].name);
-	}
-
-#if defined(CONFIG_TDMB) || defined(CONFIG_TARGET_LOCALE_NTT)
-etc:
-#endif
-	if (!IS_ERR_OR_NULL(etc_table[mdnie->cabc][mdnie->outdoor][mdnie->tone].seq)) {
-		mdnie_send_sequence(mdnie, etc_table[mdnie->cabc][mdnie->outdoor][mdnie->tone].seq);
-		dev_info(mdnie->dev, "%s\n", etc_table[mdnie->cabc][mdnie->outdoor][mdnie->tone].name);
+	} else if (mdnie->scenario < SCENARIO_MAX) {
+		table = &tuning_table[mdnie->cabc][mdnie->mode][mdnie->scenario];
+		goto exit;
 	}
 
 exit:
 	mutex_unlock(&mdnie->lock);
 
+	return table;
+}
+
+static void mdnie_update_sequence(struct mdnie_info *mdnie, struct mdnie_tuning_info *table)
+{
+	unsigned short *wbuf = NULL;
+	int ret;
+
+	if (unlikely(mdnie->tuning)) {
+		ret = mdnie_request_firmware(mdnie->path, &wbuf, table->name);
+		if (ret < 0 && IS_ERR_OR_NULL(wbuf))
+			goto exit;
+		mdnie_send_sequence(mdnie, wbuf);
+		kfree(wbuf);
+	} else
+		mdnie_send_sequence(mdnie, table->sequence);
+
+exit:
+	return;
+}
+
+static void mdnie_update(struct mdnie_info *mdnie)
+{
+	struct mdnie_tuning_info *table = NULL;
+
+	if (!mdnie->enable) {
+		dev_err(mdnie->dev, "mdnie state is off\n");
+		return;
+	}
+
+	table = mdnie_request_table(mdnie);
+	if (!IS_ERR_OR_NULL(table) && !IS_ERR_OR_NULL(table->sequence)) {
+		mdnie_update_sequence(mdnie, table);
+		dev_info(mdnie->dev, "%s\n", table->name);
+	}
+
 	return;
 }
 
 #if defined(CONFIG_FB_MDNIE_PWM)
-#ifdef CONFIG_MACH_P4NOTE
-static int get_backlight_level_from_brightness(unsigned int brightness)
+static int get_backlight_level_from_brightness(struct mdnie_info *mdnie, unsigned int brightness)
 {
 	unsigned int value;
+	struct mdnie_backlight_value *pwm = mdnie->backlight;
 
-	/* brightness tuning*/
-	if (brightness >= MID_BRIGHTNESS_LEVEL)
-		value = (brightness - MID_BRIGHTNESS_LEVEL) * (b_value.max-b_value.mid) / (MAX_BRIGHTNESS_LEVEL-MID_BRIGHTNESS_LEVEL) + b_value.mid;
-	else if (brightness >= LOW_BRIGHTNESS_LEVEL)
-		value = (brightness - LOW_BRIGHTNESS_LEVEL) * (b_value.mid-b_value.low) / (MID_BRIGHTNESS_LEVEL-LOW_BRIGHTNESS_LEVEL) + b_value.low;
-	else if (brightness >= DIM_BRIGHTNESS_LEVEL)
-		value = (brightness - DIM_BRIGHTNESS_LEVEL) * (b_value.low-b_value.dim) / (LOW_BRIGHTNESS_LEVEL-DIM_BRIGHTNESS_LEVEL) + b_value.dim;
-	else if (brightness > 0)
-		value = b_value.dim;
+	if (brightness >= MID_BRIGHTNESS_LEVEL) {
+		value = (brightness - MID_BRIGHTNESS_LEVEL) *
+		(pwm->max - pwm->mid) / (MAX_BRIGHTNESS_LEVEL-MID_BRIGHTNESS_LEVEL) + pwm->mid;
+	} else if (brightness >= LOW_BRIGHTNESS_LEVEL) {
+		value = (brightness - LOW_BRIGHTNESS_LEVEL) *
+		(pwm->mid - pwm->low) / (MID_BRIGHTNESS_LEVEL-LOW_BRIGHTNESS_LEVEL) + pwm->low;
+	} else if (brightness >= DIM_BRIGHTNESS_LEVEL) {
+		value = (brightness - DIM_BRIGHTNESS_LEVEL) *
+		(pwm->low - pwm->dim) / (LOW_BRIGHTNESS_LEVEL-DIM_BRIGHTNESS_LEVEL) + pwm->dim;
+	} else if (brightness > 0)
+		value = pwm->dim;
 	else
 		return 0;
 
@@ -257,42 +249,13 @@ static int get_backlight_level_from_brightness(unsigned int brightness)
 
 	return value;
 }
-#else
-static int get_backlight_level_from_brightness(unsigned int brightness)
-{
-	unsigned int value;
 
-	/* brightness tuning*/
-	if (brightness >= MID_BRIGHTNESS_LEVEL)
-		value = (brightness - MID_BRIGHTNESS_LEVEL) * (MAX_BACKLIGHT_VALUE-MID_BACKLIGHT_VALUE) / (MAX_BRIGHTNESS_LEVEL-MID_BRIGHTNESS_LEVEL) + MID_BACKLIGHT_VALUE;
-	else if (brightness >= LOW_BRIGHTNESS_LEVEL)
-		value = (brightness - LOW_BRIGHTNESS_LEVEL) * (MID_BACKLIGHT_VALUE-LOW_BACKLIGHT_VALUE) / (MID_BRIGHTNESS_LEVEL-LOW_BRIGHTNESS_LEVEL) + LOW_BACKLIGHT_VALUE;
-	else if (brightness >= DIM_BRIGHTNESS_LEVEL)
-		value = (brightness - DIM_BRIGHTNESS_LEVEL) * (LOW_BACKLIGHT_VALUE-DIM_BACKLIGHT_VALUE) / (LOW_BRIGHTNESS_LEVEL-DIM_BRIGHTNESS_LEVEL) + DIM_BACKLIGHT_VALUE;
-	else if (brightness > 0)
-		value = DIM_BACKLIGHT_VALUE;
-	else
-		return 0;
-
-	if (value > 1600)
-		value = 1600;
-
-	if (value < 16)
-		value = 1;
-	else
-		value = value >> 4;
-
-	return value;
-}
-#endif
-
-#if defined(CONFIG_CPU_EXYNOS4210)
 static void mdnie_pwm_control(struct mdnie_info *mdnie, int value)
 {
 	mutex_lock(&mdnie->dev_lock);
-	mdnie_write(0x00, 0x0000);
-	mdnie_write(0xB4, 0xC000 | value);
-	mdnie_write(0x28, 0x0000);
+	mdnie_write(MDNIE_REG_BANK_SEL, MDNIE_PWM_BANK);
+	mdnie_write(MDNIE_REG_PWM_CONTROL, 0xC000 | value);
+	mdnie_write(MDNIE_REG_MASK, 0);
 	mutex_unlock(&mdnie->dev_lock);
 }
 
@@ -305,74 +268,30 @@ static void mdnie_pwm_control_cabc(struct mdnie_info *mdnie, int value)
 
 	mutex_lock(&mdnie->dev_lock);
 
-	idx = tunning_table[mdnie->cabc][mdnie->mode][mdnie->scenario].idx_lut;
+	idx = SCENARIO_IS_VIDEO(mdnie->scenario) ? LUT_VIDEO : LUT_DEFAULT;
 	p_plut = power_lut[mdnie->power_lut_idx][idx];
 	min_duty = p_plut[7] * value / 100;
 
-	mdnie_write(0x00, 0x0000);
+	mdnie_write(MDNIE_REG_BANK_SEL, MDNIE_PWM_BANK);
 
 	if (min_duty < 4)
 		reg = 0xC000 | (max(1, (value * p_plut[3] / 100)));
 	else {
 		/*PowerLUT*/
-		mdnie_write(0x76, (p_plut[0] * value / 100) << 8 | (p_plut[1] * value / 100));
-		mdnie_write(0x77, (p_plut[2] * value / 100) << 8 | (p_plut[3] * value / 100));
-		mdnie_write(0x78, (p_plut[4] * value / 100) << 8 | (p_plut[5] * value / 100));
-		mdnie_write(0x79, (p_plut[6] * value / 100) << 8	| (p_plut[7] * value / 100));
-		mdnie_write(0x7a, (p_plut[8] * value / 100) << 8);
+		mdnie_write(MDNIE_REG_POWER_LUT0, (p_plut[0] * value / 100) << 8 | (p_plut[1] * value / 100));
+		mdnie_write(MDNIE_REG_POWER_LUT2, (p_plut[2] * value / 100) << 8 | (p_plut[3] * value / 100));
+		mdnie_write(MDNIE_REG_POWER_LUT4, (p_plut[4] * value / 100) << 8 | (p_plut[5] * value / 100));
+		mdnie_write(MDNIE_REG_POWER_LUT6, (p_plut[6] * value / 100) << 8 | (p_plut[7] * value / 100));
+		mdnie_write(MDNIE_REG_POWER_LUT8, (p_plut[8] * value / 100) << 8);
 
 		reg = 0x5000 | (value << 4);
 	}
 
-	mdnie_write(0xB4, reg);
-	mdnie_write(0x28, 0x0000);
+	mdnie_write(MDNIE_REG_PWM_CONTROL, reg);
+	mdnie_write(MDNIE_REG_MASK, 0);
 
 	mutex_unlock(&mdnie->dev_lock);
 }
-#elif defined(CONFIG_CPU_EXYNOS4212) || defined(CONFIG_CPU_EXYNOS4412)
-static void mdnie_pwm_control(struct mdnie_info *mdnie, int value)
-{
-	mutex_lock(&mdnie->dev_lock);
-	mdnie_write(0x00, 0x0001);
-	mdnie_write(0xB6, 0xC000 | value);
-	mdnie_write(0xff, 0x0000);
-	mutex_unlock(&mdnie->dev_lock);
-}
-
-static void mdnie_pwm_control_cabc(struct mdnie_info *mdnie, int value)
-{
-	int reg;
-	const unsigned char *p_plut;
-	u16 min_duty;
-	unsigned idx;
-
-	mutex_lock(&mdnie->dev_lock);
-
-	idx = tunning_table[mdnie->cabc][mdnie->mode][mdnie->scenario].idx_lut;
-	p_plut = power_lut[mdnie->power_lut_idx][idx];
-	min_duty = p_plut[7] * value / 100;
-
-	mdnie_write(0x00, 0x0001);
-
-	if (min_duty < 4)
-		reg = 0xC000 | (max(1, (value * p_plut[3] / 100)));
-	else {
-		/*PowerLUT*/
-		mdnie_write(0x79, (p_plut[0] * value / 100) << 8 | (p_plut[1] * value / 100));
-		mdnie_write(0x7a, (p_plut[2] * value / 100) << 8 | (p_plut[3] * value / 100));
-		mdnie_write(0x7b, (p_plut[4] * value / 100) << 8 | (p_plut[5] * value / 100));
-		mdnie_write(0x7c, (p_plut[6] * value / 100) << 8	| (p_plut[7] * value / 100));
-		mdnie_write(0x7d, (p_plut[8] * value / 100) << 8);
-
-		reg = 0x5000 | (value << 4);
-	}
-
-	mdnie_write(0xB6, reg);
-	mdnie_write(0xff, 0x0000);
-
-	mutex_unlock(&mdnie->dev_lock);
-}
-#endif
 
 void set_mdnie_pwm_value(struct mdnie_info *mdnie, int value)
 {
@@ -384,17 +303,17 @@ static int update_brightness(struct mdnie_info *mdnie)
 	unsigned int value;
 	unsigned int brightness = mdnie->bd->props.brightness;
 
-	value = get_backlight_level_from_brightness(brightness);
+	value = get_backlight_level_from_brightness(mdnie, brightness);
 
 	if (!mdnie->enable) {
 		dev_err(mdnie->dev, "mdnie states is off\n");
 		return 0;
 	}
 
-	if (brightness <= CABC_CUTOFF_BACKLIGHT_VALUE) {
+	if (brightness <= CABC_OFF_BRIGHTNESS_VALUE) {
 		mdnie_pwm_control(mdnie, value);
 	} else {
-		if ((mdnie->cabc) && (mdnie->scenario != CAMERA_MODE) && !(mdnie->tunning))
+		if ((mdnie->cabc) && (mdnie->scenario != CAMERA_MODE) && !(mdnie->tuning))
 			mdnie_pwm_control_cabc(mdnie, value);
 		else
 			mdnie_pwm_control(mdnie, value);
@@ -406,13 +325,12 @@ static int mdnie_set_brightness(struct backlight_device *bd)
 {
 	struct mdnie_info *mdnie = bl_get_data(bd);
 	int ret = 0;
-	unsigned int brightness = bd->props.brightness;
 
-	if (brightness < MIN_BRIGHTNESS ||
-		brightness > bd->props.max_brightness) {
+	if (bd->props.brightness < MIN_BRIGHTNESS ||
+		bd->props.brightness > bd->props.max_brightness) {
 		dev_err(&bd->dev, "lcd brightness should be %d to %d. now %d\n",
-			MIN_BRIGHTNESS, bd->props.max_brightness, brightness);
-		brightness = bd->props.max_brightness;
+			MIN_BRIGHTNESS, bd->props.max_brightness, bd->props.brightness);
+		bd->props.brightness = bd->props.max_brightness;
 	}
 
 	if ((mdnie->enable) && (mdnie->bd_enable)) {
@@ -436,6 +354,107 @@ static const struct backlight_ops mdnie_backlight_ops  = {
 };
 #endif
 
+#if !defined(CONFIG_FB_MDNIE_PWM)
+static void update_color_position(struct mdnie_info *mdnie, u16 idx)
+{
+	u8 cabc, mode, scenario, i;
+	unsigned short *wbuf;
+
+	dev_info(mdnie->dev, "%s: idx=%d\n", __func__, idx);
+
+	mutex_lock(&mdnie->lock);
+
+	for (cabc = 0; cabc < CABC_MAX; cabc++) {
+		for (mode = 0; mode < MODE_MAX; mode++) {
+			for (scenario = 0; scenario < SCENARIO_MAX; scenario++) {
+				wbuf = tuning_table[cabc][mode][scenario].sequence;
+				if (IS_ERR_OR_NULL(wbuf))
+					continue;
+				i = 0;
+				while (wbuf[i] != END_SEQ) {
+					if (ADDRESS_IS_SCR_WHITE(wbuf[i]))
+						break;
+					i += 2;
+				}
+				if ((wbuf[i] == END_SEQ) || IS_ERR_OR_NULL(&wbuf[i+5]))
+					continue;
+				if ((wbuf[i+1] == 0xff) && (wbuf[i+3] == 0xff) && (wbuf[i+5] == 0xff)) {
+					wbuf[i+1] = tune_scr_setting[idx][0];
+					wbuf[i+3] = tune_scr_setting[idx][1];
+					wbuf[i+5] = tune_scr_setting[idx][2];
+				}
+			}
+		}
+	}
+
+	mutex_unlock(&mdnie->lock);
+}
+
+static int get_panel_coordinate(struct mdnie_info *mdnie, int *result)
+{
+	int ret = 0;
+	char *fp = NULL;
+	unsigned int coordinate[2] = {0,};
+
+	ret = mdnie_open_file(PANEL_COORDINATE_PATH, &fp);
+	if (IS_ERR_OR_NULL(fp) || ret <= 0) {
+		dev_info(mdnie->dev, "%s: open skip: %s, %d\n", __func__, PANEL_COORDINATE_PATH, ret);
+		ret = -EINVAL;
+		goto skip_color_correction;
+	}
+
+	ret = sscanf(fp, "%d, %d", &coordinate[0], &coordinate[1]);
+	if (!(coordinate[0] + coordinate[1]) || ret != 2) {
+		dev_info(mdnie->dev, "%s: %d, %d\n", __func__, coordinate[0], coordinate[1]);
+		ret = -EINVAL;
+		goto skip_color_correction;
+	}
+
+	ret = mdnie_calibration(coordinate[0], coordinate[1], result);
+	dev_info(mdnie->dev, "%s: %d, %d, idx=%d\n", __func__, coordinate[0], coordinate[1], ret - 1);
+
+skip_color_correction:
+	mdnie->color_correction = 1;
+	if (!IS_ERR_OR_NULL(fp))
+		kfree(fp);
+
+	return ret;
+}
+#endif
+
+#ifdef CONFIG_FB_S5P_GD2EVF
+static void mdnie_evf_update(struct mdnie_info *mdnie)
+{
+	struct mdnie_tuning_info *table = NULL;
+
+	if (!mdnie->enable) {
+		dev_err(mdnie->dev, "mdnie state is off\n");
+		return;
+	}
+
+	table = &evf_table;
+	if (!IS_ERR_OR_NULL(table) && !IS_ERR_OR_NULL(table->sequence)) {
+		mdnie_update_sequence(mdnie, table);
+		dev_info(mdnie->dev, "%s\n", table->name);
+	}
+	return;
+}
+
+int mdnie_update_ext(int mode)
+{
+	struct mdnie_info *mdnie = g_mdnie;
+
+	/* mode = 1 : Main LCD */
+	/* mode = 0 : EVF */
+	if (mode)
+		mdnie_update(mdnie);
+	else
+		mdnie_evf_update(mdnie);
+
+	return 0;
+}
+#endif
+
 static ssize_t mode_show(struct device *dev,
 		struct device_attribute *attr, char *buf)
 {
@@ -448,12 +467,17 @@ static ssize_t mode_store(struct device *dev,
 		struct device_attribute *attr, const char *buf, size_t count)
 {
 	struct mdnie_info *mdnie = dev_get_drvdata(dev);
-	unsigned int value;
+	unsigned int value = 0;
 	int ret;
+#if !defined(CONFIG_FB_MDNIE_PWM)
+	int result[5] = {0,};
+#endif
 
-	ret = strict_strtoul(buf, 0, (unsigned long *)&value);
+	ret = kstrtoul(buf, 0, (unsigned long *)&value);
+	if (ret < 0)
+		return ret;
 
-	dev_info(dev, "%s :: value=%d\n", __func__, value);
+	dev_info(dev, "%s: value=%d\n", __func__, value);
 
 	if (value >= MODE_MAX) {
 		value = STANDARD;
@@ -464,7 +488,15 @@ static ssize_t mode_store(struct device *dev,
 	mdnie->mode = value;
 	mutex_unlock(&mdnie->lock);
 
-	set_mdnie_value(mdnie, 0);
+#if !defined(CONFIG_FB_MDNIE_PWM)
+	if (!mdnie->color_correction) {
+		ret = get_panel_coordinate(mdnie, result);
+		if (ret > 0)
+			update_color_position(mdnie, ret - 1);
+	}
+#endif
+
+	mdnie_update(mdnie);
 #if defined(CONFIG_FB_MDNIE_PWM)
 	if ((mdnie->enable) && (mdnie->bd_enable))
 		update_brightness(mdnie);
@@ -489,23 +521,25 @@ static ssize_t scenario_store(struct device *dev,
 	unsigned int value;
 	int ret;
 
-	ret = strict_strtoul(buf, 0, (unsigned long *)&value);
+	ret = kstrtoul(buf, 0, (unsigned long *)&value);
+	if (ret < 0)
+		return ret;
 
-	dev_info(dev, "%s :: value=%d\n", __func__, value);
+	dev_info(dev, "%s: value=%d\n", __func__, value);
 
 	if (!SCENARIO_IS_VALID(value))
-		value = CYANOGENMOD_MODE;
+		value = UI_MODE;
 
 #if defined(CONFIG_FB_MDNIE_PWM)
 	if (value >= SCENARIO_MAX)
-		value = CYANOGENMOD_MODE;
+		value = UI_MODE;
 #endif
 
 	mutex_lock(&mdnie->lock);
 	mdnie->scenario = value;
 	mutex_unlock(&mdnie->lock);
 
-	set_mdnie_value(mdnie, 0);
+	mdnie_update(mdnie);
 #if defined(CONFIG_FB_MDNIE_PWM)
 	if ((mdnie->enable) && (mdnie->bd_enable))
 		update_brightness(mdnie);
@@ -513,41 +547,6 @@ static ssize_t scenario_store(struct device *dev,
 
 	return count;
 }
-
-
-static ssize_t outdoor_show(struct device *dev,
-		struct device_attribute *attr, char *buf)
-{
-	struct mdnie_info *mdnie = dev_get_drvdata(dev);
-
-	return sprintf(buf, "%d\n", mdnie->outdoor);
-}
-
-static ssize_t outdoor_store(struct device *dev,
-		struct device_attribute *attr, const char *buf, size_t count)
-{
-	struct mdnie_info *mdnie = dev_get_drvdata(dev);
-	unsigned int value;
-	int ret;
-
-	ret = strict_strtoul(buf, 0, (unsigned long *)&value);
-
-	dev_info(dev, "%s :: value=%d\n", __func__, value);
-
-	if (value >= OUTDOOR_MAX)
-		value = OUTDOOR_OFF;
-
-	value = (value) ? OUTDOOR_ON : OUTDOOR_OFF;
-
-	mutex_lock(&mdnie->lock);
-	mdnie->outdoor = value;
-	mutex_unlock(&mdnie->lock);
-
-	set_mdnie_value(mdnie, 0);
-
-	return count;
-}
-
 
 #if defined(CONFIG_FB_MDNIE_PWM)
 static ssize_t cabc_show(struct device *dev,
@@ -565,9 +564,14 @@ static ssize_t cabc_store(struct device *dev,
 	unsigned int value;
 	int ret;
 
-	ret = strict_strtoul(buf, 0, (unsigned long *)&value);
+	if (mdnie->auto_brightness)
+		return -EINVAL;
 
-	dev_info(dev, "%s :: value=%d\n", __func__, value);
+	ret = kstrtoul(buf, 0, (unsigned long *)&value);
+	if (ret < 0)
+		return ret;
+
+	dev_info(dev, "%s: value=%d\n", __func__, value);
 
 	if (value >= CABC_MAX)
 		value = CABC_OFF;
@@ -578,7 +582,7 @@ static ssize_t cabc_store(struct device *dev,
 	mdnie->cabc = value;
 	mutex_unlock(&mdnie->lock);
 
-	set_mdnie_value(mdnie, 0);
+	mdnie_update(mdnie);
 	if ((mdnie->enable) && (mdnie->bd_enable))
 		update_brightness(mdnie);
 
@@ -586,24 +590,22 @@ static ssize_t cabc_store(struct device *dev,
 }
 
 static ssize_t auto_brightness_show(struct device *dev,
-	struct device_attribute *attr, char *buf)
+		struct device_attribute *attr, char *buf)
 {
 	struct mdnie_info *mdnie = dev_get_drvdata(dev);
 	char *pos = buf;
 	int i;
 
 	pos += sprintf(pos, "%d, %d, ", mdnie->auto_brightness, mdnie->power_lut_idx);
-
 	for (i = 0; i < 5; i++)
 		pos += sprintf(pos, "0x%02x, ", power_lut[mdnie->power_lut_idx][0][i]);
-
 	pos += sprintf(pos, "\n");
 
 	return pos - buf;
 }
 
 static ssize_t auto_brightness_store(struct device *dev,
-	struct device_attribute *attr, const char *buf, size_t size)
+		struct device_attribute *attr, const char *buf, size_t size)
 {
 	struct mdnie_info *mdnie = dev_get_drvdata(dev);
 	int value;
@@ -614,22 +616,24 @@ static ssize_t auto_brightness_store(struct device *dev,
 		return rc;
 	else {
 		if (mdnie->auto_brightness != value) {
-			dev_info(dev, "%s - %d -> %d\n", __func__, mdnie->auto_brightness, value);
+			dev_info(dev, "%s: %d, %d\n", __func__, mdnie->auto_brightness, value);
+
 			mutex_lock(&mdnie->dev_lock);
 			mdnie->auto_brightness = value;
-#if defined(CONFIG_FB_S5P_S6C1372)
+
 			mutex_lock(&mdnie->lock);
 			mdnie->cabc = (value) ? CABC_ON : CABC_OFF;
 			mutex_unlock(&mdnie->lock);
-#endif
+
 			if (mdnie->auto_brightness >= 5)
 				mdnie->power_lut_idx = LUT_LEVEL_OUTDOOR_2;
-			else if (mdnie->auto_brightness == 4)
+			else if (mdnie->auto_brightness >= 3)
 				mdnie->power_lut_idx = LUT_LEVEL_OUTDOOR_1;
 			else
 				mdnie->power_lut_idx = LUT_LEVEL_MANUAL_AND_INDOOR;
 			mutex_unlock(&mdnie->dev_lock);
-			set_mdnie_value(mdnie, 0);
+
+			mdnie_update(mdnie);
 			if (mdnie->bd_enable)
 				update_brightness(mdnie);
 		}
@@ -640,130 +644,201 @@ static ssize_t auto_brightness_store(struct device *dev,
 static DEVICE_ATTR(auto_brightness, 0644, auto_brightness_show, auto_brightness_store);
 #endif
 
-static ssize_t tunning_show(struct device *dev,
-		struct device_attribute *attr, char *buf)
-{
-	char temp[128];
-
-	sprintf(temp, "%s\n", tuning_file_name);
-	strcat(buf, temp);
-
-	return strlen(buf);
-}
-
-static ssize_t tunning_store(struct device *dev,
-		struct device_attribute *attr, const char *buf, size_t count)
-{
-	struct mdnie_info *mdnie = dev_get_drvdata(dev);
-
-	if (!strncmp(buf, "0", 1)) {
-		mdnie->tunning = FALSE;
-		dev_info(dev, "%s :: tunning is disabled.\n", __func__);
-	} else if (!strncmp(buf, "1", 1)) {
-		mdnie->tunning = TRUE;
-		dev_info(dev, "%s :: tunning is enabled.\n", __func__);
-	} else {
-		if (!mdnie->tunning)
-			return count;
-		memset(tuning_file_name, 0, sizeof(tuning_file_name));
-		strcpy(tuning_file_name, "/sdcard/mdnie/");
-		strncat(tuning_file_name, buf, count-1);
-
-		mdnie_txtbuf_to_parsing(tuning_file_name);
-
-		dev_info(dev, "%s :: %s\n", __func__, tuning_file_name);
-	}
-
-	return count;
-}
-
-static ssize_t negative_show(struct device *dev,
+static ssize_t tuning_show(struct device *dev,
 		struct device_attribute *attr, char *buf)
 {
 	struct mdnie_info *mdnie = dev_get_drvdata(dev);
 	char *pos = buf;
-	u32 i;
+	struct mdnie_tuning_info *table;
+	int ret, i;
+	unsigned short *wbuf;
 
-	pos += sprintf(pos, "%d\n", mdnie->negative);
+	pos += sprintf(pos, "++ %s: %s\n", __func__, mdnie->path);
 
-	for (i = 0; i < 5; i++) {
-		if (negative[i].enable) {
-			pos += sprintf(pos, "pid=%d, ", negative[i].pid);
-			pos += sprintf(pos, "%s, ", negative[i].comm);
-			pos += sprintf(pos, "%s\n", negative[i].time);
-		}
+	if (!mdnie->tuning) {
+		pos += sprintf(pos, "tunning mode is off\n");
+		goto exit;
 	}
+
+	if (strncmp(mdnie->path, MDNIE_SYSFS_PREFIX, sizeof(MDNIE_SYSFS_PREFIX) - 1)) {
+		pos += sprintf(pos, "file path is invalid, %s\n", mdnie->path);
+		goto exit;
+	}
+
+	table = mdnie_request_table(mdnie);
+	if (!IS_ERR_OR_NULL(table)) {
+		ret = mdnie_request_firmware(mdnie->path, &wbuf, table->name);
+		i = 0;
+		while (wbuf[i] != END_SEQ) {
+			pos += sprintf(pos, "0x%04x, 0x%04x\n", wbuf[i], wbuf[i+1]);
+			i += 2;
+		}
+		if (!IS_ERR_OR_NULL(wbuf))
+			kfree(wbuf);
+		pos += sprintf(pos, "%s\n", table->name);
+	}
+
+exit:
+	pos += sprintf(pos, "-- %s\n", __func__);
 
 	return pos - buf;
 }
 
-static ssize_t negative_store(struct device *dev,
+static ssize_t tuning_store(struct device *dev,
 		struct device_attribute *attr, const char *buf, size_t count)
 {
 	struct mdnie_info *mdnie = dev_get_drvdata(dev);
-	unsigned int value;
 	int ret;
-	struct timespec ts;
-	struct rtc_time tm;
 
-	ret = strict_strtoul(buf, 0, (unsigned long *)&value);
-	dev_info(dev, "%s :: value=%d, by %s\n", __func__, value, current->comm);
+	if (sysfs_streq(buf, "0") || sysfs_streq(buf, "1")) {
+		ret = kstrtoul(buf, 0, (unsigned long *)&mdnie->tuning);
+		if (ret < 0)
+			return ret;
+		if (!mdnie->tuning)
+			memset(mdnie->path, 0, sizeof(mdnie->path));
+		dev_info(dev, "%s: %s\n", __func__, mdnie->tuning ? "enable" : "disable");
+	} else {
+		if (!mdnie->tuning)
+			return count;
+
+		if (count > (sizeof(mdnie->path) - sizeof(MDNIE_SYSFS_PREFIX))) {
+			dev_err(dev, "file name %s is too long\n", mdnie->path);
+			return -ENOMEM;
+		}
+
+		memset(mdnie->path, 0, sizeof(mdnie->path));
+		snprintf(mdnie->path, sizeof(MDNIE_SYSFS_PREFIX) + count-1, "%s%s", MDNIE_SYSFS_PREFIX, buf);
+		dev_info(dev, "%s: %s\n", __func__, mdnie->path);
+
+		mdnie_update(mdnie);
+	}
+
+	return count;
+}
+
+static ssize_t accessibility_show(struct device *dev,
+		struct device_attribute *attr, char *buf)
+{
+	struct mdnie_info *mdnie = dev_get_drvdata(dev);
+	char *pos = buf;
+	unsigned short *wbuf;
+	int i = 0;
+
+	pos += sprintf(pos, "%d, ", mdnie->accessibility);
+	if (mdnie->accessibility == COLOR_BLIND) {
+		if (!IS_ERR_OR_NULL(accessibility_table[mdnie->cabc][COLOR_BLIND].sequence)) {
+			wbuf = accessibility_table[mdnie->cabc][COLOR_BLIND].sequence;
+			while (wbuf[i] != END_SEQ) {
+				if (ADDRESS_IS_SCR_RGB(wbuf[i]))
+					pos += sprintf(pos, "0x%04x, ", wbuf[i+1]);
+				i += 2;
+			}
+		}
+	}
+	pos += sprintf(pos, "\n");
+
+	return pos - buf;
+}
+
+static ssize_t accessibility_store(struct device *dev,
+		struct device_attribute *attr, const char *buf, size_t count)
+{
+	struct mdnie_info *mdnie = dev_get_drvdata(dev);
+	unsigned int value, s[9], cabc, i, len = 0;
+	int ret;
+	unsigned short *wbuf;
+	char str[100] = {0,};
+
+	ret = sscanf(buf, "%d %x %x %x %x %x %x %x %x %x",
+		&value, &s[0], &s[1], &s[2], &s[3],
+		&s[4], &s[5], &s[6], &s[7], &s[8]);
+
+	dev_info(dev, "%s: value=%d\n", __func__, value);
 
 	if (ret < 0)
 		return ret;
 	else {
-		if (mdnie->negative == value)
-			return count;
-
-		if (value >= NEGATIVE_MAX)
-			value = NEGATIVE_OFF;
-
-		value = (value) ? NEGATIVE_ON : NEGATIVE_OFF;
+		if (value >= ACCESSIBILITY_MAX)
+			value = ACCESSIBILITY_OFF;
 
 		mutex_lock(&mdnie->lock);
-		mdnie->negative = value;
-		if (value) {
-			getnstimeofday(&ts);
-			rtc_time_to_tm(ts.tv_sec, &tm);
-			negative[negative_idx].enable = value;
-			negative[negative_idx].pid = current->pid;
-			strcpy(negative[negative_idx].comm, current->comm);
-			sprintf(negative[negative_idx].time, "%d-%02d-%02d %02d:%02d:%02d",
-				tm.tm_year + 1900, tm.tm_mon + 1, tm.tm_mday, tm.tm_hour, tm.tm_min, tm.tm_sec);
-			negative_idx++;
-			negative_idx %= 5;
+		mdnie->accessibility = value;
+		if (value == COLOR_BLIND) {
+			if (ret != 10) {
+				mutex_unlock(&mdnie->lock);
+				return -EINVAL;
+			}
+
+			for (cabc = 0; cabc < CABC_MAX; cabc++) {
+				wbuf = accessibility_table[cabc][COLOR_BLIND].sequence;
+				if (IS_ERR_OR_NULL(wbuf))
+					continue;
+				i = 0;
+				while (wbuf[i] != END_SEQ) {
+					if (ADDRESS_IS_SCR_RGB(wbuf[i]))
+						wbuf[i+1] = s[SCR_RGB_MASK(wbuf[i])];
+					i += 2;
+				}
+			}
+
+			i = 0;
+			len = sprintf(str + len, "%s: ", __func__);
+			while (len < sizeof(str) && i < ARRAY_SIZE(s)) {
+				len += sprintf(str + len, "0x%04x, ", s[i]);
+				i++;
+			}
+			dev_info(dev, "%s\n", str);
 		}
 		mutex_unlock(&mdnie->lock);
 
-		set_mdnie_value(mdnie, 0);
+		mdnie_update(mdnie);
 	}
+
 	return count;
 }
+
+#if !defined(CONFIG_FB_MDNIE_PWM)
+static ssize_t color_correct_show(struct device *dev,
+		struct device_attribute *attr, char *buf)
+{
+	struct mdnie_info *mdnie = dev_get_drvdata(dev);
+	char *pos = buf;
+	int i, idx, result[5] = {0,};
+
+	if (!mdnie->color_correction)
+		return -EINVAL;
+
+	idx = get_panel_coordinate(mdnie, result);
+
+	for (i = 1; i < ARRAY_SIZE(result); i++)
+		pos += sprintf(pos, "F%d= %d, ", i, result[i]);
+	pos += sprintf(pos, "TUNE_%d\n", idx);
+
+	return pos - buf;
+}
+#endif
 
 static struct device_attribute mdnie_attributes[] = {
 	__ATTR(mode, 0664, mode_show, mode_store),
 	__ATTR(scenario, 0664, scenario_show, scenario_store),
-	__ATTR(outdoor, 0664, outdoor_show, outdoor_store),
 #if defined(CONFIG_FB_MDNIE_PWM)
-#if defined(CONFIG_FB_S5P_S6C1372)
-	__ATTR(cabc, 0444, cabc_show, NULL),
-#else
 	__ATTR(cabc, 0664, cabc_show, cabc_store),
 #endif
+	__ATTR(tuning, 0664, tuning_show, tuning_store),
+	__ATTR(accessibility, 0664, accessibility_show, accessibility_store),
+#if !defined(CONFIG_FB_MDNIE_PWM)
+	__ATTR(color_correct, 0444, color_correct_show, NULL),
 #endif
-	__ATTR(tunning, 0664, tunning_show, tunning_store),
-	__ATTR(negative, 0664, negative_show, negative_store),
 	__ATTR_NULL,
 };
 
 #ifdef CONFIG_PM
 #if defined(CONFIG_HAS_EARLYSUSPEND)
-void mdnie_early_suspend(struct early_suspend *h)
-{
 #if defined(CONFIG_FB_MDNIE_PWM)
+static void mdnie_early_suspend(struct early_suspend *h)
+{
 	struct mdnie_info *mdnie = container_of(h, struct mdnie_info, early_suspend);
-	struct lcd_platform_data *pd = NULL;
-	pd = mdnie->lcd_pd;
+	struct lcd_platform_data *pd = mdnie->lcd_pd;
 
 	dev_info(mdnie->dev, "+%s\n", __func__);
 
@@ -772,39 +847,29 @@ void mdnie_early_suspend(struct early_suspend *h)
 	if (mdnie->enable)
 		mdnie_pwm_control(mdnie, 0);
 
-	if (!pd)
-		dev_info(&mdnie->bd->dev, "platform data is NULL.\n");
-
-	if (!pd->power_on)
-		dev_info(&mdnie->bd->dev, "power_on is NULL.\n");
-	else
+	if (pd && pd->power_on)
 		pd->power_on(NULL, 0);
 
 	dev_info(mdnie->dev, "-%s\n", __func__);
+
+	return;
+}
 #endif
 
-	return ;
-}
-
-void mdnie_late_resume(struct early_suspend *h)
+static void mdnie_late_resume(struct early_suspend *h)
 {
-	u32 i;
 	struct mdnie_info *mdnie = container_of(h, struct mdnie_info, early_suspend);
 #if defined(CONFIG_FB_MDNIE_PWM)
-	struct lcd_platform_data *pd = NULL;
+	struct lcd_platform_data *pd = mdnie->lcd_pd;
+#endif
 
 	dev_info(mdnie->dev, "+%s\n", __func__);
-	pd = mdnie->lcd_pd;
 
+#if defined(CONFIG_FB_MDNIE_PWM)
 	if (mdnie->enable)
 		mdnie_pwm_control(mdnie, 0);
 
-	if (!pd)
-		dev_info(&mdnie->bd->dev, "platform data is NULL.\n");
-
-	if (!pd->power_on)
-		dev_info(&mdnie->bd->dev, "power_on is NULL.\n");
-	else
+	if (pd && pd->power_on)
 		pd->power_on(NULL, 1);
 
 	if (mdnie->enable) {
@@ -813,14 +878,13 @@ void mdnie_late_resume(struct early_suspend *h)
 	}
 
 	mdnie->bd_enable = TRUE;
-	dev_info(mdnie->dev, "-%s\n", __func__);
 #endif
-	for (i = 0; i < 5; i++) {
-		if (negative[i].enable)
-			dev_info(mdnie->dev, "pid=%d, %s, %s\n", negative[i].pid, negative[i].comm, negative[i].time);
-	}
 
-	return ;
+	mdnie_update(mdnie);
+
+	dev_info(mdnie->dev, "-%s\n", __func__);
+
+	return;
 }
 #endif
 #endif
@@ -860,7 +924,7 @@ static int mdnie_probe(struct platform_device *pdev)
 	if (!pdata) {
 		pr_err("no platform data specified\n");
 		ret = -EINVAL;
-		goto error2;
+		goto error3;
 	}
 
 	mdnie->bd = backlight_device_register("panel", mdnie->dev,
@@ -875,24 +939,17 @@ static int mdnie_probe(struct platform_device *pdev)
 		dev_err(&mdnie->bd->dev, "failed to add sysfs entries, %d\n", __LINE__);
 #endif
 
-	mdnie->scenario = CYANOGENMOD_MODE;
+	mdnie->scenario = UI_MODE;
 	mdnie->mode = STANDARD;
-	mdnie->tone = TONE_NORMAL;
-	mdnie->outdoor = OUTDOOR_OFF;
+	mdnie->enable = TRUE;
+	mdnie->tuning = FALSE;
+	mdnie->accessibility = ACCESSIBILITY_OFF;
+	mdnie->cabc = CABC_OFF;
+
 #if defined(CONFIG_FB_MDNIE_PWM)
-	mdnie->cabc = CABC_ON;
 	mdnie->power_lut_idx = LUT_LEVEL_MANUAL_AND_INDOOR;
 	mdnie->auto_brightness = 0;
-#else
-	mdnie->cabc = CABC_OFF;
 #endif
-
-#if defined(CONFIG_FB_S5P_S6C1372)
-	mdnie->cabc = CABC_OFF;
-#endif
-	mdnie->enable = TRUE;
-	mdnie->tunning = FALSE;
-	mdnie->negative = NEGATIVE_OFF;
 
 	mutex_init(&mdnie->lock);
 	mutex_init(&mdnie->dev_lock);
@@ -900,57 +957,44 @@ static int mdnie_probe(struct platform_device *pdev)
 	platform_set_drvdata(pdev, mdnie);
 	dev_set_drvdata(mdnie->dev, mdnie);
 
-#ifdef CONFIG_HAS_WAKELOCK
 #ifdef CONFIG_HAS_EARLYSUSPEND
-#if 1 /* defined(CONFIG_FB_MDNIE_PWM) */
+#if defined(CONFIG_FB_MDNIE_PWM)
 	mdnie->early_suspend.suspend = mdnie_early_suspend;
+#endif
 	mdnie->early_suspend.resume = mdnie_late_resume;
 	mdnie->early_suspend.level = EARLY_SUSPEND_LEVEL_DISABLE_FB - 1;
 	register_early_suspend(&mdnie->early_suspend);
 #endif
-#endif
-#endif
 
-#if defined(CONFIG_FB_S5P_S6C1372)
-	check_lcd_type();
-	dev_info(mdnie->dev, "lcdtype = %d\n", pdata->display_type);
-	if (pdata->display_type == 1) {
-		b_value.max = 1441;
-		b_value.mid = 784;
-		b_value.low = 16;
-		b_value.dim = 16;
-	} else {
-		b_value.max = 1216;	/* 76% */
-		b_value.mid = 679;	/* 39% */
-		b_value.low = 16;	/* 1% */
-		b_value.dim = 16;	/* 1% */
-	}
+
+#if defined(CONFIG_FB_MDNIE_PWM)
+	dev_info(mdnie->dev, "lcdtype: %d\n", pdata->display_type);
+	if (pdata->display_type >= ARRAY_SIZE(backlight_table))
+		pdata->display_type = 0;
+	mdnie->backlight = &backlight_table[pdata->display_type];
 #endif
 
 #if defined(CONFIG_FB_S5P_S6F1202A)
-	if (pdata->display_type == 0) {
-		memcpy(tunning_table, tunning_table_hydis, sizeof(tunning_table));
-		memcpy(etc_table, etc_table_hydis, sizeof(etc_table));
-		memcpy(camera_table, camera_table_hydis, sizeof(camera_table));
-	} else if (pdata->display_type == 1) {
-		memcpy(tunning_table, tunning_table_sec, sizeof(tunning_table));
-		memcpy(etc_table, etc_table_sec, sizeof(etc_table));
-		memcpy(camera_table, camera_table_sec, sizeof(camera_table));
-	} else if (pdata->display_type == 2) {
-		memcpy(tunning_table, tunning_table_boe, sizeof(tunning_table));
-		memcpy(etc_table, etc_table_boe, sizeof(etc_table));
-		memcpy(camera_table, camera_table_boe, sizeof(camera_table));
-	}
+	if (pdata->display_type == 0)
+		memcpy(tuning_table, tuning_table_hydis, sizeof(tuning_table));
+	else if (pdata->display_type == 1)
+		memcpy(tuning_table, tuning_table_sec, sizeof(tuning_table));
+	else if (pdata->display_type == 2)
+		memcpy(tuning_table, tuning_table_boe, sizeof(tuning_table));
 #endif
 
 	g_mdnie = mdnie;
 
-	set_mdnie_value(mdnie, 0);
+	mdnie_update(mdnie);
 
 	dev_info(mdnie->dev, "registered successfully\n");
 
 	return 0;
 
+#if defined(CONFIG_FB_MDNIE_PWM)
+error3:
+	device_destroy(mdnie_class, mdnie->dev->devt);
+#endif
 error2:
 	kfree(mdnie);
 error1:
@@ -986,12 +1030,7 @@ static void mdnie_shutdown(struct platform_device *pdev)
 	if (mdnie->enable)
 		mdnie_pwm_control(mdnie, 0);
 
-	if (!pd)
-		dev_info(&mdnie->bd->dev, "platform data is NULL.\n");
-
-	if (!pd->power_on)
-		dev_info(&mdnie->bd->dev, "power_on is NULL.\n");
-	else
+	if (pd && pd->power_on)
 		pd->power_on(NULL, 0);
 
 	dev_info(mdnie->dev, "-%s\n", __func__);

@@ -136,7 +136,7 @@ struct s3cfb_extdsp_lcd {
 #include <mach/midas-tsp.h>
 #include <mach/regs-clock.h>
 
-#include <mach/midas-lcd.h>
+#include <mach/board-lcd.h>
 #include <mach/midas-sound.h>
 #if defined(CONFIG_SEC_DEV_JACK)
 #include <mach/p4note-jack.h>

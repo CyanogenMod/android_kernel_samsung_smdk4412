@@ -53,6 +53,57 @@ struct s3c_platform_fb {
 	int		(*clk_off)(struct platform_device *pdev, struct clk **clk);
 };
 
+struct s3cfb_lcd_timing {
+	int	h_fp;
+	int	h_bp;
+	int	h_sw;
+	int	v_fp;
+	int	v_fpe;
+	int	v_bp;
+	int	v_bpe;
+	int	v_sw;
+#if defined(CONFIG_FB_S5P_MIPI_DSIM) || defined(CONFIG_S5P_MIPI_DSI2)
+	int	cmd_allow_len;
+	int	stable_vfp;
+#endif
+};
+
+struct s3cfb_lcd_polarity {
+	int rise_vclk;
+	int inv_hsync;
+	int inv_vsync;
+	int inv_vden;
+};
+
+#ifdef CONFIG_FB_S5P_MIPI_DSIM
+/* for CPU Interface */
+struct s3cfb_cpu_timing {
+	unsigned int	cs_setup;
+	unsigned int	wr_setup;
+	unsigned int	wr_act;
+	unsigned int	wr_hold;
+};
+#endif
+
+struct s3cfb_lcd {
+	char	*name;
+	int	width;
+	int	height;
+	int	p_width;
+	int	p_height;
+	int	bpp;
+	int	freq;
+	int	freq_limit;
+	int	vclk;
+	struct	s3cfb_lcd_timing timing;
+	struct	s3cfb_lcd_polarity polarity;
+#ifdef CONFIG_FB_S5P_MIPI_DSIM
+	struct	s3cfb_cpu_timing cpu_timing;
+#endif
+	void	(*init_ldi)(void);
+	void	(*deinit_ldi)(void);
+};
+
 extern void s3cfb_set_platdata(struct s3c_platform_fb *fimd);
 
 /* defined by architecture to configure gpio */

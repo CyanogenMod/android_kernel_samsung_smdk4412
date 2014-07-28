@@ -28,7 +28,9 @@
 #include "s3cfb.h"
 #include "s5p-dsim.h"
 
+#if defined(CONFIG_MACH_KONA)
 #define NT71391_CHANGE_MINI_LVDS_FREQ_MIPI 1
+#endif
 
 #define POWER_IS_ON(pwr)	((pwr) <= FB_BLANK_NORMAL)
 
@@ -36,8 +38,10 @@ struct lcd_info {
 	struct device			*dev;
 	unsigned int			ldi_enable;
 	unsigned int			power;
+#if defined(CONFIG_MACH_KONA)
 	unsigned int			connected;
 	struct mutex			lock;
+#endif
 	struct lcd_device		*ld;
 	struct lcd_platform_data	*lcd_pd;
 	struct dsim_global		*dsim;
@@ -99,7 +103,7 @@ static int _nt71391_write(struct lcd_info *lcd, const unsigned char *seq, enum N
 		ret = lcd->dsim->ops->cmd_write(lcd->dsim, NT71391_LOCK_CMD2,0x0,0x0);
 		break;
 	case NT71391_READ:
-		ret = lcd->dsim->ops->cmd_write(lcd->dsim, NT71391_READ,wbuf[0],0x0);
+			ret = lcd->dsim->ops->cmd_write(lcd->dsim, NT71391_READ,wbuf[0],0x0);
 		break;
 	case NT71391_WRITE:
 		ret = lcd->dsim->ops->cmd_write(lcd->dsim, NT71391_WRITE, wbuf[0], wbuf[1]);
@@ -178,8 +182,8 @@ static ssize_t lcdtype_show(struct device *dev, struct device_attribute *attr, c
 
 static DEVICE_ATTR(lcd_type, 0664,
 	lcdtype_show, NULL);
-
-static ssize_t window_type_show(struct device *dev,
+	
+	static ssize_t window_type_show(struct device *dev,
 	struct device_attribute *attr, char *buf)
 {
 	char temp[15];
@@ -200,15 +204,15 @@ static int nt71391_power_on(struct lcd_info *lcd)
 	int ret = 0;
 	struct lcd_platform_data *pd = NULL;
 	pd = lcd->lcd_pd;
-
+	
 	dev_info(&lcd->ld->dev, "%s\n", __func__);
 
 	msleep(120); /* power on 50ms, i2c 70ms */
-	nt71391_write(lcd, NT71391_UNLOCK_PAGE0, NT71391_WRITE);
+		nt71391_write(lcd, NT71391_UNLOCK_PAGE0, NT71391_WRITE);
 	nt71391_write(lcd, NT71391_FREQ_SETTING, NT71391_WRITE);
 	nt71391_write(lcd, NULL, NT71391_LOCK_CMD2);
 
-
+	
 	lcd->dsim->ops->cmd_write(lcd->dsim, TURN_ON, 0, 0);
 #else
 	int ret = 0;
@@ -346,7 +350,6 @@ static int __init nt71391_probe(struct device *dev)
 	lcd->power = FB_BLANK_UNBLANK;
 
 	mutex_init(&lcd->lock);
-
 	dev_set_drvdata(dev, lcd);
 
 	dev_info(dev, "lcd panel driver has been probed.\n");
@@ -355,7 +358,6 @@ static int __init nt71391_probe(struct device *dev)
 	lcd_early_suspend = nt71391_early_suspend;
 	lcd_late_resume = nt71391_late_resume;
 #endif
-
 	ret = device_create_file(&lcd->ld->dev, &dev_attr_lcd_type);
 	if (ret < 0)
 		dev_err(&lcd->ld->dev, "failed to add sysfs entries\n");

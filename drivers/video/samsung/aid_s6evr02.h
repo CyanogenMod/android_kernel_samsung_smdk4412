@@ -10,10 +10,10 @@
 #define aid_184nit			0xC2
 #define aid_182nit			0xAD
 #define aid_110nit_180nit		0x99
-#define aid_108nit			0xF6
-#define aid_106nit			0xEF
-#define aid_104nit			0xE8
-#define aid_102nit			0xE1
+#define aid_108nit			0xA6
+#define aid_106nit			0xB3
+#define aid_104nit			0xC0
+#define aid_102nit			0xCD
 #define aid_100nit			0xDA
 #define aid_90nit				0xC2
 #define aid_80nit				0xAB
@@ -35,10 +35,10 @@
 #define AOR40_BASE_130		202
 #define AOR40_BASE_120		188
 #define AOR40_BASE_110		169
-#define AOR40_BASE_108		110
-#define AOR40_BASE_106		110
-#define AOR40_BASE_104		110
-#define AOR40_BASE_102		110
+#define AOR40_BASE_108		154
+#define AOR40_BASE_106		141
+#define AOR40_BASE_104		130
+#define AOR40_BASE_102		120
 #define base_20to100			110
 
 static const struct rgb_offset_info aid_rgb_fix_table[] = {

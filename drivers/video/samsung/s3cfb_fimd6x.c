@@ -208,6 +208,9 @@ int s3cfb_set_clock(struct s3cfb_global *ctrl)
 {
 	struct s3c_platform_fb *pdata = to_fb_plat(ctrl->dev);
 	u32 cfg, maxclk, src_clk, vclk, div;
+#ifdef CONFIG_FB_S5P_GD2EVF
+	struct s3cfb_lcd_timing *timing = &ctrl->lcd->timing;
+#endif
 
 	/* spec is under 100MHz */
 	maxclk = 100 * 1000000;
@@ -243,7 +246,13 @@ int s3cfb_set_clock(struct s3cfb_global *ctrl)
 		}
 	}
 
+#ifdef CONFIG_FB_S5P_GD2EVF
+	vclk = (ctrl->lcd->freq *
+		(timing->h_bp + timing->h_fp + timing->h_sw + ctrl->lcd->width) *
+		(timing->v_bp + timing->v_fp + timing->v_sw + ctrl->lcd->height));
+#else
 	vclk = PICOS2KHZ(ctrl->fb[pdata->default_win]->var.pixclock) * 1000;
+#endif
 
 	if (vclk > maxclk) {
 		dev_info(ctrl->dev, "vclk(%d) should be smaller than %d\n",
@@ -482,7 +491,7 @@ int s3cfb_channel_localpath_on(struct s3cfb_global *ctrl, int id)
 		writel(cfg, ctrl->regs + S3C_WINSHMAP);
 	}
 
-	dev_dbg(ctrl->dev, "[fb%d] local path enabled\n", id);
+	dev_dbg(ctrl->dev, "[win%d] local path enabled\n", id);
 
 	return 0;
 }
@@ -498,7 +507,7 @@ int s3cfb_channel_localpath_off(struct s3cfb_global *ctrl, int id)
 		writel(cfg, ctrl->regs + S3C_WINSHMAP);
 	}
 
-	dev_dbg(ctrl->dev, "[fb%d] local path disabled\n", id);
+	dev_dbg(ctrl->dev, "[win%d] local path disabled\n", id);
 
 	return 0;
 }
@@ -518,7 +527,7 @@ int s3cfb_window_on(struct s3cfb_global *ctrl, int id)
 	cfg |= S3C_WINCON_ENWIN_ENABLE;
 	writel(cfg, ctrl->regs + S3C_WINCON(id));
 
-	dev_dbg(ctrl->dev, "[fb%d] turn on\n", id);
+	dev_dbg(ctrl->dev, "[win%d] turn on\n", id);
 
 	return 0;
 }
@@ -539,7 +548,7 @@ int s3cfb_window_off(struct s3cfb_global *ctrl, int id)
 		writel(cfg, ctrl->regs + S3C_WINSHMAP);
 	}
 
-	dev_dbg(ctrl->dev, "[fb%d] turn off\n", id);
+	dev_dbg(ctrl->dev, "[win%d] turn off\n", id);
 
 	return 0;
 }
@@ -552,7 +561,7 @@ int s3cfb_win_map_on(struct s3cfb_global *ctrl, int id, int color)
 	cfg |= S3C_WINMAP_COLOR(color);
 	writel(cfg, ctrl->regs + S3C_WINMAP(id));
 
-	dev_dbg(ctrl->dev, "[fb%d] win map on : 0x%08x\n", id, color);
+	dev_dbg(ctrl->dev, "[win%d] win map on : 0x%08x\n", id, color);
 
 	return 0;
 }
@@ -561,7 +570,7 @@ int s3cfb_win_map_off(struct s3cfb_global *ctrl, int id)
 {
 	writel(0, ctrl->regs + S3C_WINMAP(id));
 
-	dev_dbg(ctrl->dev, "[fb%d] win map off\n", id);
+	dev_dbg(ctrl->dev, "[win%d] win map off\n", id);
 
 	return 0;
 }
@@ -606,7 +615,7 @@ int s3cfb_set_window_control(struct s3cfb_global *ctrl, int id)
 		S3C_WINCON_INRGB_MASK | S3C_WINCON_DATAPATH_MASK);
 
 	if (win->path != DATA_PATH_DMA) {
-		dev_dbg(ctrl->dev, "[fb%d] data path: fifo\n", id);
+		dev_dbg(ctrl->dev, "[win%d] data path: fifo\n", id);
 
 		cfg |= S3C_WINCON_DATAPATH_LOCAL;
 
@@ -630,7 +639,7 @@ int s3cfb_set_window_control(struct s3cfb_global *ctrl, int id)
 			}
 		}
 	} else {
-		dev_dbg(ctrl->dev, "[fb%d] data path: dma\n", id);
+		dev_dbg(ctrl->dev, "[win%d] data path: dma\n", id);
 
 		cfg |= S3C_WINCON_DATAPATH_DMA;
 
@@ -653,15 +662,15 @@ int s3cfb_set_window_control(struct s3cfb_global *ctrl, int id)
 		case 16:
 			if (var->transp.length == 1) {
 				dev_dbg(ctrl->dev,
-					"[fb%d] bpp mode: A1-R5-G5-B5\n", id);
+					"[win%d] bpp mode: A1-R5-G5-B5\n", id);
 				cfg |= S3C_WINCON_BPPMODE_16BPP_A555;
 			} else if (var->transp.length == 4) {
 				dev_dbg(ctrl->dev,
-					"[fb%d] bpp mode: A4-R4-G4-B4\n", id);
+					"[win%d] bpp mode: A4-R4-G4-B4\n", id);
 				cfg |= S3C_WINCON_BPPMODE_16BPP_A444;
 			} else {
 				dev_dbg(ctrl->dev,
-					"[fb%d] bpp mode: R5-G6-B5\n", id);
+					"[win%d] bpp mode: R5-G6-B5\n", id);
 				cfg |= S3C_WINCON_BPPMODE_16BPP_565;
 			}
 			break;
@@ -672,11 +681,11 @@ int s3cfb_set_window_control(struct s3cfb_global *ctrl, int id)
 		case 32:
 			if (var->transp.length == 0) {
 				dev_dbg(ctrl->dev,
-					"[fb%d] bpp mode: R8-G8-B8\n", id);
+					"[win%d] bpp mode: R8-G8-B8\n", id);
 				cfg |= S3C_WINCON_BPPMODE_24BPP_888;
 			} else {
 				dev_dbg(ctrl->dev,
-					"[fb%d] bpp mode: A8-R8-G8-B8\n", id);
+					"[win%d] bpp mode: A8-R8-G8-B8\n", id);
 				cfg |= S3C_WINCON_BPPMODE_32BPP;
 			}
 			break;
@@ -700,7 +709,7 @@ int s3cfb_get_win_cur_buf_addr(struct s3cfb_global *ctrl, int id)
 
 	start_addr = readl(ctrl->regs + S3C_VIDADDR_START0(id) + S3C_SHD_WIN_BASE);
 
-	dev_dbg(ctrl->dev, "[fb%d] start_addr: 0x%08x\n", id, start_addr);
+	dev_dbg(ctrl->dev, "[win%d] start_addr: 0x%08x\n", id, start_addr);
 
 	return start_addr;
 }
@@ -768,7 +777,7 @@ int s3cfb_set_buffer_address(struct s3cfb_global *ctrl, int id)
 		writel(shw, ctrl->regs + S3C_WINSHMAP);
 	}
 
-	dev_dbg(ctrl->dev, "[fb%d] start_addr: 0x%08x, end_addr: 0x%08x\n",
+	dev_dbg(ctrl->dev, "[win%d] start_addr: 0x%08x, end_addr: 0x%08x\n",
 		id, start_addr, end_addr);
 
 	return 0;
@@ -815,7 +824,7 @@ int s3cfb_set_alpha_blending(struct s3cfb_global *ctrl, int id)
 	u32 shw;
 
 	if (id == 0) {
-		dev_err(ctrl->dev, "[fb%d] does not support alpha blending\n",
+		dev_err(ctrl->dev, "[win%d] does not support alpha blending\n",
 			id);
 		return -EINVAL;
 	}
@@ -830,12 +839,12 @@ int s3cfb_set_alpha_blending(struct s3cfb_global *ctrl, int id)
 	cfg &= ~(S3C_WINCON_BLD_MASK | S3C_WINCON_ALPHA_SEL_MASK);
 
 	if (alpha->mode == PIXEL_BLENDING) {
-		dev_dbg(ctrl->dev, "[fb%d] alpha mode: pixel blending\n", id);
+		dev_dbg(ctrl->dev, "[win%d] alpha mode: pixel blending\n", id);
 
 		/* fixing to DATA[31:24] for alpha value */
 		cfg |= (S3C_WINCON_BLD_PIXEL | S3C_WINCON_ALPHA1_SEL);
 	} else {
-		dev_dbg(ctrl->dev, "[fb%d] alpha mode: plane %d blending\n",
+		dev_dbg(ctrl->dev, "[win%d] alpha mode: plane %d blending\n",
 			id, alpha->channel);
 
 		cfg |= S3C_WINCON_BLD_PLANE;
@@ -886,7 +895,7 @@ int s3cfb_set_oneshot(struct s3cfb_global *ctrl, int id)
 		S3C_VIDOSD_BOTTOM_Y(win->y + var->yres - 1);
 	writel(cfg, ctrl->regs + S3C_VIDOSD_B(id));
 
-	dev_dbg(ctrl->dev, "[fb%d] offset: (%d, %d, %d, %d)\n", id,
+	dev_dbg(ctrl->dev, "[win%d] offset: (%d, %d, %d, %d)\n", id,
 			win->x, win->y, win->x + var->xres - 1, win->y + var->yres - 1);
 
 	/* s3cfb_set_buffer_address */
@@ -901,7 +910,7 @@ int s3cfb_set_oneshot(struct s3cfb_global *ctrl, int id)
 	writel(start_addr, ctrl->regs + S3C_VIDADDR_START0(id));
 	writel(end_addr, ctrl->regs + S3C_VIDADDR_END0(id));
 
-	dev_dbg(ctrl->dev, "[fb%d] start_addr: 0x%08x, end_addr: 0x%08x\n",
+	dev_dbg(ctrl->dev, "[win%d] start_addr: 0x%08x, end_addr: 0x%08x\n",
 		id, start_addr, end_addr);
 
 	/*  s3cfb_set_window_size */
@@ -912,7 +921,7 @@ int s3cfb_set_oneshot(struct s3cfb_global *ctrl, int id)
 		else
 			writel(cfg, ctrl->regs + S3C_VIDOSD_D(id));
 
-		dev_dbg(ctrl->dev, "[fb%d] resolution: %d x %d\n", id,
+		dev_dbg(ctrl->dev, "[win%d] resolution: %d x %d\n", id,
 				var->xres, var->yres);
 	}
 
@@ -953,7 +962,7 @@ int s3cfb_set_window_position(struct s3cfb_global *ctrl, int id)
 	shw &= ~(S3C_WINSHMAP_PROTECT(id));
 	writel(shw, ctrl->regs + S3C_WINSHMAP);
 
-	dev_dbg(ctrl->dev, "[fb%d] offset: (%d, %d, %d, %d)\n", id,
+	dev_dbg(ctrl->dev, "[win%d] offset: (%d, %d, %d, %d)\n", id,
 		win->x, win->y, win->x + var->xres - 1, win->y + var->yres - 1);
 
 	return 0;
@@ -974,7 +983,7 @@ int s3cfb_set_window_size(struct s3cfb_global *ctrl, int id)
 	else
 		writel(cfg, ctrl->regs + S3C_VIDOSD_D(id));
 
-	dev_dbg(ctrl->dev, "[fb%d] resolution: %d x %d\n", id,
+	dev_dbg(ctrl->dev, "[win%d] resolution: %d x %d\n", id,
 		var->xres, var->yres);
 
 	return 0;
@@ -1017,7 +1026,7 @@ int s3cfb_set_chroma_key(struct s3cfb_global *ctrl, int id)
 	u32 shw;
 
 	if (id == 0) {
-		dev_err(ctrl->dev, "[fb%d] does not support chroma key\n", id);
+		dev_err(ctrl->dev, "[win%d] does not support chroma key\n", id);
 		return -EINVAL;
 	}
 
@@ -1043,7 +1052,7 @@ int s3cfb_set_chroma_key(struct s3cfb_global *ctrl, int id)
 		writel(shw, ctrl->regs + S3C_WINSHMAP);
 	}
 
-	dev_dbg(ctrl->dev, "[fb%d] chroma key: 0x%08x, %s\n", id, cfg,
+	dev_dbg(ctrl->dev, "[win%d] chroma key: 0x%08x, %s\n", id, cfg,
 		chroma->enabled ? "enabled" : "disabled");
 
 	return 0;
