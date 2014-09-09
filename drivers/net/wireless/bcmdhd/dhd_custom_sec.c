@@ -324,6 +324,8 @@ void get_customized_country_code(char *country_iso_code, wl_country_t *cspec)
 #define CIS_BUF_SIZE            512
 #endif /* BCM4330_CHIP */
 
+#define MACBUFFER_SZ (sizeof("00:11:22:33:44:55\n"))
+
 #ifdef READ_MACADDR
 int dhd_read_macaddr(struct dhd_info *dhd, struct ether_addr *mac)
 {
@@ -1100,7 +1102,7 @@ int dhd_write_macaddr(struct ether_addr *mac)
 	char *filepath_efs      = MACINFO_EFS;
 
 	struct file *fp_mac = NULL;
-	char buf[18]      = {0};
+	char buf[MACBUFFER_SZ]   = {0};
 	mm_segment_t oldfs    = {0};
 	int ret = -1;
 	int retry_count = 0;
@@ -1123,7 +1125,7 @@ startwrite:
 
 		if (fp_mac->f_mode & FMODE_WRITE) {
 			ret = fp_mac->f_op->write(fp_mac, (const char *)buf,
-				sizeof(buf), &fp_mac->f_pos);
+				sizeof(buf) - 1 /* skip null byte */, &fp_mac->f_pos);
 			if (ret < 0)
 				DHD_ERROR(("[WIFI] Mac address [%s] Failed to"
 				" write into File: %s\n", buf, filepath_data));
@@ -1163,7 +1165,7 @@ startwrite:
 
 		if (fp_mac->f_mode & FMODE_WRITE) {
 			ret = fp_mac->f_op->write(fp_mac, (const char *)buf,
-				sizeof(buf), &fp_mac->f_pos);
+				sizeof(buf) - 1 /* skip null byte */, &fp_mac->f_pos);
 			if (ret < 0)
 				DHD_ERROR(("[WIFI] Mac address [%s] Failed to"
 				" write into File: %s\n", buf, filepath_efs));
