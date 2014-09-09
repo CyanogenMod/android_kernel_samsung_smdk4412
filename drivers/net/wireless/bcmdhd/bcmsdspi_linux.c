@@ -355,7 +355,7 @@ hexdump(char *pfx, unsigned char *msg, int msglen)
 	for (i = 0; i < msglen; i++, col++) {
 		if (col % 16 == 0)
 			strcpy(buf, pfx);
-		sprintf(buf + strlen(buf), "%02x", msg[i]);
+		sprintf(buf + strlen(buf), "%02hhx", msg[i]);
 		if ((col + 1) % 16 == 0)
 			printf("%s\n", buf);
 		else
