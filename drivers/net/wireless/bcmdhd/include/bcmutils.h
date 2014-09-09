@@ -669,7 +669,8 @@ extern void *_bcmutils_dummy_fn;
 #define CRC32_GOOD_VALUE 0xdebb20e3	
 
 
-#define MACF				"%02x:%02x:%02x:%02x:%02x:%02x"
+#define MACF				"%02hhx:%02hhx:%02hhx:%02hhx:%02hhx:%02hhx"
+#define MACF_U				"%02hhX:%02hhX:%02hhX:%02hhX:%02hhX:%02hhX" /* upper case hex */
 #define ETHERP_TO_MACF(ea)	((struct ether_addr *) (ea))->octet[0], \
 							((struct ether_addr *) (ea))->octet[1], \
 							((struct ether_addr *) (ea))->octet[2], \

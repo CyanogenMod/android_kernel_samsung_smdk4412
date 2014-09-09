@@ -760,7 +760,7 @@ wl_show_host_event(wl_event_msg_t *event, void *event_data)
 	datalen = ntoh32(event->datalen);
 
 	/* debug dump of event messages */
-	snprintf(eabuf, sizeof(eabuf), "%02x:%02x:%02x:%02x:%02x:%02x",
+	snprintf(eabuf, sizeof(eabuf), MACF,
 	        (uchar)event->addr.octet[0]&0xff,
 	        (uchar)event->addr.octet[1]&0xff,
 	        (uchar)event->addr.octet[2]&0xff,
