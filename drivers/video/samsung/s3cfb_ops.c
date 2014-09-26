@@ -53,6 +53,10 @@
 #include <plat/s5p-sysmmu.h>
 #endif
 
+#if defined(CONFIG_MACH_KONA) || defined(CONFIG_MACH_TAB3) || defined(CONFIG_MACH_T0)
+extern unsigned int lpcharge;
+#endif
+
 struct s3c_platform_fb *to_fb_plat(struct device *dev)
 {
 	struct platform_device *pdev = to_platform_device(dev);
@@ -1075,6 +1079,15 @@ int s3cfb_pan_display(struct fb_var_screeninfo *var, struct fb_info *fb)
 		if (win->id == pdata->default_win)
 			spin_unlock(&fbdev->slock);
 		return -EINVAL;
+	}
+#endif
+
+#if defined(CONFIG_MACH_KONA) || defined(CONFIG_MACH_TAB3) || defined(CONFIG_MACH_T0)
+	if (lpcharge) {
+		/* support LPM (off charging mode) display based on FBIOPAN_DISPLAY */
+		s3cfb_check_var(var, fb);
+		s3cfb_set_par(fb);
+		s3cfb_enable_window(fbdev, win->id);
 	}
 #endif
 
