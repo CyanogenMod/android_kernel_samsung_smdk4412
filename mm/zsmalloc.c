@@ -239,7 +239,6 @@ struct mapping_area {
 	enum zs_mapmode vm_mm; /* mapping mode */
 };
 
-
 /* per-cpu VM mapping areas for zspage accesses that cross page boundaries */
 static DEFINE_PER_CPU(struct mapping_area, zs_map_area);
 
@@ -1086,12 +1085,11 @@ void zs_unmap_object(struct zs_pool *pool, unsigned long handle)
 }
 EXPORT_SYMBOL_GPL(zs_unmap_object);
 
-u64 zs_get_total_size_bytes(struct zs_pool *pool)
+unsigned long zs_get_total_pages(struct zs_pool *pool)
 {
-	u64 npages = atomic_long_read(&pool->pages_allocated);
-	return npages << PAGE_SHIFT;
+	return atomic_long_read(&pool->pages_allocated);
 }
-EXPORT_SYMBOL_GPL(zs_get_total_size_bytes);
+EXPORT_SYMBOL_GPL(zs_get_total_pages);
 
 module_init(zs_init);
 module_exit(zs_exit);
