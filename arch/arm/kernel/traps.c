@@ -246,8 +246,23 @@ static int __die(const char *str, int err, struct thread_info *thread, struct pt
 		TASK_COMM_LEN, tsk->comm, task_pid_nr(tsk), thread + 1);
 
 	if (!user_mode(regs) || in_interrupt()) {
+#ifdef CONFIG_MACH_TAB3
+		/* Wrong stack pointer can make too much stack dump */
+		unsigned long dump_end;
+		if (likely(regs->ARM_sp > (unsigned long)task_stack_page(tsk)))
+			dump_end = THREAD_SIZE + (unsigned long)task_stack_page(tsk);
+		else {
+			printk(KERN_EMERG "SP may be wrong\n");
+			dump_end = THREAD_SIZE + regs->ARM_sp;
+		}
+
+		dump_mem(KERN_EMERG, "Stack: ", regs->ARM_sp, dump_end);
+		printk(KERN_EMERG "stack: (0x%08lx to 0x%08lx)\n",
+			regs->ARM_sp, dump_end);
+#else
 		dump_mem(KERN_EMERG, "Stack: ", regs->ARM_sp,
 			 THREAD_SIZE + (unsigned long)task_stack_page(tsk));
+#endif
 		dump_backtrace(regs, tsk);
 		dump_instr(KERN_EMERG, regs);
 	}

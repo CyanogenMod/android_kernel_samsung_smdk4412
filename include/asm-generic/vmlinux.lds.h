@@ -627,6 +627,8 @@
   	*(.initcall2s.init)						\
   	*(.initcall3.init)						\
   	*(.initcall3s.init)						\
+	*(.initcallbresume.init)					\
+	*(.initcallresume.init)						\
   	*(.initcall4.init)						\
   	*(.initcall4s.init)						\
   	*(.initcall5.init)						\

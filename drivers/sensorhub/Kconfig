@@ -1,0 +1,29 @@
+#
+# sensor drivers configuration
+#
+
+config SENSORS_SSP_ATMEL
+	tristate "Sensors ssp ATMEL"
+	default n
+	depends on I2C
+	help
+	  ssp driver for ATMEL sensor hub.
+          If you say yes here you get ssp support for
+	  sensor hub.
+	  To compile this driver as a module, choose M here: the
+	  module will be called ssp.
+
+config SENSORS_SSP_STM
+	tristate "Sensors ssp STM"
+	default n
+	depends on SPI
+	help
+	  ssp driver for STM sensor hub.
+          If you say yes here you get ssp support for
+	  sensor hub.
+	  To compile this driver as a module, choose M here: the
+	  module will be called ssp.
+
+source "drivers/sensorhub/atmel/Kconfig"
+source "drivers/sensorhub/stm/Kconfig"
+

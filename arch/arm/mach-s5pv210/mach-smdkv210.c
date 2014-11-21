@@ -11,12 +11,17 @@
 #include <linux/kernel.h>
 #include <linux/types.h>
 #include <linux/i2c.h>
+#include <linux/regulator/consumer.h>
+#include <linux/regulator/fixed.h>
+#include <linux/regulator/machine.h>
+#include <linux/mfd/max8698.h>
 #include <linux/init.h>
 #include <linux/serial_core.h>
 #include <linux/sysdev.h>
 #include <linux/dm9000.h>
 #include <linux/fb.h>
 #include <linux/gpio.h>
+#include <linux/gpio_event.h>
 #include <linux/delay.h>
 #include <linux/pwm_backlight.h>
 
@@ -28,8 +33,9 @@
 #include <video/platform_lcd.h>
 
 #include <mach/map.h>
+#include <mach/gpio.h>
 #include <mach/regs-clock.h>
-#include <mach/regs-fb.h>
+#include <mach/media.h>
 
 #include <plat/regs-serial.h>
 #include <plat/regs-srom.h>
@@ -45,6 +51,9 @@
 #include <plat/pm.h>
 #include <plat/fb.h>
 #include <plat/s5p-time.h>
+#include <plat/media.h>
+#include <plat/backlight.h>
+#include <plat/regs-fb-v4.h>
 
 /* Following are default values for UCON, ULCON and UFCON UART registers */
 #define SMDKV210_UCON_DEFAULT	(S3C2410_UCON_TXILEVEL |	\
@@ -91,6 +100,223 @@ static struct s3c2410_uartcfg smdkv210_uartcfgs[] __initdata = {
 	},
 };
 
+#if defined(CONFIG_REGULATOR_MAX8698)
+/* LDO */
+static struct regulator_consumer_supply smdkv210_ldo3_consumer[] = {
+	REGULATOR_SUPPLY("pd_io", "s3c-usbgadget")
+};
+
+static struct regulator_consumer_supply smdkv210_ldo5_consumer[] = {
+	REGULATOR_SUPPLY("AVDD", "0-001b"),
+	REGULATOR_SUPPLY("DVDD", "0-001b"),
+};
+
+static struct regulator_consumer_supply smdkv210_ldo8_consumer[] = {
+	REGULATOR_SUPPLY("pd_core", "s3c-usbgadget")
+};
+
+static struct regulator_init_data smdkv210_ldo2_data = {
+	.constraints	= {
+		.name		= "VALIVE_1.1V",
+		.min_uV		= 1100000,
+		.max_uV		= 1100000,
+		.apply_uV	= 1,
+		.always_on	= 1,
+		.state_mem	= {
+			.enabled = 1,
+		},
+	},
+};
+
+static struct regulator_init_data smdkv210_ldo3_data = {
+	.constraints	= {
+		.name		= "VUOTG_D+VUHOST_D_1.1V",
+		.min_uV		= 1100000,
+		.max_uV		= 1100000,
+		.apply_uV	= 1,
+		.valid_ops_mask = REGULATOR_CHANGE_STATUS,
+		.state_mem	= {
+			.disabled = 1,
+		},
+	},
+	.num_consumer_supplies	= ARRAY_SIZE(smdkv210_ldo3_consumer),
+	.consumer_supplies	= smdkv210_ldo3_consumer,
+};
+
+static struct regulator_init_data smdkv210_ldo4_data = {
+	.constraints	= {
+		.name		= "V_MIPI_1.8V",
+		.min_uV		= 1800000,
+		.max_uV		= 1800000,
+		.apply_uV	= 1,
+		.always_on	= 1,
+		.valid_ops_mask = REGULATOR_CHANGE_STATUS,
+		.state_mem	= {
+			.disabled = 1,
+		},
+	},
+};
+
+static struct regulator_init_data smdkv210_ldo5_data = {
+	.constraints	= {
+		.name		= "VMMC+VEXT_2.8V",
+		.min_uV		= 2800000,
+		.max_uV		= 2800000,
+		.apply_uV	= 1,
+		.always_on	= 1,
+		.valid_ops_mask = REGULATOR_CHANGE_STATUS,
+		.state_mem	= {
+			.enabled = 1,
+		},
+	},
+	.num_consumer_supplies	= ARRAY_SIZE(smdkv210_ldo5_consumer),
+	.consumer_supplies	= smdkv210_ldo5_consumer,
+};
+
+static struct regulator_init_data smdkv210_ldo6_data = {
+	.constraints	= {
+		.name		= "VCC_2.6V",
+		.min_uV		= 2600000,
+		.max_uV		= 2600000,
+		.apply_uV	= 1,
+		.always_on	= 1,
+		.valid_ops_mask	= REGULATOR_CHANGE_STATUS,
+		.state_mem	 = {
+			.disabled = 1,
+		},
+	},
+};
+
+static struct regulator_init_data smdkv210_ldo7_data = {
+	.constraints	= {
+		.name		= "VDAC_2.8V",
+		.min_uV		= 2800000,
+		.max_uV		= 2800000,
+		.apply_uV	= 1,
+		.valid_ops_mask	= REGULATOR_CHANGE_STATUS,
+		.state_mem	= {
+			.enabled = 1,
+		},
+	},
+};
+
+static struct regulator_init_data smdkv210_ldo8_data = {
+	.constraints	= {
+		.name		= "VUOTG_A+VUHOST_A_3.3V",
+		.min_uV		= 3300000,
+		.max_uV		= 3300000,
+		.apply_uV	= 1,
+		.valid_ops_mask	= REGULATOR_CHANGE_STATUS,
+		.state_mem	= {
+			.disabled = 1,
+		},
+	},
+	.num_consumer_supplies	= ARRAY_SIZE(smdkv210_ldo8_consumer),
+	.consumer_supplies	= smdkv210_ldo8_consumer,
+};
+
+static struct regulator_init_data smdkv210_ldo9_data = {
+	.constraints	= {
+		.name		= "VADC+VSYS+VKEY_2.8V",
+		.min_uV		= 2800000,
+		.max_uV		= 2800000,
+		.apply_uV	= 1,
+		.always_on	= 1,
+		.state_mem	= {
+			.enabled = 1,
+		},
+	},
+};
+
+/* BUCK */
+static struct regulator_consumer_supply smdkv210_buck1_consumer =
+	REGULATOR_SUPPLY("vddarm", NULL);
+
+static struct regulator_consumer_supply smdkv210_buck2_consumer =
+	REGULATOR_SUPPLY("vddint", NULL);
+
+static struct regulator_init_data smdkv210_buck1_data = {
+	.constraints	= {
+		.name		= "VCC_ARM",
+		.min_uV		= 750000,
+		.max_uV		= 1500000,
+		.apply_uV	= 1,
+		.valid_ops_mask	= REGULATOR_CHANGE_VOLTAGE |
+				  REGULATOR_CHANGE_STATUS,
+		.state_mem	= {
+			.uV	= 1250000,
+			.mode	= REGULATOR_MODE_NORMAL,
+			.disabled = 1,
+		},
+	},
+	.num_consumer_supplies	= 1,
+	.consumer_supplies	= &smdkv210_buck1_consumer,
+};
+
+static struct regulator_init_data smdkv210_buck2_data = {
+	.constraints	= {
+		.name		= "VCC_INTERNAL",
+		.min_uV		= 950000,
+		.max_uV		= 1200000,
+		.valid_ops_mask	= REGULATOR_CHANGE_VOLTAGE |
+				  REGULATOR_CHANGE_STATUS,
+		.state_mem	= {
+			.uV	= 1100000,
+			.mode	= REGULATOR_MODE_NORMAL,
+			.disabled = 1,
+		},
+	},
+	.num_consumer_supplies	= 1,
+	.consumer_supplies	= &smdkv210_buck2_consumer,
+};
+
+static struct regulator_init_data smdkv210_buck3_data = {
+	.constraints	= {
+		.name		= "VCC_MEM",
+		.min_uV		= 1800000,
+		.max_uV		= 1800000,
+		.always_on	= 1,
+		.apply_uV	= 1,
+		.state_mem	= {
+			.uV	= 1800000,
+			.mode	= REGULATOR_MODE_NORMAL,
+			.enabled = 1,
+		},
+	},
+};
+
+static struct max8698_regulator_data smdkv210_regulators[] = {
+	{ MAX8698_LDO2,  &smdkv210_ldo2_data },
+	{ MAX8698_LDO3,  &smdkv210_ldo3_data },
+	{ MAX8698_LDO4,  &smdkv210_ldo4_data },
+	{ MAX8698_LDO5,  &smdkv210_ldo5_data },
+	{ MAX8698_LDO6,  &smdkv210_ldo6_data },
+	{ MAX8698_LDO7,  &smdkv210_ldo7_data },
+	{ MAX8698_LDO8,  &smdkv210_ldo8_data },
+	{ MAX8698_LDO9,  &smdkv210_ldo9_data },
+	{ MAX8698_BUCK1, &smdkv210_buck1_data },
+	{ MAX8698_BUCK2, &smdkv210_buck2_data },
+	{ MAX8698_BUCK3, &smdkv210_buck3_data },
+};
+
+static struct max8698_platform_data smdkv210_max8698_pdata = {
+	.num_regulators = ARRAY_SIZE(smdkv210_regulators),
+	.regulators     = smdkv210_regulators,
+
+	/* 1GHz default voltage */
+	.dvsarm1        = 0xa,  /* 1.25v */
+	.dvsarm2        = 0x9,  /* 1.20V */
+	.dvsarm3        = 0x6,  /* 1.05V */
+	.dvsarm4        = 0x4,  /* 0.95V */
+	.dvsint1        = 0x7,  /* 1.10v */
+	.dvsint2        = 0x5,  /* 1.00V */
+
+	.set1       = S5PV210_GPH1(6),
+	.set2       = S5PV210_GPH1(7),
+	.set3       = S5PV210_GPH0(4),
+};
+#endif
+
 static struct s3c_ide_platdata smdkv210_ide_pdata __initdata = {
 	.setup_gpio	= s5pv210_ide_setup_gpio,
 };
@@ -110,7 +336,7 @@ static struct matrix_keymap_data smdkv210_keymap_data __initdata = {
 
 static struct samsung_keypad_platdata smdkv210_keypad_data __initdata = {
 	.keymap_data	= &smdkv210_keymap_data,
-	.rows		= 8,
+	.rows		= 2,
 	.cols		= 8,
 };
 
@@ -146,6 +372,38 @@ struct platform_device smdkv210_dm9000 = {
 		.platform_data	= &smdkv210_dm9000_platdata,
 	},
 };
+
+#ifdef CONFIG_REGULATOR
+static struct regulator_consumer_supply smdkv210_b_pwr_5v_consumers[] = {
+	{
+		/* WM8580 */
+		.supply		= "PVDD",
+		.dev_name	= "0-001b",
+	},
+};
+
+static struct regulator_init_data smdkv210_b_pwr_5v_data = {
+	.constraints = {
+		.always_on = 1,
+	},
+	.num_consumer_supplies	= ARRAY_SIZE(smdkv210_b_pwr_5v_consumers),
+	.consumer_supplies	= smdkv210_b_pwr_5v_consumers,
+};
+
+static struct fixed_voltage_config smdkv210_b_pwr_5v_pdata = {
+	.supply_name	= "B_PWR_5V",
+	.microvolts	= 5000000,
+	.init_data	= &smdkv210_b_pwr_5v_data,
+};
+
+static struct platform_device smdkv210_b_pwr_5v = {
+	.name          = "reg-fixed-voltage",
+	.id            = -1,
+	.dev = {
+		.platform_data = &smdkv210_b_pwr_5v_pdata,
+	},
+};
+#endif
 
 static void smdkv210_lte480wv_set_power(struct plat_lcd_data *pd,
 					unsigned int power)
@@ -210,44 +468,49 @@ static struct s3c_fb_platdata smdkv210_lcd0_pdata __initdata = {
 	.setup_gpio	= s5pv210_fb_gpio_setup_24bpp,
 };
 
-static int smdkv210_backlight_init(struct device *dev)
-{
-	int ret;
-
-	ret = gpio_request(S5PV210_GPD0(3), "Backlight");
-	if (ret) {
-		printk(KERN_ERR "failed to request GPD for PWM-OUT 3\n");
-		return ret;
+static struct gpio_event_direct_entry smdkv210_keypad_key_map[] = {
+	{
+		.gpio	= S5PV210_GPH3(7),
+		.code	= KEY_POWER,
 	}
-
-	/* Configure GPIO pin with S5PV210_GPD_0_3_TOUT_3 */
-	s3c_gpio_cfgpin(S5PV210_GPD0(3), S3C_GPIO_SFN(2));
-
-	return 0;
-}
-
-static void smdkv210_backlight_exit(struct device *dev)
-{
-	s3c_gpio_cfgpin(S5PV210_GPD0(3), S3C_GPIO_OUTPUT);
-	gpio_free(S5PV210_GPD0(3));
-}
-
-static struct platform_pwm_backlight_data smdkv210_backlight_data = {
-	.pwm_id		= 3,
-	.max_brightness	= 255,
-	.dft_brightness	= 255,
-	.pwm_period_ns	= 78770,
-	.init		= smdkv210_backlight_init,
-	.exit		= smdkv210_backlight_exit,
 };
 
-static struct platform_device smdkv210_backlight_device = {
-	.name		= "pwm-backlight",
-	.dev		= {
-		.parent		= &s3c_device_timer[3].dev,
-		.platform_data	= &smdkv210_backlight_data,
+static struct gpio_event_input_info smdkv210_keypad_key_info = {
+	.info.func		= gpio_event_input_func,
+	.info.no_suspend	= true,
+	.debounce_time.tv64	= 5 * NSEC_PER_MSEC,
+	.type			= EV_KEY,
+	.keymap			= smdkv210_keypad_key_map,
+	.keymap_size		= ARRAY_SIZE(smdkv210_keypad_key_map)
+};
+
+static struct gpio_event_info *smdkv210_input_info[] = {
+	&smdkv210_keypad_key_info.info,
+};
+
+static struct gpio_event_platform_data smdkv210_input_data = {
+	.names	= {
+		"smdkv210-keypad",
+		NULL,
+	},
+	.info		= smdkv210_input_info,
+	.info_count	= ARRAY_SIZE(smdkv210_input_info),
+};
+
+static struct platform_device smdkv210_input_device = {
+	.name	= GPIO_EVENT_DEV_NAME,
+	.id	= 0,
+	.dev	= {
+		.platform_data = &smdkv210_input_data,
 	},
 };
+
+#ifdef CONFIG_BATTERY_SAMSUNG
+static struct platform_device samsung_device_battery = {
+	.name	= "samsung-fake-battery",
+	.id	= -1,
+};
+#endif
 
 static struct platform_device *smdkv210_devices[] __initdata = {
 	&s3c_device_adc,
@@ -268,11 +531,25 @@ static struct platform_device *smdkv210_devices[] __initdata = {
 	&s5pv210_device_spdif,
 	&samsung_asoc_dma,
 	&samsung_device_keypad,
+#ifdef CONFIG_BATTERY_SAMSUNG
+	&samsung_device_battery,
+#endif
 	&smdkv210_dm9000,
 	&smdkv210_lcd_lte480wv,
-	&s3c_device_timer[3],
-	&smdkv210_backlight_device,
+	&smdkv210_input_device,
+#ifdef CONFIG_REGULATOR
+	&smdkv210_b_pwr_5v,
+#endif
 };
+
+static void __init smdkv210_button_init(void)
+{
+	s3c_gpio_cfgpin(S5PV210_GPH3(7), (0xf << 28));
+	s3c_gpio_setpull(S5PV210_GPH3(7), S3C_GPIO_PULL_NONE);
+
+	s3c_gpio_cfgpin(S5PV210_GPH0(4), (0xf << 16));
+	s3c_gpio_setpull(S5PV210_GPH0(4), S3C_GPIO_PULL_NONE);
+}
 
 static void __init smdkv210_dm9000_init(void)
 {
@@ -301,13 +578,51 @@ static struct i2c_board_info smdkv210_i2c_devs1[] __initdata = {
 };
 
 static struct i2c_board_info smdkv210_i2c_devs2[] __initdata = {
-	/* To Be Updated */
+#if defined(CONFIG_REGULATOR_MAX8698)
+	{
+		I2C_BOARD_INFO("max8698", 0xCC >> 1),
+		.platform_data	= &smdkv210_max8698_pdata,
+	},
+#endif
 };
 
 static struct s3c2410_ts_mach_info s3c_ts_platform __initdata = {
 	.delay			= 10000,
 	.presc			= 49,
 	.oversampling_shift	= 2,
+	.cal_x_max		= 800,
+	.cal_y_max		= 480,
+	.cal_param		= {
+		-13357, -85, 53858048, -95, -8493, 32809514, 65536
+	},
+};
+
+static void smdkv210_sound_init(void)
+{
+	u32 reg;
+
+	reg = __raw_readl(S5P_CLK_OUT);
+	reg &= ~S5P_CLKOUT_CLKSEL_MASK;
+	reg &= ~S5P_CLKOUT_DIVVAL_MASK;
+	reg |= S5P_CLKOUT_CLKSEL_XUSBXTI;
+	reg |= 0x1 << S5P_CLKOUT_DIVVAL_SHIFT;
+	__raw_writel(reg, S5P_CLK_OUT);
+
+	reg = __raw_readl(S5P_OTHERS);
+	reg &= ~S5P_OTHERS_CLKOUT_MASK;
+	reg |= S5P_OTHERS_CLKOUT_SYSCON;
+	__raw_writel(reg, S5P_OTHERS);
+}
+
+/* LCD Backlight data */
+static struct samsung_bl_gpio_info smdkv210_bl_gpio_info = {
+	.no = S5PV210_GPD0(3),
+	.func = S3C_GPIO_SFN(2),
+};
+
+static struct platform_pwm_backlight_data smdkv210_bl_data = {
+	.pwm_id = 3,
+	.pwm_period_ns  = 1000,
 };
 
 static void __init smdkv210_map_io(void)
@@ -316,12 +631,15 @@ static void __init smdkv210_map_io(void)
 	s3c24xx_init_clocks(24000000);
 	s3c24xx_init_uarts(smdkv210_uartcfgs, ARRAY_SIZE(smdkv210_uartcfgs));
 	s5p_set_timer_source(S5P_PWM2, S5P_PWM4);
+
+	s5p_reserve_mem(S5P_RANGE_MFC);
 }
 
 static void __init smdkv210_machine_init(void)
 {
 	s3c_pm_init();
 
+	smdkv210_button_init();
 	smdkv210_dm9000_init();
 
 	samsung_keypad_set_platdata(&smdkv210_keypad_data);
@@ -340,6 +658,11 @@ static void __init smdkv210_machine_init(void)
 	s3c_ide_set_platdata(&smdkv210_ide_pdata);
 
 	s3c_fb_set_platdata(&smdkv210_lcd0_pdata);
+
+	/* SOUND */
+	smdkv210_sound_init();
+
+	samsung_bl_set(&smdkv210_bl_gpio_info, &smdkv210_bl_data);
 
 	platform_add_devices(smdkv210_devices, ARRAY_SIZE(smdkv210_devices));
 }

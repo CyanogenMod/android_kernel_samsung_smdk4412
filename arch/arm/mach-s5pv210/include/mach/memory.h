@@ -13,7 +13,11 @@
 #ifndef __ASM_ARCH_MEMORY_H
 #define __ASM_ARCH_MEMORY_H
 
+#ifdef CONFIG_CPU_S5PC110
+#define PLAT_PHYS_OFFSET		UL(0x30000000)
+#else
 #define PLAT_PHYS_OFFSET		UL(0x20000000)
+#endif
 #define CONSISTENT_DMA_SIZE	(SZ_8M + SZ_4M + SZ_2M)
 
 /*

@@ -751,8 +751,13 @@ do_migrate_range(unsigned long start_pfn, unsigned long end_pfn)
 			goto out;
 		}
 		/* this function returns # of failed pages */
+#ifndef CONFIG_DMA_CMA
 		ret = migrate_pages(&source, hotremove_migrate_alloc, 0,
-							true, MIGRATE_SYNC);
+								true, MIGRATE_SYNC);
+#else
+		ret = migrate_pages(&source, hotremove_migrate_alloc, 0,
+								true, MIGRATE_SYNC, 0);
+#endif
 		if (ret)
 			putback_lru_pages(&source);
 	}
@@ -834,7 +839,11 @@ static int __ref offline_pages(unsigned long start_pfn,
 	nr_pages = end_pfn - start_pfn;
 
 	/* set above range as isolated */
+#ifndef CONFIG_DMA_CMA
 	ret = start_isolate_page_range(start_pfn, end_pfn);
+#else
+	ret = start_isolate_page_range(start_pfn, end_pfn, MIGRATE_MOVABLE);
+#endif
 	if (ret)
 		goto out;
 
@@ -899,7 +908,11 @@ repeat:
 	   We cannot do rollback at this point. */
 	offline_isolated_pages(start_pfn, end_pfn);
 	/* reset pagetype flags and makes migrate type to be MOVABLE */
+#ifndef CONFIG_DMA_CMA
 	undo_isolate_page_range(start_pfn, end_pfn);
+#else
+	undo_isolate_page_range(start_pfn, end_pfn, MIGRATE_MOVABLE);
+#endif
 	/* removal success */
 	zone->present_pages -= offlined_pages;
 	zone->zone_pgdat->node_present_pages -= offlined_pages;
@@ -924,7 +937,11 @@ failed_removal:
 		start_pfn, end_pfn);
 	memory_notify(MEM_CANCEL_OFFLINE, &arg);
 	/* pushback to free area */
+#ifndef CONFIG_DMA_CMA
 	undo_isolate_page_range(start_pfn, end_pfn);
+#else
+	undo_isolate_page_range(start_pfn, end_pfn, MIGRATE_MOVABLE);
+#endif
 
 out:
 	unlock_memory_hotplug();

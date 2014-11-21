@@ -1,0 +1,133 @@
+menuconfig MPU_SENSORS_ACCEL
+	bool "Accelerometer Slave Sensors"
+	default n
+	---help---
+	  Say Y here to get to see options for device drivers for various
+	  accelerometrs for integration with the MPU3050 or MPU6050 driver.
+	  This option alone does not add any kernel code.
+
+	  If you say N, all options in this submenu will be skipped and disabled.
+
+if MPU_SENSORS_ACCEL
+
+config MPU_SENSORS_ADXL34X
+	bool "ADI adxl34x"
+	depends on MPU_SENSORS_MPU6050B1 || MPU_SENSORS_MPU6050A2
+	help
+	  This enables support for the ADI adxl345 or adxl346 accelerometers.
+	  This support is for integration with the MPU3050 gyroscope device
+	  driver.  Only one accelerometer can be registered at a time.
+	  Specifying more that one accelerometer in the board file will result
+	  in runtime errors.
+
+config MPU_SENSORS_BMA222
+	bool "Bosch BMA222"
+	depends on MPU_SENSORS_MPU6050B1 || MPU_SENSORS_MPU6050A2
+	help
+	  This enables support for the Bosch BMA222 accelerometer
+	  This support is for integration with the MPU3050 gyroscope device
+	  driver.  Only one accelerometer can be registered at a time.
+	  Specifying more that one accelerometer in the board file will result
+	  in runtime errors.
+
+config MPU_SENSORS_BMA150
+	bool "Bosch BMA150"
+	depends on MPU_SENSORS_MPU6050B1 || MPU_SENSORS_MPU6050A2
+	help
+	  This enables support for the Bosch BMA150 accelerometer
+	  This support is for integration with the MPU3050 gyroscope device
+	  driver.  Only one accelerometer can be registered at a time.
+	  Specifying more that one accelerometer in the board file will result
+	  in runtime errors.
+
+config MPU_SENSORS_BMA250
+	bool "Bosch BMA250"
+	depends on MPU_SENSORS_MPU6050B1 || MPU_SENSORS_MPU6050A2
+	help
+	  This enables support for the Bosch BMA250 accelerometer
+	  This support is for integration with the MPU3050 gyroscope device
+	  driver.  Only one accelerometer can be registered at a time.
+	  Specifying more that one accelerometer in the board file will result
+	  in runtime errors.
+
+config MPU_SENSORS_KXSD9
+	bool "Kionix KXSD9"
+	depends on MPU_SENSORS_MPU6050B1 || MPU_SENSORS_MPU6050A2
+	help
+	  This enables support for the Kionix KXSD9 accelerometer
+	  This support is for integration with the MPU3050 gyroscope device
+	  driver.  Only one accelerometer can be registered at a time.
+	  Specifying more that one accelerometer in the board file will result
+	  in runtime errors.
+
+config MPU_SENSORS_KXTF9
+	bool "Kionix KXTF9"
+	depends on MPU_SENSORS_MPU6050B1 || MPU_SENSORS_MPU6050A2
+	help
+	  This enables support for the Kionix KXFT9 accelerometer
+	  This support is for integration with the MPU3050 gyroscope device
+	  driver.  Only one accelerometer can be registered at a time.
+	  Specifying more that one accelerometer in the board file will result
+	  in runtime errors.
+
+config MPU_SENSORS_LIS331DLH
+	bool "ST lis331dlh"
+	depends on MPU_SENSORS_MPU6050B1 || MPU_SENSORS_MPU6050A2
+	help
+	  This enables support for the ST lis331dlh accelerometer
+	  This support is for integration with the MPU3050 gyroscope device
+	  driver.  Only one accelerometer can be registered at a time.
+	  Specifying more that one accelerometer in the board file will result
+	  in runtime errors.
+
+config MPU_SENSORS_LIS3DH
+	bool "ST lis3dh"
+	depends on MPU_SENSORS_MPU6050B1 || MPU_SENSORS_MPU6050A2
+	help
+	  This enables support for the ST lis3dh accelerometer
+	  This support is for integration with the MPU3050 gyroscope device
+	  driver.  Only one accelerometer can be registered at a time.
+	  Specifying more that one accelerometer in the board file will result
+	  in runtime errors.
+
+config MPU_SENSORS_LSM303DLX_A
+	bool "ST lsm303dlx"
+	depends on MPU_SENSORS_MPU6050B1 || MPU_SENSORS_MPU6050A2
+	help
+	  This enables support for the ST lsm303dlh and lsm303dlm accelerometers
+	  This support is for integration with the MPU3050 gyroscope device
+	  driver.  Only one accelerometer can be registered at a time.
+	  Specifying more that one accelerometer in the board file will result
+	  in runtime errors.
+
+config MPU_SENSORS_MMA8450
+	bool "Freescale mma8450"
+	depends on MPU_SENSORS_MPU6050B1 || MPU_SENSORS_MPU6050A2
+	help
+	  This enables support for the Freescale mma8450 accelerometer
+	  This support is for integration with the MPU3050 gyroscope device
+	  driver.  Only one accelerometer can be registered at a time.
+	  Specifying more that one accelerometer in the board file will result
+	  in runtime errors.
+
+config MPU_SENSORS_MMA845X
+	bool "Freescale mma8451/8452/8453"
+	depends on MPU_SENSORS_MPU6050B1 || MPU_SENSORS_MPU6050A2
+	help
+	  This enables support for the Freescale mma8451/8452/8453 accelerometer
+	  This support is for integration with the MPU3050 gyroscope device
+	  driver.  Only one accelerometer can be registered at a time.
+	  Specifying more that one accelerometer in the board file will result
+	  in runtime errors.
+
+config MPU_SENSORS_BUILTIN_ACCEL
+	bool "MPU6050 built in accelerometer"
+	depends on MPU_SENSORS_MPU6050B1 || MPU_SENSORS_MPU6050A2
+	help
+	  This enables support for the MPU6050 built in accelerometer.
+	  This the built in support for integration with the MPU6050 gyroscope
+	  device driver.  This is the only accelerometer supported with the
+	  MPU6050.  Specifying another accelerometer in the board file will
+	  result in runtime errors.
+
+endif

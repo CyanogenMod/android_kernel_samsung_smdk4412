@@ -67,9 +67,44 @@ obj-$(CONFIG_VIDEO_TCM825X) += tcm825x.o
 obj-$(CONFIG_VIDEO_TVEEPROM) += tveeprom.o
 obj-$(CONFIG_VIDEO_MT9V011) += mt9v011.o
 obj-$(CONFIG_VIDEO_MT9V032) += mt9v032.o
+ifeq ($(CONFIG_VIDEO_SAMSUNG_S5P_FIMC),y)
+obj-$(CONFIG_VIDEO_S5K4BA) += s5k4ba2.o
+obj-$(CONFIG_VIDEO_S5K4EA) += s5k4ea2.o
+endif
+ifeq ($(CONFIG_VIDEO_FIMC),y)
+obj-$(CONFIG_VIDEO_S5K4BA) += s5k4ba.o
+obj-$(CONFIG_VIDEO_S5K4EA) += s5k4ea.o
+endif
+obj-$(CONFIG_VIDEO_M5MO)	+= m5mo.o
+ifeq ($(CONFIG_MACH_GC2PD),y)
+obj-$(CONFIG_VIDEO_M9MO)	+= m9mo.o
+else
+obj-$(CONFIG_VIDEO_M9MO)	+= m9mo_sf2.o
+endif
+obj-$(CONFIG_VIDEO_M9MO_SPI)	+= m9mo_spi.o
+ifeq ($(CONFIG_MACH_PX),y)
+obj-$(CONFIG_VIDEO_S5K5BAFX)	+= s5k5bafx-v2.o
+else
+obj-$(CONFIG_VIDEO_S5K5BAFX)	+= s5k5bafx-v2.o
+obj-$(CONFIG_VIDEO_S5K5BBGX)		+= s5k5bbgx.o
+endif
+obj-$(CONFIG_VIDEO_S5K5CCGX) 	+= s5k5ccgx.o
+obj-$(CONFIG_VIDEO_SR200PC20)	+= sr200pc20-p2.o
+obj-$(CONFIG_VIDEO_SR200PC20M)		+= sr200pc20m.o
 obj-$(CONFIG_VIDEO_SR030PC30)	+= sr030pc30.o
 obj-$(CONFIG_VIDEO_NOON010PC30)	+= noon010pc30.o
 obj-$(CONFIG_VIDEO_M5MOLS)	+= m5mols/
+obj-$(CONFIG_VIDEO_S5C73M3)	+= s5c73m3.o
+obj-$(CONFIG_VIDEO_ISX012)	+= isx012.o
+obj-$(CONFIG_VIDEO_S5C73M3_SPI)	+= s5c73m3_spi.o
+obj-$(CONFIG_VIDEO_SR300PC20)	+= sr300pc20.o
+obj-$(CONFIG_VIDEO_SR130PC20)	+= sr130pc20.o
+obj-$(CONFIG_VIDEO_SLP_S5C73M3)	+= slp_s5c73m3.o
+obj-$(CONFIG_VIDEO_SLP_S5K4ECGX)	+= slp_s5k4ecgx.o
+obj-$(CONFIG_VIDEO_SLP_DB8131M)	+= slp_db8131m.o
+obj-$(CONFIG_VIDEO_DB8131M)	+= db8131a.o
+obj-$(CONFIG_VIDEO_DRIME4)	+= drime4.o
+obj-$(CONFIG_VIDEO_DRIME4_SPI)	+= drime4_spi.o
 
 obj-$(CONFIG_SOC_CAMERA_IMX074)		+= imx074.o
 obj-$(CONFIG_SOC_CAMERA_MT9M001)	+= mt9m001.o
@@ -111,6 +146,8 @@ obj-$(CONFIG_VIDEO_TIMBERDALE)	+= timblogiw.o
 obj-$(CONFIG_VIDEOBUF_GEN) += videobuf-core.o
 obj-$(CONFIG_VIDEOBUF_DMA_SG) += videobuf-dma-sg.o
 obj-$(CONFIG_VIDEOBUF_DMA_CONTIG) += videobuf-dma-contig.o
+obj-$(CONFIG_VIDEOBUF2_CMA_PHYS) += videobuf2-cma-phys.o
+obj-$(CONFIG_VIDEOBUF2_ION) += videobuf2-ion.o
 obj-$(CONFIG_VIDEOBUF_VMALLOC) += videobuf-vmalloc.o
 obj-$(CONFIG_VIDEOBUF_DVB) += videobuf-dvb.o
 obj-$(CONFIG_VIDEO_BTCX)  += btcx-risc.o
@@ -168,12 +205,15 @@ obj-$(CONFIG_VIDEO_SH_MOBILE_CEU)	+= sh_mobile_ceu_camera.o
 obj-$(CONFIG_VIDEO_OMAP1)		+= omap1_camera.o
 
 obj-$(CONFIG_VIDEO_SAMSUNG_S5P_FIMC) 	+= s5p-fimc/
+obj-$(CONFIG_VIDEO_SAMSUNG_S5P_MFC)	+= s5p-mfc/
+obj-$(CONFIG_VIDEO_EXYNOS)		+= exynos/
 
 obj-$(CONFIG_ARCH_DAVINCI)		+= davinci/
 
 obj-$(CONFIG_VIDEO_SH_VOU)		+= sh_vou.o
 
 obj-$(CONFIG_VIDEO_AU0828) += au0828/
+obj-$(CONFIG_VIDEO_SAMSUNG)	+= samsung/
 
 obj-$(CONFIG_USB_VIDEO_CLASS)	+= uvc/
 obj-$(CONFIG_VIDEO_SAA7164)     += saa7164/
@@ -187,3 +227,6 @@ obj-$(CONFIG_ARCH_OMAP)	+= omap/
 EXTRA_CFLAGS += -Idrivers/media/dvb/dvb-core
 EXTRA_CFLAGS += -Idrivers/media/dvb/frontends
 EXTRA_CFLAGS += -Idrivers/media/common/tuners
+
+obj-$(CONFIG_SAMSUNG_MHL)	+= mhl/
+

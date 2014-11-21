@@ -19,6 +19,10 @@
 #include <asm/backlight.h>
 #endif
 
+#ifdef CONFIG_DRM
+#include <drm/drm_backlight.h>
+#endif
+
 static const char const *backlight_types[] = {
 	[BACKLIGHT_RAW] = "raw",
 	[BACKLIGHT_PLATFORM] = "platform",
@@ -101,6 +105,43 @@ static void backlight_generate_event(struct backlight_device *bd,
 	sysfs_notify(&bd->dev.kobj, NULL, "actual_brightness");
 }
 
+static ssize_t backlight_store_dimming(struct device *dev,
+		struct device_attribute *attr, const char *buf, size_t count)
+{
+	int rc;
+	struct backlight_device *bd = to_backlight_device(dev);
+	unsigned long dimming;
+
+	rc = strict_strtoul(buf, 0, &dimming);
+	if (rc)
+		return rc;
+
+	if (dimming < 0)
+		rc = -EINVAL;
+	else {
+		pr_debug("set dimming mode\n");
+
+		if (dimming)
+			bd->props.dimming = true;
+		else
+			bd->props.dimming = false;
+
+		backlight_set_dimming(bd);
+
+		rc = count;
+	}
+
+	return rc;
+}
+
+static ssize_t backlight_show_dimming(struct device *dev,
+		struct device_attribute *attr, char *buf)
+{
+	struct backlight_device *bd = to_backlight_device(dev);
+
+	return sprintf(buf, "%d\n", bd->props.dimming);
+}
+
 static ssize_t backlight_show_power(struct device *dev,
 		struct device_attribute *attr,char *buf)
 {
@@ -170,7 +211,7 @@ static ssize_t backlight_store_brightness(struct device *dev,
 	}
 	mutex_unlock(&bd->ops_lock);
 
-	backlight_generate_event(bd, BACKLIGHT_UPDATE_SYSFS);
+	/* backlight_generate_event(bd, BACKLIGHT_UPDATE_SYSFS); */
 
 	return rc;
 }
@@ -242,6 +283,7 @@ static void bl_device_release(struct device *dev)
 }
 
 static struct device_attribute bl_device_attributes[] = {
+	__ATTR(dimming, 0644, backlight_show_dimming, backlight_store_dimming),
 	__ATTR(bl_power, 0644, backlight_show_power, backlight_store_power),
 	__ATTR(brightness, 0644, backlight_show_brightness,
 		     backlight_store_brightness),
@@ -353,6 +395,10 @@ void backlight_device_unregister(struct backlight_device *bd)
 {
 	if (!bd)
 		return;
+
+#ifdef CONFIG_DRM
+	drm_bl_unregister(&bd->dev);
+#endif
 
 #ifdef CONFIG_PMAC_BACKLIGHT
 	mutex_lock(&pmac_backlight_mutex);

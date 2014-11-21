@@ -297,6 +297,12 @@
 
 #include "gadget_chips.h"
 
+#ifdef CONFIG_USB_CDFS_SUPPORT
+#ifdef CONFIG_USB_ANDROID_SAMSUNG_COMPOSITE
+#define _SUPPORT_MAC_   /* support to recognize CDFS on OSX (MAC PC) */
+#define VENDER_CMD_VERSION_INFO	0xfa  /* Image version info */
+#endif
+#endif
 
 /*------------------------------------------------------------------------*/
 
@@ -406,6 +412,13 @@ struct fsg_common {
 	 */
 	char inquiry_string[8 + 16 + 4 + 1];
 
+#ifdef CONFIG_USB_ANDROID_SAMSUNG_COMPOSITE
+	char vendor_string[8 + 1];
+	char product_string[16 + 1];
+	/* Additional image version info for SUA */
+	char version_string[100 + 1];
+#endif
+
 	struct kref		ref;
 };
 
@@ -451,6 +464,81 @@ struct fsg_dev {
 	struct usb_ep		*bulk_out;
 };
 
+#ifdef CONFIG_USB_CDFS_SUPPORT
+#ifdef CONFIG_USB_ANDROID_SAMSUNG_COMPOSITE
+static int send_message(struct fsg_common *common, char *msg)
+{
+	char name_buf[120];
+	char state_buf[120];
+	char *envp[3];
+	int env_offset = 0;
+	struct usb_gadget *gadget = common->gadget;
+
+	DBG(common, "%s called\n", __func__);
+	printk(KERN_INFO "%s (%s)\n", __func__, msg);
+
+	if (gadget) {
+		snprintf(name_buf, sizeof(name_buf),
+					"SWITCH_NAME=USB_MESSAGE");
+		envp[env_offset++] = name_buf;
+
+		snprintf(state_buf, sizeof(state_buf),
+				"SWITCH_STATE=%s", msg);
+		envp[env_offset++] = state_buf;
+
+		envp[env_offset] = NULL;
+
+		if (!gadget->dev.class) {
+			gadget->dev.class = class_create(THIS_MODULE,
+					"usb_msg");
+			if (IS_ERR(gadget->dev.class))
+				return -1;
+		}
+
+		DBG(common, "Send cd eject message to daemon\n");
+
+		kobject_uevent_env(&gadget->dev.kobj, KOBJ_CHANGE, envp);
+	}
+
+	return 0;
+}
+
+static int do_timer_stop(struct fsg_common *common)
+{
+	printk(KERN_INFO "%s called\n", __func__);
+	send_message(common, "time stop");
+
+	return 0;
+}
+
+static int do_timer_reset(struct fsg_common *common)
+{
+	printk(KERN_INFO "%s called\n", __func__);
+	send_message(common, "time reset");
+
+	return 0;
+}
+
+static int get_version_info(struct fsg_common *common, struct fsg_buffhd *bh)
+{
+	u8	*buf = (u8 *) bh->buf;
+	u8 return_size=common->data_size_from_cmnd;
+
+	memset(buf,0,common->data_size_from_cmnd);
+	if (return_size > sizeof(common->version_string))
+	{
+		/* driver version infor reply */
+		memcpy(buf , common->version_string, sizeof(common->version_string));
+		return_size = sizeof(common->version_string);
+	}
+	else
+	{
+		memcpy(buf , common->version_string, return_size);
+	}
+	return return_size;
+}
+#endif /* CONFIG_USB_ANDROID_SAMSUNG_COMPOSITE */
+#endif
 static inline int __fsg_is_set(struct fsg_common *common,
 			       const char *func, unsigned line)
 {
@@ -735,6 +823,243 @@ static int sleep_thread(struct fsg_common *common)
 	return rc;
 }
 
+#ifdef CONFIG_USB_CDFS_SUPPORT
+#ifdef _SUPPORT_MAC_
+static void _lba_to_msf(u8 *buf, int lba)
+{
+	lba += 150;
+	buf[0] = (lba / 75) / 60;
+	buf[1] = (lba / 75) % 60;
+	buf[2] = lba % 75;
+}
+
+static int _read_toc_raw(struct fsg_common *common, struct fsg_buffhd *bh)
+{
+	struct fsg_lun	*curlun = common->curlun;
+	int		msf = common->cmnd[1] & 0x02;
+	u8		*buf = (u8 *) bh->buf;
+
+	u8 *q;
+	int len;
+
+	q = buf + 2;
+	*q++ = 1; /* first session */
+	*q++ = 1; /* last session */
+
+	*q++ = 1; /* session number */
+	*q++ = 0x14; /* data track */
+	*q++ = 0; /* track number */
+	*q++ = 0xa0; /* lead-in */
+	*q++ = 0; /* min */
+	*q++ = 0; /* sec */
+	*q++ = 0; /* frame */
+	*q++ = 0;
+	*q++ = 1; /* first track */
+	*q++ = 0x00; /* disk type */
+	*q++ = 0x00;
+
+	*q++ = 1; /* session number */
+	*q++ = 0x14; /* data track */
+	*q++ = 0; /* track number */
+	*q++ = 0xa1;
+	*q++ = 0; /* min */
+	*q++ = 0; /* sec */
+	*q++ = 0; /* frame */
+	*q++ = 0;
+	*q++ = 1; /* last track */
+	*q++ = 0x00;
+	*q++ = 0x00;
+
+	*q++ = 1; /* session number */
+	*q++ = 0x14; /* data track */
+	*q++ = 0; /* track number */
+	*q++ = 0xa2; /* lead-out */
+	*q++ = 0; /* min */
+	*q++ = 0; /* sec */
+	*q++ = 0; /* frame */
+	if (msf) {
+		*q++ = 0; /* reserved */
+		_lba_to_msf(q, curlun->num_sectors);
+		q += 3;
+	} else {
+		put_unaligned_be32(curlun->num_sectors, q);
+		q += 4;
+	}
+
+	*q++ = 1; /* session number */
+	*q++ = 0x14; /* ADR, control */
+	*q++ = 0;    /* track number */
+	*q++ = 1;    /* point */
+	*q++ = 0; /* min */
+	*q++ = 0; /* sec */
+	*q++ = 0; /* frame */
+	if (msf) {
+		*q++ = 0;
+		_lba_to_msf(q, 0);
+		q += 3;
+	} else {
+		*q++ = 0;
+		*q++ = 0;
+		*q++ = 0;
+		*q++ = 0;
+	}
+
+	len = q - buf;
+	put_unaligned_be16(len - 2, buf);
+
+	return len;
+}
+
+static void cd_data_to_raw(u8 *buf, int lba)
+{
+	/* sync bytes */
+	buf[0] = 0x00;
+	memset(buf + 1, 0xff, 10);
+	buf[11] = 0x00;
+	buf += 12;
+	/* MSF */
+	_lba_to_msf(buf, lba);
+	buf[3] = 0x01; /* mode 1 data */
+	buf += 4;
+	/* data */
+	buf += 2048;
+	/* XXX: ECC not computed */
+	memset(buf, 0, 288);
+}
+
+static int do_read_cd(struct fsg_common *common)
+{
+	struct fsg_lun		*curlun = common->curlun;
+	u32			lba;
+	struct fsg_buffhd	*bh;
+	int			rc;
+	u32			amount_left;
+	loff_t			file_offset, file_offset_tmp;
+	unsigned int		amount;
+	unsigned int		partial_page;
+	ssize_t			nread;
+
+	u32 nb_sectors, transfer_request;
+
+	nb_sectors = (common->cmnd[6] << 16) |
+			(common->cmnd[7] << 8) | common->cmnd[8];
+	lba = get_unaligned_be32(&common->cmnd[2]);
+
+	if (nb_sectors == 0)
+		return 0;
+
+	if (lba >= curlun->num_sectors) {
+		curlun->sense_data = SS_LOGICAL_BLOCK_ADDRESS_OUT_OF_RANGE;
+		return -EINVAL;
+	}
+
+	transfer_request = common->cmnd[9];
+	if ((transfer_request & 0xf8) == 0xf8) {
+		file_offset = ((loff_t) lba) << 11;
+		/* read all data  - 2352 byte */
+		amount_left = 2352;
+	} else {
+		file_offset = ((loff_t) lba) << 9;
+		/* Carry out the file reads */
+		amount_left = common->data_size_from_cmnd;
+	}
+
+	if (unlikely(amount_left == 0))
+		return -EIO;		/* No default reply */
+
+	for (;;) {
+
+		/* Figure out how much we need to read:
+		 * Try to read the remaining amount.
+		 * But don't read more than the buffer size.
+		 * And don't try to read past the end of the file.
+		 * Finally, if we're not at a page boundary, don't read past
+		 *	the next page.
+		 * If this means reading 0 then we were asked to read past
+		 *	the end of file. */
+		amount = min(amount_left, FSG_BUFLEN);
+		amount = min((loff_t) amount,
+				curlun->file_length - file_offset);
+		partial_page = file_offset & (PAGE_CACHE_SIZE - 1);
+		if (partial_page > 0)
+			amount = min(amount, (unsigned int) PAGE_CACHE_SIZE -
+					partial_page);
+
+		/* Wait for the next buffer to become available */
+		bh = common->next_buffhd_to_fill;
+		while (bh->state != BUF_STATE_EMPTY) {
+			rc = sleep_thread(common);
+			if (rc)
+				return rc;
+		}
+
+		/* If we were asked to read past the end of file,
+		 * end with an empty buffer. */
+		if (amount == 0) {
+			curlun->sense_data =
+				SS_LOGICAL_BLOCK_ADDRESS_OUT_OF_RANGE;
+			curlun->sense_data_info = file_offset >> 9;
+			curlun->info_valid = 1;
+			bh->inreq->length = 0;
+			bh->state = BUF_STATE_FULL;
+			break;
+		}
+
+		/* Perform the read */
+		file_offset_tmp = file_offset;
+		if ((transfer_request & 0xf8) == 0xf8) {
+			nread = vfs_read(curlun->filp,
+					((char __user *)bh->buf)+16,
+						amount, &file_offset_tmp);
+		} else {
+			nread = vfs_read(curlun->filp,
+					(char __user *)bh->buf,
+					amount, &file_offset_tmp);
+		}
+		VLDBG(curlun, "file read %u @ %llu -> %d\n", amount,
+				(unsigned long long) file_offset,
+				(int) nread);
+		if (signal_pending(current))
+			return -EINTR;
+
+		if (nread < 0) {
+			LDBG(curlun, "error in file read: %d\n",
+					(int) nread);
+			nread = 0;
+		} else if (nread < amount) {
+			LDBG(curlun, "partial file read: %d/%u\n",
+					(int) nread, amount);
+			nread -= (nread & 511);	/* Round down to a block */
+		}
+		file_offset  += nread;
+		amount_left  -= nread;
+		common->residue -= nread;
+		bh->inreq->length = nread;
+		bh->state = BUF_STATE_FULL;
+
+		/* If an error occurred, report it and its position */
+		if (nread < amount) {
+			curlun->sense_data = SS_UNRECOVERED_READ_ERROR;
+			curlun->sense_data_info = file_offset >> 9;
+			curlun->info_valid = 1;
+			break;
+		}
+
+		if (amount_left == 0)
+			break;		/* No more left to read */
+
+		/* Send this buffer and go read some more */
+		start_in_transfer(common, bh);
+		common->next_buffhd_to_fill = bh->next;
+	}
+
+	if ((transfer_request & 0xf8) == 0xf8)
+		cd_data_to_raw(bh->buf, lba);
+
+	return -EIO;		/* No default reply */
+}
+#endif /* _SUPPORT_MAC_ */
+#endif
 
 /*-------------------------------------------------------------------------*/
 
@@ -777,8 +1102,17 @@ static int do_read(struct fsg_common *common)
 
 	/* Carry out the file reads */
 	amount_left = common->data_size_from_cmnd;
-	if (unlikely(amount_left == 0))
+	if (unlikely(amount_left == 0)) {
+		/* Wait for the next buffer to become available */
+		bh = common->next_buffhd_to_fill;
+		while (bh->state != BUF_STATE_EMPTY) {
+			rc = sleep_thread(common);
+			if (rc)
+				return rc;
+		}
+		bh->inreq->length = 0;
 		return -EIO;		/* No default reply */
+	}
 
 	for (;;) {
 		/*
@@ -795,9 +1129,22 @@ static int do_read(struct fsg_common *common)
 		amount = min((loff_t)amount,
 			     curlun->file_length - file_offset);
 		partial_page = file_offset & (PAGE_CACHE_SIZE - 1);
-		if (partial_page > 0)
-			amount = min(amount, (unsigned int)PAGE_CACHE_SIZE -
-					     partial_page);
+		if (common->gadget->speed != USB_SPEED_SUPER) {
+			if (partial_page > 0)
+				amount = min(amount, (unsigned int)PAGE_CACHE_SIZE -
+						partial_page);
+		}
+
+		if (common->gadget->speed == USB_SPEED_SUPER) {
+			/* The packet should be multiple of MPS, which is 1024. */
+			if (amount < amount_left) {
+				unsigned mod = amount % common->bulk_out_maxpacket;
+				if (mod && (amount - mod)) {
+					// not a multiple of maxpacket
+					amount -= mod;
+				}
+			}
+		}
 
 		/* Wait for the next buffer to become available */
 		bh = common->next_buffhd_to_fill;
@@ -878,7 +1225,7 @@ static int do_write(struct fsg_common *common)
 	int			get_some_more;
 	u32			amount_left_to_req, amount_left_to_write;
 	loff_t			usb_offset, file_offset, file_offset_tmp;
-	unsigned int		amount;
+	unsigned int		amount, diff;
 	unsigned int		partial_page;
 	ssize_t			nwritten;
 	int			rc;
@@ -948,9 +1295,12 @@ static int do_write(struct fsg_common *common)
 			amount = min((loff_t)amount,
 				     curlun->file_length - usb_offset);
 			partial_page = usb_offset & (PAGE_CACHE_SIZE - 1);
-			if (partial_page > 0)
-				amount = min(amount,
-	(unsigned int)PAGE_CACHE_SIZE - partial_page);
+			if (common->gadget->speed != USB_SPEED_SUPER) {
+				if (partial_page > 0)
+					amount = min(amount,
+						(unsigned int) PAGE_CACHE_SIZE -
+						partial_page);
+			}
 
 			if (amount == 0) {
 				get_some_more = 0;
@@ -969,6 +1319,17 @@ static int do_write(struct fsg_common *common)
 				 */
 				get_some_more = 0;
 				continue;
+			}
+
+			if (common->gadget->speed == USB_SPEED_SUPER) {
+				/* The packet should be multiple of MPS, which is 1024. */
+				if (amount < amount_left_to_write) {
+					unsigned mod = amount % common->bulk_out_maxpacket;
+					if (mod && (amount - mod)) {
+						// not a multiple of maxpacket
+						amount -= mod;
+					}
+				}
 			}
 
 			/* Get the next buffer */
@@ -1010,6 +1371,12 @@ static int do_write(struct fsg_common *common)
 			}
 
 			amount = bh->outreq->actual;
+			if (amount > bh->outreq->length) {
+				diff = amount - bh->outreq->length;
+				amount = bh->outreq->length;
+			} else {
+				diff = 0;
+			}
 			if (curlun->file_length - file_offset < amount) {
 				LERROR(curlun,
 				       "write %u @ %llu beyond end %llu\n",
@@ -1041,6 +1408,15 @@ static int do_write(struct fsg_common *common)
 			file_offset += nwritten;
 			amount_left_to_write -= nwritten;
 			common->residue -= nwritten;
+
+			if (diff) {
+				LDBG(curlun, "host sent too much data: %d\n", diff);
+				LDBG(curlun, "data_size=%d residue=%d amt_left=%d\n",
+					common->data_size, common->residue, common->usb_amount_left);
+				common->data_size = common->residue;
+				common->usb_amount_left = 0;
+				break;
+			}
 
 			/* If an error occurred, report it and its position */
 			if (nwritten < amount) {
@@ -1202,6 +1578,9 @@ static int do_inquiry(struct fsg_common *common, struct fsg_buffhd *bh)
 {
 	struct fsg_lun *curlun = common->curlun;
 	u8	*buf = (u8 *) bh->buf;
+#if defined(CONFIG_USB_ANDROID_SAMSUNG_COMPOSITE)
+	static char new_product_name[16 + 1];
+#endif
 
 	if (!curlun) {		/* Unsupported LUNs are okay */
 		common->bad_lun_okay = 1;
@@ -1219,6 +1598,23 @@ static int do_inquiry(struct fsg_common *common, struct fsg_buffhd *bh)
 	buf[5] = 0;		/* No special options */
 	buf[6] = 0;
 	buf[7] = 0;
+
+#if defined(CONFIG_USB_ANDROID_SAMSUNG_COMPOSITE)
+	strncpy(new_product_name, common->product_string, 16);
+	new_product_name[16] = '\0';
+	if (common->product_string[0] &&
+	    strlen(common->product_string) <= 11 && /* check string length */
+	    common->lun > 0) {
+		strncat(new_product_name, " Card", 16);
+		new_product_name[16] = '\0';
+	}
+
+	snprintf(common->inquiry_string,
+		sizeof common->inquiry_string,
+		"%-8s%-16s%04x",
+		common->vendor_string,
+		new_product_name, 1);
+#endif
 	memcpy(buf + 8, common->inquiry_string, sizeof common->inquiry_string);
 	return 36;
 }
@@ -1323,13 +1719,22 @@ static int do_read_toc(struct fsg_common *common, struct fsg_buffhd *bh)
 	int		msf = common->cmnd[1] & 0x02;
 	int		start_track = common->cmnd[6];
 	u8		*buf = (u8 *)bh->buf;
-
+#if defined(CONFIG_USB_CDFS_SUPPORT)
+#ifdef _SUPPORT_MAC_
+	int format = (common->cmnd[9] & 0xC0) >> 6;
+#endif
+#endif
 	if ((common->cmnd[1] & ~0x02) != 0 ||	/* Mask away MSF */
 			start_track > 1) {
 		curlun->sense_data = SS_INVALID_FIELD_IN_CDB;
 		return -EINVAL;
 	}
-
+#if defined(CONFIG_USB_CDFS_SUPPORT)
+#ifdef _SUPPORT_MAC_
+	if (format == 2)
+		return _read_toc_raw(common, bh);
+#endif
+#endif
 	memset(buf, 0, 20);
 	buf[1] = (20-2);		/* TOC data length */
 	buf[2] = 1;			/* First track number */
@@ -1391,6 +1796,10 @@ static int do_mode_sense(struct fsg_common *common, struct fsg_buffhd *bh)
 	 * The mode pages, in numerical order.  The only page we support
 	 * is the Caching page.
 	 */
+	/*
+	* When our device works like CD-ROM device, we need to support
+	* Page code 0x2a
+	*/
 	if (page_code == 0x08 || all_pages) {
 		valid_page = 1;
 		buf[0] = 0x08;		/* Page code */
@@ -1411,6 +1820,19 @@ static int do_mode_sense(struct fsg_common *common, struct fsg_buffhd *bh)
 		}
 		buf += 12;
 	}
+#ifdef CONFIG_USB_CDFS_SUPPORT
+	else if (page_code == 0x2A) {
+		valid_page = 1;
+		buf[0] = 0x2A;		/* Page code */
+		buf[1] = 26;		/* Page length */
+		memset(buf+2, 0,26);/* None of the fields are changeable */
+		buf[2] = 0x02;
+		buf[3] = 0x02;
+		buf[4] = 0x04;
+		buf[6] = 0x28;
+		buf += 28;
+	 }
+#endif
 
 	/*
 	 * Check that a valid page was requested and the mode data length
@@ -1454,6 +1876,12 @@ static int do_start_stop(struct fsg_common *common)
 	 * available for use as soon as it is loaded.
 	 */
 	if (start) {
+#if defined(CONFIG_USB_CDFS_SUPPORT)
+#ifdef CONFIG_USB_ANDROID_SAMSUNG_COMPOSITE
+		if (loej)
+			send_message(common, "Load AT");
+#endif
+#endif
 		if (!fsg_lun_is_open(curlun)) {
 			curlun->sense_data = SS_MEDIUM_NOT_PRESENT;
 			return -EINVAL;
@@ -1486,6 +1914,12 @@ static int do_start_stop(struct fsg_common *common)
 	fsg_lun_close(curlun);
 	up_write(&common->filesem);
 	down_read(&common->filesem);
+
+#if defined(CONFIG_USB_CDFS_SUPPORT)
+#ifdef CONFIG_USB_ANDROID_SAMSUNG_COMPOSITE
+	send_message(common, "Load User");
+#endif
+#endif
 
 	return common->ops && common->ops->post_eject
 		? min(0, common->ops->post_eject(common, curlun,
@@ -2079,7 +2513,16 @@ static int do_scsi_command(struct fsg_common *common)
 		common->data_size_from_cmnd =
 			get_unaligned_be16(&common->cmnd[7]);
 		reply = check_command(common, 10, DATA_DIR_TO_HOST,
+#if defined(CONFIG_USB_CDFS_SUPPORT)
+#ifdef _SUPPORT_MAC_
+				      (0xf<<6) | (1<<1), 1,
+#else
 				      (7<<6) | (1<<1), 1,
+#endif
+#else
+				      (7<<6) | (1<<1), 1,
+#endif
+
 				      "READ TOC");
 		if (reply == 0)
 			reply = do_read_toc(common, bh);
@@ -2172,15 +2615,49 @@ static int do_scsi_command(struct fsg_common *common)
 			reply = do_write(common);
 		break;
 
-	/*
-	 * Some mandatory commands that we recognize but don't implement.
+#if defined(CONFIG_USB_CDFS_SUPPORT)
+#ifdef CONFIG_USB_ANDROID_SAMSUNG_COMPOSITE
+	case RELEASE:	/* SUA Timer Stop : 0x17 */
+		reply = do_timer_stop(common);
+		break;
+
+	case RESERVE:	/* SUA Timer Reset : 0x16 */
+		reply = do_timer_reset(common);
+		break;
+
+#ifdef _SUPPORT_MAC_
+	case READ_CD:
+		common->data_size_from_cmnd = ((common->cmnd[6] << 16)
+						| (common->cmnd[7] << 8)
+						| (common->cmnd[8])) << 9;
+		reply = check_command(common, 12, DATA_DIR_TO_HOST,
+					(0xf<<2) | (7<<7), 1,
+					"READ CD");
+		if (reply == 0)
+			reply = do_read_cd(common);
+		break;
+
+#endif /* _SUPPORT_MAC_ */
+
+	/* reply current image version */
+	case VENDER_CMD_VERSION_INFO:
+		common->data_size_from_cmnd = common->cmnd[4];
+		reply = get_version_info(common,bh);
+		break;
+#endif
+#endif
+	/* Some mandatory commands that we recognize but don't implement.
 	 * They don't mean much in this setting.  It's left as an exercise
 	 * for anyone interested to implement RESERVE and RELEASE in terms
 	 * of Posix locks.
 	 */
 	case FORMAT_UNIT:
+#ifndef CONFIG_USB_CDFS_SUPPORT
+#ifndef CONFIG_USB_ANDROID_SAMSUNG_COMPOSITE
 	case RELEASE:
 	case RESERVE:
+#endif
+#endif
 	case SEND_DIAGNOSTIC:
 		/* Fall through */
 
@@ -2332,6 +2809,17 @@ static int enable_endpoint(struct fsg_common *common, struct usb_ep *ep,
 	int	rc;
 
 	ep->driver_data = common;
+
+	if (common->gadget->speed == USB_SPEED_SUPER) {
+		if (ep == common->fsg->bulk_in)
+			ep->maxburst = fsg_ss_bulk_in_comp_desc.bMaxBurst;
+		else if (ep == common->fsg->bulk_out)
+			ep->maxburst = fsg_ss_bulk_out_comp_desc.bMaxBurst;
+		else
+			ep->maxburst = 0;
+	} else
+		ep->maxburst = 0;
+
 	rc = usb_ep_enable(ep, d);
 	if (rc)
 		ERROR(common, "can't enable %s, result %d\n", ep->name, rc);
@@ -2398,14 +2886,22 @@ reset:
 	fsg = common->fsg;
 
 	/* Enable the endpoints */
-	d = fsg_ep_desc(common->gadget,
+	if (gadget_is_superspeed(common->gadget) &&
+	    common->gadget->speed == USB_SPEED_SUPER)
+		d = &fsg_ss_bulk_in_desc;
+	else
+		d = fsg_ep_desc(common->gadget,
 			&fsg_fs_bulk_in_desc, &fsg_hs_bulk_in_desc);
 	rc = enable_endpoint(common, fsg->bulk_in, d);
 	if (rc)
 		goto reset;
 	fsg->bulk_in_enabled = 1;
 
-	d = fsg_ep_desc(common->gadget,
+	if (gadget_is_superspeed(common->gadget) &&
+	    common->gadget->speed == USB_SPEED_SUPER)
+		d = &fsg_ss_bulk_out_desc;
+	else
+		d = fsg_ep_desc(common->gadget,
 			&fsg_fs_bulk_out_desc, &fsg_hs_bulk_out_desc);
 	rc = enable_endpoint(common, fsg->bulk_out, d);
 	if (rc)
@@ -2778,9 +3274,12 @@ static struct fsg_common *fsg_common_init(struct fsg_common *common,
 
 	for (i = 0, lcfg = cfg->luns; i < nluns; ++i, ++curlun, ++lcfg) {
 		curlun->cdrom = !!lcfg->cdrom;
-		curlun->ro = lcfg->cdrom || lcfg->ro;
+		curlun->ro = lcfg->ro;
 		curlun->initially_ro = curlun->ro;
 		curlun->removable = lcfg->removable;
+#ifdef CONFIG_USB_ANDROID_SAMSUNG_COMPOSITE
+		curlun->nofua = lcfg->nofua;
+#endif
 		curlun->dev.release = fsg_lun_release;
 		curlun->dev.parent = &gadget->dev;
 		/* curlun->dev.driver = &fsg_driver.driver; XXX */
@@ -2857,6 +3356,15 @@ buffhds_first_it:
 				     ? "File-Stor Gadget"
 				     : "File-CD Gadget"),
 		 i);
+
+#ifdef	CONFIG_USB_ANDROID_SAMSUNG_COMPOSITE
+	/* Default INQUIRY strings */
+	strncpy(common->vendor_string, "SAMSUNG",
+			sizeof(common->vendor_string) - 1);
+	strncpy(common->product_string, "File-Stor Gadget",
+			sizeof(common->product_string) - 1);
+	common->product_string[sizeof(common->product_string) - 1] = '\0';
+#endif
 
 	/*
 	 * Some peripheral controllers are known not to be able to
@@ -2978,6 +3486,7 @@ static void fsg_unbind(struct usb_configuration *c, struct usb_function *f)
 	fsg_common_put(common);
 	usb_free_descriptors(fsg->function.descriptors);
 	usb_free_descriptors(fsg->function.hs_descriptors);
+	usb_free_descriptors(fsg->function.ss_descriptors);
 	kfree(fsg);
 }
 
@@ -3028,6 +3537,28 @@ static int fsg_bind(struct usb_configuration *c, struct usb_function *f)
 		}
 	}
 
+	if (gadget_is_superspeed(gadget)) {
+		unsigned	max_burst;
+
+		/* Calculate bMaxBurst, we know packet size is 1024 */
+		max_burst = min_t(unsigned, FSG_BUFLEN / 1024, 15);
+
+		fsg_ss_bulk_in_desc.bEndpointAddress =
+			fsg_fs_bulk_in_desc.bEndpointAddress;
+		fsg_ss_bulk_in_comp_desc.bMaxBurst = max_burst;
+
+		fsg_ss_bulk_out_desc.bEndpointAddress =
+			fsg_fs_bulk_out_desc.bEndpointAddress;
+		fsg_ss_bulk_out_comp_desc.bMaxBurst = max_burst;
+
+		f->ss_descriptors = usb_copy_descriptors(fsg_ss_function);
+		if (unlikely(!f->ss_descriptors)) {
+			usb_free_descriptors(f->hs_descriptors);
+			usb_free_descriptors(f->descriptors);
+			return -ENOMEM;
+		}
+	}
+
 	return 0;
 
 autoconf_fail:
@@ -3054,7 +3585,7 @@ static int fsg_bind_config(struct usb_composite_dev *cdev,
 	if (unlikely(!fsg))
 		return -ENOMEM;
 
-	fsg->function.name        = FSG_DRIVER_DESC;
+	fsg->function.name        = "mass_storage";
 	fsg->function.strings     = fsg_strings_array;
 	fsg->function.bind        = fsg_bind;
 	fsg->function.unbind      = fsg_unbind;

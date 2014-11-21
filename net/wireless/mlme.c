@@ -877,6 +877,9 @@ void cfg80211_mlme_unregister_socket(struct wireless_dev *wdev, u32 nlpid)
 	}
 
 	spin_unlock_bh(&wdev->mgmt_registrations_lock);
+
+	if (nlpid == wdev->ap_unexpected_nlpid)
+		wdev->ap_unexpected_nlpid = 0;
 }
 
 void cfg80211_mlme_purge_registrations(struct wireless_dev *wdev)

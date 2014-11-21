@@ -323,8 +323,6 @@ int drm_get_pci_dev(struct pci_dev *pdev, const struct pci_device_id *ent,
 	if (ret)
 		goto err_g1;
 
-	pci_set_master(pdev);
-
 	dev->pdev = pdev;
 	dev->dev = &pdev->dev;
 

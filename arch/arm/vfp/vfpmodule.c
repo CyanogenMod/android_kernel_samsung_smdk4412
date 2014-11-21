@@ -11,6 +11,7 @@
 #include <linux/module.h>
 #include <linux/types.h>
 #include <linux/cpu.h>
+#include <linux/hardirq.h>
 #include <linux/kernel.h>
 #include <linux/notifier.h>
 #include <linux/signal.h>
@@ -33,7 +34,13 @@ void vfp_support_entry(void);
 void vfp_null_entry(void);
 
 void (*vfp_vector)(void) = vfp_null_entry;
-union vfp_state *last_VFP_context[NR_CPUS];
+
+/*
+ * The pointer to the vfpstate structure of the thread which currently
+ * owns the context held in the VFP hardware, or NULL if the hardware
+ * context is invalid.
+ */
+union vfp_state *vfp_current_hw_state[NR_CPUS];
 
 /*
  * Dual-use variable.
@@ -57,12 +64,12 @@ static void vfp_thread_flush(struct thread_info *thread)
 
 	/*
 	 * Disable VFP to ensure we initialize it first.  We must ensure
-	 * that the modification of last_VFP_context[] and hardware disable
+	 * that the modification of vfp_current_hw_state[] and hardware disable
 	 * are done for the same CPU and without preemption.
 	 */
 	cpu = get_cpu();
-	if (last_VFP_context[cpu] == vfp)
-		last_VFP_context[cpu] = NULL;
+	if (vfp_current_hw_state[cpu] == vfp)
+		vfp_current_hw_state[cpu] = NULL;
 	fmxr(FPEXC, fmrx(FPEXC) & ~FPEXC_EN);
 	put_cpu();
 }
@@ -73,8 +80,8 @@ static void vfp_thread_exit(struct thread_info *thread)
 	union vfp_state *vfp = &thread->vfpstate;
 	unsigned int cpu = get_cpu();
 
-	if (last_VFP_context[cpu] == vfp)
-		last_VFP_context[cpu] = NULL;
+	if (vfp_current_hw_state[cpu] == vfp)
+		vfp_current_hw_state[cpu] = NULL;
 	put_cpu();
 }
 
@@ -129,9 +136,9 @@ static int vfp_notifier(struct notifier_block *self, unsigned long cmd, void *v)
 		 * case the thread migrates to a different CPU. The
 		 * restoring is done lazily.
 		 */
-		if ((fpexc & FPEXC_EN) && last_VFP_context[cpu]) {
-			vfp_save_state(last_VFP_context[cpu], fpexc);
-			last_VFP_context[cpu]->hard.cpu = cpu;
+		if ((fpexc & FPEXC_EN) && vfp_current_hw_state[cpu]) {
+			vfp_save_state(vfp_current_hw_state[cpu], fpexc);
+			vfp_current_hw_state[cpu]->hard.cpu = cpu;
 		}
 		/*
 		 * Thread migration, just force the reloading of the
@@ -139,7 +146,7 @@ static int vfp_notifier(struct notifier_block *self, unsigned long cmd, void *v)
 		 * contain stale data.
 		 */
 		if (thread->vfpstate.hard.cpu != cpu)
-			last_VFP_context[cpu] = NULL;
+			vfp_current_hw_state[cpu] = NULL;
 #endif
 
 		/*
@@ -389,8 +396,10 @@ void VFP_bounce(u32 trigger, u32 fpexc, struct pt_regs *regs)
 
 static void vfp_enable(void *unused)
 {
-	u32 access = get_copro_access();
+	u32 access;
 
+	BUG_ON(preemptible());
+	access = get_copro_access();
 	/*
 	 * Enable full access to VFP (cp10 and cp11)
 	 */
@@ -412,10 +421,16 @@ static int vfp_pm_suspend(void)
 
 		/* disable, just in case */
 		fmxr(FPEXC, fmrx(FPEXC) & ~FPEXC_EN);
+	} else if (vfp_current_hw_state[ti->cpu]) {
+#ifndef CONFIG_SMP
+		fmxr(FPEXC, fpexc | FPEXC_EN);
+		vfp_save_state(vfp_current_hw_state[ti->cpu], fpexc);
+		fmxr(FPEXC, fpexc);
+#endif
 	}
 
 	/* clear any information we had about last context state */
-	memset(last_VFP_context, 0, sizeof(last_VFP_context));
+	vfp_current_hw_state[ti->cpu] = NULL;
 
 	return 0;
 }
@@ -451,7 +466,7 @@ void vfp_sync_hwstate(struct thread_info *thread)
 	 * If the thread we're interested in is the current owner of the
 	 * hardware VFP state, then we need to save its state.
 	 */
-	if (last_VFP_context[cpu] == &thread->vfpstate) {
+	if (vfp_current_hw_state[cpu] == &thread->vfpstate) {
 		u32 fpexc = fmrx(FPEXC);
 
 		/*
@@ -473,7 +488,7 @@ void vfp_flush_hwstate(struct thread_info *thread)
 	 * If the thread we're interested in is the current owner of the
 	 * hardware VFP state, then we need to save its state.
 	 */
-	if (last_VFP_context[cpu] == &thread->vfpstate) {
+	if (vfp_current_hw_state[cpu] == &thread->vfpstate) {
 		u32 fpexc = fmrx(FPEXC);
 
 		fmxr(FPEXC, fpexc & ~FPEXC_EN);
@@ -482,8 +497,8 @@ void vfp_flush_hwstate(struct thread_info *thread)
 		 * Set the context to NULL to force a reload the next time
 		 * the thread uses the VFP.
 		 */
-		last_VFP_context[cpu] = NULL;
 	}
+	vfp_current_hw_state[cpu] = NULL;
 
 #ifdef CONFIG_SMP
 	/*
@@ -514,7 +529,7 @@ static int vfp_hotplug(struct notifier_block *b, unsigned long action,
 {
 	if (action == CPU_DYING || action == CPU_DYING_FROZEN) {
 		unsigned int cpu = (long)hcpu;
-		last_VFP_context[cpu] = NULL;
+		vfp_current_hw_state[cpu] = NULL;
 	} else if (action == CPU_STARTING || action == CPU_STARTING_FROZEN)
 		vfp_enable(NULL);
 	return NOTIFY_OK;
@@ -529,7 +544,7 @@ static int __init vfp_init(void)
 	unsigned int cpu_arch = cpu_architecture();
 
 	if (cpu_arch >= CPU_ARCH_ARMv6)
-		vfp_enable(NULL);
+		on_each_cpu(vfp_enable, NULL, 1);
 
 	/*
 	 * First check that there is a VFP that we can use.
@@ -549,8 +564,6 @@ static int __init vfp_init(void)
 		printk("no double precision support\n");
 	} else {
 		hotcpu_notifier(vfp_hotplug, 0);
-
-		smp_call_function(vfp_enable, NULL, 1);
 
 		VFP_arch = (vfpsid & FPSID_ARCH_MASK) >> FPSID_ARCH_BIT;  /* Extract the architecture version */
 		printk("implementor %02x architecture %d part %02x variant %x rev %x\n",
@@ -585,7 +598,6 @@ static int __init vfp_init(void)
 				elf_hwcap |= HWCAP_VFPD32;
 		}
 #endif
-#ifdef CONFIG_NEON
 		/*
 		 * Check for the presence of the Advanced SIMD
 		 * load/store instructions, integer and single
@@ -593,10 +605,13 @@ static int __init vfp_init(void)
 		 * for NEON if the hardware has the MVFR registers.
 		 */
 		if ((read_cpuid_id() & 0x000f0000) == 0x000f0000) {
+#ifdef CONFIG_NEON
 			if ((fmrx(MVFR1) & 0x000fff00) == 0x00011100)
 				elf_hwcap |= HWCAP_NEON;
-		}
 #endif
+			if ((fmrx(MVFR1) & 0xf0000000) == 0x10000000)
+				elf_hwcap |= HWCAP_VFPv4;
+		}
 	}
 	return 0;
 }

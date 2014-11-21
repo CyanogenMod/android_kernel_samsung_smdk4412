@@ -2,11 +2,33 @@
 # Makefile for the linux arm-specific parts of the memory manager.
 #
 
-obj-y				:= dma-mapping.o extable.o fault.o init.o \
+obj-y				:= extable.o fault.o \
 				   iomap.o
 
+ifeq ($(CONFIG_SLP),y)
+obj-y				+= dma-mapping-slp.o init-slp.o
+else
+ifeq ($(CONFIG_DMA_CMA),y)
+obj-y				+= dma-mapping-cma.o init-cma.o
+else
+obj-y				+= dma-mapping.o init.o
+endif
+endif
+
 obj-$(CONFIG_MMU)		+= fault-armv.o flush.o idmap.o ioremap.o \
-				   mmap.o pgd.o mmu.o vmregion.o
+				   mmap.o pgd.o vmregion.o
+
+ifeq ($(CONFIG_MMU),y)
+ifeq ($(CONFIG_SLP),y)
+obj-y				+= mmu-slp.o
+else
+ifeq ($(CONFIG_DMA_CMA),y)
+obj-y				+= mmu-cma.o
+else
+obj-y				+= mmu.o
+endif
+endif
+endif
 
 ifneq ($(CONFIG_MMU),y)
 obj-y				+= nommu.o
@@ -100,3 +122,4 @@ obj-$(CONFIG_CACHE_FEROCEON_L2)	+= cache-feroceon-l2.o
 obj-$(CONFIG_CACHE_L2X0)	+= cache-l2x0.o
 obj-$(CONFIG_CACHE_XSC3L2)	+= cache-xsc3l2.o
 obj-$(CONFIG_CACHE_TAUROS2)	+= cache-tauros2.o
+obj-$(CONFIG_CACHE_PERF)	+= cache_perf.o

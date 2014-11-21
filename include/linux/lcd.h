@@ -40,6 +40,16 @@ struct lcd_ops {
 	/* Get the LCD panel power status (0: full on, 1..3: controller
 	   power on, flat panel power off, 4: full off), see FB_BLANK_XXX */
 	int (*get_power)(struct lcd_device *);
+	/*
+	 * Enable or disable power to the LCD(0: on; 4: off, see FB_BLANK_XXX)
+	 * and this callback would be called proir to fb driver's callback.
+	 *
+	 * P.S. note that if early_set_power is not NULL then early fb notifier
+	 *	would be registered.
+	 */
+	int (*early_set_power)(struct lcd_device *, int power);
+	/* revert the effects of the early blank event. */
+	int (*r_early_set_power)(struct lcd_device *, int power);
 	/* Enable or disable power to the LCD (0: on; 4: off, see FB_BLANK_XXX) */
 	int (*set_power)(struct lcd_device *, int power);
 	/* Get the current contrast setting (0-max_contrast) */
@@ -76,6 +86,9 @@ struct lcd_platform_data {
 	   lcd power off and 1, lcd power on. */
 	int (*power_on)(struct lcd_device *ld, int enable);
 
+	int (*gpio_cfg_earlysuspend)(struct lcd_device *ld);
+	int (*gpio_cfg_lateresume)(struct lcd_device *ld);
+
 	/* it indicates whether lcd panel was enabled
 	   from bootloader or not. */
 	int lcd_enabled;
@@ -87,6 +100,8 @@ struct lcd_platform_data {
 	unsigned int power_on_delay;
 	/* stable time needing to become lcd power off. */
 	unsigned int power_off_delay;
+	/*stable time needing to become sleep in mode after sleep out mode. */
+	unsigned int sleep_in_delay;
 
 	/* it could be used for any purpose. */
 	void *pdata;

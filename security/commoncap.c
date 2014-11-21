@@ -30,6 +30,10 @@
 #include <linux/user_namespace.h>
 #include <linux/personality.h>
 
+#ifdef CONFIG_ANDROID_PARANOID_NETWORK
+#include <linux/android_aid.h>
+#endif
+
 /*
  * If a non-root user executes a setuid-root binary in
  * !secure(SECURE_NOROOT) mode, then we raise capabilities.
@@ -57,14 +61,6 @@ int cap_netlink_send(struct sock *sk, struct sk_buff *skb)
 	return 0;
 }
 
-int cap_netlink_recv(struct sk_buff *skb, int cap)
-{
-	if (!cap_raised(current_cap(), cap))
-		return -EPERM;
-	return 0;
-}
-EXPORT_SYMBOL(cap_netlink_recv);
-
 /**
  * cap_capable - Determine whether a task has a particular effective capability
  * @tsk: The task to query
@@ -84,6 +80,13 @@ EXPORT_SYMBOL(cap_netlink_recv);
 int cap_capable(struct task_struct *tsk, const struct cred *cred,
 		struct user_namespace *targ_ns, int cap, int audit)
 {
+#ifdef CONFIG_ANDROID_PARANOID_NETWORK
+	if (cap == CAP_NET_RAW && in_egroup_p(AID_NET_RAW))
+		return 0;
+	if (cap == CAP_NET_ADMIN && in_egroup_p(AID_NET_ADMIN))
+		return 0;
+#endif
+
 	for (;;) {
 		/* The creator of the user namespace has all caps. */
 		if (targ_ns != &init_user_ns && targ_ns->creator == cred->user)

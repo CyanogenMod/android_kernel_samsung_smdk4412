@@ -58,6 +58,11 @@ static inline void crypto_free_rng(struct crypto_rng *tfm)
 static inline int crypto_rng_get_bytes(struct crypto_rng *tfm,
 				       u8 *rdata, unsigned int dlen)
 {
+#ifdef CONFIG_CRYPTO_FIPS
+	if (unlikely(in_fips_err()))
+		return -EACCES;
+#endif
+
 	return crypto_rng_crt(tfm)->rng_gen_random(tfm, rdata, dlen);
 }
 

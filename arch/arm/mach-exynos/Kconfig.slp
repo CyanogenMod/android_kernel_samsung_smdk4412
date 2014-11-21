@@ -1,0 +1,547 @@
+config SLP
+	bool "Enable SLP Boards"
+	help
+	 Support SLP(Samsung Linux Platform) dedicated features that do not
+	 depend on Hardware.
+	 New patches will be followed by security, lowmemory manager, stopwatch,
+	 etc.
+	 Please do not select if do not know about SLP.
+
+config MACH_SLP_MIDAS
+	bool
+	select CPU_EXYNOS4212
+	select CPU_EXYNOS4412
+	select S3C_DEV_WDT
+	select S3C_DEV_RTC
+	select S3C_DEV_HSMMC2
+	select S3C_DEV_HSMMC3
+	select S5P_DEV_USB_EHCI
+	select S3C_DEV_I2C1
+	select S3C_DEV_I2C3
+	select S3C_DEV_I2C4
+	select S3C_DEV_I2C5
+	select S3C_DEV_I2C7
+	select S5P_DEV_USBGADGET
+	select S5P_DEV_DSIM02
+	select S5P_DEV_FIMD0
+	select S5P_DEV_MFC
+	select EXYNOS4_DEV_MSHC
+	select EXYNOS4_SETUP_MSHCI
+	select EXYNOS4_MSHC_MPLL_40MHZ
+	select EXYNOS4_MSHC_DDR
+	select EXYNOS4_MSHC_8BIT
+	select EXYNOS4_SETUP_SDHCI
+	select EXYNOS4_SETUP_I2C1
+	select EXYNOS4_SETUP_I2C3
+	select EXYNOS4_SETUP_I2C4
+	select EXYNOS4_SETUP_I2C5
+	select EXYNOS4_SETUP_I2C7
+	select EXYNOS4_SETUP_USB_PHY
+	select EXYNOS4_SETUP_MFC
+	select S5P_SETUP_MIPIPHY
+	select S5P_GPIO_INT
+	select SAMSUNG_DEV_PWM
+	select EXYNOS_DEV_PD
+	select MIDAS_COMMON
+	select SLP_WIP
+	select BT_BCM4334
+	select GPS_BCM47511
+	select S3C64XX_DEV_SPI
+	select CONFIG_VIDEO_FIMC_MIPI
+	select EXYNOS_SYSREG_PM
+	select EXYNOS4_DEV_FIMC_LITE
+	select CPU_FREQ_GOV_ONDEMAND_FLEXRATE if CPU_FREQ_GOV_ONDEMAND
+	help
+	  Machine support for Samsung SLP midas board
+
+choice
+	prompt "SLP EXYNOS4212/4412 board"
+	depends on SLP
+	default MACH_SLP_MIDAS_D
+
+config MACH_SLP_MIDAS_D
+	bool "SLP Midas D (Yosemite-D) board"
+	select MACH_SLP_MIDAS
+	select GPIO_MIDAS_01_BD
+	select BATTERY_MAX17042
+
+config MACH_SLP_MIDAS_Q
+	bool "SLP Midas Q (Yosemite-Q) board"
+	select MACH_SLP_MIDAS
+	select GPIO_MIDAS_02_BD
+	select BATTERY_MAX17047_FUELGAUGE
+
+config MACH_SLP_PQ
+	bool "SLP Pegasus Q (M0-PROXIMA)"
+	select MACH_SLP_PQ_DEVS
+	select MIDAS_COMMON_BD
+	help
+	  Machine support for Samsung SLP Pegasus-Q (M0-PROXIMA) board.  The
+	  GPIO mapping is known to be same with M0 board. This board is not
+	  known to have Exynos4212; however, CPU_EXYNOS4212 config is included
+	  because of Kconfig issues that does not allow to compile board files
+	  with CPU_EXYNOS4412 enabled without CPU_EXYNOS4212.
+
+config MACH_SLP_PQ_LTE
+	bool "SLP Pegasus Q LTE(CMC221)"
+	select MACH_SLP_PQ_LTE_DEVS
+	select MIDAS_COMMON_BD
+	help
+	  Machine support for Samsung SLP Pegasus-Q LTE board.
+	  The GPIO mapping is known to be same with C1 board.
+	  PQ_LTE board is not known to have Exynos4212; however,
+	  CPU_EXYNOS4212 config is included because of Kconfig
+	  issues that does not allow to compile board files
+	  with CPU_EXYNOS4412 enabled without CPU_EXYNOS4212.
+
+config MACH_SLP_T0_LTE
+	bool "SLP Pegasus Q LTE(T0-DOCOMO)"
+	select MACH_SLP_T0_LTE_DEVS
+	select MIDAS_COMMON_BD
+	help
+	  Machine support for Samsung SLP Pegasus-Q (T0-DOCOMO) board.  The
+	  GPIO mapping is known to be same with T0 board. This board is not
+	  known to have Exynos4212; however, CPU_EXYNOS4212 config is included
+	  because of Kconfig issues that does not allow to compile board files
+	  with CPU_EXYNOS4412 enabled without CPU_EXYNOS4212.
+
+config MACH_SLP_NAPLES
+	bool "SLP Naples (Naples) board"
+	select MACH_SLP_NAPLES_DEVS
+	select GPIO_NAPLES_00_BD
+
+config MACH_TRATS
+	bool "Samsung TRATS board"
+	select MACH_U1_BD
+	select CPU_EXYNOS4210
+	select S5P_GPIO_INT
+	select S5P_DEV_DSIM02
+	select S5P_DEV_FIMD0
+	select S5P_DEV_FIMG2D
+	select S5P_DEV_MFC
+	select S5P_DEV_TV
+	select S5P_DEV_I2C_HDMIPHY
+	select S5P_DEV_USB_EHCI
+	select S5P_SYSTEM_MMU
+	select S5P_DEV_USBGADGET
+	select S3C_DEV_RTC
+	select S3C_DEV_WDT
+	select S3C_DEV_I2C1
+	select S3C_DEV_I2C3
+	select S3C_DEV_I2C5
+	select S3C_DEV_I2C6
+	select S3C_DEV_I2C7
+	select S3C_DEV_I2C8_EMUL
+	select S3C_DEV_I2C9_EMUL
+	select EXYNOS4_DEV_MSHC
+	select EXYNOS4_MSHC_MPLL_40MHZ
+	select EXYNOS4_MSHC_DDR
+	select EXYNOS4_MSHC_8BIT
+	select S3C_DEV_HSMMC2
+	select S3C_DEV_HSMMC3
+	select SAMSUNG_DEV_ADC
+	select SAMSUNG_DEV_TS
+	select SAMSUNG_DEV_TS1
+	select EXYNOS_DEV_PD
+	select S5P_SYSTEM_MMU
+	select EXYNOS4_SETUP_I2C1
+	select EXYNOS4_SETUP_I2C3
+	select EXYNOS4_SETUP_I2C5
+	select EXYNOS4_SETUP_I2C6
+	select EXYNOS4_SETUP_I2C7
+	select EXYNOS4_SETUP_SDHCI
+	select EXYNOS4_SETUP_HDMI
+	select EXYNOS4_SETUP_MSHCI
+	select EXYNOS4_SETUP_MFC
+	select EXYNOS4_SETUP_USB_PHY
+	select EXYNOS4_SETUP_THERMAL
+	select GPS_GSD4T
+	help
+	  Machine support for Samsung Mobile TRATS Board.
+	  TRATS is one of Samsung mobile division product based on ARM SOC but
+	  it is not for sale, just released for internal development and outer
+	  developer for Tizen project.
+
+endchoice
+
+config MACH_REDWOOD
+	bool "Samsung REDWOOD board"
+	select CPU_EXYNOS4212
+	select CPU_EXYNOS4412
+	select S3C_DEV_WDT
+	select S3C_DEV_RTC
+	select S3C_DEV_HSMMC2
+	select S3C_DEV_HSMMC3
+	select S5P_DEV_USB_EHCI
+	select S3C_DEV_I2C1
+	select S3C_DEV_I2C3
+	select S3C_DEV_I2C4
+	select S3C_DEV_I2C5
+	select S3C_DEV_I2C7
+	select S5P_DEV_USBGADGET
+	select S5P_DEV_DSIM02
+	select S5P_DEV_FIMD0
+	select S5P_DEV_FIMG2D
+	select S5P_DEV_MFC
+	select S5P_DEV_TV
+	select S5P_DEV_I2C_HDMIPHY
+	select EXYNOS4_DEV_MSHC
+	select EXYNOS4_SETUP_MSHCI
+	select EXYNOS4_MSHC_MPLL_40MHZ
+	select EXYNOS4_MSHC_DDR
+	select EXYNOS4_MSHC_8BIT
+	select EXYNOS4_SETUP_SDHCI
+	select EXYNOS4_SETUP_HDMI
+	select EXYNOS4_SETUP_I2C1
+	select EXYNOS4_SETUP_I2C3
+	select EXYNOS4_SETUP_I2C4
+	select EXYNOS4_SETUP_I2C5
+	select EXYNOS4_SETUP_I2C7
+	select EXYNOS4_SETUP_USB_PHY
+	select EXYNOS4_SETUP_MFC
+	select S5P_SETUP_MIPIPHY
+	select S5P_GPIO_INT
+	select SAMSUNG_DEV_PWM
+	select EXYNOS_DEV_PD
+	select MIDAS_COMMON
+	select SLP_WIP
+	select BT_BCM4334
+	select GPS_BCM47511
+	select GPS_BCM4752
+	select S3C64XX_DEV_SPI
+	select CONFIG_VIDEO_FIMC_MIPI
+	select S3C_ADC
+	select SAMSUNG_DEV_ADC
+	select EXYNOS_SYSREG_PM
+	select BATTERY_MAX17047_FUELGAUGE
+	select MFD_MAX77693
+	select MFD_MAX77686
+	select EXYNOS4_DEV_FIMC_LITE
+	select UART_SELECT
+	select USB_HOST_NOTIFY
+	select EXTCON
+	select EXYNOS4_DEV_TMU
+	select THERMAL
+	select CPU_THERMAL
+	select SAMSUNG_THERMAL_INTERFACE
+	select SENSORS_EXYNOS4_TMU
+	select MIDAS_COMMON_BD
+	help
+	  Machine support for Samsung SLP REDWOOD board.
+	  The GPIO mapping is known to be same with M0 board.
+	  REDWOOD board is not known to have Exynos4212; however,
+	  CPU_EXYNOS4212 config is included because of Kconfig
+	  issues that does not allow to compile board files
+	  with CPU_EXYNOS4412 enabled without CPU_EXYNOS4212.
+
+config MACH_SLP_PQ_DEVS
+	bool
+	select CPU_EXYNOS4212
+	select CPU_EXYNOS4412
+	select S3C_DEV_WDT
+	select S3C_DEV_RTC
+	select S3C_DEV_HSMMC2
+	select S3C_DEV_HSMMC3
+	select S5P_DEV_USB_EHCI
+	select S3C_DEV_I2C1
+	select S3C_DEV_I2C3
+	select S3C_DEV_I2C4
+	select S3C_DEV_I2C5
+	select S3C_DEV_I2C7
+	select S5P_DEV_USBGADGET
+	select S5P_DEV_DSIM02
+	select S5P_DEV_FIMD0
+	select S5P_DEV_FIMG2D
+	select S5P_DEV_MFC
+	select S5P_DEV_TV
+	select S5P_DEV_I2C_HDMIPHY
+	select EXYNOS4_DEV_MSHC
+	select EXYNOS4_SETUP_MSHCI
+	select EXYNOS4_MSHC_MPLL_40MHZ
+	select EXYNOS4_MSHC_DDR
+	select EXYNOS4_MSHC_8BIT
+	select EXYNOS4_SETUP_SDHCI
+	select EXYNOS4_SETUP_HDMI
+	select EXYNOS4_SETUP_I2C1
+	select EXYNOS4_SETUP_I2C3
+	select EXYNOS4_SETUP_I2C4
+	select EXYNOS4_SETUP_I2C5
+	select EXYNOS4_SETUP_I2C7
+	select EXYNOS4_SETUP_USB_PHY
+	select EXYNOS4_SETUP_MFC
+	select S5P_SETUP_MIPIPHY
+	select S5P_GPIO_INT
+	select SAMSUNG_DEV_PWM
+	select EXYNOS_DEV_PD
+	select MIDAS_COMMON
+	select SLP_WIP
+	select BT_BCM4334
+	select GPS_BCM47511
+	select S3C64XX_DEV_SPI
+	select CONFIG_VIDEO_FIMC_MIPI
+	select S3C_ADC
+	select SAMSUNG_DEV_ADC
+	select EXYNOS_SYSREG_PM
+	select BATTERY_MAX17047_FUELGAUGE
+	select MFD_MAX77693
+	select MFD_MAX77686
+	select EXYNOS4_DEV_FIMC_LITE
+	select UART_SELECT
+	select USB_HOST_NOTIFY
+	select EXTCON
+	select EXYNOS4_DEV_TMU
+	select THERMAL
+	select CPU_THERMAL
+	select SAMSUNG_THERMAL_INTERFACE
+	select SENSORS_EXYNOS4_TMU
+
+config MACH_SLP_PQ_LTE_DEVS
+	bool
+	select CPU_EXYNOS4212
+	select CPU_EXYNOS4412
+	select S3C_DEV_WDT
+	select S3C_DEV_RTC
+	select S3C_DEV_HSMMC2
+	select S3C_DEV_HSMMC3
+	select S5P_DEV_USB_EHCI
+	select S3C_DEV_I2C1
+	select S3C_DEV_I2C3
+	select S3C_DEV_I2C4
+	select S3C_DEV_I2C5
+	select S3C_DEV_I2C7
+	select S5P_DEV_USBGADGET
+	select S5P_DEV_DSIM02
+	select S5P_DEV_FIMD0
+	select S5P_DEV_FIMG2D
+	select S5P_DEV_MFC
+	select S5P_DEV_TV
+	select S5P_DEV_I2C_HDMIPHY
+	select EXYNOS4_DEV_MSHC
+	select EXYNOS4_SETUP_MSHCI
+	select EXYNOS4_MSHC_MPLL_40MHZ
+	select EXYNOS4_MSHC_DDR
+	select EXYNOS4_MSHC_8BIT
+	select EXYNOS4_SETUP_SDHCI
+	select EXYNOS4_SETUP_HDMI
+	select EXYNOS4_SETUP_I2C1
+	select EXYNOS4_SETUP_I2C3
+	select EXYNOS4_SETUP_I2C4
+	select EXYNOS4_SETUP_I2C5
+	select EXYNOS4_SETUP_I2C7
+	select EXYNOS4_SETUP_USB_PHY
+	select EXYNOS4_SETUP_MFC
+	select S5P_SETUP_MIPIPHY
+	select S5P_GPIO_INT
+	select SAMSUNG_DEV_PWM
+	select EXYNOS_DEV_PD
+	select MIDAS_COMMON
+	select SLP_WIP
+	select BT_BCM4334
+	select S3C64XX_DEV_SPI
+	select CONFIG_VIDEO_FIMC_MIPI
+	select S3C_ADC
+	select SAMSUNG_DEV_ADC
+	select EXYNOS_SYSREG_PM
+	select BATTERY_MAX17047_FUELGAUGE
+	select MFD_MAX77693
+	select MFD_MAX77686
+	select EXYNOS4_DEV_FIMC_LITE
+	select UART_SELECT
+	select CPU_FREQ_GOV_ONDEMAND_FLEXRATE if CPU_FREQ_GOV_ONDEMAND
+	select USB_HOST_NOTIFY
+	select EXTCON
+	select THERMAL
+	select CPU_THERMAL
+	select SAMSUNG_THERMAL_INTERFACE
+	select EXYNOS4_DEV_TMU
+	select SENSORS_EXYNOS4_TMU
+
+config MACH_SLP_T0_LTE_DEVS
+	bool
+	select CPU_EXYNOS4212
+	select CPU_EXYNOS4412
+	select S3C_DEV_WDT
+	select S3C_DEV_RTC
+	select S3C_DEV_HSMMC2
+	select S3C_DEV_HSMMC3
+	select S5P_DEV_USB_EHCI
+	select S3C_DEV_I2C1
+	select S3C_DEV_I2C3
+	select S3C_DEV_I2C4
+	select S3C_DEV_I2C5
+	select S3C_DEV_I2C7
+	select S5P_DEV_USBGADGET
+	select S5P_DEV_DSIM02
+	select S5P_DEV_FIMD0
+	select S5P_DEV_FIMG2D
+	select S5P_DEV_MFC
+	select S5P_DEV_TV
+	select S5P_DEV_I2C_HDMIPHY
+	select EXYNOS4_DEV_MSHC
+	select EXYNOS4_SETUP_MSHCI
+	select EXYNOS4_MSHC_MPLL_40MHZ
+	select EXYNOS4_MSHC_DDR
+	select EXYNOS4_MSHC_8BIT
+	select EXYNOS4_SETUP_SDHCI
+	select EXYNOS4_SETUP_HDMI
+	select EXYNOS4_SETUP_I2C1
+	select EXYNOS4_SETUP_I2C3
+	select EXYNOS4_SETUP_I2C4
+	select EXYNOS4_SETUP_I2C5
+	select EXYNOS4_SETUP_I2C7
+	select EXYNOS4_SETUP_USB_PHY
+	select EXYNOS4_SETUP_MFC
+	select S5P_SETUP_MIPIPHY
+	select S5P_GPIO_INT
+	select SAMSUNG_DEV_PWM
+	select EXYNOS_DEV_PD
+	select MIDAS_COMMON
+	select SLP_WIP
+	select BT_BCM4334
+	select GPS_BCM47511
+	select S3C64XX_DEV_SPI
+	select CONFIG_VIDEO_FIMC_MIPI
+	select S3C_ADC
+	select SAMSUNG_DEV_ADC
+	select EXYNOS_SYSREG_PM
+	select BATTERY_MAX17047_FUELGAUGE
+	select MFD_MAX77693
+	select MFD_MAX77686
+	select EXYNOS4_DEV_FIMC_LITE
+	select UART_SELECT
+	select USB_HOST_NOTIFY
+	select EXTCON
+	select EXYNOS4_DEV_TMU
+	select THERMAL
+	select CPU_THERMAL
+	select SAMSUNG_THERMAL_INTERFACE
+	select SENSORS_EXYNOS4_TMU
+
+config GPS_BCM47511
+	bool
+	default n
+	help
+	  Add BCM4751x GPS driver for Broadcom BCM4751x chipset.
+	  This driver do nothing else but only provide rfkill container and
+	  control 32KHz clock. But SLP daemon(like location manager) can use
+	  rfkill to select proper device API.
+
+config GPS_BCM4752
+	bool
+	default n
+	help
+	  Add BCM4752 GPS driver for Broadcom BCM4752 chipset.
+	  This driver do nothing else but only provide rfkill container and
+	  control 32KHz clock. But SLP daemon(like location manager) can use
+	  rfkill to select proper device API.
+
+config GPS_GSD4T
+	bool
+	default n
+	help
+	  Add GSD4T GPS driver for CSR GSD4T chipset.
+	  This driver do nothing else but only provide rfkill container and
+	  control 32KHz clock. But SLP daemon(like location manager) can use
+	  rfkill to select proper device API.
+
+config NAPLES_COMMON
+	bool
+	help
+	  Support common devices of NAPLES board.
+	  Naples board is different from Midas board.
+	  It has same AP and PMIC but specific HW devices are different.
+	  Camera, LCD, Touch, and several sensors are diffenent.
+
+config GPIO_NAPLES_00_BD
+	bool "GPIO configuration for Naples 00 BD"
+
+config MACH_SLP_NAPLES_DEVS
+	bool
+	select CPU_EXYNOS4212
+	select CPU_EXYNOS4412
+	select S3C_DEV_WDT
+	select S3C_DEV_RTC
+	select S3C_DEV_HSMMC2
+	select S3C_DEV_HSMMC3
+	select S5P_DEV_USB_EHCI
+	select S3C_DEV_I2C1
+	select S3C_DEV_I2C3
+	select S3C_DEV_I2C4
+	select S3C_DEV_I2C5
+	select S3C_DEV_I2C7
+	select S5P_DEV_USBGADGET
+	select S5P_DEV_DSIM02
+	select S5P_DEV_FIMD0
+	select S5P_DEV_MFC
+	select EXYNOS4_DEV_MSHC
+	select EXYNOS4_SETUP_MSHCI
+	select EXYNOS4_MSHC_MPLL_40MHZ
+	select EXYNOS4_MSHC_DDR
+	select EXYNOS4_MSHC_8BIT
+	select EXYNOS4_SETUP_SDHCI
+	select EXYNOS4_SETUP_I2C1
+	select EXYNOS4_SETUP_I2C3
+	select EXYNOS4_SETUP_I2C4
+	select EXYNOS4_SETUP_I2C5
+	select EXYNOS4_SETUP_I2C7
+	select EXYNOS4_SETUP_USB_PHY
+	select EXYNOS4_SETUP_MFC
+	select S5P_SETUP_MIPIPHY
+	select S5P_GPIO_INT
+	select SAMSUNG_DEV_PWM
+	select EXYNOS_DEV_PD
+	select NAPLES_COMMON
+	select SLP_WIP
+	select BT_BCM4334
+	select GPS_BCM47511
+	select CONFIG_VIDEO_FIMC_MIPI
+	select CHARGER_MANAGER
+	select EXYNOS_SYSREG_PM
+	select BATTERY_MAX17047_FUELGAUGE
+	select MFD_MAX77693
+	select UART_SELECT
+	select CPU_FREQ_GOV_ONDEMAND_FLEXRATE if CPU_FREQ_GOV_ONDEMAND
+	select USB_HOST_NOTIFY
+	select EXTCON
+
+config SLP_WIP
+	bool
+	help
+	  Please remove it later
+
+config SLP_DISP_DEBUG
+	bool "Display debug support"
+	help
+	  Support display sub part register debugging in console.
+	  If you enable this config option, you can see display sub part register.
+	  display sub part is composed FIMD, DSIM, mDNIe, FIMD-Lite(ielcd).
+	  also support FIMC, GSC for IPP.
+
+config EXYNOS4_DEV_TMU
+	bool "Exynos4 tmu device support"
+	default n
+	depends on ARCH_EXYNOS4
+	help
+	  Compile in platform device definitions for TMU. This macro also
+	  enables compilation hwmon base TMU driver and also allows compilation
+	  of the platform device files. The platform data in this case is trip
+	  temperature and some tmu h/w configurations related parameter.
+
+config BUSFREQ_LOCK_WRAPPER
+	bool "BUSFREQ_LOCK Wrapper support for legacy kernel hack"
+	depends on ARM_EXYNOS4_BUS_DEVFREQ && SLP
+	default n
+	help
+	  busfreq_lock() and busfreq_lock_free() are not supported in
+	  busfreq with devfreq framework. However, enabling this adds
+	  wrappers to support these two legacy kernel hack to sustain
+	  minimum bus/memory frequency.
+	  In addition, this supports dev_lock/unlock for memory bus.
+
+if BT
+config BT_TIZEN
+	bool "Bluetooth Tizen"
+	default n
+	help
+	  This is for bluetooth Tizen
+endif

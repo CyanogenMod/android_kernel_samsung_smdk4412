@@ -60,6 +60,8 @@ source "drivers/gpio/Kconfig"
 
 source "drivers/w1/Kconfig"
 
+source "drivers/battery/Kconfig"
+
 source "drivers/power/Kconfig"
 
 source "drivers/hwmon/Kconfig"
@@ -96,6 +98,8 @@ source "drivers/leds/Kconfig"
 
 source "drivers/nfc/Kconfig"
 
+source "drivers/switch/Kconfig"
+
 source "drivers/accessibility/Kconfig"
 
 source "drivers/infiniband/Kconfig"
@@ -125,5 +129,35 @@ source "drivers/clk/Kconfig"
 source "drivers/hwspinlock/Kconfig"
 
 source "drivers/clocksource/Kconfig"
+
+source "drivers/motor/Kconfig"
+
+source "drivers/samsung/Kconfig"
+
+source "drivers/sensor/Kconfig"
+
+source "drivers/sensorhub/Kconfig"
+
+source "drivers/devfreq/Kconfig"
+
+source "drivers/accessory/Kconfig"
+
+source "drivers/irda/Kconfig"
+
+source "drivers/extcon/Kconfig"
+
+source "drivers/barcode_emul/Kconfig"
+
+# MUIC
+source "drivers/muic/Kconfig"
+
+source "drivers/iommu/Kconfig"
+
+# FELICA
+source "drivers/felica/Kconfig"
+
+#source "drivers/j4fs/Kconfig"
+
+source "drivers/ice4_fpga/Kconfig"
 
 endmenu

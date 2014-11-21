@@ -443,22 +443,24 @@ static int __devinit s3c2410wdt_probe(struct platform_device *pdev)
 		goto err_map;
 	}
 
-	ret = request_irq(wdt_irq->start, s3c2410wdt_irq, 0, pdev->name, pdev);
-	if (ret != 0) {
-		dev_err(dev, "failed to install irq (%d)\n", ret);
-		goto err_map;
-	}
-
 	wdt_clock = clk_get(&pdev->dev, "watchdog");
 	if (IS_ERR(wdt_clock)) {
 		dev_err(dev, "failed to find watchdog clock source\n");
 		ret = PTR_ERR(wdt_clock);
-		goto err_irq;
+		goto err_map;
 	}
 
 	clk_enable(wdt_clock);
 
-	if (s3c2410wdt_cpufreq_register() < 0) {
+	/*
+	* Watchdog timer should be stopped
+	* before set prescaler to prevent unexpected expired watchdog timer
+	*/
+	if (!tmr_atboot)
+		s3c2410wdt_stop();
+
+	ret = s3c2410wdt_cpufreq_register();
+	if (ret) {
 		printk(KERN_ERR PFX "failed to register cpufreq\n");
 		goto err_clk;
 	}
@@ -497,6 +499,12 @@ static int __devinit s3c2410wdt_probe(struct platform_device *pdev)
 		s3c2410wdt_stop();
 	}
 
+	ret = request_irq(wdt_irq->start, s3c2410wdt_irq, 0, pdev->name, pdev);
+	if (ret != 0) {
+		dev_err(dev, "failed to install irq (%d)\n", ret);
+		goto err_misc_reg;
+	}
+
 	/* print out a statement of readiness */
 
 	wtcon = readl(wdt_base + S3C2410_WTCON);
@@ -508,15 +516,14 @@ static int __devinit s3c2410wdt_probe(struct platform_device *pdev)
 
 	return 0;
 
+ err_misc_reg:
+	misc_deregister(&s3c2410wdt_miscdev);
  err_cpufreq:
 	s3c2410wdt_cpufreq_deregister();
 
  err_clk:
 	clk_disable(wdt_clock);
 	clk_put(wdt_clock);
-
- err_irq:
-	free_irq(wdt_irq->start, pdev);
 
  err_map:
 	iounmap(wdt_base);
@@ -530,6 +537,9 @@ static int __devinit s3c2410wdt_probe(struct platform_device *pdev)
 
 static int __devexit s3c2410wdt_remove(struct platform_device *dev)
 {
+	free_irq(wdt_irq->start, dev);
+	wdt_irq = NULL;
+
 	misc_deregister(&s3c2410wdt_miscdev);
 
 	s3c2410wdt_cpufreq_deregister();
@@ -537,9 +547,6 @@ static int __devexit s3c2410wdt_remove(struct platform_device *dev)
 	clk_disable(wdt_clock);
 	clk_put(wdt_clock);
 	wdt_clock = NULL;
-
-	free_irq(wdt_irq->start, dev);
-	wdt_irq = NULL;
 
 	iounmap(wdt_base);
 

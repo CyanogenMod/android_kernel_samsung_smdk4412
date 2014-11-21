@@ -5,7 +5,7 @@
 #
 # Licensed under GPLv2
 
-obj-y				:=
+obj-y				:= reserve_mem-s5pv210.o
 obj-m				:=
 obj-n				:=
 obj-				:=
@@ -15,7 +15,7 @@ obj-				:=
 obj-$(CONFIG_CPU_S5PV210)	+= cpu.o init.o clock.o dma.o
 obj-$(CONFIG_CPU_S5PV210)	+= setup-i2c0.o
 obj-$(CONFIG_S5PV210_PM)	+= pm.o sleep.o
-obj-$(CONFIG_CPU_FREQ)		+= cpufreq.o
+obj-$(CONFIG_CPU_FREQ)		+= cpufreq.o dev-cpufreq.o
 
 # machine support
 

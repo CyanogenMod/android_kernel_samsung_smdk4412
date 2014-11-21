@@ -1191,6 +1191,11 @@ static int __check_block_validity(struct inode *inode, const char *func,
 {
 	if (!ext4_data_block_valid(EXT4_SB(inode->i_sb), map->m_pblk,
 				   map->m_len)) {
+		/* for debugging, sangwoo2.lee */
+		printk(KERN_ERR "printing inode..\n");
+		print_block_data(inode->i_sb, 0, (unsigned char *)inode, 0, EXT4_INODE_SIZE(inode->i_sb));
+		/* for debugging */
+
 		ext4_error_inode(inode, func, line, map->m_pblk,
 				 "lblock %lu mapped to illegal pblock "
 				 "(length %d)", (unsigned long) map->m_lblk,
@@ -2924,6 +2929,7 @@ static int ext4_da_writepages(struct address_space *mapping,
 	struct ext4_sb_info *sbi = EXT4_SB(mapping->host->i_sb);
 	pgoff_t done_index = 0;
 	pgoff_t end;
+	struct blk_plug plug;
 
 	trace_ext4_da_writepages(inode, wbc);
 
@@ -3002,6 +3008,7 @@ retry:
 	if (wbc->sync_mode == WB_SYNC_ALL || wbc->tagged_writepages)
 		tag_pages_for_writeback(mapping, index, end);
 
+	blk_start_plug(&plug);
 	while (!ret && wbc->nr_to_write > 0) {
 
 		/*
@@ -3020,6 +3027,7 @@ retry:
 			ext4_msg(inode->i_sb, KERN_CRIT, "%s: jbd2_start: "
 			       "%ld pages, ino %lu; err %d", __func__,
 				wbc->nr_to_write, inode->i_ino, ret);
+			blk_finish_plug(&plug);
 			goto out_writepages;
 		}
 
@@ -3066,6 +3074,7 @@ retry:
 			 */
 			break;
 	}
+	blk_finish_plug(&plug);
 	if (!io_done && !cycled) {
 		cycled = 1;
 		index = 0;
@@ -4948,6 +4957,12 @@ struct inode *ext4_iget(struct super_block *sb, unsigned long ino)
 		if (inode->i_mode == 0 ||
 		    !(EXT4_SB(inode->i_sb)->s_mount_state & EXT4_ORPHAN_FS)) {
 			/* this inode is deleted */
+			/* for debugging, sangwoo2.lee */
+			printk(KERN_ERR "iloc info, offset : %lu, group# : %u\n", iloc.offset, iloc.block_group);
+			printk(KERN_ERR "sb info, inodes per group : %lu, inode size : %d\n", EXT4_SB(sb)->s_inodes_per_group, EXT4_SB(sb)->s_inode_size);
+			print_bh(sb, iloc.bh, 0, EXT4_BLOCK_SIZE(sb));
+			/* for debugging */
+
 			ret = -ESTALE;
 			goto bad_inode;
 		}
@@ -5094,6 +5109,17 @@ struct inode *ext4_iget(struct super_block *sb, unsigned long ino)
 	return inode;
 
 bad_inode:
+	/* for debugging, woojoong.lee */
+	printk(KERN_ERR "iloc info, offset : %lu,"
+					, iloc.offset);
+	printk(KERN_ERR " group# : %u\n", iloc.block_group);
+	printk(KERN_ERR "sb info, inodes per group : %lu,"
+					, EXT4_SB(sb)->s_inodes_per_group);
+	printk(KERN_ERR " inode size : %d\n"
+					, EXT4_SB(sb)->s_inode_size);
+	print_bh(sb, iloc.bh, 0, EXT4_BLOCK_SIZE(sb));
+	/* end */
+
 	brelse(iloc.bh);
 	iget_failed(inode);
 	return ERR_PTR(ret);

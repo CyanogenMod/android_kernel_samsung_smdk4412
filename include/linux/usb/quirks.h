@@ -30,4 +30,16 @@
    descriptor */
 #define USB_QUIRK_DELAY_INIT		0x00000040
 
+/* device does not support reset-resume */
+#define USB_QUIRK_NO_RESET_RESUME	0x00000080
+
+/* device does not need GET_STATUS request */
+#define USB_QUIRK_NO_GET_STATUS		0x00000100
+
+/* device needs hsic specific tunning */
+#define USB_QUIRK_HSIC_TUNE		0x00000200
+
+/* resume bus driver after dpm resume  */
+#define USB_QUIRK_NO_DPM_RESUME         0x00000400
+
 #endif /* __LINUX_USB_QUIRKS_H */

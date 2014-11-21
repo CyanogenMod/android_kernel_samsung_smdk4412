@@ -1,11 +1,11 @@
 /*
  * Hash: Hash algorithms under the crypto API
- * 
+ *
  * Copyright (c) 2008 Herbert Xu <herbert@gondor.apana.org.au>
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by the Free
- * Software Foundation; either version 2 of the License, or (at your option) 
+ * Software Foundation; either version 2 of the License, or (at your option)
  * any later version.
  *
  */
@@ -197,11 +197,21 @@ static inline int crypto_ahash_import(struct ahash_request *req, const void *in)
 
 static inline int crypto_ahash_init(struct ahash_request *req)
 {
+#ifdef CONFIG_CRYPTO_FIPS
+	if (unlikely(in_fips_err()))
+		return -EACCES;
+#endif
+
 	return crypto_ahash_reqtfm(req)->init(req);
 }
 
 static inline int crypto_ahash_update(struct ahash_request *req)
 {
+#ifdef CONFIG_CRYPTO_FIPS
+	if (unlikely(in_fips_err()))
+		return -EACCES;
+#endif
+
 	return crypto_ahash_reqtfm(req)->update(req);
 }
 
@@ -215,6 +225,11 @@ static inline struct ahash_request *ahash_request_alloc(
 	struct crypto_ahash *tfm, gfp_t gfp)
 {
 	struct ahash_request *req;
+
+#ifdef CONFIG_CRYPTO_FIPS
+	if (unlikely(in_fips_err()))
+		return NULL;
+#endif
 
 	req = kmalloc(sizeof(struct ahash_request) +
 		      crypto_ahash_reqsize(tfm), gfp);
@@ -331,16 +346,31 @@ int crypto_shash_digest(struct shash_desc *desc, const u8 *data,
 
 static inline int crypto_shash_export(struct shash_desc *desc, void *out)
 {
+#ifdef CONFIG_CRYPTO_FIPS
+	if (unlikely(in_fips_err()))
+		return -EACCES;
+#endif
+
 	return crypto_shash_alg(desc->tfm)->export(desc, out);
 }
 
 static inline int crypto_shash_import(struct shash_desc *desc, const void *in)
 {
+#ifdef CONFIG_CRYPTO_FIPS
+	if (unlikely(in_fips_err()))
+		return -EACCES;
+#endif
+
 	return crypto_shash_alg(desc->tfm)->import(desc, in);
 }
 
 static inline int crypto_shash_init(struct shash_desc *desc)
 {
+#ifdef CONFIG_CRYPTO_FIPS
+	if (unlikely(in_fips_err()))
+		return -EACCES;
+#endif
+
 	return crypto_shash_alg(desc->tfm)->init(desc);
 }
 

@@ -101,28 +101,39 @@ extern int __get_user_1(void *);
 extern int __get_user_2(void *);
 extern int __get_user_4(void *);
 
-#define __get_user_x(__r2,__p,__e,__s,__i...)				\
+#define __GUP_CLOBBER_1	"lr", "cc"
+#ifdef CONFIG_CPU_USE_DOMAINS
+#define __GUP_CLOBBER_2	"ip", "lr", "cc"
+#else
+#define __GUP_CLOBBER_2 "lr", "cc"
+#endif
+#define __GUP_CLOBBER_4	"lr", "cc"
+
+#define __get_user_x(__r2,__p,__e,__l,__s)				\
 	   __asm__ __volatile__ (					\
 		__asmeq("%0", "r0") __asmeq("%1", "r2")			\
+		__asmeq("%3", "r1")					\
 		"bl	__get_user_" #__s				\
 		: "=&r" (__e), "=r" (__r2)				\
-		: "0" (__p)						\
-		: __i, "cc")
+		: "0" (__p), "r" (__l)					\
+		: __GUP_CLOBBER_##__s)
 
 #define get_user(x,p)							\
 	({								\
+		unsigned long __limit = current_thread_info()->addr_limit - 1; \
 		register const typeof(*(p)) __user *__p asm("r0") = (p);\
 		register unsigned long __r2 asm("r2");			\
+		register unsigned long __l asm("r1") = __limit;		\
 		register int __e asm("r0");				\
 		switch (sizeof(*(__p))) {				\
 		case 1:							\
-			__get_user_x(__r2, __p, __e, 1, "lr");		\
-	       		break;						\
+			__get_user_x(__r2, __p, __e, __l, 1);		\
+			break;						\
 		case 2:							\
-			__get_user_x(__r2, __p, __e, 2, "r3", "lr");	\
+			__get_user_x(__r2, __p, __e, __l, 2);		\
 			break;						\
 		case 4:							\
-	       		__get_user_x(__r2, __p, __e, 4, "lr");		\
+			__get_user_x(__r2, __p, __e, __l, 4);		\
 			break;						\
 		default: __e = __get_user_bad(); break;			\
 		}							\
@@ -135,31 +146,34 @@ extern int __put_user_2(void *, unsigned int);
 extern int __put_user_4(void *, unsigned int);
 extern int __put_user_8(void *, unsigned long long);
 
-#define __put_user_x(__r2,__p,__e,__s)					\
+#define __put_user_x(__r2,__p,__e,__l,__s)				\
 	   __asm__ __volatile__ (					\
 		__asmeq("%0", "r0") __asmeq("%2", "r2")			\
+		__asmeq("%3", "r1")					\
 		"bl	__put_user_" #__s				\
 		: "=&r" (__e)						\
-		: "0" (__p), "r" (__r2)					\
+		: "0" (__p), "r" (__r2), "r" (__l)			\
 		: "ip", "lr", "cc")
 
 #define put_user(x,p)							\
 	({								\
+		unsigned long __limit = current_thread_info()->addr_limit - 1; \
 		register const typeof(*(p)) __r2 asm("r2") = (x);	\
 		register const typeof(*(p)) __user *__p asm("r0") = (p);\
+		register unsigned long __l asm("r1") = __limit;		\
 		register int __e asm("r0");				\
 		switch (sizeof(*(__p))) {				\
 		case 1:							\
-			__put_user_x(__r2, __p, __e, 1);		\
+			__put_user_x(__r2, __p, __e, __l, 1);		\
 			break;						\
 		case 2:							\
-			__put_user_x(__r2, __p, __e, 2);		\
+			__put_user_x(__r2, __p, __e, __l, 2);		\
 			break;						\
 		case 4:							\
-			__put_user_x(__r2, __p, __e, 4);		\
+			__put_user_x(__r2, __p, __e, __l, 4);		\
 			break;						\
 		case 8:							\
-			__put_user_x(__r2, __p, __e, 8);		\
+			__put_user_x(__r2, __p, __e, __l, 8);		\
 			break;						\
 		default: __e = __put_user_bad(); break;			\
 		}							\
@@ -227,7 +241,7 @@ do {									\
 
 #define __get_user_asm_byte(x,addr,err)				\
 	__asm__ __volatile__(					\
-	"1:	" T(ldrb) "	%1,[%2],#0\n"			\
+	"1:	" TUSER(ldrb) "	%1,[%2],#0\n"			\
 	"2:\n"							\
 	"	.pushsection .fixup,\"ax\"\n"			\
 	"	.align	2\n"					\
@@ -263,7 +277,7 @@ do {									\
 
 #define __get_user_asm_word(x,addr,err)				\
 	__asm__ __volatile__(					\
-	"1:	" T(ldr) "	%1,[%2],#0\n"			\
+	"1:	" TUSER(ldr) "	%1,[%2],#0\n"			\
 	"2:\n"							\
 	"	.pushsection .fixup,\"ax\"\n"			\
 	"	.align	2\n"					\
@@ -308,7 +322,7 @@ do {									\
 
 #define __put_user_asm_byte(x,__pu_addr,err)			\
 	__asm__ __volatile__(					\
-	"1:	" T(strb) "	%1,[%2],#0\n"			\
+	"1:	" TUSER(strb) "	%1,[%2],#0\n"			\
 	"2:\n"							\
 	"	.pushsection .fixup,\"ax\"\n"			\
 	"	.align	2\n"					\
@@ -341,7 +355,7 @@ do {									\
 
 #define __put_user_asm_word(x,__pu_addr,err)			\
 	__asm__ __volatile__(					\
-	"1:	" T(str) "	%1,[%2],#0\n"			\
+	"1:	" TUSER(str) "	%1,[%2],#0\n"			\
 	"2:\n"							\
 	"	.pushsection .fixup,\"ax\"\n"			\
 	"	.align	2\n"					\
@@ -366,10 +380,10 @@ do {									\
 
 #define __put_user_asm_dword(x,__pu_addr,err)			\
 	__asm__ __volatile__(					\
- ARM(	"1:	" T(str) "	" __reg_oper1 ", [%1], #4\n"	)	\
- ARM(	"2:	" T(str) "	" __reg_oper0 ", [%1]\n"	)	\
- THUMB(	"1:	" T(str) "	" __reg_oper1 ", [%1]\n"	)	\
- THUMB(	"2:	" T(str) "	" __reg_oper0 ", [%1, #4]\n"	)	\
+ ARM(	"1:	" TUSER(str) "	" __reg_oper1 ", [%1], #4\n"	) \
+ ARM(	"2:	" TUSER(str) "	" __reg_oper0 ", [%1]\n"	) \
+ THUMB(	"1:	" TUSER(str) "	" __reg_oper1 ", [%1]\n"	) \
+ THUMB(	"2:	" TUSER(str) "	" __reg_oper0 ", [%1, #4]\n"	) \
 	"3:\n"							\
 	"	.pushsection .fixup,\"ax\"\n"			\
 	"	.align	2\n"					\

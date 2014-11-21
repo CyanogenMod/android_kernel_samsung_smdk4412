@@ -174,7 +174,10 @@ static int __devinit max17042_probe(struct i2c_client *client,
 
 	i2c_set_clientdata(client, chip);
 
-	chip->battery.name		= "max17042_battery";
+	if (chip->pdata->psy_name)
+		chip->battery.name		= chip->pdata->psy_name;
+	else
+		chip->battery.name		= "max17042_battery";
 	chip->battery.type		= POWER_SUPPLY_TYPE_BATTERY;
 	chip->battery.get_property	= max17042_get_property;
 	chip->battery.properties	= max17042_battery_props;

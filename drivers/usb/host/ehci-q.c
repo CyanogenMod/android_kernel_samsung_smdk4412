@@ -297,6 +297,12 @@ __acquires(ehci->lock)
 		urb->actual_length, urb->transfer_buffer_length);
 #endif
 
+#ifdef CONFIG_HOST_COMPLIANT_TEST
+	if (likely (urb->transfer_flags == URB_HCD_DRIVER_TEST)) {
+		ehci_dbg(ehci, "USB_TEST : transfer_flags = URB_HCD_DRIVER_TEST so... return!\n");
+		return;
+	}
+#endif
 	/* complete() can reenter this HCD */
 	usb_hcd_unlink_urb_from_ep(ehci_to_hcd(ehci), urb);
 	spin_unlock (&ehci->lock);
@@ -308,6 +314,9 @@ static void start_unlink_async (struct ehci_hcd *ehci, struct ehci_qh *qh);
 static void unlink_async (struct ehci_hcd *ehci, struct ehci_qh *qh);
 
 static int qh_schedule (struct ehci_hcd *ehci, struct ehci_qh *qh);
+#if defined(CONFIG_MDM_HSIC_PM)
+extern void debug_ehci_reg_dump(struct device *hdev);
+#endif
 
 /*
  * Process and free completed qtds for a qh, returning URBs to drivers.
@@ -395,10 +404,6 @@ qh_completions (struct ehci_hcd *ehci, struct ehci_qh *qh)
 						QTD_CERR(token) == 0 &&
 						++qh->xacterrs < QH_XACTERR_MAX &&
 						!urb->unlinked) {
-					ehci_dbg(ehci,
-	"detected XactErr len %zu/%zu retry %d\n",
-	qtd->length - QTD_LENGTH(token), qtd->length, qh->xacterrs);
-
 					/* reset the token in the qtd and the
 					 * qh overlay (which still contains
 					 * the qtd) so that we pick up from
@@ -413,6 +418,20 @@ qh_completions (struct ehci_hcd *ehci, struct ehci_qh *qh)
 					hw->hw_token = cpu_to_hc32(ehci,
 							token);
 					goto retry_xacterr;
+				}
+				if (qh->xacterrs >= QH_XACTERR_MAX) {
+#if defined(CONFIG_MDM_HSIC_PM)
+					struct usb_hcd *hcd = ehci_to_hcd(ehci);
+					static int dump_cnt = 0;
+#endif
+					ehci_dbg(ehci,
+						"detected XactErr len %zu/%zu retry %d\n",
+						qtd->length - QTD_LENGTH(token),
+						qtd->length, qh->xacterrs);
+#if defined(CONFIG_MDM_HSIC_PM)
+					if (dump_cnt++ < 3)
+						debug_ehci_reg_dump(hcd->self.controller);
+#endif
 				}
 				stopped = 1;
 
@@ -1213,7 +1232,12 @@ static void start_unlink_async (struct ehci_hcd *ehci, struct ehci_qh *qh)
 			|| (qh->qh_state != QH_STATE_LINKED
 				&& qh->qh_state != QH_STATE_UNLINK_WAIT)
 			)
+#if defined(CONFIG_MACH_T0_USA_USCC)
+		/*return added as per the main line code kernel version 3.10*/
+		return;
+#else
 		BUG ();
+#endif
 #endif
 
 	/* stop async schedule right now? */

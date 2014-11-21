@@ -255,7 +255,7 @@ not_from_user:
 
 	*ctxp = ctx = kmalloc(sizeof(*ctx) +
 			      str_len,
-			      GFP_ATOMIC);
+			      GFP_KERNEL);
 
 	if (!ctx) {
 		rc = -ENOMEM;

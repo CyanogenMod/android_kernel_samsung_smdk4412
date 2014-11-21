@@ -44,6 +44,11 @@
     doing the mount will be allowed to access the filesystem */
 #define FUSE_ALLOW_OTHER         (1 << 1)
 
+/** If the FUSE_HANDLE_RT_CLASS flag is given,
+    then fuse handle RT class I/O in different request queue  */
+#define FUSE_HANDLE_RT_CLASS   (1 << 2)
+
+
 /** List of active connections */
 extern struct list_head fuse_conn_list;
 
@@ -345,10 +350,10 @@ struct fuse_conn {
 	unsigned max_write;
 
 	/** Readers of the connection are waiting on this */
-	wait_queue_head_t waitq;
+	wait_queue_head_t waitq[2];
 
 	/** The list of pending requests */
-	struct list_head pending;
+	struct list_head pending[2];
 
 	/** The list of requests being processed */
 	struct list_head processing;
@@ -378,7 +383,7 @@ struct fuse_conn {
 	struct list_head bg_queue;
 
 	/** Pending interrupts */
-	struct list_head interrupts;
+	struct list_head interrupts[2];
 
 	/** Queue of pending forgets */
 	struct fuse_forget_link forget_list_head;

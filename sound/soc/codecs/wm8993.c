@@ -236,7 +236,6 @@ struct wm8993_priv {
 	unsigned int sysclk_rate;
 	unsigned int fs;
 	unsigned int bclk;
-	int class_w_users;
 	unsigned int fll_fref;
 	unsigned int fll_fout;
 	int fll_src;
@@ -706,84 +705,6 @@ static int clk_sys_event(struct snd_soc_dapm_widget *w,
 	return 0;
 }
 
-/*
- * When used with DAC outputs only the WM8993 charge pump supports
- * operation in class W mode, providing very low power consumption
- * when used with digital sources.  Enable and disable this mode
- * automatically depending on the mixer configuration.
- *
- * Currently the only supported paths are the direct DAC->headphone
- * paths (which provide minimum power consumption anyway).
- */
-static int class_w_put(struct snd_kcontrol *kcontrol,
-		       struct snd_ctl_elem_value *ucontrol)
-{
-	struct snd_soc_dapm_widget_list *wlist = snd_kcontrol_chip(kcontrol);
-	struct snd_soc_dapm_widget *widget = wlist->widgets[0];
-	struct snd_soc_codec *codec = widget->codec;
-	struct wm8993_priv *wm8993 = snd_soc_codec_get_drvdata(codec);
-	int ret;
-
-	/* Turn it off if we're using the main output mixer */
-	if (ucontrol->value.integer.value[0] == 0) {
-		if (wm8993->class_w_users == 0) {
-			dev_dbg(codec->dev, "Disabling Class W\n");
-			snd_soc_update_bits(codec, WM8993_CLASS_W_0,
-					    WM8993_CP_DYN_FREQ |
-					    WM8993_CP_DYN_V,
-					    0);
-		}
-		wm8993->class_w_users++;
-		wm8993->hubs_data.class_w = true;
-	}
-
-	/* Implement the change */
-	ret = snd_soc_dapm_put_enum_double(kcontrol, ucontrol);
-
-	/* Enable it if we're using the direct DAC path */
-	if (ucontrol->value.integer.value[0] == 1) {
-		if (wm8993->class_w_users == 1) {
-			dev_dbg(codec->dev, "Enabling Class W\n");
-			snd_soc_update_bits(codec, WM8993_CLASS_W_0,
-					    WM8993_CP_DYN_FREQ |
-					    WM8993_CP_DYN_V,
-					    WM8993_CP_DYN_FREQ |
-					    WM8993_CP_DYN_V);
-		}
-		wm8993->class_w_users--;
-		wm8993->hubs_data.class_w = false;
-	}
-
-	dev_dbg(codec->dev, "Indirect DAC use count now %d\n",
-		wm8993->class_w_users);
-
-	return ret;
-}
-
-#define SOC_DAPM_ENUM_W(xname, xenum) \
-{	.iface = SNDRV_CTL_ELEM_IFACE_MIXER, .name = xname, \
-	.info = snd_soc_info_enum_double, \
-	.get = snd_soc_dapm_get_enum_double, \
-	.put = class_w_put, \
-	.private_value = (unsigned long)&xenum }
-
-static const char *hp_mux_text[] = {
-	"Mixer",
-	"DAC",
-};
-
-static const struct soc_enum hpl_enum =
-	SOC_ENUM_SINGLE(WM8993_OUTPUT_MIXER1, 8, 2, hp_mux_text);
-
-static const struct snd_kcontrol_new hpl_mux =
-	SOC_DAPM_ENUM_W("Left Headphone Mux", hpl_enum);
-
-static const struct soc_enum hpr_enum =
-	SOC_ENUM_SINGLE(WM8993_OUTPUT_MIXER2, 8, 2, hp_mux_text);
-
-static const struct snd_kcontrol_new hpr_mux =
-	SOC_DAPM_ENUM_W("Right Headphone Mux", hpr_enum);
-
 static const struct snd_kcontrol_new left_speaker_mixer[] = {
 SOC_DAPM_SINGLE("Input Switch", WM8993_SPEAKER_MIXER, 7, 1, 0),
 SOC_DAPM_SINGLE("IN1LP Switch", WM8993_SPEAKER_MIXER, 5, 1, 0),
@@ -869,8 +790,8 @@ SND_SOC_DAPM_MUX("DACR Sidetone", SND_SOC_NOPM, 0, 0, &sidetoner_mux),
 SND_SOC_DAPM_DAC("DACL", NULL, WM8993_POWER_MANAGEMENT_3, 1, 0),
 SND_SOC_DAPM_DAC("DACR", NULL, WM8993_POWER_MANAGEMENT_3, 0, 0),
 
-SND_SOC_DAPM_MUX("Left Headphone Mux", SND_SOC_NOPM, 0, 0, &hpl_mux),
-SND_SOC_DAPM_MUX("Right Headphone Mux", SND_SOC_NOPM, 0, 0, &hpr_mux),
+SND_SOC_DAPM_MUX("Left Headphone Mux", SND_SOC_NOPM, 0, 0, &wm_hubs_hpl_mux),
+SND_SOC_DAPM_MUX("Right Headphone Mux", SND_SOC_NOPM, 0, 0, &wm_hubs_hpr_mux),
 
 SND_SOC_DAPM_MIXER("SPKL", WM8993_POWER_MANAGEMENT_3, 8, 0,
 		   left_speaker_mixer, ARRAY_SIZE(left_speaker_mixer)),
@@ -958,6 +879,8 @@ static int wm8993_set_bias_level(struct snd_soc_codec *codec,
 	struct wm8993_priv *wm8993 = snd_soc_codec_get_drvdata(codec);
 	int ret;
 
+	wm_hubs_set_bias_level(codec, level);
+
 	switch (level) {
 	case SND_SOC_BIAS_ON:
 	case SND_SOC_BIAS_PREPARE:
@@ -981,6 +904,8 @@ static int wm8993_set_bias_level(struct snd_soc_codec *codec,
 			snd_soc_write(codec, 0x44, 3);
 			snd_soc_write(codec, 0x56, 3);
 			snd_soc_write(codec, 0x44, 0);
+
+			wm_hubs_vmid_ena(codec);
 
 			/* Bring up VMID with fast soft start */
 			snd_soc_update_bits(codec, WM8993_ANTIPOP2,
@@ -1044,6 +969,12 @@ static int wm8993_set_bias_level(struct snd_soc_codec *codec,
 		*/
 		codec->cache_sync = 1;
 #endif
+
+		snd_soc_update_bits(codec, WM8993_POWER_MANAGEMENT_3,
+				    WM8993_LINEOUT1N_ENA |
+				    WM8993_LINEOUT1P_ENA |
+				    WM8993_LINEOUT2N_ENA |
+				    WM8993_LINEOUT2P_ENA, 0);
 
 		regulator_bulk_disable(ARRAY_SIZE(wm8993->supplies),
 				       wm8993->supplies);
@@ -1471,9 +1402,6 @@ static int wm8993_probe(struct snd_soc_codec *codec)
 
 	codec->cache_only = 1;
 
-	/* By default we're using the output mixers */
-	wm8993->class_w_users = 2;
-
 	/* Latch volume update bits and default ZC on */
 	snd_soc_update_bits(codec, WM8993_RIGHT_DAC_DIGITAL_VOLUME,
 			    WM8993_DAC_VU, WM8993_DAC_VU);
@@ -1518,6 +1446,12 @@ static int wm8993_probe(struct snd_soc_codec *codec)
 	snd_soc_dapm_add_routes(dapm, routes, ARRAY_SIZE(routes));
 	wm_hubs_add_analogue_routes(codec, wm8993->pdata.lineout1_diff,
 				    wm8993->pdata.lineout2_diff);
+
+	/* If the line outputs are differential then we aren't presenting
+	 * VMID as an output and can disable it.
+	 */
+	if (wm8993->pdata.lineout1_diff && wm8993->pdata.lineout2_diff)
+		codec->dapm.idle_bias_off = 1;
 
 	return 0;
 

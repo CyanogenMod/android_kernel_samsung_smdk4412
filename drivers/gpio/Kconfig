@@ -88,7 +88,11 @@ config GPIO_IT8761E
 
 config GPIO_EXYNOS4
 	def_bool y
-	depends on CPU_EXYNOS4210
+	depends on ARCH_EXYNOS4
+
+config GPIO_EXYNOS5
+	def_bool y
+	depends on ARCH_EXYNOS5
 
 config GPIO_PLAT_SAMSUNG
 	def_bool y
@@ -454,4 +458,7 @@ config GPIO_TPS65910
 	help
 	  Select this option to enable GPIO driver for the TPS65910
 	  chip family.
+
+config SEC_GPIO_DVS
+	tristate "setting Samsung GPIO debugging and verification system"
 endif

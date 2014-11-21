@@ -49,6 +49,9 @@
 #include <asm/mach/time.h>
 #include <asm/traps.h>
 #include <asm/unwind.h>
+#ifdef CONFIG_MIDAS_COMMON
+#include <plat/cpu.h>
+#endif
 
 #if defined(CONFIG_DEPRECATED_PARAM_STRUCT)
 #include "compat.h"
@@ -75,6 +78,9 @@ __setup("fpe=", fpe_setup);
 extern void paging_init(struct machine_desc *desc);
 extern void sanity_check_meminfo(void);
 extern void reboot_setup(char *str);
+#ifdef CONFIG_DMA_CMA
+extern void setup_dma_zone(struct machine_desc *desc);
+#endif
 
 unsigned int processor_id;
 EXPORT_SYMBOL(processor_id);
@@ -126,6 +132,9 @@ static struct stack stacks[NR_CPUS];
 char elf_platform[ELF_PLATFORM_SIZE];
 EXPORT_SYMBOL(elf_platform);
 
+#ifdef CONFIG_MIDAS_COMMON
+const char *chip_name;
+#endif
 static const char *cpu_name;
 static const char *machine_name;
 static char __initdata cmd_line[COMMAND_LINE_SIZE];
@@ -887,6 +896,9 @@ void __init setup_arch(char **cmdline_p)
 	machine_desc = mdesc;
 	machine_name = mdesc->name;
 
+#ifdef CONFIG_DMA_CMA
+	setup_dma_zone(mdesc);
+#endif
 	if (mdesc->soft_reboot)
 		reboot_setup("s");
 
@@ -979,6 +991,10 @@ static const char *hwcap_str[] = {
 	"neon",
 	"vfpv3",
 	"vfpv3d16",
+	"tls",
+	"vfpv4",
+	"idiva",
+	"idivt",
 	NULL
 };
 
@@ -1037,6 +1053,12 @@ static int c_show(struct seq_file *m, void *v)
 
 	seq_puts(m, "\n");
 
+#ifdef CONFIG_MIDAS_COMMON
+	if ((soc_is_exynos4412() || soc_is_exynos4212()) && chip_name)
+		seq_printf(m, "Chip name\t: %s\n", chip_name);
+	if (soc_is_exynos4412())
+		seq_printf(m, "Chip revision\t: %04x\n", samsung_rev());
+#endif
 	seq_printf(m, "Hardware\t: %s\n", machine_name);
 	seq_printf(m, "Revision\t: %04x\n", system_rev);
 	seq_printf(m, "Serial\t\t: %08x%08x\n",

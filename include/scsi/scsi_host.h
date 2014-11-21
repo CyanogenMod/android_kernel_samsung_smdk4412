@@ -715,6 +715,9 @@ struct Scsi_Host {
 	 * Needed just in case we have virtual hosts.
 	 */
 	struct device *dma_dev;
+#ifdef CONFIG_USB_HOST_NOTIFY
+	unsigned int  by_usb;
+#endif
 
 	/*
 	 * We should ensure that this is aligned, both for better performance

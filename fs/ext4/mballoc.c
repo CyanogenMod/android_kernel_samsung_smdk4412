@@ -731,6 +731,10 @@ void ext4_mb_generate_buddy(struct super_block *sb,
 	grp->bb_fragments = fragments;
 
 	if (free != grp->bb_free) {
+		/* for more specific debugging, sangwoo2.lee */
+		print_block_data(sb, 0, bitmap, 0, EXT4_BLOCK_SIZE(sb));
+		/* for more specific debugging */
+
 		ext4_grp_locked_error(sb, group, 0, 0,
 				      "%u blocks in bitmap, %u in gd",
 				      free, grp->bb_free);
@@ -1338,6 +1342,9 @@ static void mb_free_blocks(struct inode *inode, struct ext4_buddy *e4b,
 
 			blocknr = ext4_group_first_block_no(sb, e4b->bd_group);
 			blocknr += block;
+			/* for debugging, sangwoo2.lee */
+			print_block_data(sb, blocknr, EXT4_MB_BITMAP(e4b), 0, EXT4_BLOCK_SIZE(sb));
+			/* for debugging */
 			ext4_grp_locked_error(sb, e4b->bd_group,
 					      inode ? inode->i_ino : 0,
 					      blocknr,

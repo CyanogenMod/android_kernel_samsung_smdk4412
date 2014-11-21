@@ -41,6 +41,9 @@
 #include <linux/scatterlist.h>
 #include <linux/mm.h>
 #include <linux/dma-mapping.h>
+#if defined(CONFIG_LINK_DEVICE_HSIC) || defined(CONFIG_MDM_HSIC_PM)
+#include <linux/usb/quirks.h>
+#endif
 
 #include "usb.h"
 
@@ -283,6 +286,12 @@ static int usb_dev_suspend(struct device *dev)
 
 static int usb_dev_resume(struct device *dev)
 {
+#if defined(CONFIG_LINK_DEVICE_HSIC) || defined(CONFIG_MDM_HSIC_PM)
+	struct usb_device	*udev = to_usb_device(dev);
+
+	if (udev && udev->quirks & USB_QUIRK_NO_DPM_RESUME)
+		return 0;
+#endif
 	return usb_resume(dev, PMSG_RESUME);
 }
 
@@ -309,8 +318,10 @@ static int usb_dev_restore(struct device *dev)
 static const struct dev_pm_ops usb_device_pm_ops = {
 	.prepare =	usb_dev_prepare,
 	.complete =	usb_dev_complete,
+#if !defined(CONFIG_MACH_P4NOTE) && !defined(CONFIG_MACH_SP7160LTE)
 	.suspend =	usb_dev_suspend,
 	.resume =	usb_dev_resume,
+#endif
 	.freeze =	usb_dev_freeze,
 	.thaw =		usb_dev_thaw,
 	.poweroff =	usb_dev_poweroff,

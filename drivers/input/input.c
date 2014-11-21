@@ -176,6 +176,10 @@ static int input_handle_abs_event(struct input_dev *dev,
 		 */
 		if (*pval >= 0 && *pval < dev->mtsize)
 			dev->slot = *pval;
+		else
+			printk(KERN_DEBUG "[TSP] dev->slot[%d], pval[%d]\n",\
+				 dev->slot, *pval);
+
 
 		return INPUT_IGNORE_EVENT;
 	}
@@ -1574,9 +1578,9 @@ void input_reset_device(struct input_dev *dev)
 		 * Keys that have been pressed at suspend time are unlikely
 		 * to be still pressed when we resume.
 		 */
-		spin_lock_irq(&dev->event_lock);
+	/*	spin_lock_irq(&dev->event_lock);
 		input_dev_release_keys(dev);
-		spin_unlock_irq(&dev->event_lock);
+		spin_unlock_irq(&dev->event_lock);*/
 	}
 
 	mutex_unlock(&dev->mutex);

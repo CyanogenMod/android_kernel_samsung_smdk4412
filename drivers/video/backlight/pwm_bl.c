@@ -31,11 +31,19 @@ struct pwm_bl_data {
 	int			(*check_fb)(struct device *, struct fb_info *);
 };
 
+/*H/W team requirement for MWC Demo*/
+/* lcd max brightnessis restrictd to PWM 80% MAX PWM Duty : 80 (204)%*/
+#define CONFIG_MWC_DEMO
+
 static int pwm_backlight_update_status(struct backlight_device *bl)
 {
 	struct pwm_bl_data *pb = dev_get_drvdata(&bl->dev);
 	int brightness = bl->props.brightness;
 	int max = bl->props.max_brightness;
+#ifdef CONFIG_MWC_DEMO
+	if (brightness >= 204)
+		brightness = 204;
+#endif
 
 	if (bl->props.power != FB_BLANK_UNBLANK)
 		brightness = 0;

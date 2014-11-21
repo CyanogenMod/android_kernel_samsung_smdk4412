@@ -1,0 +1,12 @@
+config VIDEO_EXYNOS_ROTATOR
+	bool "EXYNOS Image Rotator Driver"
+	depends on VIDEO_EXYNOS && (ARCH_EXYNOS4 || ARCH_EXYNOS5)
+	select V4L2_MEM2MEM_DEV
+	default n
+	help
+	  This is a v4l2 driver for EXYNOS Image Rotator device.
+
+config VIDEO_SAMSUNG_MEMSIZE_ROT
+	int "Memory size in kbytes for ROTATOR"
+	depends on VIDEO_EXYNOS_ROTATOR
+	default "9216"

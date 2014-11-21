@@ -1,5 +1,7 @@
 # S3c24XX Platform Support
 snd-soc-s3c24xx-objs := dma.o
+snd-soc-idma-objs := idma.o
+snd-soc-dma-wrapper-objs := dma-wrapper.o
 snd-soc-s3c24xx-i2s-objs := s3c24xx-i2s.o
 snd-soc-s3c2412-i2s-objs := s3c2412-i2s.o
 snd-soc-ac97-objs := ac97.o
@@ -7,6 +9,7 @@ snd-soc-s3c-i2s-v2-objs := s3c-i2s-v2.o
 snd-soc-samsung-spdif-objs := spdif.o
 snd-soc-pcm-objs := pcm.o
 snd-soc-i2s-objs := i2s.o
+snd-soc-audss-objs := audss.o
 
 obj-$(CONFIG_SND_SOC_SAMSUNG) += snd-soc-s3c24xx.o
 obj-$(CONFIG_SND_S3C24XX_I2S) += snd-soc-s3c24xx-i2s.o
@@ -16,6 +19,9 @@ obj-$(CONFIG_SND_S3C_I2SV2_SOC) += snd-soc-s3c-i2s-v2.o
 obj-$(CONFIG_SND_SAMSUNG_SPDIF) += snd-soc-samsung-spdif.o
 obj-$(CONFIG_SND_SAMSUNG_PCM) += snd-soc-pcm.o
 obj-$(CONFIG_SND_SAMSUNG_I2S) += snd-soc-i2s.o
+obj-$(CONFIG_SND_SAMSUNG_I2S) += snd-soc-audss.o
+obj-$(CONFIG_SND_SAMSUNG_I2S) += snd-soc-idma.o
+obj-$(CONFIG_SND_SOC_SAMSUNG_USE_DMA_WRAPPER) += snd-soc-dma-wrapper.o
 
 # S3C24XX Machine Support
 snd-soc-jive-wm8750-objs := jive_wm8750.o
@@ -30,12 +36,28 @@ snd-soc-h1940-uda1380-objs := h1940_uda1380.o
 snd-soc-rx1950-uda1380-objs := rx1950_uda1380.o
 snd-soc-smdk-wm8580-objs := smdk_wm8580.o
 snd-soc-smdk-wm8994-objs := smdk_wm8994.o
+snd-soc-smdk-wm8994pcm-objs := smdk_wm8994pcm.o
 snd-soc-smdk-wm9713-objs := smdk_wm9713.o
 snd-soc-s3c64xx-smartq-wm8987-objs := smartq_wm8987.o
 snd-soc-goni-wm8994-objs := goni_wm8994.o
 snd-soc-smdk-spdif-objs := smdk_spdif.o
 snd-soc-smdk-wm8580pcm-objs := smdk_wm8580pcm.o
 snd-soc-speyside-objs := speyside.o
+snd-soc-slp-trats-mc1n2-objs := slp_trats_mc1n2.o
+snd-soc-slp-jack-objs := slp_jack.o
+snd-soc-midas-wm1811-objs := midas_wm1811.o
+snd-soc-t0-wm1811-objs := t0_wm1811.o
+snd-soc-t0duos-wm1811-objs := t0duos_wm1811.o
+snd-soc-m3-wm1811-objs := m3_wm1811.o
+snd-soc-kona-wm1811-objs := kona_wm1811.o
+snd-soc-slp-exynos-wm1811-objs := slp_exynos_wm1811.o
+snd-soc-slp-naples-wm1811-objs := slp_naples_wm1811.o
+snd-soc-lungo-wm1811-objs := lungo_wm1811.o
+snd-soc-grande-wm1811-objs := grande_wm1811.o
+snd-soc-tab3-wm1811-objs := tab3_wm1811.o
+snd-soc-zest-wm1811-objs := zest_wm1811.o
+snd-soc-gd2-wm1811-objs := gd2_wm1811.o
+snd-soc-gc2pd-wm1811-objs := gc2pd_wm1811.o
 
 obj-$(CONFIG_SND_SOC_SAMSUNG_JIVE_WM8750) += snd-soc-jive-wm8750.o
 obj-$(CONFIG_SND_SOC_SAMSUNG_NEO1973_WM8753) += snd-soc-neo1973-wm8753.o
@@ -49,9 +71,29 @@ obj-$(CONFIG_SND_SOC_SAMSUNG_H1940_UDA1380) += snd-soc-h1940-uda1380.o
 obj-$(CONFIG_SND_SOC_SAMSUNG_RX1950_UDA1380) += snd-soc-rx1950-uda1380.o
 obj-$(CONFIG_SND_SOC_SAMSUNG_SMDK_WM8580) += snd-soc-smdk-wm8580.o
 obj-$(CONFIG_SND_SOC_SAMSUNG_SMDK_WM8994) += snd-soc-smdk-wm8994.o
+obj-$(CONFIG_SND_SOC_SAMSUNG_SMDK_WM8994_PCM) += snd-soc-smdk-wm8994pcm.o
 obj-$(CONFIG_SND_SOC_SAMSUNG_SMDK_WM9713) += snd-soc-smdk-wm9713.o
 obj-$(CONFIG_SND_SOC_SMARTQ) += snd-soc-s3c64xx-smartq-wm8987.o
 obj-$(CONFIG_SND_SOC_SAMSUNG_SMDK_SPDIF) += snd-soc-smdk-spdif.o
 obj-$(CONFIG_SND_SOC_GONI_AQUILA_WM8994) += snd-soc-goni-wm8994.o
 obj-$(CONFIG_SND_SOC_SMDK_WM8580_PCM) += snd-soc-smdk-wm8580pcm.o
 obj-$(CONFIG_SND_SOC_SPEYSIDE) += snd-soc-speyside.o
+obj-$(CONFIG_SND_SOC_SLP_TRATS_MC1N2) += snd-soc-slp-trats-mc1n2.o
+obj-$(CONFIG_SND_SOC_SLP_TRATS_MC1N2) += snd-soc-slp-jack.o
+obj-$(CONFIG_SND_SOC_SAMSUNG_MIDAS_WM1811) += snd-soc-midas-wm1811.o
+obj-$(CONFIG_SND_SOC_SAMSUNG_T0_WM1811) += snd-soc-t0-wm1811.o
+obj-$(CONFIG_SND_SOC_SAMSUNG_T0DUOS_WM1811) += snd-soc-t0duos-wm1811.o
+obj-$(CONFIG_SND_SOC_SAMSUNG_M3_WM1811) += snd-soc-m3-wm1811.o
+obj-$(CONFIG_SND_SOC_SAMSUNG_KONA_WM1811) += snd-soc-kona-wm1811.o
+obj-$(CONFIG_SND_SOC_SAMSUNG_SLP_EXYNOS_WM1811) += snd-soc-slp-exynos-wm1811.o
+obj-$(CONFIG_SND_SOC_SAMSUNG_SLP_NAPLES_WM1811) += snd-soc-slp-naples-wm1811.o
+obj-$(CONFIG_SND_SOC_SAMSUNG_LUNGO_WM1811) += snd-soc-midas-wm1811.o
+obj-$(CONFIG_SND_SOC_SAMSUNG_GRANDE_WM1811) += snd-soc-grande-wm1811.o
+obj-$(CONFIG_SND_SOC_SAMSUNG_TAB3_WM1811) += snd-soc-tab3-wm1811.o
+obj-$(CONFIG_SND_SOC_SAMSUNG_ZEST_WM1811) += snd-soc-zest-wm1811.o
+obj-$(CONFIG_SND_SOC_SAMSUNG_GD2_WM1811) += snd-soc-gd2-wm1811.o
+obj-$(CONFIG_SND_SOC_SAMSUNG_GC2PD_WM1811) += snd-soc-gc2pd-wm1811.o
+
+obj-$(CONFIG_SND_SAMSUNG_RP)   += srp_ulp/
+obj-$(CONFIG_SND_SAMSUNG_ALP)   += srp_alp/
+

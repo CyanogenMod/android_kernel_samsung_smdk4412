@@ -1,0 +1,89 @@
+#
+# TDMB config states
+#
+
+#klaatu TDMB
+config TDMB
+	bool "T-DMB"
+	help
+	  This allows T-DMB support for Korea.
+	  This module is designed for SPI or EBI2.
+	  Select chipset and interface
+
+choice
+	depends on TDMB
+	depends on TDMB_VENDOR_FCI || TDMB_VENDOR_RAONTECH \
+		|| TDMB_VENDOR_INC || TDMB_VENDOR_TELECHIPS
+	prompt "interface"
+	default TDMB_SPI
+	config TDMB_SPI
+		bool "SPI"
+	config TDMB_EBI
+		bool "EBI"
+	config TDMB_TSIF
+		bool "TSIF"
+endchoice
+
+	config TDMB_VENDOR_FCI
+	depends on TDMB
+		bool "FCI"
+
+choice
+	depends on TDMB && TDMB_VENDOR_FCI
+	prompt "chip"
+	default TDMB_FC8053
+	config TDMB_FC8053
+		bool "FC8053"
+	config TDMB_FC8050
+		bool "FC8050"
+endchoice
+
+config TDMB_VENDOR_INC
+	depends on TDMB
+	bool "I&C"
+
+choice
+	depends on TDMB && TDMB_VENDOR_INC
+	prompt "chip"
+	default TDMB_T39F0
+	config TDMB_T39F0
+		bool "T39F0"
+	config TDMB_T3900
+		bool "T3900"
+	config TDMB_T3700
+		bool "T3700"
+	config TDMB_T3300
+		bool "T3300"
+endchoice
+
+config TDMB_VENDOR_RAONTECH
+	depends on TDMB
+	bool "Raontech"
+
+choice
+	depends on TDMB && TDMB_VENDOR_RAONTECH
+	prompt "chip"
+	default TDMB_MTV318
+	config TDMB_MTV318
+		bool "MTV318"
+endchoice
+
+config TDMB_VENDOR_TELECHIPS
+	depends on TDMB
+	bool "Telechips"
+
+choice
+	depends on TDMB && TDMB_VENDOR_TELECHIPS
+	prompt "chip"
+	default TDMB_TCC3170
+	config TDMB_TCC3170
+		bool "TCC3170"
+endchoice
+
+config TDMB_SIMUL
+	depends on TDMB
+	bool "Simulation"
+
+config TDMB_ANT_DET
+	depends on TDMB
+	bool "tdmb antenna detector"

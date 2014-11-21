@@ -242,6 +242,73 @@ static const struct address_space_operations fat_aops = {
 	.bmap		= _fat_bmap
 };
 
+#if defined(CONFIG_VMWARE_MVP)
+int _fat_fallocate(struct inode *inode, loff_t len)
+{
+	struct super_block *sb = inode->i_sb;
+	struct msdos_sb_info *sbi = MSDOS_SB(sb);
+	int err;
+	sector_t nblocks, iblock;
+	unsigned short offset;
+
+	if (!S_ISREG(inode->i_mode)) {
+		printk(KERN_ERR "_fat_fallocate: supported only for regular files\n");
+		return -EOPNOTSUPP;
+	}
+
+	if (IS_IMMUTABLE(inode)) {
+		return -EPERM;
+	}
+
+	mutex_lock(&inode->i_mutex);
+
+	/* file is already big enough */
+	if (len <= i_size_read(inode)) {
+		mutex_unlock(&inode->i_mutex);
+		return 0;
+	}
+
+	nblocks = (len + sb->s_blocksize - 1 ) >> sb->s_blocksize_bits;
+	iblock = (MSDOS_I(inode)->mmu_private + sb->s_blocksize - 1) >> sb->s_blocksize_bits;
+
+	/* validate new size */
+	err = inode_newsize_ok(inode, len);
+	if (err) {
+		mutex_unlock(&inode->i_mutex);
+		return err;
+	}
+
+	/* check for available blocks on last cluster */
+	offset = (unsigned long)iblock & (sbi->sec_per_clus - 1);
+	if (offset) {
+		iblock += min((unsigned long) (sbi->sec_per_clus - offset),
+				(unsigned long) (nblocks - iblock));
+	}
+
+	/* now allocate new clusters */
+	while (iblock < nblocks) {
+		err = fat_add_cluster(inode);
+		if (err) {
+			break;
+		}
+
+		iblock += min((unsigned long) sbi->sec_per_clus,
+				(unsigned long) (nblocks - iblock));
+	}
+
+	/* update inode informations */
+	len = min(len, (loff_t)(iblock << sb->s_blocksize_bits));
+	i_size_write(inode, len);
+	MSDOS_I(inode)->mmu_private = len;
+	inode->i_mtime = inode->i_ctime = CURRENT_TIME_SEC;
+	mark_inode_dirty(inode);
+
+	mutex_unlock(&inode->i_mutex);
+
+	return err;
+}
+#endif
+
 /*
  * New FAT inode stuff. We do the following:
  *	a) i_ino is constant and has nothing with on-disk location.
@@ -487,6 +554,8 @@ static void fat_put_super(struct super_block *sb)
 {
 	struct msdos_sb_info *sbi = MSDOS_SB(sb);
 
+	fat_msg(sb, KERN_INFO, "trying to unmount...");
+
 	if (sb->s_dirt)
 		fat_write_super(sb);
 
@@ -500,6 +569,8 @@ static void fat_put_super(struct super_block *sb)
 
 	sb->s_fs_info = NULL;
 	kfree(sbi);
+
+	fat_msg(sb, KERN_INFO, "unmounted successfully!");
 }
 
 static struct kmem_cache *fat_inode_cachep;
@@ -1229,8 +1300,8 @@ static int fat_read_root(struct inode *inode)
 	MSDOS_I(inode)->mmu_private = inode->i_size;
 
 	fat_save_attrs(inode, ATTR_DIR);
-	inode->i_mtime.tv_sec = inode->i_atime.tv_sec = inode->i_ctime.tv_sec = 0;
-	inode->i_mtime.tv_nsec = inode->i_atime.tv_nsec = inode->i_ctime.tv_nsec = 0;
+
+	inode->i_mtime = inode->i_atime = inode->i_ctime = CURRENT_TIME_SEC;
 	inode->i_nlink = fat_subdirs(inode)+2;
 
 	return 0;
@@ -1258,6 +1329,7 @@ int fat_fill_super(struct super_block *sb, void *data, int silent, int isvfat,
 	struct inode *root_inode = NULL, *fat_inode = NULL;
 	struct buffer_head *bh;
 	struct fat_boot_sector *b;
+	struct fat_boot_bsx *bsx;
 	struct msdos_sb_info *sbi;
 	u16 logical_sector_size;
 	u32 total_sectors, total_clusters, fat_clusters, rootdir_sectors;
@@ -1266,6 +1338,7 @@ int fat_fill_super(struct super_block *sb, void *data, int silent, int isvfat,
 	long error;
 	char buf[50];
 
+	fat_msg(sb, KERN_INFO, "trying to mount...");
 	/*
 	 * GFP_KERNEL is ok here, because while we do hold the
 	 * supeblock lock, memory pressure can't call back into
@@ -1273,8 +1346,10 @@ int fat_fill_super(struct super_block *sb, void *data, int silent, int isvfat,
 	 * it and have no inodes etc active!
 	 */
 	sbi = kzalloc(sizeof(struct msdos_sb_info), GFP_KERNEL);
-	if (!sbi)
+	if (!sbi) {
+		fat_msg(sb, KERN_ERR, "failed to mount! (ENOMEM)");
 		return -ENOMEM;
+	}
 	sb->s_fs_info = sbi;
 
 	sb->s_flags |= MS_NODIRATIME;
@@ -1403,6 +1478,8 @@ int fat_fill_super(struct super_block *sb, void *data, int silent, int isvfat,
 			goto out_fail;
 		}
 
+		bsx = (struct fat_boot_bsx *)(bh->b_data + FAT32_BSX_OFFSET);
+
 		fsinfo = (struct fat_boot_fsinfo *)fsinfo_bh->b_data;
 		if (!IS_FSINFO(fsinfo)) {
 			fat_msg(sb, KERN_WARNING, "Invalid FSINFO signature: "
@@ -1418,7 +1495,13 @@ int fat_fill_super(struct super_block *sb, void *data, int silent, int isvfat,
 		}
 
 		brelse(fsinfo_bh);
+	} else {
+		bsx = (struct fat_boot_bsx *)(bh->b_data + FAT16_BSX_OFFSET);
 	}
+
+	/* interpret volume ID as a little endian 32 bit integer */
+	sbi->vol_id = (((u32)bsx->vol_id[0]) | ((u32)bsx->vol_id[1] << 8) |
+		((u32)bsx->vol_id[2] << 16) | ((u32)bsx->vol_id[3] << 24));
 
 	sbi->dir_per_block = sb->s_blocksize / sizeof(struct msdos_dir_entry);
 	sbi->dir_per_block_bits = ffs(sbi->dir_per_block) - 1;
@@ -1519,6 +1602,7 @@ int fat_fill_super(struct super_block *sb, void *data, int silent, int isvfat,
 		goto out_fail;
 	}
 
+	fat_msg(sb, KERN_INFO, "mounted successfully!");
 	return 0;
 
 out_invalid:
@@ -1527,6 +1611,7 @@ out_invalid:
 		fat_msg(sb, KERN_INFO, "Can't find a valid FAT filesystem");
 
 out_fail:
+	fat_msg(sb, KERN_ERR, "failed to mount!");
 	if (fat_inode)
 		iput(fat_inode);
 	if (root_inode)

@@ -1,0 +1,180 @@
+#
+# MUIC devices
+#
+
+comment "MUIC new configs"
+
+config USE_MUIC
+	bool "Using MUIC device driver"
+	depends on I2C
+	default n
+	help
+	  If you say yes here you will get support for
+	  the MUIC device driver.
+
+config MUIC_ADD_PLATFORM_DEVICE
+	bool "Using MUIC platform device register utility"
+	depends on USE_MUIC
+	default n
+	help
+	  If you say yes here you will get support for
+	  the MUIC platform device register utility.
+
+config MUIC_ADC_ADD_PLATFORM_DEVICE
+	bool "Using ADC platform device register utility"
+	depends on USE_MUIC
+	default n
+	help
+	  If you say yes here you will get support for
+	  the ADC platform device register utility.
+
+config SAMSUNG_MUIC
+	bool "Using samsung MUIC chip driver"
+	depends on USE_MUIC
+	default n
+	help
+	  If you say yes here you will get support for the MUIC chip.
+
+config DI_MUIC
+	bool "Using DI MUIC chip driver"
+	depends on USE_MUIC
+	default n
+	help
+	  If you say yes here you will get support for the MUIC chip for DI.
+
+config MUIC_I2C_USE_S3C_DEV_I2C4
+	bool "MUIC using H/W I2C-4"
+	depends on I2C && USE_MUIC
+	default n
+	help
+	  If you say yes here you will get support for the MUIC
+	  to use GPIO H/W I2C number 4.
+
+config MUIC_I2C_USE_I2C17_EMUL
+	bool "Using GPIO S/W Emulated I2C number 17 for MUIC"
+	depends on I2C && USE_MUIC
+	default n
+	help
+	  If you say yes here you will get support for the MUIC
+	  to use GPIO S/W Emulated I2C number 17.
+
+config MUIC_INIT_DETECT_DELAY
+	int "Init detect delay time in MUIC"
+	depends on USE_MUIC
+	default 3000
+	help
+	  Amount of init detection delay time on MUIC.
+
+config MUIC_USB_DETECT_DELAY
+	int "USB detect delay time in MUIC"
+	depends on USE_MUIC
+	default 17000
+	help
+	  Amount of USB detection delay time on MUIC.
+
+config MUIC_SUPPORT_11PIN_DEV_GENDER
+	bool "MUIC SUPPORT 11PIN DEV GENDER"
+	depends on USE_MUIC
+	default n
+	help
+	  for 11pin dev gender supporting.
+
+config MUIC_USE_11PIN_MHL_TO_USB
+	bool "MUIC USE 11PIN MHL SWITCH TO USB"
+	depends on USE_MUIC && MUIC_SUPPORT_11PIN_DEV_GENDER
+	default n
+	help
+	  for using 11pin MHL switch to USB.
+
+config MUIC_MAX77693_DEBUG
+	bool "MUIC MAX77693 DEBUG"
+	depends on MFD_MAX77693 && USE_MUIC
+	default n
+	help
+	  for max77693-muic device debugging.
+
+config MUIC_MAX77693_RESET_WA
+	bool "MUIC_MAX77693_RESET_WA"
+	depends on MFD_MAX77693 && USE_MUIC
+	default n
+	help
+	  for max77693-muic device reset workaround.
+	  recovery from muic reset.
+
+config MUIC_MAX77693_SUPPORT_MHL_CABLE_DETECTION
+	bool "MUIC_MAX77693_SUPPORT_MHL_CABLE_DETECTION"
+	depends on MFD_MAX77693 && USE_MUIC
+	default y
+	help
+	  If you say yes here you will get support for the MHL cable
+	  detection.
+
+config MUIC_MAX77693_SUPPORT_OTG_AUDIO_DOCK
+	bool "MUIC_MAX77693_SUPPORT_OTG_AUDIO_DOCK"
+	depends on MFD_MAX77693 && USE_MUIC
+	default n
+	help
+	  If you say yes here you will get support for the OTG audio dock.
+
+config MUIC_MAX77693_SUPPORT_SMART_DOCK
+	bool "MUIC_MAX77693_SUPPORT_SMART_DOCK"
+	depends on MFD_MAX77693 && USE_MUIC
+	default n
+	help
+	  If you say yes here you will get support for the smart dock.
+
+config MUIC_MAX77693_SUPPORT_CAR_DOCK
+	bool "MUIC_MAX77693_SUPPORT_CAR_DOCK"
+	depends on MFD_MAX77693 && USE_MUIC
+	default n
+	help
+	  If you say yes here you will get support for the car dock.
+
+config MUIC_MAX77693_SUPPORT_REMOTE_SWITCH
+	bool "MUIC_MAX77693_SUPPORT_REMOTE_SWITCH"
+	depends on MFD_MAX77693 && DI_MUIC
+	default n
+	help
+	  If you say yes here you will get support for the remote switch.
+
+config MUIC_MAX77693_SUPPORT_PS_CABLE
+	bool "MUIC_MAX77693_SUPPORT_PS_CABLE"
+	depends on MFD_MAX77693 && USE_MUIC
+	default n
+	help
+	  If you say yes here you will get support for the power sharing cable.
+
+config MUIC_FSA9485
+	bool "Using FSA9485 MUIC"
+	depends on I2C && USE_MUIC
+	default n
+	help
+	  If you say yes here you will get support for
+	  for the FSA9485 MUIC chip.
+
+config MUIC_MAX14577
+	bool "Using MAX14577 MUIC"
+	depends on MFD_MAX14577 && USE_MUIC
+	default n
+	help
+	  If you say yes here you will get support for
+	  for the MAX14577 MUIC chip.
+
+config MUIC_MAX8997
+	tristate "MAX8997 MUIC"
+	depends on MFD_MAX8997
+	help
+	  If you say yes here you will get support for the MUIC of
+	  Maxim MAX8997 PMIC.
+	  The MAX8997 MUIC is a USB port accessory detector and switch.
+
+config MUIC_MAX8997_OVPUI
+	tristate "MAX8997 MUIC"
+	depends on MFD_MAX8997
+	default n
+	help
+	  If you say yes here you will get support for the MUIC OVP UI
+	  concept of Maxim MAX8997 PMIC. The MAX8997 MUIC OVP UI concept
+	  is used in Chinese models. When OVP is occurred, the battery UI
+	  must be changed to uncharging status.
+

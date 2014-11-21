@@ -16,19 +16,38 @@
 #include <linux/err.h>
 #include <linux/clk.h>
 #include <linux/io.h>
+#include <linux/suspend.h>
+#include <linux/reboot.h>
+#include <linux/regulator/consumer.h>
 #include <linux/cpufreq.h>
+#include <linux/platform_device.h>
 
 #include <mach/map.h>
 #include <mach/regs-clock.h>
+#include <mach/cpu-freq-v210.h>
 
 static struct clk *cpu_clk;
 static struct clk *dmc0_clk;
 static struct clk *dmc1_clk;
 static struct cpufreq_freqs freqs;
+static DEFINE_MUTEX(set_freq_lock);
 
 /* APLL M,P,S values for 1G/800Mhz */
 #define APLL_VAL_1000	((1 << 31) | (125 << 16) | (3 << 8) | 1)
 #define APLL_VAL_800	((1 << 31) | (100 << 16) | (3 << 8) | 1)
+
+#define SLEEP_FREQ	(800 * 1000) /* Use 800MHz when entering sleep */
+
+/*
+ * relation has an additional symantics other than the standard of cpufreq
+ *	DISALBE_FURTHER_CPUFREQ: disable further access to target until being re-enabled.
+ *	ENABLE_FURTUER_CPUFREQ: re-enable access to target
+*/
+enum cpufreq_access {
+	DISABLE_FURTHER_CPUFREQ = 0x10,
+	ENABLE_FURTHER_CPUFREQ = 0x20,
+};
+static bool no_cpufreq_access;
 
 /*
  * DRAM configurations to calculate refresh counter for changing
@@ -64,6 +83,40 @@ static struct cpufreq_frequency_table s5pv210_freq_table[] = {
 	{L3, 200*1000},
 	{L4, 100*1000},
 	{0, CPUFREQ_TABLE_END},
+};
+
+static struct regulator *arm_regulator;
+static struct regulator *internal_regulator;
+
+struct s5pv210_dvs_conf {
+	unsigned long	arm_volt; /* uV */
+	unsigned long	int_volt; /* uV */
+};
+
+const unsigned long arm_volt_max = 1350000;
+const unsigned long int_volt_max = 1250000;
+
+static struct s5pv210_dvs_conf dvs_conf[] = {
+	[L0] = {
+		.arm_volt   = 1250000,
+		.int_volt   = 1100000,
+	},
+	[L1] = {
+		.arm_volt   = 1200000,
+		.int_volt   = 1100000,
+	},
+	[L2] = {
+		.arm_volt   = 1050000,
+		.int_volt   = 1100000,
+	},
+	[L3] = {
+		.arm_volt   = 950000,
+		.int_volt   = 1100000,
+	},
+	[L4] = {
+		.arm_volt   = 950000,
+		.int_volt   = 1000000,
+	},
 };
 
 static u32 clkdiv_val[5][11] = {
@@ -146,29 +199,65 @@ static int s5pv210_target(struct cpufreq_policy *policy,
 	unsigned int index, priv_index;
 	unsigned int pll_changing = 0;
 	unsigned int bus_speed_changing = 0;
+	unsigned int arm_volt, int_volt;
+	int ret = 0;
+
+	mutex_lock(&set_freq_lock);
+
+	if (relation & ENABLE_FURTHER_CPUFREQ)
+		no_cpufreq_access = false;
+	if (no_cpufreq_access) {
+#ifdef CONFIG_PM_VERBOSE
+		pr_err("%s:%d denied access to %s as it is disabled"
+				"temporarily\n", __FILE__, __LINE__, __func__);
+#endif
+		ret = -EINVAL;
+		goto out;
+	}
+	if (relation & DISABLE_FURTHER_CPUFREQ)
+		no_cpufreq_access = true;
+	relation &= ~(ENABLE_FURTHER_CPUFREQ | DISABLE_FURTHER_CPUFREQ);
 
 	freqs.old = s5pv210_getspeed(0);
 
 	if (cpufreq_frequency_table_target(policy, s5pv210_freq_table,
-					   target_freq, relation, &index))
-		return -EINVAL;
+					   target_freq, relation, &index)) {
+		ret = -EINVAL;
+		goto out;
+	}
 
 	freqs.new = s5pv210_freq_table[index].frequency;
 	freqs.cpu = 0;
 
 	if (freqs.new == freqs.old)
-		return 0;
+		goto out;
 
 	/* Finding current running level index */
 	if (cpufreq_frequency_table_target(policy, s5pv210_freq_table,
-					   freqs.old, relation, &priv_index))
-		return -EINVAL;
+					   freqs.old, relation, &priv_index)) {
+		ret = -EINVAL;
+		goto out;
+	}
 
-	cpufreq_notify_transition(&freqs, CPUFREQ_PRECHANGE);
+	arm_volt = dvs_conf[index].arm_volt;
+	int_volt = dvs_conf[index].int_volt;
 
 	if (freqs.new > freqs.old) {
-		/* Voltage up: will be implemented */
+		/* Voltage up code: increase ARM first */
+		if (!IS_ERR_OR_NULL(arm_regulator) &&
+				!IS_ERR_OR_NULL(internal_regulator)) {
+			ret = regulator_set_voltage(arm_regulator,
+						    arm_volt, arm_volt_max);
+			if (ret)
+				goto out;
+			ret = regulator_set_voltage(internal_regulator,
+						    int_volt, int_volt_max);
+			if (ret)
+				goto out;
+		}
 	}
+
+	cpufreq_notify_transition(&freqs, CPUFREQ_PRECHANGE);
 
 	/* Check if there need to change PLL */
 	if ((index == L0) || (priv_index == L0))
@@ -380,15 +469,24 @@ static int s5pv210_target(struct cpufreq_policy *policy,
 		}
 	}
 
-	if (freqs.new < freqs.old) {
-		/* Voltage down: will be implemented */
-	}
-
 	cpufreq_notify_transition(&freqs, CPUFREQ_POSTCHANGE);
+
+	if (freqs.new < freqs.old) {
+		/* Voltage down: decrease INT first */
+		if (!IS_ERR_OR_NULL(arm_regulator) &&
+				!IS_ERR_OR_NULL(internal_regulator)) {
+			regulator_set_voltage(internal_regulator,
+					int_volt, int_volt_max);
+			regulator_set_voltage(arm_regulator,
+					arm_volt, arm_volt_max);
+		}
+	}
 
 	printk(KERN_DEBUG "Perf changed[L%d]\n", index);
 
-	return 0;
+out:
+	mutex_unlock(&set_freq_lock);
+	return ret;
 }
 
 #ifdef CONFIG_PM
@@ -464,6 +562,40 @@ static int __init s5pv210_cpu_init(struct cpufreq_policy *policy)
 	return cpufreq_frequency_table_cpuinfo(policy, s5pv210_freq_table);
 }
 
+static int s5pv210_cpufreq_notifier_event(struct notifier_block *this,
+		unsigned long event, void *ptr)
+{
+	int ret;
+
+	switch (event) {
+	case PM_SUSPEND_PREPARE:
+		ret = cpufreq_driver_target(cpufreq_cpu_get(0), SLEEP_FREQ,
+				DISABLE_FURTHER_CPUFREQ);
+		if (ret < 0)
+			return NOTIFY_BAD;
+		return NOTIFY_OK;
+	case PM_POST_RESTORE:
+	case PM_POST_SUSPEND:
+		cpufreq_driver_target(cpufreq_cpu_get(0), SLEEP_FREQ,
+				ENABLE_FURTHER_CPUFREQ);
+		return NOTIFY_OK;
+	}
+	return NOTIFY_DONE;
+}
+
+static int s5pv210_cpufreq_reboot_notifier_event(struct notifier_block *this,
+		unsigned long event, void *ptr)
+{
+	int ret = 0;
+
+	ret = cpufreq_driver_target(cpufreq_cpu_get(0), SLEEP_FREQ,
+			DISABLE_FURTHER_CPUFREQ);
+	if (ret < 0)
+		return NOTIFY_BAD;
+
+	return NOTIFY_DONE;
+}
+
 static struct cpufreq_driver s5pv210_driver = {
 	.flags		= CPUFREQ_STICKY,
 	.verify		= s5pv210_verify_speed,
@@ -477,9 +609,71 @@ static struct cpufreq_driver s5pv210_driver = {
 #endif
 };
 
+static struct notifier_block s5pv210_cpufreq_notifier = {
+	.notifier_call = s5pv210_cpufreq_notifier_event,
+};
+
+static struct notifier_block s5pv210_cpufreq_reboot_notifier = {
+	.notifier_call	= s5pv210_cpufreq_reboot_notifier_event,
+};
+
+static int __init s5pv210_cpufreq_probe(struct platform_device *pdev)
+{
+	struct s5pv210_cpufreq_data *pdata = dev_get_platdata(&pdev->dev);
+	int i, j;
+
+	if (pdata && pdata->size) {
+		for (i = 0; i < pdata->size; i++) {
+			j = 0;
+			while (s5pv210_freq_table[j].frequency != CPUFREQ_TABLE_END) {
+				if (s5pv210_freq_table[j].frequency == pdata->volt[i].freq) {
+					dvs_conf[j].arm_volt = pdata->volt[i].varm;
+					dvs_conf[j].int_volt = pdata->volt[i].vint;
+					break;
+				}
+				j++;
+			}
+		}
+	}
+
+	arm_regulator = regulator_get(NULL, "vddarm");
+	if (IS_ERR(arm_regulator)) {
+		pr_err("failed to get regulater resource vddarm\n");
+		goto error;
+	}
+	internal_regulator = regulator_get(NULL, "vddint");
+	if (IS_ERR(internal_regulator)) {
+		pr_err("failed to get regulater resource vddint\n");
+		goto error;
+	}
+	goto finish;
+error:
+	pr_warn("Cannot get vddarm or vddint. CPUFREQ Will not"
+		       " change the voltage.\n");
+finish:
+	register_pm_notifier(&s5pv210_cpufreq_notifier);
+	register_reboot_notifier(&s5pv210_cpufreq_reboot_notifier);
+
+	return cpufreq_register_driver(&s5pv210_driver);
+}
+
+static struct platform_driver s5pv210_cpufreq_drv = {
+	.probe		= s5pv210_cpufreq_probe,
+	.driver		= {
+		.owner	= THIS_MODULE,
+		.name	= "s5pv210-cpufreq",
+	},
+};
+
 static int __init s5pv210_cpufreq_init(void)
 {
-	return cpufreq_register_driver(&s5pv210_driver);
+	int ret;
+
+	ret = platform_driver_register(&s5pv210_cpufreq_drv);
+	if (!ret)
+		pr_info("%s: S5PV210 cpu-freq driver\n", __func__);
+
+	return ret;
 }
 
 late_initcall(s5pv210_cpufreq_init);

@@ -23,6 +23,7 @@
 #include <plat/irq-uart.h>
 #include <plat/regs-serial.h>
 #include <plat/cpu.h>
+#include <asm/mach/irq.h>
 
 /* Note, we make use of the fact that the parent IRQs, IRQ_UART[0..3]
  * are consecutive when looking up the interrupt in the demux routines.
@@ -32,6 +33,12 @@ static void s3c_irq_demux_uart(unsigned int irq, struct irq_desc *desc)
 	struct s3c_uart_irq *uirq = desc->irq_data.handler_data;
 	u32 pend = __raw_readl(uirq->regs + S3C64XX_UINTP);
 	int base = uirq->base_irq;
+	struct irq_chip *chip = irq_get_chip(irq);
+
+	chained_irq_enter(chip, desc);
+
+	if (!(pend & 0xf))
+		do_bad_IRQ(irq, desc);
 
 	if (pend & (1 << 0))
 		generic_handle_irq(base);
@@ -41,6 +48,8 @@ static void s3c_irq_demux_uart(unsigned int irq, struct irq_desc *desc)
 		generic_handle_irq(base + 2);
 	if (pend & (1 << 3))
 		generic_handle_irq(base + 3);
+
+	chained_irq_exit(chip, desc);
 }
 
 static void __init s3c_init_uart_irq(struct s3c_uart_irq *uirq)
@@ -65,6 +74,8 @@ static void __init s3c_init_uart_irq(struct s3c_uart_irq *uirq)
 	ct->chip.irq_ack = irq_gc_ack_set_bit;
 	ct->chip.irq_mask = irq_gc_mask_set_bit;
 	ct->chip.irq_unmask = irq_gc_mask_clr_bit;
+	ct->chip.irq_mask_ack = irq_gc_mask_and_ack_set;
+	ct->chip.irq_disable = irq_gc_mask_and_ack_set;
 	ct->regs.ack = S3C64XX_UINTP;
 	ct->regs.mask = S3C64XX_UINTM;
 	irq_setup_generic_chip(gc, IRQ_MSK(4), IRQ_GC_INIT_MASK_CACHE,

@@ -19,6 +19,12 @@ void get_vmalloc_info(struct vmalloc_info *vmi)
 	struct vm_struct *vma;
 	unsigned long free_area_size;
 	unsigned long prev_end;
+#ifdef CONFIG_PROC_SEC_MEMINFO
+	int i;
+
+	vmi->low_page_cnt = 0;
+	vmi->total_page_cnt = 0;
+#endif
 
 	vmi->used = 0;
 
@@ -50,6 +56,14 @@ void get_vmalloc_info(struct vmalloc_info *vmi)
 				vmi->largest_chunk = free_area_size;
 
 			prev_end = vma->size + addr;
+	#ifdef CONFIG_PROC_SEC_MEMINFO
+			for (i = 0; i < vma->nr_pages; i++) {
+				struct page *page = vma->pages[i];
+				if (page_zonenum(page) == ZONE_NORMAL)
+					vmi->low_page_cnt++;
+			}
+			vmi->total_page_cnt += vma->nr_pages;
+	#endif
 		}
 
 		if (VMALLOC_END - prev_end > vmi->largest_chunk)

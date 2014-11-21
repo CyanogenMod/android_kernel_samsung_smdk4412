@@ -22,6 +22,16 @@ config KEYBOARD_ADP5520
 	  To compile this driver as a module, choose M here: the module will
 	  be called adp5520-keys.
 
+config KEYBOARD_ADP5587
+	tristate "ADP5587 I2C QWERTY Keypad and IO Expander"
+	depends on I2C
+	help
+	  Say Y here if you want to use a ADP5587 attached to your
+	  system I2C bus with slide HALL IC.
+
+	  To compile this driver as a module, choose M here: the
+	  module will be called sec_keypad.
+
 config KEYBOARD_ADP5588
 	tristate "ADP5588/87 I2C QWERTY Keypad and IO Expander"
 	depends on I2C
@@ -562,5 +572,19 @@ config KEYBOARD_W90P910
 
 	  To compile this driver as a module, choose M here: the
 	  module will be called w90p910_keypad.
+
+config SENSORS_HALL
+	tristate "HALL"
+	help
+	  Say Y here to enable the HALL.
+
+config KEYBOARD_TC370L_TOUCHKEY
+	tristate "Coreriver touchkey support"
+	help
+	  Say Y here to enable the Coreriver touchkey.
+
+	  To compile this driver as a module, choose M here.
+
+source "drivers/input/keyboard/cypress/Kconfig"
 
 endif

@@ -61,6 +61,15 @@ static inline int crypto_set_driver_name(struct crypto_alg *alg)
 
 static int crypto_check_alg(struct crypto_alg *alg)
 {
+#ifdef CRYPTO_FIPS
+	if (unlikely(in_fips_err())) {
+		printk(KERN_ERR
+			"crypto_check_alg failed due to FIPS error: %s",
+			alg->cra_name);
+		return -EACCES;
+	}
+#endif
+
 	if (alg->cra_alignmask & (alg->cra_alignmask + 1))
 		return -EINVAL;
 
@@ -355,6 +364,15 @@ int crypto_register_alg(struct crypto_alg *alg)
 	struct crypto_larval *larval;
 	int err;
 
+#ifdef CRYPTO_FIPS
+	if (unlikely(in_fips_err())) {
+		printk(KERN_ERR
+			"Unable to registrer alg: %s because of FIPS ERROR\n"
+			, alg->cra_name);
+		return -EACCES;
+	}
+#endif
+
 	err = crypto_check_alg(alg);
 	if (err)
 		return err;
@@ -410,6 +428,11 @@ int crypto_register_template(struct crypto_template *tmpl)
 {
 	struct crypto_template *q;
 	int err = -EEXIST;
+
+#ifdef CRYPTO_FIPS
+	if (unlikely(in_fips_err()))
+		return -EACCES;
+#endif
 
 	down_write(&crypto_alg_sem);
 
@@ -478,8 +501,14 @@ static struct crypto_template *__crypto_lookup_template(const char *name)
 
 struct crypto_template *crypto_lookup_template(const char *name)
 {
-	return try_then_request_module(__crypto_lookup_template(name), "%s",
-				       name);
+#ifdef CRYPTO_FIPS
+	if (unlikely(in_fips_err())) {
+		printk(KERN_ERR
+			"crypto_lookup failed due to FIPS error: %s", name);
+		return -EACCES;
+	}
+#endif
+	return try_then_request_module(__crypto_lookup_template(name), name);
 }
 EXPORT_SYMBOL_GPL(crypto_lookup_template);
 
@@ -488,6 +517,11 @@ int crypto_register_instance(struct crypto_template *tmpl,
 {
 	struct crypto_larval *larval;
 	int err;
+
+#ifdef CRYPTO_FIPS
+	if (unlikely(in_fips_err()))
+		return -EACCES;
+#endif
 
 	err = crypto_check_alg(&inst->alg);
 	if (err)
@@ -523,6 +557,11 @@ int crypto_init_spawn(struct crypto_spawn *spawn, struct crypto_alg *alg,
 		      struct crypto_instance *inst, u32 mask)
 {
 	int err = -EAGAIN;
+
+#ifdef CRYPTO_FIPS
+	if (unlikely(in_fips_err()))
+		return -EACCES;
+#endif
 
 	spawn->inst = inst;
 	spawn->mask = mask;
@@ -739,6 +778,11 @@ void *crypto_alloc_instance2(const char *name, struct crypto_alg *alg,
 	char *p;
 	int err;
 
+#ifdef CRYPTO_FIPS
+	if (unlikely(in_fips_err()))
+		return ERR_PTR(-EACCES);
+#endif
+
 	p = kzalloc(head + sizeof(*inst) + sizeof(struct crypto_spawn),
 		    GFP_KERNEL);
 	if (!p)
@@ -769,6 +813,11 @@ struct crypto_instance *crypto_alloc_instance(const char *name,
 	struct crypto_instance *inst;
 	struct crypto_spawn *spawn;
 	int err;
+
+ #ifdef CRYPTO_FIPS
+	if (unlikely(in_fips_err()))
+		return ERR_PTR(-EACCES);
+#endif
 
 	inst = crypto_alloc_instance2(name, alg, 0);
 	if (IS_ERR(inst))
@@ -805,6 +854,11 @@ int crypto_enqueue_request(struct crypto_queue *queue,
 			   struct crypto_async_request *request)
 {
 	int err = -EINPROGRESS;
+
+#ifdef CRYPTO_FIPS
+	if (unlikely(in_fips_err()))
+		return ERR_PTR(-EACCES);
+#endif
 
 	if (unlikely(queue->qlen >= queue->max_qlen)) {
 		err = -EBUSY;
@@ -910,13 +964,13 @@ EXPORT_SYMBOL_GPL(crypto_xor);
 
 static int __init crypto_algapi_init(void)
 {
-	crypto_init_proc();
+	/*crypto_init_proc(); //Moved to testmgr*/
 	return 0;
 }
 
 static void __exit crypto_algapi_exit(void)
 {
-	crypto_exit_proc();
+	/*crypto_exit_proc(); //Moved to testmgr*/
 }
 
 module_init(crypto_algapi_init);

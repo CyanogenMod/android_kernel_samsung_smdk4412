@@ -274,9 +274,13 @@ void led_blink_set(struct led_classdev *led_cdev,
 		return;
 
 	/* blink with 1 Hz as default if nothing specified */
-	if (!*delay_on && !*delay_off)
+	if (!*delay_on && !*delay_off){
+#if defined(CONFIG_MACH_IPCAM)
+		*delay_on = *delay_off = 0;
+#else
 		*delay_on = *delay_off = 500;
-
+#endif
+	}
 	led_set_software_blink(led_cdev, *delay_on, *delay_off);
 }
 EXPORT_SYMBOL(led_blink_set);

@@ -836,6 +836,10 @@ periodic_error:
 async_error:
 	debugfs_remove(ohci->debug_dir);
 dir_error:
+#if defined(CONFIG_LINK_DEVICE_HSIC)
+/* Clear the previous debugfs dentry when OHCI on/off debugfs fail case */
+	ohci->debug_registers = NULL;
+#endif
 	ohci->debug_periodic = NULL;
 	ohci->debug_async = NULL;
 	ohci->debug_dir = NULL;

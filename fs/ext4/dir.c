@@ -90,6 +90,10 @@ int __ext4_check_dir_entry(const char *function, unsigned int line,
 	else
 		return 0;
 
+	/* for debugging, sangwoo2.lee */
+	print_bh(dir->i_sb, bh, 0, EXT4_BLOCK_SIZE(dir->i_sb));
+	/* for debugging */
+
 	if (filp)
 		ext4_error_file(filp, function, line, bh ? bh->b_blocknr : 0,
 				"bad entry in directory: %s - offset=%u(%u), "

@@ -11,6 +11,14 @@ menuconfig INPUT_MISC
 	  If unsure, say Y.
 
 if INPUT_MISC
+config SENSORS_BH1721FVC
+	tristate "ROHM BH1721FVC ambient light sensor"
+	depends on I2C
+	help
+	  Say Y here if you have ROHM BH1721FVC hooked to an I2C bus.
+
+	  This option eanbles the light sensor device driver for
+	  the ROHM BH1721FVC chip.
 
 config INPUT_88PM860X_ONKEY
 	tristate "88PM860x ONKEY support"
@@ -193,6 +201,17 @@ config INPUT_ATI_REMOTE2
 	  To compile this driver as a module, choose M here: the module will be
 	  called ati_remote2.
 
+config INPUT_KEYCHORD
+	tristate "Key chord input driver support"
+	help
+	  Say Y here if you want to enable the key chord driver
+	  accessible at /dev/keychord.  This driver can be used
+	  for receiving notifications when client specified key
+	  combinations are pressed.
+
+	  To compile this driver as a module, choose M here: the
+	  module will be called keychord.
+
 config INPUT_KEYSPAN_REMOTE
 	tristate "Keyspan DMR USB remote control (EXPERIMENTAL)"
 	depends on EXPERIMENTAL
@@ -293,6 +312,11 @@ config INPUT_SGI_BTNS
 
 	  To compile this driver as a module, choose M here: the
 	  module will be called sgi_btns.
+
+config INPUT_GPIO
+	tristate "GPIO driver support"
+	help
+	  Say Y here if you want to support gpio based keys, wheels etc...
 
 config HP_SDC_RTC
 	tristate "HP SDC Real Time Clock"
@@ -439,7 +463,20 @@ config INPUT_ADXL34X_SPI
 	  Say Y here if you have ADXL345/6 hooked to a SPI bus.
 
 	  To compile this driver as a module, choose M here: the
-	  module will be called adxl34x-spi.
+
+config OPTICAL_GP2A
+	depends on I2C && GENERIC_GPIO
+	tristate "GP2A ambient light and proximity input device"
+	default n
+	help
+	  This option enables proximity & light sensors using gp2a driver.
+
+config OPTICAL_WAKE_ENABLE
+	depends on I2C && GENERIC_GPIO
+	tristate "Enabled ambient light and proximity to wake up gpio"
+	default n
+	help
+	  This option enables proximity & light sensors using wake up gpio.
 
 config INPUT_CMA3000
 	tristate "VTI CMA3000 Tri-axis accelerometer"
@@ -477,5 +514,24 @@ config INPUT_XEN_KBDDEV_FRONTEND
 
 	  To compile this driver as a module, choose M here: the
 	  module will be called xen-kbdfront.
+
+config INPUT_FLIP
+        tristate "INPUT_FLIP"
+	help
+	  Say Y here if you want to support gpio based Flip...
+
+config INPUT_KR3DH
+	tristate "ST KR3DH accelerometer sensor"
+	depends on I2C
+	help
+	  Say Y here if you want to support for ST KR3DH accelerometer sensor.
+
+	  To compile this driver as a module, choose M here: the
+	  module will be called kr3dh.
+
+config INPUT_SEC_KEYS
+	tristate "sec keys"
+	help
+	  Say Y here if you want to support for sec keys.
 
 endif

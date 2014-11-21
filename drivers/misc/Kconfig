@@ -61,12 +61,33 @@ config AD525X_DPOT_SPI
 	  To compile this driver as a module, choose M here: the
 	  module will be called ad525x_dpot-spi.
 
+config ANDROID_PMEM
+	bool "Android pmem allocator"
+	depends on MACH_U1 || MACH_PX || MACH_TRATS
+	default n
+
+if ANDROID_PMEM
+	comment "Reserved memory configurations"
+
+config ANDROID_PMEM_MEMSIZE_PMEM
+	int "Memory size in kbytes for android surface using pmem"
+	default "4096"
+
+config ANDROID_PMEM_MEMSIZE_PMEM_GPU1
+	int "Memory size in kbytes for android surface using pmem_gpu1"
+	default "10240"
+
+config ANDROID_PMEM_MEMSIZE_PMEM_CAM
+	int "Memory size in kbytes for android camera using pmem_camera"
+	default "4096"
+endif
+
 config ATMEL_PWM
 	tristate "Atmel AT32/AT91 PWM support"
 	depends on AVR32 || ARCH_AT91SAM9263 || ARCH_AT91SAM9RL || ARCH_AT91CAP9
 	help
 	  This option enables device driver support for the PWM channels
-	  on certain Atmel processors.  Pulse Width Modulation is used for
+	  on certain Atmel processors.	Pulse Width Modulation is used for
 	  purposes including software controlled power-efficient backlights
 	  on LCD displays, motor control, and waveform generation.
 
@@ -364,14 +385,14 @@ config SENSORS_BH1780
 	  will be called bh1780gli.
 
 config SENSORS_BH1770
-         tristate "BH1770GLC / SFH7770 combined ALS - Proximity sensor"
-         depends on I2C
-         ---help---
-           Say Y here if you want to build a driver for BH1770GLC (ROHM) or
+	 tristate "BH1770GLC / SFH7770 combined ALS - Proximity sensor"
+	 depends on I2C
+	 ---help---
+	   Say Y here if you want to build a driver for BH1770GLC (ROHM) or
 	   SFH7770 (Osram) combined ambient light and proximity sensor chip.
 
-           To compile this driver as a module, choose M here: the
-           module will be called bh1770glc. If unsure, say N here.
+	   To compile this driver as a module, choose M here: the
+	   module will be called bh1770glc. If unsure, say N here.
 
 config SENSORS_APDS990X
 	 tristate "APDS990X combined als and proximity sensors"
@@ -390,6 +411,22 @@ config HMC6352
 	help
 	  This driver provides support for the Honeywell HMC6352 compass,
 	  providing configuration and heading data via sysfs.
+
+config SENSORS_AK8975
+	tristate "AK8975 compass support"
+	default n
+	depends on I2C
+	help
+	  If you say yes here you get support for Asahi Kasei's
+	  orientation sensor AK8975.
+
+config SENSORS_AK8963
+	tristate "AK8963 compass support"
+	default n
+	depends on I2C
+	help
+	  If you say yes here you get support for Asahi Kasei's
+	  orientation sensor AK8963.
 
 config EP93XX_PWM
 	tristate "EP93xx PWM support"
@@ -433,6 +470,10 @@ config TI_DAC7512
 
 	  This driver can also be built as a module. If so, the module
 	  will be called ti_dac7512.
+
+config UID_STAT
+	bool "UID based statistics tracking exported to /proc/uid_stat"
+	default n
 
 config VMWARE_BALLOON
 	tristate "VMware Balloon Driver"
@@ -490,12 +531,180 @@ config PCH_PHUB
 	  To compile this driver as a module, choose M here: the module will
 	  be called pch_phub.
 
+config WL127X_RFKILL
+	tristate "Bluetooth power control driver for TI wl127x"
+	depends on RFKILL
+	default n
+	---help---
+	 Creates an rfkill entry in sysfs for power control of Bluetooth
+	 TI wl127x chips.
+
+config APANIC
+	bool "Android kernel panic diagnostics driver"
+	default n
+	---help---
+	 Driver which handles kernel panics and attempts to write
+	 critical debugging data to flash.
+
+config APANIC_PLABEL
+	string "Android panic dump flash partition label"
+	depends on APANIC
+	default "kpanic"
+	---help---
+	 If your platform uses a different flash partition label for storing
+	 crashdumps, enter it here.
+
+config JACK_MON
+	bool "Jacks Monitoring Driver"
+	default n
+	help
+	 Jacks Monitoring Driver
+
+config UART_SELECT
+	bool "Uart Selection Driver"
+	default n
+	help
+	 This is uart selection driver.
+
+config SWITCH_DUAL_MODEM
+	bool "Switch UART/USB to dual MODEM"
+	default n
+	help
+	 This feature can be active when do dual CP project such as Grande.
+	 This can offer an interface to switch UART/USB to AP/CP1/CP2 at *#7284# keystring application.
+	 Need to change UI at *#7284# also to have effect on this.
+	 Use a combination of MAX77693 switch function and GPIO control.
+
+config SWITCH_USB_PATH_AUTO
+	bool "Switch USB path automatically"
+	default n
+	help
+	 This feature can be switch the path of USB automatically when switching the USB path by using the sysfs node
+
+config WIMAX_CMC
+        bool "SUB PMIC FOR WIMAX CMC"
+        depends on I2C
+        default n
+	help
+	 This is feature for WIMAX ICS on gaudi Devices.
+	 This is a 4G technology and connected through the SDIO interface 3.
+	 This is powered through the max8893.
+	 This feature is enabled by default if Wimax is enabled.
+
+config SEC_DEV_JACK
+	bool "Earjack detection driver for Samsung devices"
+	depends on INPUT
+	default n
+	---help---
+	 This is Earjack detection driver for Samsung devices.
+
+config MUIC_DET_JACK
+	bool "Earjack detection driver using MUIC"
+	default n
+	help
+	 This is Earjack detection driver using MUIC.
+	 MUIC can recognize earjack device type and earkey using ADC values.
+	 Some project use muic earjack instead of 3.5phi earjack.
+	 Max77693 muic also support earjack detection.
+
+config FM34_WE395
+	bool "Forte Media 2MIC driver"
+	default n
+	help
+	  This is Forte media voice solution devices.
+	  Say yes here to build support for FM34_WE395 2mic driver.
+	  If your device have this soulution, you maybe say yes to hear sounds.
+	  FM34 series (FM34-WE395, FM34-WE500) share it.
+
+config AUDIENCE_ES305
+	bool "Audience 2MIC driver"
+	default n
+	help
+	  This is Audience voice processor devices.
+	  Say yes here to build support for AUDIENCE_ES305 2mic driver.
+	  Audience A2220 series are same as ES305.
+	  A1026 also can use this driver.
+
+source "drivers/misc/2mic/Kconfig"
+
+config USBHUB_USB3503
+	bool "USB3503 USB HUB Driver"
+	depends on I2C
+	help
+	 Enables USB HUB USB3503
+
+config USBHUB_USB3503_OTG_CONN
+	bool "USB3503 USB HUB Driver"
+	depends on I2C
+	help
+	 Enables USB HUB USB3503
+
+config USBHUB_USB3803
+	bool "USB3803 USB HUB Driver"
+	depends on I2C
+	help
+	 Enables USB HUB USB3803. Say yes to use USB3803 usb hub
+	 for the device. This hub is used to switch the usb
+	 connection between AP and CP.
+
+	 If unsure, say N
+
+config PN544
+        bool "NXP PN544 NFC Controller Driver"
+        default n
+        help
+          NXP PN544 Near Field Communication controller support.
+
+config STMPE811_ADC
+	tristate "STMPE811 ADC driver"
+	depends on I2C
+	---help---
+	  Say yes here to build support for STMPE811 8 channel ADC driver
+
+config TIMA_LOG
+	tristate "Support for dumping TIMA log"
+	default y
+	help
+	  This option enables support for dumping TIMA log
+
+config MPU_SENSORS_MPU3050
+    tristate "MPU3050"
+    depends on I2C
+
+config MPU_SENSORS_MPU6050
+    tristate "MPU6050"
+    depends on I2C
+
 source "drivers/misc/c2port/Kconfig"
 source "drivers/misc/eeprom/Kconfig"
 source "drivers/misc/cb710/Kconfig"
 source "drivers/misc/iwmc3200top/Kconfig"
+if MPU_SENSORS_MPU3050
+source "drivers/misc/mpu3050/Kconfig"
+endif
+if MPU_SENSORS_MPU6050
+source "drivers/misc/inv_mpu/Kconfig"
+endif
 source "drivers/misc/ti-st/Kconfig"
 source "drivers/misc/lis3lv02d/Kconfig"
 source "drivers/misc/carma/Kconfig"
+source "drivers/misc/c2c/Kconfig"
+source "drivers/misc/modem_if/Kconfig"
+source "drivers/misc/modem_if_na/Kconfig"
+source "drivers/misc/modem_if_na_spr/Kconfig"
+source "drivers/misc/modem_v2/Kconfig"
+
+config SLP_LOWMEM_NOTIFY
+	bool "Driver for SLP Low Memory Notification"
+	depends on SLP
+	help
+	  Provide interface to register for low memory notifications.
+
+config SLP_PROCESS_MON
+	bool "Driver for SLP process monitoring"
+	depends on SLP
+	help
+	  Providing monitoring important processes. Users can register the process
+	  with sysfs.
 
 endif # MISC_DEVICES

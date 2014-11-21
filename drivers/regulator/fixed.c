@@ -229,7 +229,11 @@ static int __init regulator_fixed_voltage_init(void)
 {
 	return platform_driver_register(&regulator_fixed_voltage_driver);
 }
+#ifdef CONFIG_FAST_RESUME
+beforeresume_initcall(regulator_fixed_voltage_init);
+#else
 subsys_initcall(regulator_fixed_voltage_init);
+#endif
 
 static void __exit regulator_fixed_voltage_exit(void)
 {

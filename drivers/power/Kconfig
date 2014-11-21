@@ -177,7 +177,7 @@ config BATTERY_S3C_ADC
 	tristate "Battery driver for Samsung ADC based monitoring"
 	depends on S3C_ADC
 	help
-	  Say Y here to enable support for iPAQ h1930/h1940/rx1950 battery
+	  Say Y to enable support for batteries with samsung chip.
 
 config CHARGER_PCF50633
 	tristate "NXP PCF50633 MBC"
@@ -234,5 +234,110 @@ config CHARGER_GPIO
 
 	  This driver can be build as a module. If so, the module will be
 	  called gpio-charger.
+
+config BATTERY_SAMSUNG
+	tristate "Fake battery driver for samsung smdk boards"
+	depends on PLAT_SAMSUNG
+	help
+	  Say Y to enable support for batteries with samsung chip.
+
+config CHARGER_MAX8997
+	tristate "Maxim MAX8997/MAX8966 PMIC battery charger driver"
+	depends on MFD_MAX8997 && REGULATOR_MAX8997
+	help
+	  Say Y to enable support for the battery charger control sysfs and
+	  platform data of MAX8997/LP3974 PMICs.
+
+config CHARGER_MAX8997_U1
+	tristate "Maxim MAX8997/MAX8966 PMIC battery charger driver for Samsung Galaxy S2 ICS upgrade"
+	depends on MFD_MAX8997 && REGULATOR_MAX8997
+	help
+	  Say Y to enable support for the battery charger control sysfs and
+	  platform data of MAX8997/LP3974 PMICs.
+
+config CHARGER_MAX8997_PX
+	tristate "Maxim MAX8997/MAX8966 PMIC battery charger driver for Samsung Galaxy Tab ICS upgrade"
+	depends on MFD_MAX8997 && REGULATOR_MAX8997
+
+config BATTERY_SEC_U1
+	tristate "Battery driver for Samsung Galaxy S2"
+	depends on PLAT_SAMSUNG
+	help
+	  Say Y to enable support for batteries with samsung chip.
+
+config BATTERY_SEC_PX
+	tristate "Battery driver for Samsung Galaxy Tab"
+	depends on PLAT_SAMSUNG
+
+config CHARGER_MAX8922_U1
+	tristate "MAX8922 battery charger support for Samsung Galaxy S2 ICS upgrade"
+	depends on PLAT_SAMSUNG
+	help
+	  Say Y here to enable support for the battery charger in the Maxim
+	  MAX8922 Charger IC.
+
+config BATTERY_MAX17042_FUELGAUGE_U1
+	tristate "Maxim MAX17042/8997/8966 Fuel Gauge for Samsung Galaxy S2 ICS upgrade"
+	depends on I2C
+	help
+	  MAX17042 is fuel-gauge systems for lithium-ion (Li+) batteries
+	  in handheld and portable equipment. The MAX17042 is configured
+	  to operate with a single lithium cell. MAX8997 and MAX8966 are
+	  multi-function devices that include fuel gauages that are compatible
+	  with MAX17042.
+
+config BATTERY_MAX17042_FUELGAUGE_PX
+	tristate "Maxim MAX17042/8997/8966 Fuel Gauge for Samsung Galaxy Tab ICS upgrade"
+	depends on I2C
+	help
+	  MAX17042 is fuel-gauge systems for lithium-ion (Li+) batteries
+	  in handheld and portable equipment. The MAX17042 is configured
+	  to operate with a single lithium cell. MAX8997 and MAX8966 are
+	  multi-function devices that include fuel gauages that are compatible
+	  with MAX17042.
+
+config SMB136_CHARGER
+	tristate "SMB136 battery charger support"
+	depends on PLAT_SAMSUNG
+	help
+	  Say Y here to enable support for the battery charger in the SUMMIT
+	  SMB136 Charger IC.
+
+config SMB136_CHARGER_Q1
+	tristate "SMB136 battery charger support Q1 HWREV01"
+	depends on PLAT_SAMSUNG
+	help
+	  Say Y here to enable support for the battery charger in the SUMMIT
+	  SMB136 Charger IC.
+	  Support Q1 HWREV01.
+
+config SMB328_CHARGER
+	tristate "SMB328 battery charger support"
+	depends on PLAT_SAMSUNG
+	help
+	  Say Y here to enable support for the battery charger in the SUMMIT
+	  SMB328 Charger IC.
+
+config SMB347_CHARGER
+	tristate "SMB347 battery charger support"
+	depends on PLAT_SAMSUNG
+	help
+	  Say Y here to enable support for the battery charger in the SUMMIT
+	  SMB328 Charger IC.
+
+config CHARGER_MANAGER
+	tristate "Battery charger manager for multiple chargers"
+	help
+	  Say Y to enable charger-manager support, which allows multiple
+	  chargers attached to a battery and multiple batteries attached to a
+	  system. The charger-manager also can monitor charging status in
+	  runtime and in suspend-to-RAM by waking up the system periodically
+	  with help of pm-loop support.
+
+config SAMSUNG_LPM_MODE
+	bool "Off charging mode support in sec battery driver"
+	depends on BATTERY_SEC_PX
+	help
+	 Say Y to include support for samsungs off charging support
 
 endif # POWER_SUPPLY

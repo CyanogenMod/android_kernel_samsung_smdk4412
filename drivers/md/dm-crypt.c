@@ -186,7 +186,13 @@ static u8 *iv_of_dmreq(struct crypt_config *cc, struct dm_crypt_request *dmreq);
 
 static struct crypt_cpu *this_crypt_config(struct crypt_config *cc)
 {
-	return this_cpu_ptr(cc->cpu);
+	struct crypt_cpu *this_cc;
+
+	preempt_disable();
+	this_cc = this_cpu_ptr(cc->cpu);
+	preempt_enable();
+
+	return this_cc;
 }
 
 /*
@@ -1651,20 +1657,27 @@ static int crypt_ctr(struct dm_target *ti, unsigned int argc, char **argv)
 	cc->start = tmpll;
 
 	ret = -ENOMEM;
+#if 1
+	cc->io_queue = create_singlethread_workqueue("kcryptd_io");
+#else
 	cc->io_queue = alloc_workqueue("kcryptd_io",
 				       WQ_NON_REENTRANT|
 				       WQ_MEM_RECLAIM,
 				       1);
+#endif
 	if (!cc->io_queue) {
 		ti->error = "Couldn't create kcryptd io queue";
 		goto bad;
 	}
-
+#if 1
+	cc->crypt_queue = create_singlethread_workqueue("kcryptd");
+#else
 	cc->crypt_queue = alloc_workqueue("kcryptd",
 					  WQ_NON_REENTRANT|
 					  WQ_CPU_INTENSIVE|
 					  WQ_MEM_RECLAIM,
 					  1);
+#endif
 	if (!cc->crypt_queue) {
 		ti->error = "Couldn't create kcryptd queue";
 		goto bad;

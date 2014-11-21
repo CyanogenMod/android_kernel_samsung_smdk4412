@@ -12,7 +12,7 @@ fw-external-y := $(subst ",,$(CONFIG_EXTRA_FIRMWARE))
 # There are three cases to care about:
 # 1. Building kernel with CONFIG_FIRMWARE_IN_KERNEL=y -- $(fw-shipped-y) should
 #    include the firmware files to include, according to .config
-# 2. 'make modules_install', which will install firmware for modules, and 
+# 2. 'make modules_install', which will install firmware for modules, and
 #    _also_ for the in-kernel drivers when CONFIG_FIRMWARE_IN_KERNEL=n
 # 3. 'make firmware_install', which installs all firmware, unconditionally.
 
@@ -26,6 +26,36 @@ fw-shipped- += acenic/tg1.bin
 else
 acenic-objs := acenic/tg1.bin acenic/tg2.bin
 endif
+
+ifdef CONFIG_MACH_T0
+fw-shipped-$(CONFIG_VIDEO_S5C73M3) += SlimISP_ZK.bin \
+				      SlimISP_GK.bin
+else
+ifdef CONFIG_MACH_M3_USA_TMO
+fw-shipped-$(CONFIG_VIDEO_S5C73M3) += SlimISP_ZK.bin \
+				      SlimISP_GK.bin
+else
+ifdef CONFIG_MACH_BAFFIN
+fw-shipped-$(CONFIG_VIDEO_S5C73M3) += SlimISP_ZK.bin \
+				      SlimISP_GK.bin \
+				      SlimISP_BK.bin \
+				      SlimISP_GM.bin
+else
+ifdef CONFIG_MACH_GRANDE
+fw-shipped-$(CONFIG_VIDEO_S5C73M3) += SlimISP_GJ.bin
+else
+ifdef CONFIG_MACH_IRON
+fw-shipped-$(CONFIG_VIDEO_S5C73M3) += SlimISP_GJ.bin
+else
+fw-shipped-$(CONFIG_VIDEO_S5C73M3) += SlimISP_ZD.bin \
+				      SlimISP_GD.bin
+endif
+endif
+endif
+endif
+endif
+
+fw-shipped-$(CONFIG_RMI4_FWLIB) += rmi4/KONA-E036.img
 fw-shipped-$(CONFIG_3C359) += 3com/3C359.bin
 fw-shipped-$(CONFIG_ACENIC) += $(acenic-objs)
 fw-shipped-$(CONFIG_ADAPTEC_STARFIRE) += adaptec/starfire_rx.bin \
@@ -141,6 +171,112 @@ fw-shipped-$(CONFIG_USB_SERIAL_XIRCOM) += keyspan_pda/xircom_pgs.fw
 fw-shipped-$(CONFIG_USB_VICAM) += vicam/firmware.fw
 fw-shipped-$(CONFIG_VIDEO_CPIA2) += cpia2/stv0672_vp4.bin
 fw-shipped-$(CONFIG_YAM) += yam/1200.bin yam/9600.bin
+fw-shipped-$(CONFIG_EPEN_WACOM_G5SP) += epen/W8501.bin epen/W8501_P48.bin
+fw-shipped-$(CONFIG_EPEN_WACOM_G9PM) += epen/W9001_B746.bin epen/W9001_B713.bin epen/W9001_B660.bin \
+			epen/W9001_B746S.bin epen/W9001_B746L.bin \
+			epen/W9001_B746JD.bin \
+			epen/W9001_B746VZW.bin epen/W9001_B746USC.bin \
+			epen/W9001_0700.bin
+fw-shipped-$(CONFIG_EPEN_WACOM_G9PL) += epen/W9002_B781.bin
+fw-shipped-$(CONFIG_KEYBOARD_TC370L_TOUCHKEY) += coreriver/tc370.fw
+
+#for sensorhub
+fw-shipped-$(CONFIG_SENSORS_SSP_STM) += ssp_b.fw
+fw-shipped-$(CONFIG_SENSORS_SSP_ATMEL) += ssp.fw
+fw-shipped-$(CONFIG_SENSORS_SSP) += ssp_crashed.fw
+
+TSPFIRMWARE_DIRECTORY = $(srctree)/firmware/tsp_atmel
+ifeq ($(shell test -d $(TSPFIRMWARE_DIRECTORY) && echo yes),yes)
+fw-shipped-$(CONFIG_TOUCHSCREEN_ATMEL_MXT224E) += tsp_atmel/mXT224e.fw
+fw-shipped-$(CONFIG_TOUCHSCREEN_ATMEL_MXT540E) += tsp_atmel/mXT540E.fw
+fw-shipped-$(CONFIG_TOUCHSCREEN_ATMEL_MXT540S) += tsp_atmel/mXT540Sg.fw tsp_atmel/mXT540Si.fw
+fw-shipped-$(CONFIG_TOUCHSCREEN_MXT768E) += tsp_atmel/mXT768E.fw
+fw-shipped-$(CONFIG_TOUCHSCREEN_ATMEL_MXT1664S) += tsp_atmel/mXT1664S.fw
+fw-shipped-$(CONFIG_TOUCHSCREEN_ATMEL_MXT1188S) += tsp_atmel/mXT1188S.fw
+fw-shipped-$(CONFIG_TOUCHSCREEN_ATMEL_MXT1188S) += tsp_atmel/mXT1188S_4G.fw
+fw-shipped-$(CONFIG_TOUCHSCREEN_ATMEL_MXT1188S) += tsp_atmel/mXT1188S_old.fw
+fw-shipped-$(CONFIG_TOUCHSCREEN_ATMEL_MXTS) += tsp_atmel/mXT336S.fw
+else
+$(warning '$(TSPFIRMWARE_DIRECTORY)' directory dose not exist)
+endif
+
+TSPFIRMWARE_DIRECTORY_MEL = $(srctree)/firmware/tsp_melfas
+ifeq ($(shell test -d $(TSPFIRMWARE_DIRECTORY_MEL) && echo yes),yes)
+fw-shipped-$(CONFIG_TOUCHSCREEN_MELFAS) += tsp_melfas/CORE.fw
+fw-shipped-$(CONFIG_TOUCHSCREEN_MELFAS) += tsp_melfas/PRIV.fw
+fw-shipped-$(CONFIG_TOUCHSCREEN_MELFAS) += tsp_melfas/PUBL.fw
+else
+$(warning '$(TSPFIRMWARE_DIRECTORY)' directory dose not exist)
+endif
+
+TSPFIRMWARE_DIRECTORY_MEL_GC = firmware/tsp_melfas/gc
+ifeq ($(shell test -d $(TSPFIRMWARE_DIRECTORY_MEL_GC) && echo yes),yes)
+fw-shipped-$(CONFIG_TOUCHSCREEN_MELFAS_GC) += tsp_melfas/gc/A_CORE.fw
+fw-shipped-$(CONFIG_TOUCHSCREEN_MELFAS_GC) += tsp_melfas/gc/A_PRIV.fw
+fw-shipped-$(CONFIG_TOUCHSCREEN_MELFAS_GC) += tsp_melfas/gc/A_PUBL.fw
+fw-shipped-$(CONFIG_TOUCHSCREEN_MELFAS_GC) += tsp_melfas/gc/B_CORE.fw
+fw-shipped-$(CONFIG_TOUCHSCREEN_MELFAS_GC) += tsp_melfas/gc/B_PRIV.fw
+fw-shipped-$(CONFIG_TOUCHSCREEN_MELFAS_GC) += tsp_melfas/gc/B_PUBL.fw
+fw-shipped-$(CONFIG_TOUCHSCREEN_MELFAS_GC) += tsp_melfas/gc/C_CORE.fw
+fw-shipped-$(CONFIG_TOUCHSCREEN_MELFAS_GC) += tsp_melfas/gc/C_PRIV.fw
+fw-shipped-$(CONFIG_TOUCHSCREEN_MELFAS_GC) += tsp_melfas/gc/C_PUBL.fw
+else
+$(warning '$(TSPFIRMWARE_DIRECTORY)' directory dose not exist)
+endif
+
+TSPFIRMWARE_DIRECTORY_MEL_W = firmware/tsp_melfas/w
+ifeq ($(shell test -d $(TSPFIRMWARE_DIRECTORY_MEL_W) && echo yes),yes)
+fw-shipped-$(CONFIG_TOUCHSCREEN_MELFAS_W) += tsp_melfas/w/CORE.fw
+fw-shipped-$(CONFIG_TOUCHSCREEN_MELFAS_W) += tsp_melfas/w/PRIV.fw
+fw-shipped-$(CONFIG_TOUCHSCREEN_MELFAS_W) += tsp_melfas/w/PUBL.fw
+fw-shipped-$(CONFIG_TOUCHSCREEN_MELFAS_W) += tsp_melfas/w/mms_ts_w.fw
+fw-shipped-$(CONFIG_TOUCHSCREEN_MELFAS_W) += tsp_melfas/w/mms_ts_w_config.fw
+else
+$(warning '$(TSPFIRMWARE_DIRECTORY)' directory dose not exist)
+endif
+
+TSPFIRMWARE_DIRECTORY_MEL_NOTE = firmware/tsp_melfas/note
+ifeq ($(shell test -d $(TSPFIRMWARE_DIRECTORY_MEL_NOTE) && echo yes),yes)
+fw-shipped-$(CONFIG_TOUCHSCREEN_MELFAS_NOTE) += tsp_melfas/note/melfas.fw
+fw-shipped-$(CONFIG_TOUCHSCREEN_MELFAS_NOTE) += tsp_melfas/note/BOOT.fw
+fw-shipped-$(CONFIG_TOUCHSCREEN_MELFAS_NOTE) += tsp_melfas/note/CORE.fw
+fw-shipped-$(CONFIG_TOUCHSCREEN_MELFAS_NOTE) += tsp_melfas/note/CONF.fw
+fw-shipped-$(CONFIG_TOUCHSCREEN_MELFAS_NOTE) += tsp_melfas/note/mms_boot.fw
+else
+$(warning '$(TSPFIRMWARE_DIRECTORY)' directory dose not exist)
+endif
+
+TSPFIRMWARE_DIRECTORY_MEL_TAB3 = firmware/tsp_melfas/tab3
+ifeq ($(shell test -d $(TSPFIRMWARE_DIRECTORY_MEL_TAB3) && echo yes),yes)
+fw-shipped-$(CONFIG_TOUCHSCREEN_MMS152_TAB3) += tsp_melfas/tab3/melfas.fw
+fw-shipped-$(CONFIG_TOUCHSCREEN_MMS152_TAB3) += tsp_melfas/tab3/BOOT.fw
+fw-shipped-$(CONFIG_TOUCHSCREEN_MMS152_TAB3) += tsp_melfas/tab3/CORE.fw
+fw-shipped-$(CONFIG_TOUCHSCREEN_MMS152_TAB3) += tsp_melfas/tab3/CONF.fw
+fw-shipped-$(CONFIG_TOUCHSCREEN_MMS152_TAB3) += tsp_melfas/tab3/mms_boot.fw
+else
+$(warning '$(TSPFIRMWARE_DIRECTORY)' directory dose not exist)
+endif
+
+TSPFIRMWARE_DIRECTORY_MEL_MMS252 = firmware/tsp_melfas/lt
+ifeq ($(shell test -d $(TSPFIRMWARE_DIRECTORY_MEL_MMS252) && echo yes),yes)
+fw-shipped-$(CONFIG_TOUCHSCREEN_MMS252) += tsp_melfas/lt/melfas_yf.fw
+fw-shipped-$(CONFIG_TOUCHSCREEN_MMS252) += tsp_melfas/lt/melfas_wt.fw
+fw-shipped-$(CONFIG_TOUCHSCREEN_MMS252) += tsp_melfas/lt/melfas_ij.fw
+else
+$(warning '$(TSPFIRMWARE_DIRECTORY)' directory dose not exist)
+endif
+
+TSPFIRMWARE_DIRECTORY_MEL_GD2 = firmware/tsp_melfas/gd2
+ifeq ($(shell test -d $(TSPFIRMWARE_DIRECTORY_MEL_GD2) && echo yes),yes)
+fw-shipped-$(CONFIG_TOUCHSCREEN_MELFAS_GD2) += tsp_melfas/gd2/melfas.fw
+fw-shipped-$(CONFIG_TOUCHSCREEN_MELFAS_GD2) += tsp_melfas/gd2/BOOT.fw
+fw-shipped-$(CONFIG_TOUCHSCREEN_MELFAS_GD2) += tsp_melfas/gd2/CORE.fw
+fw-shipped-$(CONFIG_TOUCHSCREEN_MELFAS_GD2) += tsp_melfas/gd2/CONF.fw
+else
+$(warning '$(TSPFIRMWARE_DIRECTORY)' directory dose not exist)
+endif
+
+fw-shipped-$(CONFIG_AUDIENCE_ES305) += audience/es305_fw.bin
 
 fw-shipped-all := $(fw-shipped-y) $(fw-shipped-m) $(fw-shipped-)
 
@@ -219,7 +355,7 @@ $(obj)/%: $(obj)/%.ihex | $(objtree)/$(obj)/$$(dir %)
 # Don't depend on ihex2fw if we're installing and it already exists.
 # Putting it after | in the dependencies doesn't seem sufficient when
 # we're installing after a cross-compile, because ihex2fw has dependencies
-# on stuff like /usr/lib/gcc/ppc64-redhat-linux/4.3.0/include/stddef.h and 
+# on stuff like /usr/lib/gcc/ppc64-redhat-linux/4.3.0/include/stddef.h and
 # thus wants to be rebuilt. Which it can't be, if the prebuilt kernel tree
 # is exported read-only for someone to run 'make install'.
 ifeq ($(INSTALL):$(wildcard $(obj)/ihex2fw),install:$(obj)/ihex2fw)

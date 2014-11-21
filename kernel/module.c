@@ -78,9 +78,9 @@
  * only when CONFIG_DEBUG_SET_MODULE_RONX=y
  */
 #ifdef CONFIG_DEBUG_SET_MODULE_RONX
-# define debug_align(X) ALIGN(X, PAGE_SIZE)
+#define debug_align(X) ALIGN(X, PAGE_SIZE)
 #else
-# define debug_align(X) (X)
+#define debug_align(X) (X)
 #endif
 
 /*

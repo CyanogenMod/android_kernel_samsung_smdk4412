@@ -1,0 +1,34 @@
+#
+# ICE4_FPGA
+#
+menu "BARCODE_EMUL and IRDA FPGA"
+
+config ICE4_FPGA
+	tristate "FPGA chip for Barcode emulator and IR LED control"
+	default n
+	help
+	  Lattice FPGA can support both Barcode emulator and IR LED controller.
+	  The configuration is just BARCODE_EMUL, but it contains IRDA feature, too.
+	  To compile this driver as a module, choose M here.
+	  If unsure, say N.
+
+config BARCODE_EMUL_FPGA_ICE4
+	tristate "this feature allows Barcode emulator"
+	depends on ICE4_FPGA
+	default n
+	help
+	  This is a driver for barcode emulator driver based on Lattice chip.
+	  Lattice FPGA can support Barcode emulator.
+	  To compile this driver as a module, choose M here.
+	  If unsure, say N.
+
+config IR_REMOCON_FPGA
+	tristate "this feature allows IR LED"
+	depends on ICE4_FPGA
+	default n
+	help
+	  This is a driver for IR LED driver based on Lattice chip.
+	  Lattice FPGA can support IR LED.
+	  To compile this driver as a module, choose M here.
+	  If unsure, say N.
+endmenu

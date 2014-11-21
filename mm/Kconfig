@@ -189,7 +189,7 @@ config COMPACTION
 config MIGRATION
 	bool "Page migration"
 	def_bool y
-	depends on NUMA || ARCH_ENABLE_MEMORY_HOTREMOVE || COMPACTION
+	depends on NUMA || ARCH_ENABLE_MEMORY_HOTREMOVE || COMPACTION || DMA_CMA
 	help
 	  Allows the migration of the physical location of pages of processes
 	  while the virtual addresses are not changed. This is useful in
@@ -370,3 +370,141 @@ config CLEANCACHE
 	  in a negligible performance hit.
 
 	  If unsure, say Y to enable cleancache
+
+config FRONTSWAP
+	bool "Enable frontswap to cache swap pages if tmem is present"
+	depends on SWAP
+	default n
+	help
+	  Frontswap is so named because it can be thought of as the opposite
+	  of a "backing" store for a swap device.  The data is stored into
+	  "transcendent memory", memory that is not directly accessible or
+	  addressable by the kernel and is of unknown and possibly
+	  time-varying size.  When space in transcendent memory is available,
+	  a significant swap I/O reduction may be achieved.  When none is
+	  available, all frontswap calls are reduced to a single pointer-
+	  compare-against-NULL resulting in a negligible performance hit
+	  and swap data is stored as normal on the matching swap device.
+
+	  If unsure, say Y to enable frontswap.
+
+config ZSMALLOC_NEW
+	tristate "Memory allocator for compressed pages"
+	default n
+	help
+	  zsmalloc is a slab-based memory allocator designed to store
+	  compressed RAM pages.  zsmalloc uses virtual memory mapping
+	  in order to reduce fragmentation.  However, this results in a
+	  non-standard allocator interface where a handle, not a pointer, is
+	  returned by an alloc().  This handle must be mapped in order to
+	  access the allocated space.
+
+config PGTABLE_MAPPING
+	bool "Use page table mapping to access object in zsmalloc"
+	depends on ZSMALLOC_NEW
+	help
+	  By default, zsmalloc uses a copy-based object mapping method to
+	  access allocations that span two pages. However, if a particular
+	  architecture (ex, ARM) performs VM mapping faster than copying,
+	  then you should select this. This causes zsmalloc to use page table
+	  mapping rather than copying for object mapping.
+
+	  You can check speed with zsmalloc benchmark[1].
+	  [1] https://github.com/spartacus06/zsmalloc
+
+config ZSWAP
+	bool "In-kernel swap page compression"
+	depends on FRONTSWAP && CRYPTO
+	select CRYPTO_LZO
+	select ZSMALLOC_NEW
+	default n
+	help
+	  Zswap is a backend for the frontswap mechanism in the VMM.
+	  It receives pages from frontswap and attempts to store them
+	  in a compressed memory pool, resulting in an effective
+	  partial memory reclaim.  In addition, pages and be retrieved
+	  from this compressed store much faster than most tradition
+	  swap devices resulting in reduced I/O and faster performance
+	  for many workloads.
+
+config DISABLE_LUMPY_RECLAIM
+	bool "Disable lumpy reclaim"
+	default y
+	depends on ZSWAP
+
+config DIRECT_RECLAIM_FILE_PAGES_ONLY
+	bool "Reclaim file pages only"
+	default n
+	depends on ZSWAP
+
+config TIGHT_PGDAT_BALANCE
+	bool "Increase balance condition"
+	default n
+	depends on ZSWAP
+
+config CMA
+	bool "Contiguous Memory Allocator framework"
+	# Currently there is only one allocator so force it on
+	select CMA_BEST_FIT
+	help
+	  This enables the Contiguous Memory Allocator framework which
+	  allows drivers to allocate big physically-contiguous blocks of
+	  memory for use with hardware components that do not support I/O
+	  map nor scatter-gather.
+
+	  If you select this option you will also have to select at least
+	  one allocator algorithm below.
+
+	  To make use of CMA you need to specify the regions and
+	  driver->region mapping on command line when booting the kernel.
+
+config CMA_DEVELOPEMENT
+	bool "Include CMA developement features"
+	depends on CMA
+	help
+	  This lets you enable some developement features of the CMA
+	  freamework.
+
+config CMA_DEBUG
+	bool "CMA debug messages"
+	depends on CMA_DEVELOPEMENT
+	help
+	  Enable debug messages in CMA code.
+
+config CMA_SYSFS
+	bool "CMA SysFS interface support"
+	depends on CMA_DEVELOPEMENT
+	help
+	  Enable support for SysFS interface.
+
+config CMA_CMDLINE
+	bool "CMA command line parameters support"
+	depends on CMA_DEVELOPEMENT
+	help
+	  Enable support for cma, cma.map and cma.asterisk command line
+	  parameters.
+
+config CMA_BEST_FIT
+	bool "CMA best-fit allocator"
+	depends on CMA
+	help
+	  This is a best-fit algorithm running in O(n log n) time where
+	  n is the number of existing holes (which is never greater then
+	  the number of allocated regions and usually much smaller).  It
+	  allocates area from the smallest hole that is big enough for
+	  allocation in question.
+
+config DEBUG_VMALLOC
+	bool "Enable VMALLOC debugging support"
+	help
+	  This enables the inclusion of a few debugging parameters, which
+	  are the PID and the name of the task requesting vmalloc.
+
+	  Disabling these can result in savings in code size.
+
+config LOWMEM_CHECK
+	bool "Process's file and anon lowmem allocating status"
+
+config FADV_NOACTIVE
+	bool "fadvise noactive option support"
+	default n

@@ -357,7 +357,17 @@ static inline pte_t *pmd_page_vaddr(pmd_t pmd)
 #define pte_page(pte)		pfn_to_page(pte_pfn(pte))
 #define mk_pte(page,prot)	pfn_pte(page_to_pfn(page), prot)
 
+#ifdef CONFIG_EXYNOS_MARK_PAGE_HOLES_DEBUG
+extern void panic(const char * fmt, ...);
+#define set_pte_ext(ptep,pte,ext) do {					\
+		if ((pte != __pte(0)) && is_pfn_hole(pte_pfn(pte)))	\
+			panic("Mapping pfn %#lx that is hole",		\
+				(unsigned long)pte_pfn(pte));		\
+		cpu_set_pte_ext(ptep,pte,ext);				\
+	} while (0)
+#else
 #define set_pte_ext(ptep,pte,ext) cpu_set_pte_ext(ptep,pte,ext)
+#endif
 #define pte_clear(mm,addr,ptep)	set_pte_ext(ptep, __pte(0), 0)
 
 #define pte_none(pte)		(!pte_val(pte))

@@ -825,6 +825,7 @@ int cfg80211_wext_giwfreq(struct net_device *dev,
 
 	switch (wdev->iftype) {
 	case NL80211_IFTYPE_STATION:
+	case NL80211_IFTYPE_P2P_CLIENT:
 		return cfg80211_mgd_wext_giwfreq(dev, info, freq, extra);
 	case NL80211_IFTYPE_ADHOC:
 		return cfg80211_ibss_wext_giwfreq(dev, info, freq, extra);

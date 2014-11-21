@@ -157,7 +157,12 @@ armpmu_map_cache_event(u64 config)
 static int
 armpmu_map_event(u64 config)
 {
-	int mapping = (*armpmu->event_map)[config];
+	int mapping;
+
+	if (config >= PERF_COUNT_HW_MAX)
+		return -ENOENT;
+
+	mapping = (*armpmu->event_map)[config];
 	return mapping == HW_OP_UNSUPPORTED ? -EOPNOTSUPP : mapping;
 }
 
@@ -352,6 +357,9 @@ validate_event(struct cpu_hw_events *cpuc,
 	       struct perf_event *event)
 {
 	struct hw_perf_event fake_event = event->hw;
+
+	if (is_software_event(event))
+		return 1;
 
 	if (event->pmu != &pmu || event->state <= PERF_EVENT_STATE_OFF)
 		return 1;
@@ -661,6 +669,12 @@ init_hw_perf_events(void)
 			break;
 		case 0xC090:	/* Cortex-A9 */
 			armpmu = armv7_a9_pmu_init();
+			break;
+		case 0xC050:	/* Cortex-A5 */
+			armpmu = armv7_a5_pmu_init();
+			break;
+		case 0xC0F0:	/* Cortex-A15 */
+			armpmu = armv7_a15_pmu_init();
 			break;
 		}
 	/* Intel CPUs [xscale]. */

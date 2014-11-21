@@ -373,12 +373,27 @@ EXPORT_SYMBOL(mark_page_accessed);
 
 void __lru_cache_add(struct page *page, enum lru_list lru)
 {
+#ifndef CONFIG_DMA_CMA
 	struct pagevec *pvec = &get_cpu_var(lru_add_pvecs)[lru];
 
 	page_cache_get(page);
 	if (!pagevec_add(pvec, page))
 		____pagevec_lru_add(pvec, lru);
 	put_cpu_var(lru_add_pvecs);
+#else
+	struct pagevec *pvec;
+	int is_cma;
+
+	/* FIXME: too slow */
+	is_cma = is_cma_pageblock(page);
+
+	pvec = &get_cpu_var(lru_add_pvecs)[lru];
+
+	page_cache_get(page);
+	if (!pagevec_add(pvec, page) || is_cma)
+		____pagevec_lru_add(pvec, lru);
+	put_cpu_var(lru_add_pvecs);
+#endif
 }
 EXPORT_SYMBOL(__lru_cache_add);
 
@@ -495,7 +510,7 @@ static void lru_deactivate_fn(struct page *page, void *arg)
  * Either "cpu" is the current CPU, and preemption has already been
  * disabled; or "cpu" is being hot-unplugged, and is already dead.
  */
-static void drain_cpu_pagevecs(int cpu)
+void lru_add_drain_cpu(int cpu)
 {
 	struct pagevec *pvecs = per_cpu(lru_add_pvecs, cpu);
 	struct pagevec *pvec;
@@ -552,7 +567,7 @@ void deactivate_page(struct page *page)
 
 void lru_add_drain(void)
 {
-	drain_cpu_pagevecs(get_cpu());
+	lru_add_drain_cpu(get_cpu());
 	put_cpu();
 }
 

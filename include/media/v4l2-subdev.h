@@ -153,6 +153,7 @@ struct v4l2_subdev_core_ops {
 	int (*s_gpio)(struct v4l2_subdev *sd, u32 val);
 	int (*queryctrl)(struct v4l2_subdev *sd, struct v4l2_queryctrl *qc);
 	int (*g_ctrl)(struct v4l2_subdev *sd, struct v4l2_control *ctrl);
+	int (*noti_ctrl)(struct v4l2_subdev *sd, struct v4l2_noti_control *ctrl);
 	int (*s_ctrl)(struct v4l2_subdev *sd, struct v4l2_control *ctrl);
 	int (*g_ext_ctrls)(struct v4l2_subdev *sd, struct v4l2_ext_controls *ctrls);
 	int (*s_ext_ctrls)(struct v4l2_subdev *sd, struct v4l2_ext_controls *ctrls);
@@ -229,6 +230,12 @@ struct v4l2_subdev_audio_ops {
    s_std_output: set v4l2_std_id for video OUTPUT devices. This is ignored by
 	video input devices.
 
+   g_std_output: get current standard for video OUTPUT devices. This is ignored
+	by video input devices.
+
+   g_tvnorms_output: get v4l2_std_id with all standards supported by video
+	OUTPUT device. This is ignored by video input devices.
+
    s_crystal_freq: sets the frequency of the crystal used to generate the
 	clocks in Hz. An extra flags field allows device specific configuration
 	regarding clock frequency dividers, etc. If not used, then set flags
@@ -242,6 +249,8 @@ struct v4l2_subdev_audio_ops {
 
    s_dv_preset: set dv (Digital Video) preset in the sub device. Similar to
 	s_std()
+
+   g_dv_preset: get current dv (Digital Video) preset in the sub device.
 
    query_dv_preset: query dv preset in the sub device. This is similar to
 	querystd()
@@ -264,7 +273,9 @@ struct v4l2_subdev_video_ops {
 	int (*s_routing)(struct v4l2_subdev *sd, u32 input, u32 output, u32 config);
 	int (*s_crystal_freq)(struct v4l2_subdev *sd, u32 freq, u32 flags);
 	int (*s_std_output)(struct v4l2_subdev *sd, v4l2_std_id std);
+	int (*g_std_output)(struct v4l2_subdev *sd, v4l2_std_id *std);
 	int (*querystd)(struct v4l2_subdev *sd, v4l2_std_id *std);
+	int (*g_tvnorms_output)(struct v4l2_subdev *sd, v4l2_std_id *std);
 	int (*g_input_status)(struct v4l2_subdev *sd, u32 *status);
 	int (*s_stream)(struct v4l2_subdev *sd, int enable);
 	int (*cropcap)(struct v4l2_subdev *sd, struct v4l2_cropcap *cc);
@@ -281,6 +292,8 @@ struct v4l2_subdev_video_ops {
 	int (*enum_dv_presets) (struct v4l2_subdev *sd,
 			struct v4l2_dv_enum_preset *preset);
 	int (*s_dv_preset)(struct v4l2_subdev *sd,
+			struct v4l2_dv_preset *preset);
+	int (*g_dv_preset)(struct v4l2_subdev *sd,
 			struct v4l2_dv_preset *preset);
 	int (*query_dv_preset)(struct v4l2_subdev *sd,
 			struct v4l2_dv_preset *preset);

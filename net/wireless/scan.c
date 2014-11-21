@@ -17,7 +17,7 @@
 #include "nl80211.h"
 #include "wext-compat.h"
 
-#define IEEE80211_SCAN_RESULT_EXPIRE	(15 * HZ)
+#define IEEE80211_SCAN_RESULT_EXPIRE	(3 * HZ)
 
 void ___cfg80211_scan_done(struct cfg80211_registered_device *rdev, bool leak)
 {
@@ -330,8 +330,10 @@ static int cmp_bss(struct cfg80211_bss *a,
 {
 	int r;
 
+#if !(defined(CONFIG_BCM4334) || defined(CONFIG_BCM4334_MODULE))
 	if (a->channel != b->channel)
 		return b->channel->center_freq - a->channel->center_freq;
+#endif /* CONFIG_BCM4334 */
 
 	if (is_mesh_bss(a) && is_mesh_bss(b)) {
 		r = cmp_ies(WLAN_EID_MESH_ID,
@@ -352,6 +354,11 @@ static int cmp_bss(struct cfg80211_bss *a,
 	if (r)
 		return r;
 
+#if defined(CONFIG_BCM4334) || defined(CONFIG_BCM4334_MODULE)
+	if (a->channel != b->channel)
+		return b->channel->center_freq - a->channel->center_freq;
+#endif /* CONFIG_BCM4334 */
+
 	return cmp_ies(WLAN_EID_SSID,
 		       a->information_elements,
 		       a->len_information_elements,
@@ -368,6 +375,9 @@ struct cfg80211_bss *cfg80211_get_bss(struct wiphy *wiphy,
 	struct cfg80211_registered_device *dev = wiphy_to_dev(wiphy);
 	struct cfg80211_internal_bss *bss, *res = NULL;
 	unsigned long now = jiffies;
+
+	if ((bssid == NULL) || (ssid == NULL))
+		return NULL;
 
 	spin_lock_bh(&dev->bss_lock);
 

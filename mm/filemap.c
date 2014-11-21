@@ -1163,8 +1163,14 @@ page_ok:
 		 * When a sequential read accesses a page several times,
 		 * only mark it as accessed the first time.
 		 */
+#ifdef CONFIG_FADV_NOACTIVE
+		if (prev_index != index || offset != prev_offset)
+			if (!(filp->f_mode & FMODE_NOACTIVE))
+				mark_page_accessed(page);
+#else
 		if (prev_index != index || offset != prev_offset)
 			mark_page_accessed(page);
+#endif
 		prev_index = index;
 
 		/*

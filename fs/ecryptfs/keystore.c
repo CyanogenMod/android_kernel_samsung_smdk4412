@@ -1150,8 +1150,8 @@ decrypt_pki_encrypted_session_key(struct ecryptfs_auth_tok *auth_tok,
 	u8 cipher_code = 0;
 	struct ecryptfs_msg_ctx *msg_ctx;
 	struct ecryptfs_message *msg = NULL;
-	char *auth_tok_sig;
-	char *payload;
+	char *auth_tok_sig = NULL;
+	char *payload = NULL;
 	size_t payload_len;
 	int rc;
 
@@ -1206,6 +1206,10 @@ decrypt_pki_encrypted_session_key(struct ecryptfs_auth_tok *auth_tok,
 out:
 	if (msg)
 		kfree(msg);
+	if (auth_tok_sig)
+        kfree(auth_tok_sig);
+	if (payload)
+        kfree(payload);
 	return rc;
 }
 
@@ -1762,8 +1766,8 @@ int ecryptfs_parse_packet_set(struct ecryptfs_crypt_stat *crypt_stat,
 	size_t found_auth_tok;
 	size_t next_packet_is_auth_tok_packet;
 	struct list_head auth_tok_list;
-	struct ecryptfs_auth_tok *matching_auth_tok;
-	struct ecryptfs_auth_tok *candidate_auth_tok;
+	struct ecryptfs_auth_tok *matching_auth_tok = NULL;
+	struct ecryptfs_auth_tok *candidate_auth_tok = NULL;
 	char *candidate_auth_tok_sig;
 	size_t packet_size;
 	struct ecryptfs_auth_tok *new_auth_tok;
@@ -1970,7 +1974,7 @@ pki_encrypt_session_key(struct key *auth_tok_key,
 {
 	struct ecryptfs_msg_ctx *msg_ctx = NULL;
 	char *payload = NULL;
-	size_t payload_len;
+	size_t payload_len = 0;
 	struct ecryptfs_message *msg;
 	int rc;
 
@@ -2183,7 +2187,7 @@ write_tag_3_packet(char *dest, size_t *remaining_bytes,
 {
 	size_t i;
 	size_t encrypted_session_key_valid = 0;
-	char session_key_encryption_key[ECRYPTFS_MAX_KEY_BYTES];
+	char session_key_encryption_key[ECRYPTFS_MAX_KEY_BYTES] = {0, };
 	struct scatterlist dst_sg[2];
 	struct scatterlist src_sg[2];
 	struct mutex *tfm_mutex = NULL;

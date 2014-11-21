@@ -1,0 +1,18 @@
+config ISDBT
+	bool "isdbt"
+
+choice
+	depends on ISDBT
+	prompt "isdbt one-seg driver"
+	default ISDBT_FC8150
+
+	config ISDBT_FC8150
+		bool "ISDBT_FC8150"
+
+	config ISDBT_FC8100
+		bool "ISDBT_FC8100"
+
+endchoice
+
+        config ISDBT_ANT_DET
+                bool "ISDBT antenna detector"

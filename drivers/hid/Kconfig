@@ -50,6 +50,27 @@ config HIDRAW
 
 	If unsure, say Y.
 
+config UHID
+	tristate "User-space I/O driver support for HID subsystem"
+	depends on HID
+	default n
+	---help---
+	Say Y here if you want to provide HID I/O Drivers from user-space.
+	This allows to write I/O drivers in user-space and feed the data from
+	the device into the kernel. The kernel parses the HID reports, loads the
+	corresponding HID Device Driver or provides input devices on top of your
+	user-space device.
+
+	This driver cannot be used to parse HID-reports in user-space and write
+	special HID-drivers. You should use hidraw for that.
+	Instead, this driver allows to write the transport-layer driver in
+	user-space like USB-HID and Bluetooth-HID do in kernel-space.
+
+	If unsure, say N.
+
+	To compile this driver as a module, choose M here: the
+	module will be called uhid.
+
 source "drivers/hid/usbhid/Kconfig"
 
 menu "Special HID drivers"
@@ -217,6 +238,12 @@ config HID_KENSINGTON
 	default !EXPERT
 	---help---
 	Support for Kensington Slimblade Trackball.
+
+config HID_KK_UPGRADE
+	bool "KK Upgrade"
+	depends on USB_HID
+	---help---
+	Feature for KK Upgrade models.
 
 config HID_LCPOWER
 	tristate "LC-Power"
@@ -486,7 +513,7 @@ config HID_ROCCAT_PYRA
 
 config HID_SAMSUNG
 	tristate "Samsung InfraRed remote control or keyboards"
-	depends on USB_HID
+	depends on (USB_HID || BT_HIDP)
 	---help---
 	Support for Samsung InfraRed remote control or keyboards.
 
@@ -532,6 +559,13 @@ config SMARTJOYPLUS_FF
 	Say Y here if you have a SmartJoy PLUS PS2/USB adapter and want to
 	enable force feedback support for it.
 
+config HID_SYNAPTICS_BT
+	tristate "HID Synaptics"
+	depends on HID
+	default n
+	---help---
+	For a Bluetooth HID touchpad
+
 config HID_TOPSEED
 	tristate "TopSeed Cyberlink, BTC Emprex, Conceptronic remote control support"
 	depends on USB_HID
@@ -568,6 +602,12 @@ config HID_WACOM_POWER_SUPPLY
 	---help---
 	  Say Y here if you want to enable power supply status monitoring for
 	  Wacom Bluetooth devices.
+
+config HID_ZAGG
+	tristate "ZAGG InfraRed remote control or keyboards"
+	depends on (USB_HID || BT_HIDP)
+	---help---
+	Support for ZAGG InfraRed remote control or keyboards.
 
 config HID_ZEROPLUS
 	tristate "Zeroplus based game controller support"

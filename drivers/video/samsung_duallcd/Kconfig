@@ -1,0 +1,12 @@
+#
+# S3C Video configuration
+#
+
+config S5P_DSIM_SWITCHABLE_DUAL_LCD
+	bool "Samsung MIPI DSIM Switchable DUAL LCD support"
+	default n
+	---help---
+	  This enables support for Samsung MIPI DSIM Switchable DUAL LCD.
+	  This driver uses one DSIM port. DSIM port is able to switch to
+	  select LCD Panel. Using LCD_SEL gpio, LCD can be switched.
+	  Only one side of lcd panel could be enabled.

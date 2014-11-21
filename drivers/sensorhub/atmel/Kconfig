@@ -1,0 +1,144 @@
+#
+# sensor drivers configuration
+#
+config SENSORS_SYSFS
+	tristate "Sensors sysfs"
+	help
+	  Support sysfs for sensors.
+          If you say yes here you get sysfs support for
+	  sensor factory test.
+	  To compile this driver as a module, choose M here: the
+	  module will be called sensors_core.
+
+config SENSORS_SSP
+	tristate "Sensors ssp"
+	default n
+	depends on I2C
+	help
+	  ssp driver for sensor hub.
+          If you say yes here you get ssp support for
+	  sensor hub.
+	  To compile this driver as a module, choose M here: the
+	  module will be called ssp.
+
+config SENSORS_SSP_ATMEL
+	tristate "Sensors ssp atmel"
+	default n
+	depends on I2C
+	help
+	  ssp driver for sensor hub.
+          If you say yes here you get ssp support for
+	  sensor hub.
+	  To compile this driver as a module, choose M here: the
+	  module will be called ssp.
+
+config SENSORS_SSP_LSM330
+	tristate "Sensors ssp lsm330"
+	default n
+	depends on I2C
+	help
+	  lsm330 file for factory test in ssp driver.
+          If you say yes here you get lsm330 support for
+	  factory test.
+	  To compile this driver as a module, choose M here: the
+	  module will be called ssp.
+
+config SENSORS_SSP_AK8963C
+	tristate "Sensors ssp ak8963c"
+	default n
+	depends on I2C
+	help
+	  ak8963c file for factory test in ssp driver.
+          If you say yes here you get ak8963c support for
+	  factory test.
+	  To compile this driver as a module, choose M here: the
+	  module will be called ssp.
+
+config SENSORS_SSP_CM36651
+	tristate "Sensors ssp cm36651"
+	default n
+	depends on I2C
+	help
+	  cm36651 file for factory test in ssp driver.
+          If you say yes here you get cm36651 support for
+	  factory test.
+	  To compile this driver as a module, choose M here: the
+	  module will be called ssp.
+
+config SENSORS_SSP_BMP182
+	tristate "Sensors ssp bmp182"
+	default n
+	depends on I2C
+	help
+	  bmp182 file for factory test in ssp driver.
+          If you say yes here you get bmp182 support for
+	  factory test.
+	  To compile this driver as a module, choose M here: the
+	  module will be called ssp.
+
+config SENSORS_SSP_AT32UC3L0128
+	tristate "Sensors ssp at32uc3l0128"
+	default n
+	depends on I2C
+	help
+	  at32uc3l0128 file for factory test in ssp driver.
+          If you say yes here you get at32uc3l0128 support for
+	  factory test.
+	  To compile this driver as a module, choose M here: the
+	  module will be called ssp.
+
+config SENSORS_SSP_ACCELEROMETER_POSITION
+	int "Accelerometer Sensor Mounting Position on Board"
+	depends on SENSORS_SSP
+	default "0"
+	help
+	  X Y Z axis position.
+	    0:  X, Y, Z
+	    1:  Y,-X, Z
+	    2: -X,-Y, Z
+	    3: -Y, X, Z
+	    4: -X, Y,-Z
+	    5:  Y, X,-Z
+	    6:  X,-Y,-Z
+	    7: -Y,-X,-Z
+
+config SENSORS_SSP_GYROSCOPE_POSITION
+	int "Gyroscope Sensor Mounting Position on Board"
+	depends on SENSORS_SSP
+	default "0"
+	help
+	  X Y Z axis position.
+	    0:  X, Y, Z
+	    1:  Y,-X, Z
+	    2: -X,-Y, Z
+	    3: -Y, X, Z
+	    4: -X, Y,-Z
+	    5:  Y, X,-Z
+	    6:  X,-Y,-Z
+	    7: -Y,-X,-Z
+
+config SENSORS_SSP_MAGNETOMETER_POSITION
+	int "Geomagnetic Sensor Mounting Position on Board"
+	depends on SENSORS_SSP
+	default "0"
+	help
+	  X Y Z axis position.
+	    0:  X, Y, Z
+	    1:  Y,-X, Z
+	    2: -X,-Y, Z
+	    3: -Y, X, Z
+	    4: -X, Y,-Z
+	    5:  Y, X,-Z
+	    6:  X,-Y,-Z
+	    7: -Y,-X,-Z
+
+config SENSORS_SSP_SENSORHUB
+	tristate "Sensors ssp sensorhub"
+	default n
+	depends on I2C
+	help
+	  ssp sensor hub driver for sensor hub.
+          If you say yes here you get ssp support for
+	  sensor hub.
+	  To compile this driver as a module, choose M here: the
+	  module will be called ssp.

@@ -1,0 +1,142 @@
+#
+# sensor drivers configuration
+#
+config SENSORS_SYSFS
+	tristate "Sensors sysfs"
+	help
+	  Support sysfs for sensors.
+          If you say yes here you get sysfs support for
+	  sensor factory test.
+	  To compile this driver as a module, choose M here: the
+	  module will be called sensors_core.
+
+config SENSORS_SSP
+	tristate "Sensors ssp"
+	default n
+	depends on SPI
+	help
+	  ssp driver for sensor hub.
+          If you say yes here you get ssp support for
+	  sensor hub.
+	  To compile this driver as a module, choose M here: the
+	  module will be called ssp.
+
+config SENSORS_SSP_STM
+	tristate "Sensors ssp stm"
+	default n
+	depends on SPI
+	help
+	  ssp driver for sensor hub.
+          If you say yes here you get ssp support for
+	  sensor hub.
+	  To compile this driver as a module, choose M here: the
+	  module will be called ssp.
+
+config SENSORS_SSP_MPU6500
+	tristate "Sensors ssp mpu6500"
+	default n
+	depends on SPI
+	help
+	  mpu6500 file for factory test in ssp driver.
+          If you say yes here you get mpu6500 support for
+	  factory test.
+	  To compile this driver as a module, choose M here: the
+	  module will be called ssp.
+
+config SENSORS_SSP_YAS532
+	tristate "Sensors ssp yas532"
+	default n
+	depends on SPI
+	help
+	  yas532 file for factory test in ssp driver.
+          If you say yes here you get yas532 support for
+	  factory test.
+	  To compile this driver as a module, choose M here: the
+	  module will be called ssp.
+
+config SENSORS_SSP_CM3320
+	tristate "Sensors ssp cm3320"
+	default n
+	depends on SPI
+	help
+	  cm3320 file for factory test in ssp driver.
+          If you say yes here you get cm3320 support for
+	  factory test.
+	  To compile this driver as a module, choose M here: the
+	  module will be called ssp.
+
+config SENSORS_SSP_MAX88920
+	tristate "Sensors ssp max88920"
+	default n
+	depends on SPI
+	help
+	  max88920 file for factory test in ssp driver.
+          If you say yes here you get max88920 support for
+	  factory test.
+	  To compile this driver as a module, choose M here: the
+	  module will be called ssp.
+
+config SENSORS_SSP_BMP182
+	tristate "Sensors ssp bmp182"
+	default n
+	depends on SPI
+	help
+	  bmp182 file for factory test in ssp driver.
+          If you say yes here you get bmp182 support for
+	  factory test.
+	  To compile this driver as a module, choose M here: the
+	  module will be called ssp.
+
+config SENSORS_SSP_SHTC1
+	tristate "Sensors ssp shtc1"
+	default n
+	depends on SPI
+	help
+	  shtc1 file for factory test in ssp driver.
+          If you say yes here you get shtc1 support for
+	  factory test.
+	  To compile this driver as a module, choose M here: the
+	  module will be called ssp.
+
+config SENSORS_SSP_SHTC1_VER
+	string "Sensors shtc1 version name"
+	default "No_Version_Name"
+	depends on SENSORS_SSP_SHTC1
+	help
+	  shtc1 version for temphumid factory test in ssp driver.
+          If you give version name here you get shtc1 version for
+	  lcd test.
+
+config SENSORS_SSP_ATUC128L5HAR
+	tristate "Sensors ssp atuc128l5har"
+	default n
+	depends on SPI
+	help
+	  atuc128l5har file for factory test in ssp driver.
+          If you say yes here you get atuc128l5har support for
+	  factory test.
+	  To compile this driver as a module, choose M here: the
+	  module will be called ssp.
+
+config SENSORS_SSP_STM32F401
+	tristate "Sensors ssp stm32f401"
+	default n
+	depends on SPI
+	help
+	  stm32f401 file for factory test in ssp driver.
+          If you say yes here you get stm32f401 support for
+	  factory test.
+	  To compile this driver as a module, choose M here: the
+	  module will be called ssp.
+
+config SENSORS_SSP_SENSORHUB
+	tristate "Sensors ssp sensorhub"
+	default n
+	depends on SPI
+	help
+	  ssp sensor hub driver for sensor hub.
+          If you say yes here you get ssp support for
+	  sensor hub.
+	  To compile this driver as a module, choose M here: the
+	  module will be called ssp.
+

@@ -1,0 +1,24 @@
+config MPU_SENSORS_GYRO
+	tristate "MPU6050 built in gyroscope"
+	depends on MPU_SENSORS_MPU6050
+
+config MPU_SENSORS_TIMERIRQ
+    tristate "Timer IRQ"
+    depends on MPU_SENSORS_MPU6050
+    help
+      If you say yes here you get access to the timerirq device handle which
+      can be used to select on.  This can be used instead of IRQ's, sleeping,
+      or timer threads.  Reading from this device returns the same type of
+      information as reading from the MPU and slave IRQ's.
+
+config MPU_SENSORS_DEBUG
+    bool "MPU6050 MPU debug"
+    depends on MPU_SENSORS_TIMERIRQ
+    help
+      If you say yes here you get extra debug messages from the MPU6050
+      and other slave sensors.
+      
+config MPU_SENSORS_CORE
+	tristate "Sensors core"
+	
+

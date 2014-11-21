@@ -947,8 +947,13 @@ static int migrate_to_node(struct mm_struct *mm, int source, int dest,
 		return PTR_ERR(vma);
 
 	if (!list_empty(&pagelist)) {
+#ifndef CONFIG_DMA_CMA
 		err = migrate_pages(&pagelist, new_node_page, dest,
-							false, MIGRATE_SYNC);
+								false, MIGRATE_SYNC);
+#else
+		err = migrate_pages(&pagelist, new_node_page, dest,
+								false, MIGRATE_SYNC, 0);
+#endif
 		if (err)
 			putback_lru_pages(&pagelist);
 	}
@@ -1167,9 +1172,15 @@ static long do_mbind(unsigned long start, unsigned long len,
 		err = mbind_range(mm, start, end, new);
 
 		if (!list_empty(&pagelist)) {
+#ifndef CONFIG_DMA_CMA
 			nr_failed = migrate_pages(&pagelist, new_vma_page,
 						(unsigned long)vma,
 						false, true);
+#else
+			nr_failed = migrate_pages(&pagelist, new_vma_page,
+						(unsigned long)vma,
+						false, true, 0);
+#endif
 			if (nr_failed)
 				putback_lru_pages(&pagelist);
 		}

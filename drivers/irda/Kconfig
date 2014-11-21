@@ -1,0 +1,38 @@
+#
+# IR_LED
+#
+menuconfig IR_REMOCON
+	bool "IR LED driver only for the remote control"
+	help
+	  This option doesn't affect the kernel.
+
+	  If unsure, say N.
+
+choice
+	prompt "Control type"
+	depends on IR_REMOCON
+	default IR_REMOCON_GPIO
+
+config IR_REMOCON_GPIO
+	bool "GPIO-based IR LED driver"
+
+config IR_REMOCON_MC96
+	bool "Micom(ABOV)-based IR LED driver"
+
+endchoice
+
+config IR_REMOCON_GPIO_EUR
+	bool "GPIO-based IR LED driver of EUR model"
+	depends on IR_REMOCON && IR_REMOCON_GPIO
+	default n
+	help
+	  Say Y here to enable the GPIO-based driver for IR_LED of EUR model.
+
+config IR_REMOCON_GPIO_TMO
+        bool "GPIO-based IR LED driver of TMO model"
+        depends on IR_REMOCON && IR_REMOCON_GPIO
+        default n
+        help
+          Say Y here to enable the GPIO-based driver for IR_LED of TMO model.
+
+

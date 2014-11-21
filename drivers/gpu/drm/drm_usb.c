@@ -1,7 +1,6 @@
 #include "drmP.h"
 #include <linux/usb.h>
 
-#ifdef CONFIG_USB
 int drm_get_usb_dev(struct usb_interface *interface,
 		    const struct usb_device_id *id,
 		    struct drm_driver *driver)
@@ -114,4 +113,3 @@ void drm_usb_exit(struct drm_driver *driver,
 	usb_deregister(udriver);
 }
 EXPORT_SYMBOL(drm_usb_exit);
-#endif

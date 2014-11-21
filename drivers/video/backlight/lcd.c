@@ -15,6 +15,10 @@
 #include <linux/fb.h>
 #include <linux/slab.h>
 
+#ifdef CONFIG_DRM
+#include <drm/drm_backlight.h>
+#endif
+
 #if defined(CONFIG_FB) || (defined(CONFIG_FB_MODULE) && \
 			   defined(CONFIG_LCD_CLASS_DEVICE_MODULE))
 /* This callback gets called when something important happens inside a
@@ -32,6 +36,8 @@ static int fb_notifier_callback(struct notifier_block *self,
 	case FB_EVENT_BLANK:
 	case FB_EVENT_MODE_CHANGE:
 	case FB_EVENT_MODE_CHANGE_ALL:
+	case FB_EARLY_EVENT_BLANK:
+	case FB_R_EARLY_EVENT_BLANK:
 		break;
 	default:
 		return 0;
@@ -46,6 +52,14 @@ static int fb_notifier_callback(struct notifier_block *self,
 		if (event == FB_EVENT_BLANK) {
 			if (ld->ops->set_power)
 				ld->ops->set_power(ld, *(int *)evdata->data);
+		} else if (event == FB_EARLY_EVENT_BLANK) {
+			if (ld->ops->early_set_power)
+				ld->ops->early_set_power(ld,
+						*(int *)evdata->data);
+		} else if (event == FB_R_EARLY_EVENT_BLANK) {
+			if (ld->ops->r_early_set_power)
+				ld->ops->r_early_set_power(ld,
+						*(int *)evdata->data);
 		} else {
 			if (ld->ops->set_mode)
 				ld->ops->set_mode(ld, evdata->data);
@@ -226,6 +240,10 @@ struct lcd_device *lcd_device_register(const char *name, struct device *parent,
 
 	new_ld->ops = ops;
 
+#ifdef CONFIG_DRM
+	drm_bl_register(&new_ld->dev, BL_LCD_CLASS);
+#endif
+
 	return new_ld;
 }
 EXPORT_SYMBOL(lcd_device_register);
@@ -240,6 +258,10 @@ void lcd_device_unregister(struct lcd_device *ld)
 {
 	if (!ld)
 		return;
+
+#ifdef CONFIG_DRM
+	drm_bl_unregister(&ld->dev);
+#endif
 
 	mutex_lock(&ld->ops_lock);
 	ld->ops = NULL;

@@ -325,6 +325,7 @@ struct ipv6_pinfo {
 				__unused_2:6;
 	__s16			mcast_hops:9;
 #endif
+    int			ucast_oif;
 	int			mcast_oif;
 
 	/* pktoption flags */

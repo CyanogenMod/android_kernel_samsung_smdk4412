@@ -49,11 +49,16 @@ static int samsung_gpiolib_4bit_input(struct gpio_chip *chip,
 {
 	struct s3c_gpio_chip *ourchip = to_s3c_gpio(chip);
 	void __iomem *base = ourchip->base;
+	unsigned long flags;
 	unsigned long con;
+
+	s3c_gpio_lock(ourchip, flags);
 
 	con = __raw_readl(base + GPIOCON_OFF);
 	con &= ~(0xf << con_4bit_shift(offset));
 	__raw_writel(con, base + GPIOCON_OFF);
+
+	s3c_gpio_unlock(ourchip, flags);
 
 	gpio_dbg("%s: %p: CON now %08lx\n", __func__, base, con);
 
@@ -65,8 +70,11 @@ static int samsung_gpiolib_4bit_output(struct gpio_chip *chip,
 {
 	struct s3c_gpio_chip *ourchip = to_s3c_gpio(chip);
 	void __iomem *base = ourchip->base;
+	unsigned long flags;
 	unsigned long con;
 	unsigned long dat;
+
+	s3c_gpio_lock(ourchip, flags);
 
 	con = __raw_readl(base + GPIOCON_OFF);
 	con &= ~(0xf << con_4bit_shift(offset));
@@ -82,6 +90,8 @@ static int samsung_gpiolib_4bit_output(struct gpio_chip *chip,
 	__raw_writel(dat, base + GPIODAT_OFF);
 	__raw_writel(con, base + GPIOCON_OFF);
 	__raw_writel(dat, base + GPIODAT_OFF);
+
+	s3c_gpio_unlock(ourchip, flags);
 
 	gpio_dbg("%s: %p: CON %08lx, DAT %08lx\n", __func__, base, con, dat);
 
@@ -115,6 +125,7 @@ static int samsung_gpiolib_4bit2_input(struct gpio_chip *chip,
 	struct s3c_gpio_chip *ourchip = to_s3c_gpio(chip);
 	void __iomem *base = ourchip->base;
 	void __iomem *regcon = base;
+	unsigned long flags;
 	unsigned long con;
 
 	if (offset > 7)
@@ -122,9 +133,13 @@ static int samsung_gpiolib_4bit2_input(struct gpio_chip *chip,
 	else
 		regcon -= 4;
 
+	s3c_gpio_lock(ourchip, flags);
+
 	con = __raw_readl(regcon);
 	con &= ~(0xf << con_4bit_shift(offset));
 	__raw_writel(con, regcon);
+
+	s3c_gpio_unlock(ourchip, flags);
 
 	gpio_dbg("%s: %p: CON %08lx\n", __func__, base, con);
 
@@ -137,6 +152,7 @@ static int samsung_gpiolib_4bit2_output(struct gpio_chip *chip,
 	struct s3c_gpio_chip *ourchip = to_s3c_gpio(chip);
 	void __iomem *base = ourchip->base;
 	void __iomem *regcon = base;
+	unsigned long flags;
 	unsigned long con;
 	unsigned long dat;
 	unsigned con_offset = offset;
@@ -145,6 +161,8 @@ static int samsung_gpiolib_4bit2_output(struct gpio_chip *chip,
 		con_offset -= 8;
 	else
 		regcon -= 4;
+
+	s3c_gpio_lock(ourchip, flags);
 
 	con = __raw_readl(regcon);
 	con &= ~(0xf << con_4bit_shift(con_offset));
@@ -161,6 +179,8 @@ static int samsung_gpiolib_4bit2_output(struct gpio_chip *chip,
 	__raw_writel(con, regcon);
 	__raw_writel(dat, base + GPIODAT_OFF);
 
+	s3c_gpio_unlock(ourchip, flags);
+
 	gpio_dbg("%s: %p: CON %08lx, DAT %08lx\n", __func__, base, con, dat);
 
 	return 0;
@@ -170,14 +190,20 @@ void __init samsung_gpiolib_add_4bit(struct s3c_gpio_chip *chip)
 {
 	chip->chip.direction_input = samsung_gpiolib_4bit_input;
 	chip->chip.direction_output = samsung_gpiolib_4bit_output;
-	chip->pm = __gpio_pm(&s3c_gpio_pm_4bit);
+	chip->pm = chip->pm ?: __gpio_pm(&s3c_gpio_pm_4bit);
 }
 
 void __init samsung_gpiolib_add_4bit2(struct s3c_gpio_chip *chip)
 {
 	chip->chip.direction_input = samsung_gpiolib_4bit2_input;
 	chip->chip.direction_output = samsung_gpiolib_4bit2_output;
-	chip->pm = __gpio_pm(&s3c_gpio_pm_4bit);
+	chip->pm = chip->pm ?: __gpio_pm(&s3c_gpio_pm_4bit);
+}
+
+void __init samsung_gpiolib_add_4bit_no_pm(struct s3c_gpio_chip *chip)
+{
+	chip->chip.direction_input = samsung_gpiolib_4bit_input;
+	chip->chip.direction_output = samsung_gpiolib_4bit_output;
 }
 
 void __init samsung_gpiolib_add_4bit_chips(struct s3c_gpio_chip *chip,
@@ -185,6 +211,15 @@ void __init samsung_gpiolib_add_4bit_chips(struct s3c_gpio_chip *chip,
 {
 	for (; nr_chips > 0; nr_chips--, chip++) {
 		samsung_gpiolib_add_4bit(chip);
+		s3c_gpiolib_add(chip);
+	}
+}
+
+void __init samsung_gpiolib_add_4bit_chips_no_pm(struct s3c_gpio_chip *chip,
+					   int nr_chips)
+{
+	for (; nr_chips > 0; nr_chips--, chip++) {
+		samsung_gpiolib_add_4bit_no_pm(chip);
 		s3c_gpiolib_add(chip);
 	}
 }

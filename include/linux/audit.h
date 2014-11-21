@@ -26,6 +26,8 @@
 
 #include <linux/types.h>
 #include <linux/elf-em.h>
+#include "ptrace.h"
+#include "err.h"
 
 /* The netlink messages for the audit system is divided into blocks:
  * 1000 - 1099 are for commanding the audit system
@@ -420,22 +422,44 @@ extern int audit_classify_arch(int arch);
 				/* Public API */
 extern void audit_finish_fork(struct task_struct *child);
 extern int  audit_alloc(struct task_struct *task);
-extern void audit_free(struct task_struct *task);
-extern void audit_syscall_entry(int arch,
+extern void __audit_free(struct task_struct *task);
+extern void __audit_syscall_entry(int arch,
 				int major, unsigned long a0, unsigned long a1,
 				unsigned long a2, unsigned long a3);
-extern void audit_syscall_exit(int failed, long return_code);
+extern void __audit_syscall_exit(int ret_success, long ret_value);
 extern void __audit_getname(const char *name);
 extern void audit_putname(const char *name);
 extern void __audit_inode(const char *name, const struct dentry *dentry);
 extern void __audit_inode_child(const struct dentry *dentry,
 				const struct inode *parent);
+extern void __audit_seccomp(unsigned long syscall);
 extern void __audit_ptrace(struct task_struct *t);
 
 static inline int audit_dummy_context(void)
 {
 	void *p = current->audit_context;
 	return !p || *(int *)p;
+}
+static inline void audit_free(struct task_struct *task)
+{
+	if (unlikely(task->audit_context))
+		__audit_free(task);
+}
+static inline void audit_syscall_entry(int arch, int major, unsigned long a0,
+				       unsigned long a1, unsigned long a2,
+				       unsigned long a3)
+{
+	if (unlikely(!audit_dummy_context()))
+		__audit_syscall_entry(arch, major, a0, a1, a2, a3);
+}
+static inline void audit_syscall_exit(void *pt_regs)
+{
+	if (unlikely(current->audit_context)) {
+		int success = is_syscall_success(pt_regs);
+		int return_code = regs_return_value(pt_regs);
+
+		__audit_syscall_exit(success, return_code);
+	}
 }
 static inline void audit_getname(const char *name)
 {
@@ -453,6 +477,12 @@ static inline void audit_inode_child(const struct dentry *dentry,
 }
 void audit_core_dumps(long signr);
 
+static inline void audit_seccomp(unsigned long syscall)
+{
+	if (unlikely(!audit_dummy_context()))
+		__audit_seccomp(syscall);
+}
+
 static inline void audit_ptrace(struct task_struct *t)
 {
 	if (unlikely(!audit_dummy_context()))
@@ -468,10 +498,10 @@ extern int  audit_set_loginuid(struct task_struct *task, uid_t loginuid);
 #define audit_get_sessionid(t) ((t)->sessionid)
 extern void audit_log_task_context(struct audit_buffer *ab);
 extern void __audit_ipc_obj(struct kern_ipc_perm *ipcp);
-extern void __audit_ipc_set_perm(unsigned long qbytes, uid_t uid, gid_t gid, mode_t mode);
-extern int audit_bprm(struct linux_binprm *bprm);
-extern void audit_socketcall(int nargs, unsigned long *args);
-extern int audit_sockaddr(int len, void *addr);
+extern void __audit_ipc_set_perm(unsigned long qbytes, uid_t uid, gid_t gid, umode_t mode);
+extern int __audit_bprm(struct linux_binprm *bprm);
+extern void __audit_socketcall(int nargs, unsigned long *args);
+extern int __audit_sockaddr(int len, void *addr);
 extern void __audit_fd_pair(int fd1, int fd2);
 extern int audit_set_macxattr(const char *name);
 extern void __audit_mq_open(int oflag, mode_t mode, struct mq_attr *attr);
@@ -494,12 +524,29 @@ static inline void audit_fd_pair(int fd1, int fd2)
 	if (unlikely(!audit_dummy_context()))
 		__audit_fd_pair(fd1, fd2);
 }
-static inline void audit_ipc_set_perm(unsigned long qbytes, uid_t uid, gid_t gid, mode_t mode)
+static inline void audit_ipc_set_perm(unsigned long qbytes, uid_t uid, gid_t gid, umode_t mode)
 {
 	if (unlikely(!audit_dummy_context()))
 		__audit_ipc_set_perm(qbytes, uid, gid, mode);
 }
-static inline void audit_mq_open(int oflag, mode_t mode, struct mq_attr *attr)
+static inline int audit_bprm(struct linux_binprm *bprm)
+{
+	if (unlikely(!audit_dummy_context()))
+		return __audit_bprm(bprm);
+	return 0;
+}
+static inline void audit_socketcall(int nargs, unsigned long *args)
+{
+	if (unlikely(!audit_dummy_context()))
+		__audit_socketcall(nargs, args);
+}
+static inline int audit_sockaddr(int len, void *addr)
+{
+	if (unlikely(!audit_dummy_context()))
+		return __audit_sockaddr(len, addr);
+	return 0;
+}
+static inline void audit_mq_open(int oflag, umode_t mode, struct mq_attr *attr)
 {
 	if (unlikely(!audit_dummy_context()))
 		__audit_mq_open(oflag, mode, attr);
@@ -613,6 +660,11 @@ extern void		    audit_log_d_path(struct audit_buffer *ab,
 extern void		    audit_log_key(struct audit_buffer *ab,
 					  char *key);
 extern void		    audit_log_lost(const char *message);
+#ifdef CONFIG_SECURITY
+extern void 		    audit_log_secctx(struct audit_buffer *ab, u32 secid);
+#else
+#define audit_log_secctx(b,s) do { ; } while (0)
+#endif
 extern int		    audit_update_lsm_rules(void);
 
 				/* Private API (for audit.c only) */
@@ -635,6 +687,7 @@ extern int audit_enabled;
 #define audit_log_untrustedstring(a,s) do { ; } while (0)
 #define audit_log_d_path(b, p, d) do { ; } while (0)
 #define audit_log_key(b, k) do { ; } while (0)
+#define audit_log_secctx(b,s) do { ; } while (0)
 #define audit_enabled 0
 #endif
 #endif

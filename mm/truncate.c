@@ -138,12 +138,20 @@ invalidate_complete_page(struct address_space *mapping, struct page *page)
 	return ret;
 }
 
+#if defined(CONFIG_MACH_P4NOTE) || defined(CONFIG_MACH_SP7160LTE) \
+		|| defined(CONFIG_MACH_TAB3) || defined(CONFIG_MACH_GD2)
+static int unmap_mapcount = -99;
+#endif
 int truncate_inode_page(struct address_space *mapping, struct page *page)
 {
 	if (page_mapped(page)) {
 		unmap_mapping_range(mapping,
 				   (loff_t)page->index << PAGE_CACHE_SHIFT,
 				   PAGE_CACHE_SIZE, 0);
+#if defined(CONFIG_MACH_P4NOTE) || defined(CONFIG_MACH_SP7160LTE) \
+		|| defined(CONFIG_MACH_TAB3) || defined(CONFIG_MACH_GD2)
+		unmap_mapcount = atomic_read(&(page)->_mapcount);
+#endif
 	}
 	return truncate_complete_page(mapping, page);
 }

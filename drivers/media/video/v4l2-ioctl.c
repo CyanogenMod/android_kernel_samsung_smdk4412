@@ -203,6 +203,7 @@ static const char *v4l2_ioctls[] = {
 	[_IOC_NR(VIDIOC_ENUMSTD)]          = "VIDIOC_ENUMSTD",
 	[_IOC_NR(VIDIOC_ENUMINPUT)]        = "VIDIOC_ENUMINPUT",
 	[_IOC_NR(VIDIOC_G_CTRL)]           = "VIDIOC_G_CTRL",
+	[_IOC_NR(VIDIOC_NOTI_CTRL)]        = "VIDIOC_NOTI_CTRL",
 	[_IOC_NR(VIDIOC_S_CTRL)]           = "VIDIOC_S_CTRL",
 	[_IOC_NR(VIDIOC_G_TUNER)]          = "VIDIOC_G_TUNER",
 	[_IOC_NR(VIDIOC_S_TUNER)]          = "VIDIOC_S_TUNER",
@@ -1418,7 +1419,9 @@ static long __video_do_ioctl(struct file *file,
 	{
 		struct v4l2_queryctrl *p = arg;
 
-		if (vfd->ctrl_handler)
+		if (vfh && vfh->ctrl_handler)
+			ret = v4l2_queryctrl(vfh->ctrl_handler, p);
+		else if (vfd->ctrl_handler)
 			ret = v4l2_queryctrl(vfd->ctrl_handler, p);
 		else if (ops->vidioc_queryctrl)
 			ret = ops->vidioc_queryctrl(file, fh, p);
@@ -1438,7 +1441,9 @@ static long __video_do_ioctl(struct file *file,
 	{
 		struct v4l2_control *p = arg;
 
-		if (vfd->ctrl_handler)
+		if (vfh && vfh->ctrl_handler)
+			ret = v4l2_g_ctrl(vfh->ctrl_handler, p);
+		else if (vfd->ctrl_handler)
 			ret = v4l2_g_ctrl(vfd->ctrl_handler, p);
 		else if (ops->vidioc_g_ctrl)
 			ret = ops->vidioc_g_ctrl(file, fh, p);
@@ -1464,17 +1469,40 @@ static long __video_do_ioctl(struct file *file,
 			dbgarg(cmd, "id=0x%x\n", p->id);
 		break;
 	}
+	case VIDIOC_NOTI_CTRL:
+	{
+		struct v4l2_noti_control *p = arg;
+
+		if (vfh && vfh->ctrl_handler)
+			ret = v4l2_noti_ctrl(vfh->ctrl_handler, p);
+		else if (vfd->ctrl_handler)
+			ret = v4l2_noti_ctrl(vfd->ctrl_handler, p);
+		else if (ops->vidioc_noti_ctrl) {
+			ret = ops->vidioc_noti_ctrl(file, fh, p);
+		} else
+			break;
+		if (!ret)
+			dbgarg(cmd, "id=0x%x, value=%d\n", p->id, p->value);
+		else
+			dbgarg(cmd, "id=0x%x\n", p->id);
+		break;
+	}
 	case VIDIOC_S_CTRL:
 	{
 		struct v4l2_control *p = arg;
 		struct v4l2_ext_controls ctrls;
 		struct v4l2_ext_control ctrl;
 
-		if (!vfd->ctrl_handler &&
+		if (!(vfh && vfh->ctrl_handler) && !vfd->ctrl_handler &&
 			!ops->vidioc_s_ctrl && !ops->vidioc_s_ext_ctrls)
 			break;
 
 		dbgarg(cmd, "id=0x%x, value=%d\n", p->id, p->value);
+
+		if (vfh && vfh->ctrl_handler) {
+			ret = v4l2_s_ctrl(vfh->ctrl_handler, p);
+			break;
+		}
 
 		if (vfd->ctrl_handler) {
 			ret = v4l2_s_ctrl(vfd->ctrl_handler, p);
@@ -1501,7 +1529,9 @@ static long __video_do_ioctl(struct file *file,
 		struct v4l2_ext_controls *p = arg;
 
 		p->error_idx = p->count;
-		if (vfd->ctrl_handler)
+		if (vfh && vfh->ctrl_handler)
+			ret = v4l2_g_ext_ctrls(vfh->ctrl_handler, p);
+		else if (vfd->ctrl_handler)
 			ret = v4l2_g_ext_ctrls(vfd->ctrl_handler, p);
 		else if (ops->vidioc_g_ext_ctrls && check_ext_ctrls(p, 0))
 			ret = ops->vidioc_g_ext_ctrls(file, fh, p);
@@ -1515,10 +1545,13 @@ static long __video_do_ioctl(struct file *file,
 		struct v4l2_ext_controls *p = arg;
 
 		p->error_idx = p->count;
-		if (!vfd->ctrl_handler && !ops->vidioc_s_ext_ctrls)
+		if (!(vfh && vfh->ctrl_handler) && !vfd->ctrl_handler &&
+				!ops->vidioc_s_ext_ctrls)
 			break;
 		v4l_print_ext_ctrls(cmd, vfd, p, 1);
-		if (vfd->ctrl_handler)
+		if (vfh && vfh->ctrl_handler)
+			ret = v4l2_s_ext_ctrls(vfh->ctrl_handler, p);
+		else if (vfd->ctrl_handler)
 			ret = v4l2_s_ext_ctrls(vfd->ctrl_handler, p);
 		else if (check_ext_ctrls(p, 0))
 			ret = ops->vidioc_s_ext_ctrls(file, fh, p);
@@ -1529,10 +1562,13 @@ static long __video_do_ioctl(struct file *file,
 		struct v4l2_ext_controls *p = arg;
 
 		p->error_idx = p->count;
-		if (!vfd->ctrl_handler && !ops->vidioc_try_ext_ctrls)
+		if (!(vfh && vfh->ctrl_handler) && !vfd->ctrl_handler &&
+				!ops->vidioc_try_ext_ctrls)
 			break;
 		v4l_print_ext_ctrls(cmd, vfd, p, 1);
-		if (vfd->ctrl_handler)
+		if (vfh && vfh->ctrl_handler)
+			ret = v4l2_try_ext_ctrls(vfh->ctrl_handler, p);
+		else if (vfd->ctrl_handler)
 			ret = v4l2_try_ext_ctrls(vfd->ctrl_handler, p);
 		else if (check_ext_ctrls(p, 0))
 			ret = ops->vidioc_try_ext_ctrls(file, fh, p);
@@ -1542,7 +1578,9 @@ static long __video_do_ioctl(struct file *file,
 	{
 		struct v4l2_querymenu *p = arg;
 
-		if (vfd->ctrl_handler)
+		if (vfh && vfh->ctrl_handler)
+			ret = v4l2_querymenu(vfh->ctrl_handler, p);
+		else if (vfd->ctrl_handler)
 			ret = v4l2_querymenu(vfd->ctrl_handler, p);
 		else if (ops->vidioc_querymenu)
 			ret = ops->vidioc_querymenu(file, fh, p);
@@ -2238,7 +2276,8 @@ static unsigned long cmd_input_size(unsigned int cmd)
 		CMDINSIZE(G_PARM,		streamparm,	type);
 		CMDINSIZE(ENUMSTD,		standard,	index);
 		CMDINSIZE(ENUMINPUT,		input,		index);
-		CMDINSIZE(G_CTRL,		control,	id);
+		CMDINSIZE(G_CTRL,		noti_control,	id);
+		CMDINSIZE(NOTI_CTRL,		noti_control,	id);
 		CMDINSIZE(G_TUNER,		tuner,		index);
 		CMDINSIZE(QUERYCTRL,		queryctrl,	id);
 		CMDINSIZE(QUERYMENU,		querymenu,	index);

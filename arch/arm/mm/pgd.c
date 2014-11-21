@@ -16,7 +16,9 @@
 #include <asm/tlbflush.h>
 
 #include "mm.h"
-
+#ifdef CONFIG_PROC_SEC_MEMINFO
+#include "linux/sec_meminfo.h"
+#endif
 /*
  * need to get a 16k page for level 1
  */
@@ -30,7 +32,9 @@ pgd_t *pgd_alloc(struct mm_struct *mm)
 	new_pgd = (pgd_t *)__get_free_pages(GFP_KERNEL, 2);
 	if (!new_pgd)
 		goto no_pgd;
-
+#ifdef CONFIG_PROC_SEC_MEMINFO
+	sec_meminfo_set_alloc_cnt(2, 1, NULL);
+#endif
 	memset(new_pgd, 0, USER_PTRS_PER_PGD * sizeof(pgd_t));
 
 	/*
@@ -112,4 +116,7 @@ no_pud:
 	pud_free(mm, pud);
 no_pgd:
 	free_pages((unsigned long) pgd_base, 2);
+#ifdef CONFIG_PROC_SEC_MEMINFO
+	sec_meminfo_set_alloc_cnt(2, 0, NULL);
+#endif
 }
