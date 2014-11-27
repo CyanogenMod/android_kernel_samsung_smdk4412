@@ -38,6 +38,13 @@ extern int mali_dvfs_bottom_lock_push(int lock_step);
 extern int mali_dvfs_bottom_lock_pop(void);
 #endif
 
+#if defined(CONFIG_CPU_EXYNOS4412) && defined(CONFIG_MALI400) \
+			   && defined(CONFIG_MALI_DVFS) && defined(CONFIG_MALI400)
+#define CONFIG_PEGASUS_GPU_LOCK
+extern int mali_dvfs_bottom_lock_push(int lock_step);
+extern int mali_dvfs_bottom_lock_pop(void);
+#endif
+
 #include "power.h"
 
 DEFINE_MUTEX(pm_mutex);

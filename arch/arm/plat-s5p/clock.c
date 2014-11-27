@@ -93,7 +93,11 @@ struct clk clk_fout_dpll = {
 struct clk clk_fout_vpll = {
 	.name		= "fout_vpll",
 	.id		= -1,
+#ifdef CONFIG_MALI_VER_R4P0
+	.ctrlbit = (1 << 4),
+#else
 	.ctrlbit	= (1 << 31),
+#endif
 };
 
 /* Possible clock sources for APLL Mux */

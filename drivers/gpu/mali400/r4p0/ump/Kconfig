@@ -1,0 +1,13 @@
+config MALI400_UMP
+	bool "Enable UMP(Unified Memory Provider)"
+	default y
+	---help---
+		This enables UMP memory provider
+
+config UMP_DEBUG
+	bool "Enable extra debug in UMP"
+	depends on MALI400_UMP
+	default n
+	---help---
+	  This enabled extra debug checks and messages in UMP.
+

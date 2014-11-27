@@ -237,7 +237,11 @@ static int __maybe_unused exynos4_clk_epll_ctrl(struct clk *clk, int enable)
 
 static int exynos4_clk_vpll_ctrl(struct clk *clk, int enable)
 {
+#if defined(CONFIG_MALI_VER_R4P0)
+	   return s5p_gatectrl(EXYNOS4_VPLL_CON2, clk, !enable);
+#else
 	return s5p_gatectrl(EXYNOS4_VPLL_CON0, clk, enable);
+#endif
 }
 
 int exynos4_clk_ip_dmc_ctrl(struct clk *clk, int enable)
@@ -550,8 +554,10 @@ static struct clksrc_sources exynos4_clkset_vpllsrc = {
 static struct clksrc_clk exynos4_clk_vpllsrc = {
 	.clk	= {
 		.name		= "vpll_src",
+#ifdef CONFIG_MALI_VER_R4P0
 		.enable		= exynos4_clksrc_mask_top_ctrl,
 		.ctrlbit	= (1 << 0),
+#endif
 	},
 	.sources = &exynos4_clkset_vpllsrc,
 	.reg_src = { .reg = EXYNOS4_CLKSRC_TOP1, .shift = 0, .size = 1 },
@@ -2413,6 +2419,16 @@ static int exynos4_clock_suspend(void)
 static void exynos4_clock_resume(void)
 {
 	s3c_pm_do_restore_core(exynos4_clock_save, ARRAY_SIZE(exynos4_clock_save));
+#if defined(CONFIG_MALI_VER_R4P0)
+	   unsigned int tmp;
+	   do {
+				   tmp = __raw_readl(EXYNOS4_EPLL_CON0);
+	   } while (!(tmp & 0x1 << EXYNOS4_EPLLCON0_LOCKED_SHIFT));
+
+	   do {
+				   tmp = __raw_readl(EXYNOS4_VPLL_CON0);
+	   } while (!(tmp & 0x1 << EXYNOS4_VPLLCON0_LOCKED_SHIFT));
+#endif
 }
 #else
 #define exynos4_clock_suspend NULL
