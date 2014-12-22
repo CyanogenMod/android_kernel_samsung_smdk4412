@@ -12,7 +12,7 @@
  *  GNU General Public License for more details.
  *
  */
-#include "../ssp.h"
+#include "ssp.h"
 
 #define	VENDOR		"CAPELLA"
 #define	CHIP_ID		"CM36651"
