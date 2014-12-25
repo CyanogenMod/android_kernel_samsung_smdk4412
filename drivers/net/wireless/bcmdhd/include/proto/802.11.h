@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 1999-2012, Broadcom Corporation
+ * Copyright (C) 1999-2014, Broadcom Corporation
  * 
  *      Unless you and Broadcom execute a separate written software license
  * agreement governing use of this software, this software is licensed to you
@@ -21,7 +21,7 @@
  *
  * Fundamental types and constants relating to 802.11
  *
- * $Id: 802.11.h 368403 2012-11-13 17:20:09Z $
+ * $Id: 802.11.h 444070 2013-12-18 13:20:12Z $
  */
 
 #ifndef _802_11_H_
@@ -337,10 +337,10 @@ BWL_PRE_PACKED_STRUCT struct dot11_extch {
 typedef struct dot11_extch dot11_extch_ie_t;
 
 BWL_PRE_PACKED_STRUCT struct dot11_brcm_extch {
-	uint8	id;		
-	uint8	len;		
-	uint8	oui[3];		
-	uint8	type;           
+	uint8	id;		/* IE ID, 221, DOT11_MNG_PROPR_ID */
+	uint8	len;		/* IE length */
+	uint8	oui[3];
+	uint8	type;           /* type inidicates what follows */
 	uint8	extch;
 } BWL_POST_PACKED_STRUCT;
 typedef struct dot11_brcm_extch dot11_brcm_extch_ie_t;
@@ -994,6 +994,245 @@ typedef struct ti_ie ti_ie_t;
 #define DOT11_RC_TDLS_PEER_UNREACH	25
 #define DOT11_RC_TDLS_DOWN_UNSPECIFIED	26
 
+/* Status Codes */
+#define DOT11_SC_SUCCESS		0	/* Successful */
+#define DOT11_SC_FAILURE		1	/* Unspecified failure */
+#define DOT11_SC_TDLS_WAKEUP_SCH_ALT 2	/* TDLS wakeup schedule rejected but alternative  */
+					/* schedule provided */
+#define DOT11_SC_TDLS_WAKEUP_SCH_REJ 3	/* TDLS wakeup schedule rejected */
+#define DOT11_SC_TDLS_SEC_DISABLED	5	/* TDLS Security disabled */
+#define DOT11_SC_LIFETIME_REJ		6	/* Unacceptable lifetime */
+#define DOT11_SC_NOT_SAME_BSS		7	/* Not in same BSS */
+#define DOT11_SC_CAP_MISMATCH		10	/* Cannot support all requested
+						 * capabilities in the Capability
+						 * Information field
+						 */
+#define DOT11_SC_REASSOC_FAIL		11	/* Reassociation denied due to inability
+						 * to confirm that association exists
+						 */
+#define DOT11_SC_ASSOC_FAIL		12	/* Association denied due to reason
+						 * outside the scope of this standard
+						 */
+#define DOT11_SC_AUTH_MISMATCH		13	/* Responding station does not support
+						 * the specified authentication
+						 * algorithm
+						 */
+#define DOT11_SC_AUTH_SEQ		14	/* Received an Authentication frame
+						 * with authentication transaction
+						 * sequence number out of expected
+						 * sequence
+						 */
+#define DOT11_SC_AUTH_CHALLENGE_FAIL	15	/* Authentication rejected because of
+						 * challenge failure
+						 */
+#define DOT11_SC_AUTH_TIMEOUT		16	/* Authentication rejected due to timeout
+						 * waiting for next frame in sequence
+						 */
+#define DOT11_SC_ASSOC_BUSY_FAIL	17	/* Association denied because AP is
+						 * unable to handle additional
+						 * associated stations
+						 */
+#define DOT11_SC_ASSOC_RATE_MISMATCH	18	/* Association denied due to requesting
+						 * station not supporting all of the
+						 * data rates in the BSSBasicRateSet
+						 * parameter
+						 */
+#define DOT11_SC_ASSOC_SHORT_REQUIRED	19	/* Association denied due to requesting
+						 * station not supporting the Short
+						 * Preamble option
+						 */
+#define DOT11_SC_ASSOC_PBCC_REQUIRED	20	/* Association denied due to requesting
+						 * station not supporting the PBCC
+						 * Modulation option
+						 */
+#define DOT11_SC_ASSOC_AGILITY_REQUIRED	21	/* Association denied due to requesting
+						 * station not supporting the Channel
+						 * Agility option
+						 */
+#define DOT11_SC_ASSOC_SPECTRUM_REQUIRED	22	/* Association denied because Spectrum
+							 * Management capability is required.
+							 */
+#define DOT11_SC_ASSOC_BAD_POWER_CAP	23	/* Association denied because the info
+						 * in the Power Cap element is
+						 * unacceptable.
+						 */
+#define DOT11_SC_ASSOC_BAD_SUP_CHANNELS	24	/* Association denied because the info
+						 * in the Supported Channel element is
+						 * unacceptable
+						 */
+#define DOT11_SC_ASSOC_SHORTSLOT_REQUIRED	25	/* Association denied due to requesting
+							 * station not supporting the Short Slot
+							 * Time option
+							 */
+#define DOT11_SC_ASSOC_DSSSOFDM_REQUIRED 26	/* Association denied because requesting station
+						 * does not support the DSSS-OFDM option
+						 */
+#define DOT11_SC_ASSOC_HT_REQUIRED	27	/* Association denied because the requesting
+						 * station does not support HT features
+						 */
+#define DOT11_SC_ASSOC_R0KH_UNREACHABLE	28	/* Association denied due to AP
+						 * being unable to reach the R0 Key Holder
+						 */
+#define DOT11_SC_ASSOC_TRY_LATER	30	/* Association denied temporarily, try again later
+						 */
+#define DOT11_SC_ASSOC_MFP_VIOLATION	31	/* Association denied due to Robust Management
+						 * frame policy violation
+						 */
+
+#define	DOT11_SC_DECLINED		37	/* request declined */
+#define	DOT11_SC_INVALID_PARAMS		38	/* One or more params have invalid values */
+#define DOT11_SC_INVALID_PAIRWISE_CIPHER	42 /* invalid pairwise cipher */
+#define	DOT11_SC_INVALID_AKMP		43	/* Association denied due to invalid AKMP */
+#define DOT11_SC_INVALID_RSNIE_CAP	45	/* invalid RSN IE capabilities */
+#define DOT11_SC_DLS_NOT_ALLOWED	48	/* DLS is not allowed in the BSS by policy */
+#define	DOT11_SC_INVALID_PMKID		53	/* Association denied due to invalid PMKID */
+#define	DOT11_SC_INVALID_MDID		54	/* Association denied due to invalid MDID */
+#define	DOT11_SC_INVALID_FTIE		55	/* Association denied due to invalid FTIE */
+
+#define DOT11_SC_ADV_PROTO_NOT_SUPPORTED	59	/* ad proto not supported */
+#define DOT11_SC_NO_OUTSTAND_REQ			60	/* no outstanding req */
+#define DOT11_SC_RSP_NOT_RX_FROM_SERVER		61	/* no response from server */
+#define DOT11_SC_TIMEOUT					62	/* timeout */
+#define DOT11_SC_QUERY_RSP_TOO_LARGE		63	/* query rsp too large */
+#define DOT11_SC_SERVER_UNREACHABLE			65	/* server unreachable */
+
+#define DOT11_SC_UNEXP_MSG			70	/* Unexpected message */
+#define DOT11_SC_INVALID_SNONCE		71	/* Invalid SNonce */
+#define DOT11_SC_INVALID_RSNIE		72	/* Invalid contents of RSNIE */
+#define DOT11_SC_ASSOC_VHT_REQUIRED	104	/* Association denied because the requesting
+						 * station does not support VHT features.
+						 */
+
+#define DOT11_SC_TRANSMIT_FAILURE	79	/* transmission failure */
+
+/* Info Elts, length of INFORMATION portion of Info Elts */
+#define DOT11_MNG_DS_PARAM_LEN			1	/* d11 management DS parameter length */
+#define DOT11_MNG_IBSS_PARAM_LEN		2	/* d11 management IBSS parameter length */
+
+/* TIM Info element has 3 bytes fixed info in INFORMATION field,
+ * followed by 1 to 251 bytes of Partial Virtual Bitmap
+ */
+#define DOT11_MNG_TIM_FIXED_LEN			3	/* d11 management TIM fixed length */
+#define DOT11_MNG_TIM_DTIM_COUNT		0	/* d11 management DTIM count */
+#define DOT11_MNG_TIM_DTIM_PERIOD		1	/* d11 management DTIM period */
+#define DOT11_MNG_TIM_BITMAP_CTL		2	/* d11 management TIM BITMAP control  */
+#define DOT11_MNG_TIM_PVB			3	/* d11 management TIM PVB */
+
+/* TLV defines */
+#define TLV_TAG_OFF		0	/* tag offset */
+#define TLV_LEN_OFF		1	/* length offset */
+#define TLV_HDR_LEN		2	/* header length */
+#define TLV_BODY_OFF		2	/* body offset */
+#define TLV_BODY_LEN_MAX	255	/* max body length */
+
+/* Management Frame Information Element IDs */
+#define DOT11_MNG_SSID_ID			0	/* d11 management SSID id */
+#define DOT11_MNG_RATES_ID			1	/* d11 management rates id */
+#define DOT11_MNG_FH_PARMS_ID			2	/* d11 management FH parameter id */
+#define DOT11_MNG_DS_PARMS_ID			3	/* d11 management DS parameter id */
+#define DOT11_MNG_CF_PARMS_ID			4	/* d11 management CF parameter id */
+#define DOT11_MNG_TIM_ID			5	/* d11 management TIM id */
+#define DOT11_MNG_IBSS_PARMS_ID			6	/* d11 management IBSS parameter id */
+#define DOT11_MNG_COUNTRY_ID			7	/* d11 management country id */
+#define DOT11_MNG_HOPPING_PARMS_ID		8	/* d11 management hopping parameter id */
+#define DOT11_MNG_HOPPING_TABLE_ID		9	/* d11 management hopping table id */
+#define DOT11_MNG_REQUEST_ID			10	/* d11 management request id */
+#define DOT11_MNG_QBSS_LOAD_ID 			11	/* d11 management QBSS Load id */
+#define DOT11_MNG_EDCA_PARAM_ID			12	/* 11E EDCA Parameter id */
+#define DOT11_MNG_TSPEC_ID			13	/* d11 management TSPEC id */
+#define DOT11_MNG_TCLAS_ID			14	/* d11 management TCLAS id */
+#define DOT11_MNG_CHALLENGE_ID			16	/* d11 management chanllenge id */
+#define DOT11_MNG_PWR_CONSTRAINT_ID		32	/* 11H PowerConstraint */
+#define DOT11_MNG_PWR_CAP_ID			33	/* 11H PowerCapability */
+#define DOT11_MNG_TPC_REQUEST_ID 		34	/* 11H TPC Request */
+#define DOT11_MNG_TPC_REPORT_ID			35	/* 11H TPC Report */
+#define DOT11_MNG_SUPP_CHANNELS_ID		36	/* 11H Supported Channels */
+#define DOT11_MNG_CHANNEL_SWITCH_ID		37	/* 11H ChannelSwitch Announcement */
+#define DOT11_MNG_MEASURE_REQUEST_ID		38	/* 11H MeasurementRequest */
+#define DOT11_MNG_MEASURE_REPORT_ID		39	/* 11H MeasurementReport */
+#define DOT11_MNG_QUIET_ID			40	/* 11H Quiet */
+#define DOT11_MNG_IBSS_DFS_ID			41	/* 11H IBSS_DFS */
+#define DOT11_MNG_ERP_ID			42	/* d11 management ERP id */
+#define DOT11_MNG_TS_DELAY_ID			43	/* d11 management TS Delay id */
+#define DOT11_MNG_TCLAS_PROC_ID			44	/* d11 management TCLAS processing id */
+#define	DOT11_MNG_HT_CAP			45	/* d11 mgmt HT cap id */
+#define DOT11_MNG_QOS_CAP_ID			46	/* 11E QoS Capability id */
+#define DOT11_MNG_NONERP_ID			47	/* d11 management NON-ERP id */
+#define DOT11_MNG_RSN_ID			48	/* d11 management RSN id */
+#define DOT11_MNG_EXT_RATES_ID			50	/* d11 management ext. rates id */
+#define DOT11_MNG_AP_CHREP_ID			51	/* 11k AP Channel report id */
+#define DOT11_MNG_NEIGHBOR_REP_ID		52	/* 11k & 11v Neighbor report id */
+#define DOT11_MNG_RCPI_ID			53	/* 11k RCPI */
+#define DOT11_MNG_MDIE_ID			54	/* 11r Mobility domain id */
+#define DOT11_MNG_FTIE_ID			55	/* 11r Fast Bss Transition id */
+#define DOT11_MNG_FT_TI_ID			56	/* 11r Timeout Interval id */
+#define DOT11_MNG_RDE_ID			57	/* 11r RIC Data Element id */
+#define	DOT11_MNG_REGCLASS_ID			59	/* d11 management regulatory class id */
+#define DOT11_MNG_EXT_CSA_ID			60	/* d11 Extended CSA */
+#define	DOT11_MNG_HT_ADD			61	/* d11 mgmt additional HT info */
+#define	DOT11_MNG_EXT_CHANNEL_OFFSET		62	/* d11 mgmt ext channel offset */
+#define DOT11_MNG_BSS_AVR_ACCESS_DELAY_ID	63	/* 11k bss average access delay */
+#define DOT11_MNG_ANTENNA_ID			64	/* 11k antenna id */
+#define DOT11_MNG_RSNI_ID			65	/* 11k RSNI id */
+#define DOT11_MNG_MEASUREMENT_PILOT_TX_ID	66	/* 11k measurement pilot tx info id */
+#define DOT11_MNG_BSS_AVAL_ADMISSION_CAP_ID	67	/* 11k bss aval admission cap id */
+#define DOT11_MNG_BSS_AC_ACCESS_DELAY_ID	68	/* 11k bss AC access delay id */
+#define DOT11_MNG_WAPI_ID			68	/* d11 management WAPI id */
+#define DOT11_MNG_TIME_ADVERTISE_ID	69	/* 11p time advertisement */
+#define DOT11_MNG_RRM_CAP_ID		70	/* 11k radio measurement capability */
+#define DOT11_MNG_MULTIPLE_BSSID_ID		71	/* 11k multiple BSSID id */
+#define	DOT11_MNG_HT_BSS_COEXINFO_ID		72	/* d11 mgmt OBSS Coexistence INFO */
+#define	DOT11_MNG_HT_BSS_CHANNEL_REPORT_ID	73	/* d11 mgmt OBSS Intolerant Channel list */
+#define	DOT11_MNG_HT_OBSS_ID			74	/* d11 mgmt OBSS HT info */
+#define DOT11_MNG_MMIE_ID			76	/* d11 mgmt MIC IE */
+#define DOT11_MNG_FMS_DESCR_ID			86	/* 11v FMS descriptor */
+#define DOT11_MNG_FMS_REQ_ID			87	/* 11v FMS request id */
+#define DOT11_MNG_FMS_RESP_ID			88	/* 11v FMS response id */
+#define DOT11_MNG_BSS_MAX_IDLE_PERIOD_ID	90	/* 11v bss max idle id */
+#define DOT11_MNG_TFS_REQUEST_ID		91	/* 11v tfs request id */
+#define DOT11_MNG_TFS_RESPONSE_ID		92	/* 11v tfs response id */
+#define DOT11_MNG_WNM_SLEEP_MODE_ID		93	/* 11v wnm-sleep mode id */
+#define DOT11_MNG_TIMBC_REQ_ID			94	/* 11v TIM broadcast request id */
+#define DOT11_MNG_TIMBC_RESP_ID			95	/* 11v TIM broadcast response id */
+#define DOT11_MNG_CHANNEL_USAGE			97	/* 11v channel usage */
+#define DOT11_MNG_TIME_ZONE_ID			98	/* 11v time zone */
+#define DOT11_MNG_DMS_REQUEST_ID		99	/* 11v dms request id */
+#define DOT11_MNG_DMS_RESPONSE_ID		100	/* 11v dms response id */
+#define DOT11_MNG_LINK_IDENTIFIER_ID		101	/* 11z TDLS Link Identifier IE */
+#define DOT11_MNG_WAKEUP_SCHEDULE_ID		102	/* 11z TDLS Wakeup Schedule IE */
+#define DOT11_MNG_CHANNEL_SWITCH_TIMING_ID	104	/* 11z TDLS Channel Switch Timing IE */
+#define DOT11_MNG_PTI_CONTROL_ID		105	/* 11z TDLS PTI Control IE */
+#define DOT11_MNG_PU_BUFFER_STATUS_ID	106	/* 11z TDLS PU Buffer Status IE */
+#define DOT11_MNG_INTERWORKING_ID		107	/* 11u interworking */
+#define DOT11_MNG_ADVERTISEMENT_ID		108	/* 11u advertisement protocol */
+#define DOT11_MNG_EXP_BW_REQ_ID			109	/* 11u expedited bandwith request */
+#define DOT11_MNG_QOS_MAP_ID			110	/* 11u QoS map set */
+#define DOT11_MNG_ROAM_CONSORT_ID		111	/* 11u roaming consortium */
+#define DOT11_MNG_EMERGCY_ALERT_ID		112	/* 11u emergency alert identifier */
+#define	DOT11_MNG_EXT_CAP_ID			127	/* d11 mgmt ext capability */
+#define	DOT11_MNG_VHT_CAP_ID			191	/* d11 mgmt VHT cap id */
+#define	DOT11_MNG_VHT_OPERATION_ID		192	/* d11 mgmt VHT op id */
+#define DOT11_MNG_WIDE_BW_CHANNEL_SWITCH_ID		194	/* Wide BW Channel Switch IE */
+#define DOT11_MNG_VHT_TRANSMIT_POWER_ENVELOPE_ID	195	/* VHT transmit Power Envelope IE */
+#define DOT11_MNG_CHANNEL_SWITCH_WRAPPER_ID		196	/* Channel Switch Wrapper IE */
+#define DOT11_MNG_AID_ID					197	/* Association ID  IE */
+#define	DOT11_MNG_OPER_MODE_NOTIF_ID	199	/* d11 mgmt VHT oper mode notif */
+
+
+#define DOT11_MNG_WPA_ID			221	/* d11 management WPA id */
+#define DOT11_MNG_PROPR_ID			221
+/* should start using this one instead of above two */
+#define DOT11_MNG_VS_ID				221	/* d11 management Vendor Specific IE */
+
+/* Rate Defines */
+
+/* Valid rates for the Supported Rates and Extended Supported Rates IEs.
+ * Encoding is the rate in 500kbps units, rouding up for fractional values.
+ * 802.11-2012, section 6.5.5.2, DATA_RATE parameter enumerates all the values.
+ * The rate values cover DSSS, HR/DSSS, ERP, and OFDM phy rates.
+ * The defines below do not cover the rates specific to 10MHz, {3, 4.5, 27},
+ * and 5MHz, {1.5, 2.25, 3, 4.5, 13.5}, which are not supported by Broadcom devices.
+ */
 
 #define DOT11_SC_SUCCESS		0	
 #define DOT11_SC_FAILURE		1	
@@ -1973,26 +2212,28 @@ typedef struct d11cnt {
 	uint32		rxundec;	
 } d11cnt_t;
 
+#define BRCM_PROP_OUI		"\x00\x90\x4C"
+
+
+/* Action frame type for RWL */
+#define RWL_WIFI_DEFAULT		0
+#define RWL_WIFI_FIND_MY_PEER		9 /* Used while finding server */
+#define RWL_WIFI_FOUND_PEER		10 /* Server response to the client  */
+#define RWL_ACTION_WIFI_FRAG_TYPE	85 /* Fragment indicator for receiver */
 
 #define BRCM_PROP_OUI		"\x00\x90\x4C"	
 
-
-
-#define BRCM_SYSCAP_WET_TUNNEL	0x0100	
-
-
 #define BRCM_OUI		"\x00\x10\x18"	
 
-
 BWL_PRE_PACKED_STRUCT struct brcm_ie {
-	uint8	id;		
-	uint8	len;		
-	uint8	oui[3];		
-	uint8	ver;		
-	uint8	assoc;		
-	uint8	flags;		
-	uint8	flags1;		
-	uint16	amsdu_mtu_pref;	
+	uint8	id;		/* IE ID, 221, DOT11_MNG_PROPR_ID */
+	uint8	len;		/* IE length */
+	uint8	oui[3];
+	uint8	ver;		/* type/ver of this IE */
+	uint8	assoc;		/* # of assoc STAs */
+	uint8	flags;		/* misc flags */
+	uint8	flags1;		/* misc flags */
+	uint16	amsdu_mtu_pref;	/* preferred A-MSDU MTU */
 } BWL_POST_PACKED_STRUCT;
 typedef	struct brcm_ie brcm_ie_t;
 #define BRCM_IE_LEN		11	
@@ -2043,10 +2284,10 @@ typedef struct ht_cap_ie ht_cap_ie_t;
 
 
 BWL_PRE_PACKED_STRUCT struct ht_prop_cap_ie {
-	uint8	id;		
-	uint8	len;		
-	uint8	oui[3];		
-	uint8	type;           
+	uint8	id;		/* IE ID, 221, DOT11_MNG_PROPR_ID */
+	uint8	len;		/* IE length */
+	uint8	oui[3];
+	uint8	type;           /* type inidicates what follows */
 	ht_cap_ie_t cap_ie;
 } BWL_POST_PACKED_STRUCT;
 typedef struct ht_prop_cap_ie ht_prop_cap_ie_t;
@@ -2132,10 +2373,10 @@ typedef struct ht_add_ie ht_add_ie_t;
 
 
 BWL_PRE_PACKED_STRUCT struct ht_prop_add_ie {
-	uint8	id;		
-	uint8	len;		
-	uint8	oui[3];		
-	uint8	type;		
+	uint8	id;		/* IE ID, 221, DOT11_MNG_PROPR_ID */
+	uint8	len;		/* IE length */
+	uint8	oui[3];
+	uint8	type;		/* indicates what follows */
 	ht_add_ie_t add_ie;
 } BWL_POST_PACKED_STRUCT;
 typedef struct ht_prop_add_ie ht_prop_add_ie_t;
@@ -2367,9 +2608,9 @@ typedef enum vht_op_chan_width {
 
 #define BRCM_VHT_FEATURES_OUITYPE	0x4
 BWL_PRE_PACKED_STRUCT struct vht_features_ie_hdr {
-	uint8 oui[3];		
-	uint8 type;		
-	uint8 rate_mask;	
+	uint8 oui[3];
+	uint8 type;		/* type of this IE = 4 */
+	uint8 rate_mask;	/* VHT rate mask */
 } BWL_POST_PACKED_STRUCT;
 typedef struct vht_features_ie_hdr vht_features_ie_hdr_t;
 
