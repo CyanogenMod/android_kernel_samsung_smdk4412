@@ -4626,6 +4626,45 @@ wl_cfg80211_config_p2p_pub_af_tx(struct wiphy *wiphy,
 	return err;
 }
 
+#ifdef WL11U
+static bool
+wl_cfg80211_check_DFS_channel(struct bcm_cfg80211 *cfg, wl_af_params_t *af_params,
+	void *frame, u16 frame_len)
+{
+	struct wl_scan_results *bss_list;
+	struct wl_bss_info *bi = NULL;
+	bool result = false;
+	s32 i;
+	chanspec_t chanspec;
+
+	/* If DFS channel is 52~148, check to block it or not */
+	WL_DBG(("af_params->channel=%d\n", af_params->channel));
+	if (af_params &&
+		(af_params->channel >= 52 && af_params->channel <= 148)) {
+		if (!wl_cfgp2p_is_p2p_action(frame, frame_len)) {
+			WL_DBG(("non p2p action frame\n"));
+			bss_list = cfg->bss_list;
+			bi = next_bss(bss_list, bi);
+			for_each_bss(bss_list, bi, i) {
+				chanspec = wl_chspec_driver_to_host(bi->chanspec);
+				WL_DBG(("bi->chanspec=%d, chanspec=%d\n", bi->chanspec, chanspec));
+				if (CHSPEC_IS5G(chanspec) &&
+					((bi->ctl_ch ? bi->ctl_ch : CHSPEC_CHANNEL(chanspec))
+					== af_params->channel)) {
+					result = true;	/* do not block the action frame */
+					break;
+				}
+			}
+		}
+	}
+	else {
+		result = true;
+	}
+
+	WL_DBG(("result=%s", result?"true":"false"));
+	return result;
+}
+#endif /* WL11U */
 
 static bool
 wl_cfg80211_send_action_frame(struct wiphy *wiphy, struct net_device *dev,
@@ -8525,9 +8564,30 @@ wl_cfg80211_netdev_notifier_call(struct notifier_block * nb,
 		return NOTIFY_DONE;
 	switch (state) {
 		case NETDEV_DOWN:
-			while (work_pending(&wdev->cleanup_work) && refcnt < 100) {
-				if (refcnt%5 == 0)
-					WL_ERR(("[NETDEV_DOWN] work_pending (%d th)\n", refcnt));
+		{
+			int max_wait_timeout = 5;
+			int max_wait_count = 100;
+			unsigned long limit = jiffies + max_wait_timeout * HZ;
+			while (work_pending(&wdev->cleanup_work)) {
+				if (refcnt%5 == 0) {
+					WL_ERR(("[NETDEV_DOWN] wait for "
+						"complete of cleanup_work"
+						" (%d th)\n", refcnt));
+				}
+				if (!time_before(jiffies, limit)) {
+					WL_ERR(("[NETDEV_DOWN] cleanup_work"
+						" of CFG80211 is not"
+						" completed in %d sec\n",
+						max_wait_timeout));
+					break;
+				}
+				if (refcnt >= max_wait_count) {
+					WL_ERR(("[NETDEV_DOWN] cleanup_work"
+						" of CFG80211 is not"
+						" completed in %d loop\n",
+						max_wait_count));
+					break;
+				}
 				set_current_state(TASK_INTERRUPTIBLE);
 				schedule_timeout(100);
 				set_current_state(TASK_RUNNING);

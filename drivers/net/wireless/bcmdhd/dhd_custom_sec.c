@@ -853,10 +853,10 @@ vid_info_t vid_info[] = {
 };
 #elif defined(BCM4334_CHIP)
 vid_info_t vid_info[] = {
-	{ 3, { 0x33, 0x33, }, { "semco" } },
-	{ 3, { 0xfb, 0x50, }, { "semcosh" } },
+	{ 6, { 0x00, 0x00, 0x00, 0x33, 0x33, }, { "semco" } },
+	{ 6, { 0x00, 0x00, 0x00, 0xfb, 0x50, }, { "semcosh" } },
 	{ 6, { 0x00, 0x20, 0xc7, 0x00, 0x00, }, { "murata" } },
-	{ 0, { 0x00, }, { "samsung" } }
+	{ 0, { 0x00, }, { "murata" } }
 };
 #else /* BCM4335_CHIP */
 vid_info_t vid_info[] = {
@@ -1075,6 +1075,70 @@ int dhd_check_module_mac(dhd_pub_t *dhd, struct ether_addr *mac)
 			mac_id[0], mac_id[1], mac_id[2], mac_id[3], mac_id[4],
 			mac_id[5]);
 		DHD_ERROR(("[WIFI]mac_id is setted from OTP \n"));
+
+		/* Find a new tuple tag */
+		while (index < remained_len) {
+			if (cis_buf[index] == CIS_TUPLE_TAG_START) {
+				remained_len -= index;
+				if (remained_len >= sizeof(bcm_tlv_t)) {
+					elt = (bcm_tlv_t *)&cis_buf[index];
+				}
+				break;
+			} else {
+				index++;
+			}
+
+		}
+
+		/* Find a MAC address tuple */
+		while (elt && remained_len >= TLV_HDR_LEN) {
+			int body_len = (int)elt->len;
+
+			if ((elt->id == CIS_TUPLE_TAG_START) &&
+				(remained_len >= (body_len + TLV_HDR_LEN)) &&
+				(*elt->data == CIS_TUPLE_TAG_MACADDR)) {
+				/* found MAC Address tuple and
+				 * get the MAC Address data
+				 */
+				mac_addr = (uint8 *)elt + CIS_TUPLE_TAG_MACADDR_OFF;
+				break;
+			}
+		}
+
+		/* Find a MAC address tuple */
+		while (elt && remained_len >= TLV_HDR_LEN) {
+			int body_len = (int)elt->len;
+
+			if ((elt->id == CIS_TUPLE_TAG_START) &&
+				(remained_len >= (body_len + TLV_HDR_LEN)) &&
+				(*elt->data == CIS_TUPLE_TAG_MACADDR)) {
+				/* found MAC Address tuple and
+				 * get the MAC Address data
+				 */
+				mac_addr = (uint8 *)elt + CIS_TUPLE_TAG_MACADDR_OFF;
+				break;
+			}
+
+			/* Go to next tuple if tuple value
+			 * is not MAC address type
+			 */
+			elt = (bcm_tlv_t *)((uint8 *)elt + (body_len + TLV_HDR_LEN));
+			remained_len -= (body_len + TLV_HDR_LEN);
+		}
+
+		if (mac_addr) {
+			sprintf(otp_mac_buf, "%02X:%02X:%02X:%02X:%02X:%02X\n",
+				mac_addr[0], mac_addr[1], mac_addr[2],
+				mac_addr[3], mac_addr[4], mac_addr[5]);
+			DHD_ERROR(("[WIFI_SEC] MAC address is taken from OTP\n"));
+		} else {
+			sprintf(otp_mac_buf, "%02X:%02X:%02X:%02X:%02X:%02X\n",
+				mac->octet[0], mac->octet[1], mac->octet[2],
+				mac->octet[3], mac->octet[4], mac->octet[5]);
+			DHD_ERROR(("[WIFI_SEC] %s: Cannot find MAC address info from OTP,"
+				" Check module mac by initial value: " MACDBG "\n",
+				__FUNCTION__, MAC2STRDBG(mac->octet)));
+		}
 	}
 
 	fp_mac = filp_open(macfilepath, O_RDONLY, 0);
