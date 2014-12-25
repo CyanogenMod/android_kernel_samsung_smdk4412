@@ -96,12 +96,6 @@ config BCM4335BT
 	---help---
 	  This is a configuration for bt lock enable.
 
-config WIFI_BROADCOM_COB
-	bool "BROADCOM COB type chip is enabled"
-	depends on (BCM4330 || BCM4334 || BCM4335 || BCM4339 || BCM43241)
-	---help---
-	  This is a configuration for COB type feature.
-
 config WLAN_REGION_CODE
 	int "---Region codes for Broadcom WiFi Driver"
 	depends on (BCM4330 || BCM4334 || BCM4335 || BCM4339 || BCM4354 || BCM43241)

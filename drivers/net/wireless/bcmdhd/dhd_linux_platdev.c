@@ -1,7 +1,7 @@
 /*
  * Linux platform device for DHD WLAN adapter
  *
- * Copyright (C) 1999-2013, Broadcom Corporation
+ * Copyright (C) 1999-2014, Broadcom Corporation
  * 
  *      Unless you and Broadcom execute a separate written software license
  * agreement governing use of this software, this software is licensed to you
@@ -554,7 +554,7 @@ static int dhd_wifi_platform_load_sdio(void)
 					__FUNCTION__, err));
 				return err;
 			}
-			err = wifi_platform_set_power(adapter, TRUE, 200);
+			err = wifi_platform_set_power(adapter, TRUE, WIFI_TURNON_DELAY);
 			if (err) {
 				/* WL_REG_ON state unknown, Power off forcely */
 				wifi_platform_set_power(adapter, FALSE, WIFI_TURNOFF_DELAY);
@@ -573,15 +573,7 @@ static int dhd_wifi_platform_load_sdio(void)
 			DHD_ERROR(("failed to power up %s, %d retry left\n", adapter->name, retry));
 			dhd_bus_unreg_sdio_notify();
 			wifi_platform_set_power(adapter, FALSE, WIFI_TURNOFF_DELAY);
-
-#if !defined(CONFIG_MACH_KLTE_ATT) && !defined(CONFIG_MACH_KLTE_VZW) &&\
-    !defined(CONFIG_MACH_KLTE_SPR) && !defined(CONFIG_MACH_KLTE_TMO) &&\
-    !defined(CONFIG_MACH_KLTE_USC) && !defined(CONFIG_MACH_K3GDUOS_CTC) &&\
-    !defined(CONFIG_MACH_VIENNAATT) && !defined(CONFIG_MACH_KLTE_KOR) &&\
-    !defined(CONFIG_MACH_KLTE_JPN)
-
 			wifi_platform_bus_enumerate(adapter, FALSE);
-#endif
 		} while (retry--);
 
 		if (!chip_up) {
@@ -607,6 +599,7 @@ static int dhd_wifi_platform_load_sdio(void)
 	err = down_timeout(&dhd_registration_sem, msecs_to_jiffies(DHD_REGISTRATION_TIMEOUT));
 	if (err) {
 		DHD_ERROR(("%s: sdio_register_driver timeout or error \n", __FUNCTION__));
+		dhd_bus_unregister();
 		goto fail;
 	}
 
@@ -616,7 +609,7 @@ fail:
 	/* power down all adapters */
 	for (i = 0; i < dhd_wifi_platdata->num_adapters; i++) {
 		adapter = &dhd_wifi_platdata->adapters[i];
-		err = wifi_platform_set_power(adapter, FALSE, WIFI_TURNOFF_DELAY);
+		wifi_platform_set_power(adapter, FALSE, WIFI_TURNOFF_DELAY);
 		wifi_platform_bus_enumerate(adapter, FALSE);
 	}
 #else

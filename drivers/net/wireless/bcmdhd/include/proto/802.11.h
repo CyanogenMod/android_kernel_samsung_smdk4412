@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 1999-2013, Broadcom Corporation
+ * Copyright (C) 1999-2014, Broadcom Corporation
  * 
  *      Unless you and Broadcom execute a separate written software license
  * agreement governing use of this software, this software is licensed to you
@@ -21,7 +21,7 @@
  *
  * Fundamental types and constants relating to 802.11
  *
- * $Id: 802.11.h 421788 2013-09-04 20:57:15Z $
+ * $Id: 802.11.h 444070 2013-12-18 13:20:12Z $
  */
 
 #ifndef _802_11_H_
@@ -361,7 +361,7 @@ typedef struct dot11_extch dot11_extch_ie_t;
 BWL_PRE_PACKED_STRUCT struct dot11_brcm_extch {
 	uint8	id;		/* IE ID, 221, DOT11_MNG_PROPR_ID */
 	uint8	len;		/* IE length */
-	uint8	oui[3];		/* Proprietary OUI, BRCM_PROP_OUI */
+	uint8	oui[3];
 	uint8	type;           /* type inidicates what follows */
 	uint8	extch;
 } BWL_POST_PACKED_STRUCT;
@@ -1276,7 +1276,7 @@ typedef struct ti_ie ti_ie_t;
 
 
 #define DOT11_MNG_WPA_ID			221	/* d11 management WPA id */
-#define DOT11_MNG_PROPR_ID			221	/* d11 management proprietary id */
+#define DOT11_MNG_PROPR_ID			221
 /* should start using this one instead of above two */
 #define DOT11_MNG_VS_ID				221	/* d11 management Vendor Specific IE */
 
@@ -2881,29 +2881,8 @@ typedef struct d11cnt {
 	uint32		rxundec;	/* dot11WEPUndecryptableCount */
 } d11cnt_t;
 
-/* OUI for BRCM proprietary IE */
-#define BRCM_PROP_OUI		"\x00\x90\x4C"	/* Broadcom proprietary OUI */
+#define BRCM_PROP_OUI		"\x00\x90\x4C"
 
-/* Broadcom Proprietary OUI type list. Please update below twiki page when adding a new type.
- *  Twiki http://hwnbu-twiki.sj.broadcom.com/bin/view/Mwgroup/WlBrcmPropIE
- */
-/* The following BRCM_PROP_OUI types are currently in use (defined in
- * relevant subsections). Each of them will be in a separate proprietary(221) IE
- * #define RWL_WIFI_DEFAULT		0
- * #define SES_VNDR_IE_TYPE		1   (defined in src/ses/shared/ses.h)
- * #define DPT_IE_TYPE			2
- * #define VHT_FEATURES_IE_TYPE  		4
- * #define RWL_WIFI_FIND_MY_PEER		9
- * #define RWL_WIFI_FOUND_PEER		10
- * #define PROXD_AF_TYPE			11
- * #define HT_CAP_IE_TYPE			51
- * #define HT_ADD_IE_TYPE			52
- * #define BRCM_EXTCH_IE_TYPE		53
- * #define MEMBER_OF_BRCM_PROP_IE_TYPE	54
- * #define BRCM_RELMACST_IE_TYPE		55
- * #define BRCM_EVT_WL_BSS_INFO		64
- * #define RWL_ACTION_WIFI_FRAG_TYPE	85
- */
 
 /* Action frame type for RWL */
 #define RWL_WIFI_DEFAULT		0
@@ -2914,45 +2893,17 @@ typedef struct d11cnt {
 #define PROXD_AF_TYPE			11 /* Wifi proximity action frame type */
 #define BRCM_RELMACST_AF_TYPE	        12 /* RMC action frame type */
 
-#ifndef LINUX_POSTMOGRIFY_REMOVAL
-/*
- * This BRCM_PROP_OUI types is intended for use in events to embed additional
- * data, and would not be expected to appear on the air -- but having an IE
- * format allows IE frame data with extra data in events in that allows for
- * more flexible parsing.
- */
-#define BRCM_EVT_WL_BSS_INFO	64
-
-/* Following is the generic structure for brcm_prop_ie (uses BRCM_PROP_OUI).
- * DPT uses this format with type set to DPT_IE_TYPE
- */
-BWL_PRE_PACKED_STRUCT struct brcm_prop_ie_s {
-	uint8 id;		/* IE ID, 221, DOT11_MNG_PROPR_ID */
-	uint8 len;		/* IE length */
-	uint8 oui[3];		/* Proprietary OUI, BRCM_PROP_OUI */
-	uint8 type;		/* type of this IE */
-	uint16 cap;		/* DPT capabilities */
-} BWL_POST_PACKED_STRUCT;
-typedef struct brcm_prop_ie_s brcm_prop_ie_t;
-
-#define BRCM_PROP_IE_LEN	6	/* len of fixed part of brcm_prop ie */
-
-#define DPT_IE_TYPE		2
-#define BRCM_SYSCAP_IE_TYPE	3
-#define WET_TUNNEL_IE_TYPE	3
-#endif /* LINUX_POSTMOGRIFY_REMOVAL */
 
 /* brcm syscap_ie cap */
 #define BRCM_SYSCAP_WET_TUNNEL	0x0100	/* Device with WET_TUNNEL support */
 
-/* BRCM OUI: Used in the proprietary(221) IE in all broadcom devices */
 #define BRCM_OUI		"\x00\x10\x18"	/* Broadcom OUI */
 
 /* BRCM info element */
 BWL_PRE_PACKED_STRUCT struct brcm_ie {
 	uint8	id;		/* IE ID, 221, DOT11_MNG_PROPR_ID */
 	uint8	len;		/* IE length */
-	uint8	oui[3];		/* Proprietary OUI, BRCM_OUI */
+	uint8	oui[3];
 	uint8	ver;		/* type/ver of this IE */
 	uint8	assoc;		/* # of assoc STAs */
 	uint8	flags;		/* misc flags */
@@ -3050,7 +3001,7 @@ typedef struct dot11_ht_cap_ie dot11_ht_cap_ie_t;
 BWL_PRE_PACKED_STRUCT struct ht_prop_cap_ie {
 	uint8	id;		/* IE ID, 221, DOT11_MNG_PROPR_ID */
 	uint8	len;		/* IE length */
-	uint8	oui[3];		/* Proprietary OUI, BRCM_PROP_OUI */
+	uint8	oui[3];
 	uint8	type;           /* type inidicates what follows */
 	ht_cap_ie_t cap_ie;
 } BWL_POST_PACKED_STRUCT;
@@ -3178,7 +3129,7 @@ typedef struct ht_add_ie ht_add_ie_t;
 BWL_PRE_PACKED_STRUCT struct ht_prop_add_ie {
 	uint8	id;		/* IE ID, 221, DOT11_MNG_PROPR_ID */
 	uint8	len;		/* IE length */
-	uint8	oui[3];		/* Proprietary OUI, BRCM_PROP_OUI */
+	uint8	oui[3];
 	uint8	type;		/* indicates what follows */
 	ht_add_ie_t add_ie;
 } BWL_POST_PACKED_STRUCT;
@@ -3425,7 +3376,7 @@ typedef enum vht_op_chan_width {
  */
 #define VHT_FEATURES_IE_TYPE	0x4
 BWL_PRE_PACKED_STRUCT struct vht_features_ie_hdr {
-	uint8 oui[3];		/* Proprietary OUI, BRCM_PROP_OUI */
+	uint8 oui[3];
 	uint8 type;		/* type of this IE = 4 */
 	uint8 rate_mask;	/* VHT rate mask */
 } BWL_POST_PACKED_STRUCT;

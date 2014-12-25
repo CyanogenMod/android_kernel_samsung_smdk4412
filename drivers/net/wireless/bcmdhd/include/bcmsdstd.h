@@ -1,7 +1,7 @@
 /*
  *  'Standard' SDIO HOST CONTROLLER driver
  *
- * Copyright (C) 1999-2013, Broadcom Corporation
+ * Copyright (C) 1999-2014, Broadcom Corporation
  * 
  *      Unless you and Broadcom execute a separate written software license
  * agreement governing use of this software, this software is licensed to you
@@ -21,7 +21,7 @@
  * software in any way with any other Broadcom software provided under a license
  * other than the GPL, without Broadcom's express prior written consent.
  *
- * $Id: bcmsdstd.h 421078 2013-08-30 08:35:01Z $
+ * $Id: bcmsdstd.h 455427 2014-02-14 00:11:19Z $
  */
 #ifndef	_BCM_SD_STD_H
 #define	_BCM_SD_STD_H
@@ -277,6 +277,6 @@ extern void sdstd_3_osclean_tuning(sdioh_info_t *sd);
 
 extern void sdstd_enable_disable_periodic_timer(sdioh_info_t * sd, uint val);
 
-extern sdioh_info_t *sdioh_attach(osl_t *osh, int32 bar0, uint irq);
+extern sdioh_info_t *sdioh_attach(osl_t *osh, void *bar0, uint irq);
 extern SDIOH_API_RC sdioh_detach(osl_t *osh, sdioh_info_t *sd);
 #endif /* _BCM_SD_STD_H */

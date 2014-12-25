@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 1999-2013, Broadcom Corporation
+ * Copyright (C) 1999-2014, Broadcom Corporation
  * 
  *      Unless you and Broadcom execute a separate written software license
  * agreement governing use of this software, this software is licensed to you
@@ -21,7 +21,7 @@
  *
  * Fundamental types and constants relating to WFA P2P (aka WiFi Direct)
  *
- * $Id: p2p.h 408760 2013-06-20 16:00:58Z $
+ * $Id: p2p.h 444066 2013-12-18 12:49:24Z $
  */
 
 #ifndef _P2P_H_
@@ -85,7 +85,7 @@ typedef struct wifi_p2p_ie wifi_p2p_ie_t;
 #define P2P_SEID_INVITE_FLAGS		18	/* Invitation Flags */
 #define P2P_SEID_VNDR			221	/* Vendor-specific subelement */
 
-#define P2P_SE_VS_ID_SERVICES	0x1b /* BRCM proprietary subel: L2 Services */
+#define P2P_SE_VS_ID_SERVICES	0x1b
 
 
 /* WiFi P2P IE subelement: P2P Capability (capabilities info) */

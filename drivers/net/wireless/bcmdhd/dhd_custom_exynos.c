@@ -1,7 +1,7 @@
 /*
  * Platform Dependent file for Samsung Exynos
  *
- * Copyright (C) 1999-2013, Broadcom Corporation
+ * Copyright (C) 1999-2014, Broadcom Corporation
  * 
  *      Unless you and Broadcom execute a separate written software license
  * agreement governing use of this software, this software is licensed to you
@@ -21,7 +21,7 @@
  * software in any way with any other Broadcom software provided under a license
  * other than the GPL, without Broadcom's express prior written consent.
  *
- * $Id: dhd_custom_exynos.c 439370 2013-11-26 19:11:43Z $
+ * $Id: dhd_custom_exynos.c 459213 2014-03-01 06:26:09Z $
  */
 #include <linux/device.h>
 #include <linux/gpio.h>
@@ -47,7 +47,8 @@
 #include <linux/wlan_plat.h>
 
 #include <mach/gpio.h>
-#include <mach/sec-sysfs.h>
+#include <mach/irqs.h>
+#include <linux/sec_sysfs.h>
 
 #include <plat/gpio-cfg.h>
 
@@ -168,6 +169,13 @@ static int dhd_init_wlan_mem(void)
 
 err_mem_alloc:
 	pr_err("Failed to mem_alloc for WLAN\n");
+	if (wlan_static_scan_buf0)
+		kfree(wlan_static_scan_buf0);
+	if (wlan_static_scan_buf1)
+		kfree(wlan_static_scan_buf1);
+	if (wlan_static_dhd_info_buf)
+		kfree(wlan_static_dhd_info_buf);
+
 	for (j = 0; j < i; j++)
 		kfree(wlan_mem_array[j].mem_ptr);
 
@@ -270,6 +278,29 @@ int __init dhd_wlan_init_gpio(void)
 	wlan_host_wake_irq = gpio_to_irq(wlan_host_wake_up);
 
 	return 0;
+}
+
+void interrupt_set_cpucore(int set)
+{
+	printk(KERN_INFO "%s: set: %d\n", __FUNCTION__, set);
+	if (set)
+	{
+#if defined(CONFIG_MACH_UNIVERSAL5422)
+		irq_set_affinity(EXYNOS5_IRQ_HSMMC1, cpumask_of(DPC_CPUCORE));
+		irq_set_affinity(EXYNOS_IRQ_EINT16_31, cpumask_of(DPC_CPUCORE));
+#elif defined(CONFIG_MACH_UNIVERSAL5430)
+		irq_set_affinity(IRQ_SPI(226), cpumask_of(DPC_CPUCORE));
+		irq_set_affinity(IRQ_SPI(2), cpumask_of(DPC_CPUCORE));
+#endif
+	} else {
+#if defined(CONFIG_MACH_UNIVERSAL5422)
+		irq_set_affinity(EXYNOS5_IRQ_HSMMC1, cpumask_of(PRIMARY_CPUCORE));
+		irq_set_affinity(EXYNOS_IRQ_EINT16_31, cpumask_of(PRIMARY_CPUCORE));
+#elif defined(CONFIG_MACH_UNIVERSAL5430)
+		irq_set_affinity(IRQ_SPI(226), cpumask_of(PRIMARY_CPUCORE));
+		irq_set_affinity(IRQ_SPI(2), cpumask_of(PRIMARY_CPUCORE));
+#endif
+	}
 }
 
 struct resource dhd_wlan_resources = {

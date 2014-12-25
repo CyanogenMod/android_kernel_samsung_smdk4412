@@ -1,5 +1,5 @@
 /*
-* Copyright (C) 1999-2013, Broadcom Corporation
+* Copyright (C) 1999-2014, Broadcom Corporation
 * 
 *      Unless you and Broadcom execute a separate written software license
 * agreement governing use of this software, this software is licensed to you
@@ -18,7 +18,7 @@
 *      Notwithstanding the above, under no circumstances may you combine this
 * software in any way with any other Broadcom software provided under a license
 * other than the GPL, without Broadcom's express prior written consent.
-* $Id: dhd_wlfc.h 434888 2013-11-07 18:39:38Z $
+* $Id: dhd_wlfc.h 464247 2014-03-24 07:21:40Z $
 *
 */
 #ifndef __wlfc_host_driver_definitions_h__
@@ -226,6 +226,7 @@ typedef struct athost_wl_stat_counters {
 #define WLFC_FCMODE_NONE				0
 #define WLFC_FCMODE_IMPLIED_CREDIT		1
 #define WLFC_FCMODE_EXPLICIT_CREDIT		2
+#define WLFC_ONLY_AMPDU_HOSTREORDER		3
 
 /* How long to defer borrowing in milliseconds */
 #define WLFC_BORROW_DEFER_PERIOD_MS 100
@@ -470,6 +471,11 @@ int dhd_wlfc_commit_packets(dhd_pub_t *dhdp, f_commitpkt_t fcommit,
 	void* commit_ctx, void *pktbuf, bool need_toggle_host_if);
 int dhd_wlfc_txcomplete(dhd_pub_t *dhd, void *txp, bool success);
 int dhd_wlfc_init(dhd_pub_t *dhd);
+int dhd_wlfc_hostreorder_init(dhd_pub_t *dhd);
+#ifdef SUPPORT_P2P_GO_PS
+int dhd_wlfc_suspend(dhd_pub_t *dhd);
+int dhd_wlfc_resume(dhd_pub_t *dhd);
+#endif /* SUPPORT_P2P_GO_PS */
 int dhd_wlfc_cleanup_txq(dhd_pub_t *dhd, f_processpkt_t fn, void *arg);
 int dhd_wlfc_cleanup(dhd_pub_t *dhd, f_processpkt_t fn, void* arg);
 int dhd_wlfc_deinit(dhd_pub_t *dhd);

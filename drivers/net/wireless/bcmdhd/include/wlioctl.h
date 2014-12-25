@@ -4,7 +4,7 @@
  *
  * Definitions subject to change without notice.
  *
- * Copyright (C) 1999-2013, Broadcom Corporation
+ * Copyright (C) 1999-2014, Broadcom Corporation
  * 
  *      Unless you and Broadcom execute a separate written software license
  * agreement governing use of this software, this software is licensed to you
@@ -24,7 +24,7 @@
  * software in any way with any other Broadcom software provided under a license
  * other than the GPL, without Broadcom's express prior written consent.
  *
- * $Id: wlioctl.h 433418 2013-10-31 20:16:40Z $
+ * $Id: wlioctl.h 450748 2014-01-23 00:49:46Z $
  */
 
 #ifndef _wlioctl_h_
@@ -37,18 +37,16 @@
 #include <proto/bcmip.h>
 #include <proto/bcmevent.h>
 #include <proto/802.11.h>
+#include <proto/802.1d.h>
 #include <bcmwifi_channels.h>
 #include <bcmwifi_rates.h>
 #include <devctrl_if/wlioctl_defs.h>
 
-#ifndef LINUX_POSTMOGRIFY_REMOVAL
 #include <bcm_mpool_pub.h>
 #include <bcmcdc.h>
-#endif /* LINUX_POSTMOGRIFY_REMOVAL */
 
 
 
-#ifndef LINUX_POSTMOGRIFY_REMOVAL
 
 #ifndef INTF_NAME_SIZ
 #define INTF_NAME_SIZ	16
@@ -110,15 +108,12 @@ typedef struct wl_sa_query {
 	struct ether_addr 	da;
 } wl_sa_query_t;
 
-#endif /*  LINUX_POSTMOGRIFY_REMOVAL */
-
 /* require default structure packing */
 #define BWL_DEFAULT_PACKING
 #include <packed_section_start.h>
 
 
 
-#ifndef LINUX_POSTMOGRIFY_REMOVAL
 /* Legacy structure to help keep backward compatible wl tool and tray app */
 
 #define	LEGACY_WL_BSS_INFO_VERSION	107	/* older version of wl_bss_info struct */
@@ -190,8 +185,6 @@ typedef struct wl_bss_info_108 {
 	/* variable length Information Elements */
 } wl_bss_info_108_t;
 
-#endif /* LINUX_POSTMOGRIFY_REMOVAL */
-
 #define	WL_BSS_INFO_VERSION	109		/* current version of wl_bss_info struct */
 
 /* BSS info structure
@@ -236,7 +229,6 @@ typedef struct wl_bss_info {
 	/* variable length Information Elements */
 } wl_bss_info_t;
 
-#ifndef LINUX_POSTMOGRIFY_REMOVAL
 
 typedef struct wl_bsscfg {
 	uint32  bsscfg_idx;
@@ -317,14 +309,11 @@ struct wl_clm_dload_info {
 };
 typedef struct wl_clm_dload_info wl_clm_dload_info_t;
 
-#endif /* LINUX_POSTMOGRIFY_REMOVAL */
-
 typedef struct wlc_ssid {
 	uint32		SSID_len;
 	uchar		SSID[DOT11_MAX_SSID_LEN];
 } wlc_ssid_t;
 
-#ifndef LINUX_POSTMOGRIFY_REMOVAL
 
 #define MAX_PREFERRED_AP_NUM     5
 typedef struct wlc_fastssidinfo {
@@ -418,7 +407,6 @@ typedef struct wl_iscan_params {
 
 /* 3 fields + size of wl_scan_params, not including variable length array */
 #define WL_ISCAN_PARAMS_FIXED_SIZE (OFFSETOF(wl_iscan_params_t, params) + sizeof(wlc_ssid_t))
-#endif /* LINUX_POSTMOGRIFY_REMOVAL */
 
 typedef struct wl_scan_results {
 	uint32 buflen;
@@ -427,7 +415,6 @@ typedef struct wl_scan_results {
 	wl_bss_info_t bss_info[1];
 } wl_scan_results_t;
 
-#ifndef LINUX_POSTMOGRIFY_REMOVAL
 /* size of wl_scan_results not including variable length array */
 #define WL_SCAN_RESULTS_FIXED_SIZE (sizeof(wl_scan_results_t) - sizeof(wl_bss_info_t))
 
@@ -503,7 +490,6 @@ typedef struct wl_probe_params {
 	struct ether_addr bssid;
 	struct ether_addr mac;
 } wl_probe_params_t;
-#endif /* LINUX_POSTMOGRIFY_REMOVAL */
 
 #define WL_MAXRATES_IN_SET		16	/* max # of rates in a rateset */
 typedef struct wl_rateset {
@@ -588,7 +574,6 @@ typedef struct wl_join_params {
 					 */
 } wl_join_params_t;
 
-#ifndef  LINUX_POSTMOGRIFY_REMOVAL
 #define WL_JOIN_PARAMS_FIXED_SIZE 	(OFFSETOF(wl_join_params_t, params) + \
 					 WL_ASSOC_PARAMS_FIXED_SIZE)
 /* scan params for extended join */
@@ -660,11 +645,9 @@ typedef struct {
 	uint32 source;	/* last detected interference source */
 	uint32 timestamp;	/* second timestamp on interferenced flag change */
 } interference_source_rep_t;
-#endif /* LINUX_POSTMOGRIFY_REMOVAL */
 
 #define WLC_CNTRY_BUF_SZ	4		/* Country string is 3 bytes + NUL */
 
-#ifndef LINUX_POSTMOGRIFY_REMOVAL
 
 typedef struct wl_country {
 	char country_abbrev[WLC_CNTRY_BUF_SZ];	/* nul-terminated country code used in
@@ -789,7 +772,6 @@ typedef enum sup_auth_status {
 	WLC_SUP_KEYXCHANGE_WAIT_G1,	/* Waiting to receive handshake msg G1 */
 	WLC_SUP_KEYXCHANGE_PREP_G2	/* Preparing to send handshake msg G2 */
 } sup_auth_status_t;
-#endif /* LINUX_POSTMOGRIFY_REMOVAL */
 
 typedef struct wl_wsec_key {
 	uint32		index;		/* key index */
@@ -846,7 +828,6 @@ typedef struct _pmkid_cand_list {
 
 #define WL_STA_ANT_MAX		4	/* max possible rx antennas */
 
-#ifndef LINUX_POSTMOGRIFY_REMOVAL
 typedef struct wl_assoc_info {
 	uint32		req_len;
 	uint32		resp_len;
@@ -980,8 +961,6 @@ typedef struct {
 
 #define WL_STA_VER		4
 
-#endif /* LINUX_POSTMOGRIFY_REMOVAL */
-
 #define	WLC_NUMRATES	16	/* max # of rates in a rateset */
 
 typedef struct wlc_rateset {
@@ -1017,7 +996,6 @@ struct maclist {
 	struct ether_addr ea[1];	/* variable length array of MAC addresses */
 };
 
-#ifndef LINUX_POSTMOGRIFY_REMOVAL
 /* get pkt count struct passed through ioctl */
 typedef struct get_pktcnt {
 	uint rx_good_pkt;
@@ -1074,8 +1052,6 @@ typedef struct {
 	uint32	tsf_timer[2][2];	/* Start and End time for 8bytes value */
 } wl_mac_ratehisto_res_t;	/* MAC Specific Rate Histogram Response */
 
-#endif /* LINUX_POSTMOGRIFY_REMOVAL */
-
 /* Linux network driver ioctl encoding */
 typedef struct wl_ioctl {
 	uint cmd;	/* common ioctl definition */
@@ -1086,7 +1062,6 @@ typedef struct wl_ioctl {
 	uint needed;	/* bytes needed (optional) */
 } wl_ioctl_t;
 
-#ifndef LINUX_POSTMOGRIFY_REMOVAL
 
 /*
  * Structure for passing hardware and software
@@ -1583,7 +1558,6 @@ typedef struct wl_txchain_pwr_offsets {
 struct tsinfo_arg {
 	uint8 octets[3];
 };
-#endif /* LINUX_POSTMOGRIFY_REMOVAL */
 
 #define	NFIFO			6	/* # tx/rx fifopairs */
 #define NREINITREASONCOUNT	8
@@ -1845,7 +1819,6 @@ typedef struct {
 	uint32	reinitreason[NREINITREASONCOUNT]; /* reinitreason counters; 0: Unknown reason */
 } wl_cnt_t;
 
-#ifndef LINUX_POSTMOGRIFY_REMOVAL
 typedef struct {
 	uint16  version;    /* see definition of WL_CNT_T_VERSION */
 	uint16  length;     /* length of entire structure */
@@ -2127,7 +2100,6 @@ typedef struct {
 	uint32 bphy_badplcp;
 
 } wl_delta_stats_t;
-#endif /* LINUX_POSTMOGRIFY_REMOVAL */
 
 typedef struct {
 	uint32 packets;
@@ -2149,7 +2121,6 @@ typedef struct {
 
 } wl_wme_cnt_t;
 
-#ifndef LINUX_POSTMOGRIFY_REMOVAL
 struct wl_msglevel2 {
 	uint32 low;
 	uint32 high;
@@ -2247,6 +2218,12 @@ typedef struct wlc_ba_cnt {
 struct ampdu_tid_control {
 	uint8 tid;			/* tid */
 	uint8 enable;			/* enable/disable */
+};
+
+/* struct for per-tid, per-mode ampdu control */
+struct ampdu_tid_control_mode {
+	struct ampdu_tid_control control[NUMPRIO]; /* tid will be 0xff for not used element */
+	char mode_name[8]; /* supported mode : AIBSS */
 };
 
 /* structure for identifying ea/tid for sending addba/delba */
@@ -2560,8 +2537,6 @@ typedef BWL_PRE_PACKED_STRUCT struct pfn_olmsg_params_t {
 #define MSCAN_MAX			90
 #endif
 
-#endif /* LINUX_POSTMOGRIFY_REMOVAL */
-
 /* Service discovery */
 typedef struct {
 	uint8	transaction_id;	/* Transaction id */
@@ -2613,7 +2588,6 @@ typedef struct {
 	struct ether_addr bssid[1];	/* max ANQPO_MAX_IGNORE_BSSID */
 } wl_anqpo_ignore_bssid_list_t;
 
-#ifndef LINUX_POSTMOGRIFY_REMOVAL
 
 struct toe_ol_stats_t {
 	/* Num of tx packets that don't need to be checksummed */
@@ -3471,8 +3445,6 @@ typedef struct {
 } wl_ioctl_overlay_t;
 #endif /* DONGLEOVERLAYS */
 
-#endif /* LINUX_POSTMOGRIFY_REMOVAL */
-
 /* 11k Neighbor Report element */
 typedef struct nbr_element {
 	uint8 id;
@@ -3501,7 +3473,6 @@ typedef struct keepalives_max_idle {
 /* require strict packing */
 #include <packed_section_start.h>
 
-#ifndef LINUX_POSTMOGRIFY_REMOVAL
 
 /* Structures and constants used for "vndr_ie" IOVar interface */
 #define VNDR_IE_CMD_LEN		4	/* length of the set command string:
@@ -3621,7 +3592,6 @@ typedef BWL_PRE_PACKED_STRUCT struct {
 } BWL_POST_PACKED_STRUCT ibss_route_tbl_t;
 
 #define MAX_IBSS_ROUTE_TBL_ENTRY	64
-#endif /* LINUX_POSTMOGRIFY_REMOVAL */
 
 #define TXPWR_TARGET_VERSION  0
 typedef BWL_PRE_PACKED_STRUCT struct {
@@ -3685,7 +3655,6 @@ typedef BWL_PRE_PACKED_STRUCT struct {
 /* no strict structure packing */
 #include <packed_section_end.h>
 
-#ifndef LINUX_POSTMOGRIFY_REMOVAL
 	/* Global ASSERT Logging */
 #define ASSERTLOG_CUR_VER	0x0100
 #define MAX_ASSRTSTR_LEN	64
@@ -4578,8 +4547,6 @@ typedef struct net_detect_wake_data {
 } net_detect_wake_data_t;
 
 #endif /* NET_DETECT */
-
-#endif /* LINUX_POSTMOGRIFY_REMOVAL */
 
 typedef struct bcnreq {
 	uint8 bcn_mode;

@@ -4,7 +4,7 @@
  *
  * Definitions subject to change without notice.
  *
- * Copyright (C) 1999-2013, Broadcom Corporation
+ * Copyright (C) 1999-2014, Broadcom Corporation
  * 
  *      Unless you and Broadcom execute a separate written software license
  * agreement governing use of this software, this software is licensed to you
@@ -32,7 +32,6 @@
 #define wlioctl_defs_h
 
 
-#ifndef LINUX_POSTMOGRIFY_REMOVAL
 
 
 
@@ -331,8 +330,6 @@
 
 /* check this magic number */
 #define WLC_IOCTL_MAGIC		0x14e46c77
-
-#endif /* LINUX_POSTMOGRIFY_REMOVAL */
 
 /* bss_info_cap_t flags */
 #define WL_BSS_FLAGS_FROM_BEACON	0x01	/* bss_info derived from beacon */
@@ -635,7 +632,6 @@
 #define WLC_SET_LAZYWDS				139
 #define WLC_GET_BANDLIST			140
 
-#ifndef LINUX_POSTMOGRIFY_REMOVAL
 #define WLC_GET_BAND				141
 #define WLC_SET_BAND				142
 #define WLC_SCB_DEAUTHENTICATE			143
@@ -675,9 +671,7 @@
 /* #define WLC_DUMP_PHYREGS			177 */ /* no longer supported */
 #define WLC_GET_PROTECTION_CONTROL		178
 #define WLC_SET_PROTECTION_CONTROL		179
-#endif /* LINUX_POSTMOGRIFY_REMOVAL  */
 #define WLC_GET_PHYLIST				180
-#ifndef LINUX_POSTMOGRIFY_REMOVAL
 #define WLC_ENCRYPT_STRENGTH			181	/* ndis only */
 #define WLC_DECRYPT_STATUS			182	/* ndis only */
 #define WLC_GET_KEY_SEQ				183
@@ -698,9 +692,7 @@
 /* #define WLC_GET_GMODE_PROTECTION_CTS		198 */ /* no longer supported */
 /* #define WLC_SET_GMODE_PROTECTION_CTS		199 */ /* no longer supported */
 #define WLC_SET_WSEC_TEST			200
-#endif /* LINUX_POSTMOGRIFY_REMOVAL */
 #define WLC_SCB_DEAUTHENTICATE_FOR_REASON	201
-#ifndef LINUX_POSTMOGRIFY_REMOVAL
 #define WLC_TKIP_COUNTERMEASURES		202
 #define WLC_GET_PIOMODE				203
 #define WLC_SET_PIOMODE				204
@@ -716,7 +708,6 @@
 #define WLC_START_CHANNEL_QA			214
 #define WLC_GET_CHANNEL_SEL			215
 #define WLC_START_CHANNEL_SEL			216
-#endif /* LINUX_POSTMOGRIFY_REMOVAL */
 #define WLC_GET_VALID_CHANNELS			217
 #define WLC_GET_FAKEFRAG			218
 #define WLC_SET_FAKEFRAG			219
@@ -738,7 +729,6 @@
 #define WLC_GET_KEY_PRIMARY			235
 #define WLC_SET_KEY_PRIMARY			236
 
-#ifndef LINUX_POSTMOGRIFY_REMOVAL
 
 /* #define WLC_DUMP_RADIOREGS			237 */ /* no longer supported */
 #define WLC_GET_ACI_ARGS			238
@@ -765,17 +755,13 @@
 #define WLC_LEGACY_LINK_BEHAVIOR		259
 #define WLC_GET_CHANNELS_IN_COUNTRY		260
 #define WLC_GET_COUNTRY_LIST			261
-#endif /* LINUX_POSTMOGRIFY_REMOVAL */
 #define WLC_GET_VAR				262	/* get value of named variable */
 #define WLC_SET_VAR				263	/* set named variable to value */
-#ifndef LINUX_POSTMOGRIFY_REMOVAL
 #define WLC_NVRAM_GET				264	/* deprecated */
 #define WLC_NVRAM_SET				265
 #define WLC_NVRAM_DUMP				266
 #define WLC_REBOOT				267
-#endif /* !LINUX_POSTMOGRIFY_REMOVAL */
 #define WLC_SET_WSEC_PMK			268
-#ifndef LINUX_POSTMOGRIFY_REMOVAL
 #define WLC_GET_AUTH_MODE			269
 #define WLC_SET_AUTH_MODE			270
 #define WLC_GET_WAKEENTRY			271
@@ -2006,8 +1992,6 @@
 #define NET_DETECT_MAX_PROFILES		16
 #define NET_DETECT_MAX_CHANNELS		50
 #endif /* NET_DETECT */
-
-#endif /* LINUX_POSTMOGRIFY_REMOVAL */
 
 /* Bit masks for radio disabled status - returned by WL_GET_RADIO */
 #define WL_RADIO_SW_DISABLE		(1<<0)

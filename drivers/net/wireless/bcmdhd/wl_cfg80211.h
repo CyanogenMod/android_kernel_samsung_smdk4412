@@ -1,7 +1,7 @@
 /*
  * Linux cfg80211 driver
  *
- * Copyright (C) 1999-2013, Broadcom Corporation
+ * Copyright (C) 1999-2014, Broadcom Corporation
  * 
  *      Unless you and Broadcom execute a separate written software license
  * agreement governing use of this software, this software is licensed to you
@@ -21,7 +21,7 @@
  * software in any way with any other Broadcom software provided under a license
  * other than the GPL, without Broadcom's express prior written consent.
  *
- * $Id: wl_cfg80211.h 440870 2013-12-04 05:23:45Z $
+ * $Id: wl_cfg80211.h 457855 2014-02-25 01:27:41Z $
  */
 
 #ifndef _wl_cfg80211_h_
@@ -186,12 +186,12 @@ do {									\
 
 #define WL_PM_ENABLE_TIMEOUT 10000
 
-#if defined(CUSTOMER_HW4)
-/* Custom IBSS beacon parameters */
+#ifdef WLAIBSS
+/* Custom AIBSS beacon parameters */
 #define AIBSS_INITIAL_MIN_BCN_DUR	500
 #define AIBSS_MIN_BCN_DUR		5000
 #define AIBSS_BCN_FLOOD_DUR		5000
-#endif /* CUSTOMER_HW4 */
+#endif /* WLAIBSS */
 
 /* driver status */
 enum wl_status {
@@ -425,6 +425,7 @@ struct escan_info {
 #endif /* STATIC_WL_PRIV_STRUCT */
 #if defined(CUSTOMER_HW4) && defined(DUAL_ESCAN_RESULT_BUFFER)
 	u8 cur_sync_id;
+	u8 escan_type[2];
 #endif /* CUSTOMER_HW4 && DUAL_ESCAN_RESULT_BUFFER */
 	struct wiphy *wiphy;
 	struct net_device *ndev;
@@ -479,7 +480,9 @@ struct parsed_ies {
 /* Max length of Interworking element */
 #define IW_IES_MAX_BUF_LEN 		9
 #endif
-
+#ifdef WLFBT
+#define FBT_KEYLEN		32
+#endif
 #define MAX_EVENT_BUF_NUM 16
 typedef struct wl_eventmsg_buf {
     u16 num;
@@ -613,6 +616,10 @@ struct bcm_cfg80211 {
 	u32 aibss_txfail_pid;
 	u32 aibss_txfail_seq;
 #endif /* WLAIBSS */
+	bool roam_offload;
+#ifdef WLFBT
+	uint8 fbt_key[FBT_KEYLEN];
+#endif
 };
 
 
@@ -821,16 +828,21 @@ wl_get_netinfo_by_netdev(struct bcm_cfg80211 *cfg, struct net_device *ndev)
 	((wdev->iftype == NL80211_IFTYPE_P2P_DEVICE) ? \
 	bcmcfg_to_prmry_ndev(cfg) : wdev_to_ndev(wdev))
 #define cfgdev_to_wlc_ndev(cfgdev, cfg)	wdev_to_wlc_ndev(cfgdev, cfg)
+#define bcmcfg_to_prmry_cfgdev(cfgdev, cfg) bcmcfg_to_prmry_wdev(cfg)
 #elif defined(WL_ENABLE_P2P_IF)
 #define cfgdev_to_wlc_ndev(cfgdev, cfg)	ndev_to_wlc_ndev(cfgdev, cfg)
+#define bcmcfg_to_prmry_cfgdev(cfgdev, cfg) bcmcfg_to_prmry_ndev(cfg)
 #else
 #define cfgdev_to_wlc_ndev(cfgdev, cfg)	(cfgdev)
+#define bcmcfg_to_prmry_cfgdev(cfgdev, cfg) (cfgdev)
 #endif /* WL_CFG80211_P2P_DEV_IF */
 
 #if defined(WL_CFG80211_P2P_DEV_IF)
 #define ndev_to_cfgdev(ndev)	ndev_to_wdev(ndev)
+#define discover_cfgdev(cfgdev, cfg) (cfgdev->iftype == NL80211_IFTYPE_P2P_DEVICE)
 #else
 #define ndev_to_cfgdev(ndev)	(ndev)
+#define discover_cfgdev(cfgdev, cfg) (cfgdev == cfg->p2p_net)
 #endif /* WL_CFG80211_P2P_DEV_IF */
 
 #if defined(WL_CFG80211_P2P_DEV_IF)
@@ -934,6 +946,9 @@ void wl_cfg80211_enable_trace(bool set, u32 level);
 extern s32 wl_update_wiphybands(struct bcm_cfg80211 *cfg, bool notify);
 extern s32 wl_cfg80211_if_is_group_owner(void);
 extern chanspec_t wl_ch_host_to_driver(u16 channel);
+extern s32 wl_set_tx_power(struct net_device *dev,
+	enum nl80211_tx_power_setting type, s32 dbm);
+extern s32 wl_get_tx_power(struct net_device *dev, s32 *dbm);
 extern s32 wl_add_remove_eventmsg(struct net_device *ndev, u16 event, bool add);
 extern void wl_stop_wait_next_action_frame(struct bcm_cfg80211 *cfg, struct net_device *ndev);
 #ifdef WL_HOST_BAND_MGMT
@@ -946,10 +961,26 @@ extern void get_primary_mac(struct bcm_cfg80211 *cfg, struct ether_addr *mac);
 extern void wl_cfg80211_update_power_mode(struct net_device *dev);
 #define SCAN_BUF_CNT	2
 #define SCAN_BUF_NEXT	1
+#define WL_SCANTYPE_LEGACY	0x1
+#define WL_SCANTYPE_P2P		0x2
 #if defined(DUAL_ESCAN_RESULT_BUFFER)
 #define wl_escan_set_sync_id(a, b) ((a) = (b)->escan_info.cur_sync_id)
-#define wl_escan_get_buf(a, b) ((wl_scan_results_t *) (a)->escan_info.escan_buf\
-[((a)->escan_info.cur_sync_id + (b))%SCAN_BUF_CNT])
+#define wl_escan_set_type(a, b) ((a)->escan_info.escan_type\
+[((a)->escan_info.cur_sync_id)%SCAN_BUF_CNT] = (b))
+static inline wl_scan_results_t *wl_escan_get_buf(struct bcm_cfg80211 *cfg, bool aborted)
+{
+	u8 index;
+	if (aborted) {
+		if (cfg->escan_info.escan_type[0] == cfg->escan_info.escan_type[1])
+			index = (cfg->escan_info.cur_sync_id + 1)%SCAN_BUF_CNT;
+		else
+			index = (cfg->escan_info.cur_sync_id)%SCAN_BUF_CNT;
+	}
+	else
+		index = (cfg->escan_info.cur_sync_id)%SCAN_BUF_CNT;
+
+	return (wl_scan_results_t *)cfg->escan_info.escan_buf[index];
+}
 static inline int wl_escan_check_sync_id(s32 status, u16 result_id, u16 wl_id)
 {
 	if (result_id != wl_id) {
@@ -969,23 +1000,38 @@ static inline void wl_escan_print_sync_id(s32 status, u16 result_id, u16 wl_id)
 			status, wl_id, result_id));
 	}
 }
+
 #define wl_escan_increment_sync_id(a, b) ((a)->escan_info.cur_sync_id += b)
 #define wl_escan_init_sync_id(a) ((a)->escan_info.cur_sync_id = 0)
 #else
 #define wl_escan_set_sync_id(a, b) ((a) = htod16(0x1234))
+#define wl_escan_set_type(a, b)
 #define wl_escan_get_buf(a, b) ((wl_scan_results_t *) (a)->escan_info.escan_buf)
 #define wl_escan_check_sync_id(a, b, c) 0
 #define wl_escan_print_sync_id(a, b, c)
 #define wl_escan_increment_sync_id(a, b)
 #define wl_escan_init_sync_id(a)
 #endif /* DUAL_ESCAN_RESULT_BUFFER */
+
 extern void wl_cfg80211_ibss_vsie_set_buffer(vndr_ie_setbuf_t *ibss_vsie, int ibss_vsie_len);
 extern s32 wl_cfg80211_ibss_vsie_delete(struct net_device *dev);
 #ifdef WLAIBSS
 extern void wl_cfg80211_set_txfail_pid(int pid);
 #endif /* WLAIBSS */
+#ifdef WLFBT
+extern void wl_cfg80211_get_fbt_key(uint8 *key);
+#endif
 
 /* Action frame specific functions */
 extern u8 wl_get_action_category(void *frame, u32 frame_len);
 extern int wl_get_public_action(void *frame, u32 frame_len, u8 *ret_action);
+
+extern int wl_cfg80211_enable_roam_offload(struct net_device *dev, bool enable);
+
+#ifdef WL_CFG80211_VSDB_PRIORITIZE_SCAN_REQUEST
+struct net_device *wl_cfg80211_get_remain_on_channel_ndev(struct bcm_cfg80211 *cfg);
+#endif /* WL_CFG80211_VSDB_PRIORITIZE_SCAN_REQUEST */
+
+extern int wl_cfg80211_get_ioctl_version(void);
+
 #endif				/* _wl_cfg80211_h_ */

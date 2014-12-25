@@ -1,7 +1,7 @@
 /*
  * Linux OS Independent Layer
  *
- * Copyright (C) 1999-2013, Broadcom Corporation
+ * Copyright (C) 1999-2014, Broadcom Corporation
  * 
  *      Unless you and Broadcom execute a separate written software license
  * agreement governing use of this software, this software is licensed to you
@@ -165,18 +165,9 @@ extern void osl_dma_unmap(osl_t *osh, uint pa, uint size, int direction);
 /* API for DMA addressing capability */
 #define OSL_DMADDRWIDTH(osh, addrwidth) ({BCM_REFERENCE(osh); BCM_REFERENCE(addrwidth);})
 
-#if defined(__ARM_ARCH_7A__)
-	extern void osl_cache_flush(void *va, uint size);
-	extern void osl_cache_inv(void *va, uint size);
-	extern void osl_prefetch(const void *ptr);
-	#define OSL_CACHE_FLUSH(va, len)	osl_cache_flush((void *) va, len)
-	#define OSL_CACHE_INV(va, len)		osl_cache_inv((void *) va, len)
-	#define OSL_PREFETCH(ptr)			osl_prefetch(ptr)
-#else
 	#define OSL_CACHE_FLUSH(va, len)	BCM_REFERENCE(va)
 	#define OSL_CACHE_INV(va, len)		BCM_REFERENCE(va)
 	#define OSL_PREFETCH(ptr)			prefetch(ptr)
-#endif 
 
 /* register access macros */
 	#include <bcmsdh.h>

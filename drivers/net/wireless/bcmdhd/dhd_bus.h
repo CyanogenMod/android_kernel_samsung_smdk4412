@@ -4,7 +4,7 @@
  * Provides type definitions and function prototypes used to link the
  * DHD OS, bus, and protocol modules.
  *
- * Copyright (C) 1999-2013, Broadcom Corporation
+ * Copyright (C) 1999-2014, Broadcom Corporation
  * 
  *      Unless you and Broadcom execute a separate written software license
  * agreement governing use of this software, this software is licensed to you
@@ -24,7 +24,7 @@
  * software in any way with any other Broadcom software provided under a license
  * other than the GPL, without Broadcom's express prior written consent.
  *
- * $Id: dhd_bus.h 430217 2013-10-17 19:07:58Z $
+ * $Id: dhd_bus.h 442838 2013-12-13 00:56:44Z $
  */
 
 #ifndef _dhd_bus_h_
@@ -140,7 +140,8 @@ enum {
 	DTOH_CTRL_RPTR,
 	DTOH_CTRL_WPTR,
 	HTOD_MB_DATA,
-	DTOH_MB_DATA
+	DTOH_MB_DATA,
+	MAX_HOST_RXBUFS
 };
 typedef void (*dhd_mb_ring_t) (struct dhd_bus *, uint32);
 extern void dhd_bus_cmn_writeshared(struct dhd_bus *bus, void * data, uint32 len, uint8 type);

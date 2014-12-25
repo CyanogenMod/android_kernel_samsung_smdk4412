@@ -1,7 +1,7 @@
 /*
  * Linux cfgp2p driver
  *
- * Copyright (C) 1999-2013, Broadcom Corporation
+ * Copyright (C) 1999-2014, Broadcom Corporation
  * 
  *      Unless you and Broadcom execute a separate written software license
  * agreement governing use of this software, this software is licensed to you
@@ -21,7 +21,7 @@
  * software in any way with any other Broadcom software provided under a license
  * other than the GPL, without Broadcom's express prior written consent.
  *
- * $Id: wl_cfgp2p.h 433630 2013-11-01 19:15:47Z $
+ * $Id: wl_cfgp2p.h 444054 2013-12-18 11:33:42Z $
  */
 #ifndef _wl_cfgp2p_h_
 #define _wl_cfgp2p_h_
@@ -202,6 +202,12 @@ enum wl_cfgp2p_status {
 #undef WL_SUPPORT_BACKPORTED_KPATCHES
 #endif
 #endif /* (LINUX_VERSION >= VERSION(3, 8, 0)) */
+
+#ifndef WL_CFG80211_P2P_DEV_IF
+#ifdef WL_NEWCFG_PRIVCMD_SUPPORT
+#undef WL_NEWCFG_PRIVCMD_SUPPORT
+#endif
+#endif /* WL_CFG80211_P2P_DEV_IF */
 
 #if defined(WL_ENABLE_P2P_IF) && (defined(WL_CFG80211_P2P_DEV_IF) || \
 	(LINUX_VERSION_CODE >= KERNEL_VERSION(3, 8, 0)))

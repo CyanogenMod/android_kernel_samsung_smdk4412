@@ -1,7 +1,7 @@
 /*
  * Broadcom Dongle Host Driver (DHD), common DHD core.
  *
- * Copyright (C) 1999-2013, Broadcom Corporation
+ * Copyright (C) 1999-2014, Broadcom Corporation
  * 
  *      Unless you and Broadcom execute a separate written software license
  * agreement governing use of this software, this software is licensed to you
@@ -21,7 +21,7 @@
  * software in any way with any other Broadcom software provided under a license
  * other than the GPL, without Broadcom's express prior written consent.
  *
- * $Id: dhd_common.c 439205 2013-11-26 00:41:18Z $
+ * $Id: dhd_common.c 451346 2014-01-24 22:19:39Z $
  */
 #include <typedefs.h>
 #include <osl.h>
@@ -76,11 +76,6 @@ int dhd_msg_level = DHD_ERROR_VAL;
 
 
 #include <wl_iw.h>
-
-#ifdef WRITE_WLANINFO
-char fw_path[MOD_PARAM_PATHLEN];
-char nv_path[MOD_PARAM_PATHLEN];
-#endif
 
 #ifdef SOFTAP
 char fw_path2[MOD_PARAM_PATHLEN];
@@ -712,6 +707,7 @@ dhd_prec_drop_pkts(dhd_pub_t *dhdp, struct pktq *pq, int prec, f_droppkt_t fn)
 			if (first) {
 				/* No last frag pkt, use prev as last */
 				last = prev;
+				break;
 			} else {
 				first = p;
 				prev_first = prev;
@@ -761,6 +757,8 @@ dhd_prec_drop_pkts(dhd_pub_t *dhdp, struct pktq *pq, int prec, f_droppkt_t fn)
 			q->tail = NULL;
 	} else {
 		PKTSETLINK(prev_first, next);
+		if (!next)
+			q->tail = prev_first;
 	}
 
 	return TRUE;

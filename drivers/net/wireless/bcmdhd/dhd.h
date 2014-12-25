@@ -4,7 +4,7 @@
  * Provides type definitions and function prototypes used to link the
  * DHD OS, bus, and protocol modules.
  *
- * Copyright (C) 1999-2013, Broadcom Corporation
+ * Copyright (C) 1999-2014, Broadcom Corporation
  * 
  *      Unless you and Broadcom execute a separate written software license
  * agreement governing use of this software, this software is licensed to you
@@ -24,7 +24,7 @@
  * software in any way with any other Broadcom software provided under a license
  * other than the GPL, without Broadcom's express prior written consent.
  *
- * $Id: dhd.h 439237 2013-11-26 02:17:05Z $
+ * $Id: dhd.h 457596 2014-02-24 02:24:14Z $
  */
 
 /****************
@@ -52,6 +52,7 @@
 struct task_struct;
 struct sched_param;
 int setScheduler(struct task_struct *p, int policy, struct sched_param *param);
+int get_scheduler_policy(struct task_struct *p);
 
 #define ALL_INTERFACES	0xff
 
@@ -275,6 +276,7 @@ typedef struct dhd_pub {
 	0 - Do not do any proptxtstatus flow control
 	1 - Use implied credit from a packet status
 	2 - Use explicit credit
+	3 - Only AMPDU hostreorder used. no wlfc.
 	*/
 	uint8	proptxstatus_mode;
 	bool	proptxstatus_txoff;
@@ -328,6 +330,11 @@ typedef struct dhd_pub {
 #if defined(CUSTOMER_HW4)
 	bool dhd_bug_on;
 #endif
+#ifdef CUSTOM_SET_CPUCORE
+	struct task_struct * current_dpc;
+	struct task_struct * current_rxf;
+	int chan_isvht80;
+#endif /* CUSTOM_SET_CPUCORE */
 } dhd_pub_t;
 #if defined(CUSTOMER_HW4)
 #define MAX_RESCHED_CNT 600
@@ -484,7 +491,7 @@ inline static void MUTEX_UNLOCK_SOFTAP_SET(dhd_pub_t * dhdp)
 #define DHD_OS_WAKE_LOCK_CTRL_TIMEOUT_CANCEL(pub) \
 	dhd_os_wake_lock_ctrl_timeout_cancel(pub)
 #endif /* DHD_DEBUG_WAKE_LOCK */
-#define DHD_PACKET_TIMEOUT_MS	1000
+#define DHD_PACKET_TIMEOUT_MS	500
 #define DHD_EVENT_TIMEOUT_MS	1500
 
 
@@ -598,6 +605,10 @@ extern void dhd_set_version_info(dhd_pub_t *pub, char *fw);
 extern bool dhd_os_check_if_up(dhd_pub_t *pub);
 extern int dhd_os_check_wakelock(dhd_pub_t *pub);
 
+#ifdef CUSTOM_SET_CPUCORE
+extern void dhd_set_cpucore(dhd_pub_t *dhd, int set);
+#endif /* CUSTOM_SET_CPUCORE */
+
 #if defined(KEEP_ALIVE)
 extern int dhd_keep_alive_onoff(dhd_pub_t *dhd);
 #endif /* KEEP_ALIVE */
@@ -669,6 +680,9 @@ extern int dhd_sendpkt(dhd_pub_t *dhdp, int ifidx, void *pkt);
 extern void dhd_sendup_event_common(dhd_pub_t *dhdp, wl_event_msg_t *event, void *data);
 /* Send event to host */
 extern void dhd_sendup_event(dhd_pub_t *dhdp, wl_event_msg_t *event, void *data);
+#ifdef LOG_INTO_TCPDUMP
+extern void dhd_sendup_log(dhd_pub_t *dhdp, void *data, int len);
+#endif /* LOG_INTO_TCPDUMP */
 extern int dhd_bus_devreset(dhd_pub_t *dhdp, uint8 flag);
 extern uint dhd_bus_status(dhd_pub_t *dhdp);
 extern int  dhd_bus_start(dhd_pub_t *dhdp);
@@ -810,6 +824,11 @@ extern uint dhd_force_tx_queueing;
 #define WIFI_TURNOFF_DELAY		DEFAULT_WIFI_TURNOFF_DELAY
 #endif /* WIFI_TURNOFF_DELAY */
 
+#define DEFAULT_WIFI_TURNON_DELAY		200
+#ifndef WIFI_TURNON_DELAY
+#define WIFI_TURNON_DELAY		DEFAULT_WIFI_TURNON_DELAY
+#endif /* WIFI_TURNON_DELAY */
+
 #ifdef WLTDLS
 #ifndef CUSTOM_TDLS_IDLE_MODE_SETTING
 #define CUSTOM_TDLS_IDLE_MODE_SETTING  60000 /* 60sec to tear down TDLS of not active */
@@ -840,12 +859,6 @@ extern uint dhd_pktgen_len;
 
 /* optionally set by a module_param_string() */
 #define MOD_PARAM_PATHLEN	2048
-
-#ifdef WRITE_WLANINFO
-extern char fw_path[MOD_PARAM_PATHLEN];
-extern char nv_path[MOD_PARAM_PATHLEN];
-#endif
-
 #define MOD_PARAM_INFOLEN	512
 
 #ifdef SOFTAP
@@ -896,7 +909,7 @@ int dhd_ndo_enable(dhd_pub_t * dhd, int ndo_enable);
 int dhd_ndo_add_ip(dhd_pub_t *dhd, char* ipaddr, int idx);
 int dhd_ndo_remove_ip(dhd_pub_t *dhd, int idx);
 /* ioctl processing for nl80211 */
-int dhd_ioctl_process(dhd_pub_t *pub, int ifidx, struct dhd_ioctl *ioc);
+int dhd_ioctl_process(dhd_pub_t *pub, int ifidx, struct dhd_ioctl *ioc, void *data_buf);
 
 #if defined(SUPPORT_MULTIPLE_REVISION)
 extern int
@@ -905,6 +918,7 @@ concate_revision(struct dhd_bus *bus, char *fwpath, int fw_path_len, char *nvpat
 extern int wifi_get_fw_nv_path(char *fw, char *nv);
 #endif
 #endif /* SUPPORT_MULTIPLE_REVISION */
+void dhd_bus_update_fw_nv_path(struct dhd_bus *bus, char *pfw_path, char *pnv_path);
 void dhd_set_bus_state(void *bus, uint32 state);
 
 /* Remove proper pkts(either one no-frag pkt or whole fragmented pkts) */

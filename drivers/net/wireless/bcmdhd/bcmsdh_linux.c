@@ -1,7 +1,7 @@
 /*
  * SDIO access interface for drivers - linux specific (pci only)
  *
- * Copyright (C) 1999-2013, Broadcom Corporation
+ * Copyright (C) 1999-2014, Broadcom Corporation
  * 
  *      Unless you and Broadcom execute a separate written software license
  * agreement governing use of this software, this software is licensed to you
@@ -21,7 +21,7 @@
  * software in any way with any other Broadcom software provided under a license
  * other than the GPL, without Broadcom's express prior written consent.
  *
- * $Id: bcmsdh_linux.c 434138 2013-11-05 12:12:57Z $
+ * $Id: bcmsdh_linux.c 455573 2014-02-14 17:49:31Z $
  */
 
 /**
@@ -133,7 +133,7 @@ bcmsdh_chipmatch(uint16 vendor, uint16 device)
 void* bcmsdh_probe(osl_t *osh, void *dev, void *sdioh, void *adapter_info, uint bus_type,
 	uint bus_num, uint slot_num)
 {
-	uint32 regs;
+	ulong regs;
 	bcmsdh_info_t *bcmsdh;
 	uint32 vendevid;
 	bcmsdh_os_info_t *bcmsdh_osinfo = NULL;
@@ -295,8 +295,12 @@ bool bcmsdh_dev_pm_enabled(bcmsdh_info_t *bcmsdh)
 void bcmsdh_oob_intr_set(bcmsdh_info_t *bcmsdh, bool enable)
 {
 	unsigned long flags;
-	bcmsdh_os_info_t *bcmsdh_osinfo = bcmsdh->os_cxt;
+	bcmsdh_os_info_t *bcmsdh_osinfo;
 
+	if (!bcmsdh)
+		return;
+
+	bcmsdh_osinfo = bcmsdh->os_cxt;
 	spin_lock_irqsave(&bcmsdh_osinfo->oob_irq_spinlock, flags);
 	if (bcmsdh_osinfo->oob_irq_enabled != enable) {
 		if (enable)
@@ -345,13 +349,13 @@ int bcmsdh_oob_intr_register(bcmsdh_info_t *bcmsdh, bcmsdh_cb_fn_t oob_irq_handl
 
 #if defined(CONFIG_ARCH_RHEA) || defined(CONFIG_ARCH_CAPRI)
 	if (device_may_wakeup(bcmsdh_osinfo->dev)) {
-#endif
+#endif /* CONFIG_ARCH_RHEA || CONFIG_ARCH_CAPRI */
 		err = enable_irq_wake(bcmsdh_osinfo->oob_irq_num);
 		if (!err)
 			bcmsdh_osinfo->oob_irq_wake_enabled = TRUE;
 #if defined(CONFIG_ARCH_RHEA) || defined(CONFIG_ARCH_CAPRI)
 	}
-#endif
+#endif /* CONFIG_ARCH_RHEA || CONFIG_ARCH_CAPRI */
 	bcmsdh_osinfo->oob_irq_enabled = TRUE;
 	bcmsdh_osinfo->oob_irq_registered = TRUE;
 	return err;
@@ -370,13 +374,13 @@ void bcmsdh_oob_intr_unregister(bcmsdh_info_t *bcmsdh)
 	if (bcmsdh_osinfo->oob_irq_wake_enabled) {
 #if defined(CONFIG_ARCH_RHEA) || defined(CONFIG_ARCH_CAPRI)
 		if (device_may_wakeup(bcmsdh_osinfo->dev)) {
-#endif
+#endif /* CONFIG_ARCH_RHEA || CONFIG_ARCH_CAPRI */
 			err = disable_irq_wake(bcmsdh_osinfo->oob_irq_num);
 			if (!err)
 				bcmsdh_osinfo->oob_irq_wake_enabled = FALSE;
 #if defined(CONFIG_ARCH_RHEA) || defined(CONFIG_ARCH_CAPRI)
 		}
-#endif
+#endif /* CONFIG_ARCH_RHEA || CONFIG_ARCH_CAPRI */
 	}
 	if (bcmsdh_osinfo->oob_irq_enabled) {
 		disable_irq(bcmsdh_osinfo->oob_irq_num);

@@ -1,7 +1,7 @@
 /*
  * Linux OS Independent Layer
  *
- * Copyright (C) 1999-2013, Broadcom Corporation
+ * Copyright (C) 1999-2014, Broadcom Corporation
  * 
  *      Unless you and Broadcom execute a separate written software license
  * agreement governing use of this software, this software is licensed to you
@@ -21,7 +21,7 @@
  * software in any way with any other Broadcom software provided under a license
  * other than the GPL, without Broadcom's express prior written consent.
  *
- * $Id: linux_osl.c 433009 2013-10-30 09:13:49Z $
+ * $Id: linux_osl.c 451649 2014-01-27 17:23:38Z $
  */
 
 #define LINUX_PORT
@@ -31,9 +31,6 @@
 #include <linuxver.h>
 #include <bcmdefs.h>
 
-#ifdef __ARM_ARCH_7A__
-#include <asm/cacheflush.h>
-#endif /* __ARM_ARCH_7A__ */
 
 #include <osl.h>
 #include <bcmutils.h>
@@ -590,13 +587,8 @@ osl_pktfastget(osl_t *osh, uint len)
 
 	/* Init skb struct */
 	skb->next = skb->prev = NULL;
-#if defined(__ARM_ARCH_7A__)
-	skb->data = skb->head + NET_SKB_PAD;
-	skb->tail = skb->head + NET_SKB_PAD;
-#else
 	skb->data = skb->head + 16;
 	skb->tail = skb->head + 16;
-#endif /* __ARM_ARCH_7A__ */
 	skb->len = 0;
 	skb->cloned = 0;
 #if LINUX_VERSION_CODE < KERNEL_VERSION(2, 6, 14)
@@ -932,7 +924,7 @@ osl_pci_slot(osl_t *osh)
 {
 	ASSERT(osh && (osh->magic == OS_HANDLE_MAGIC) && osh->pdev);
 
-#if defined(__ARM_ARCH_7A__) && LINUX_VERSION_CODE > KERNEL_VERSION(2, 6, 35)
+#if 0 > KERNEL_VERSION(2, 6, 35)
 	return PCI_SLOT(((struct pci_dev *)osh->pdev)->devfn) + 1;
 #else
 	return PCI_SLOT(((struct pci_dev *)osh->pdev)->devfn);
@@ -1111,17 +1103,11 @@ osl_dma_alloc_consistent(osl_t *osh, uint size, uint16 align_bits, uint *alloced
 		size += align;
 	*alloced = size;
 
-#ifdef __ARM_ARCH_7A__
-	va = kmalloc(size, GFP_ATOMIC | __GFP_ZERO);
-	if (va)
-		*pap = (ulong)__virt_to_phys((ulong)va);
-#else
 	{
 		dma_addr_t pap_lin;
 		va = pci_alloc_consistent(osh->pdev, size, &pap_lin);
 		*pap = (dmaaddr_t)pap_lin;
 	}
-#endif
 	return va;
 }
 
@@ -1130,11 +1116,7 @@ osl_dma_free_consistent(osl_t *osh, void *va, uint size, dmaaddr_t pa)
 {
 	ASSERT((osh && (osh->magic == OS_HANDLE_MAGIC)));
 
-#ifdef __ARM_ARCH_7A__
-	kfree(va);
-#else
 	pci_free_consistent(osh->pdev, size, va, (dma_addr_t)pa);
-#endif
 }
 
 dmaaddr_t BCMFASTPATH
@@ -1145,36 +1127,6 @@ osl_dma_map(osl_t *osh, void *va, uint size, int direction, void *p, hnddma_seg_
 	ASSERT((osh && (osh->magic == OS_HANDLE_MAGIC)));
 	dir = (direction == DMA_TX)? PCI_DMA_TODEVICE: PCI_DMA_FROMDEVICE;
 
-#if defined(__ARM_ARCH_7A__) && defined(BCMDMASGLISTOSL)
-	if (dmah != NULL) {
-		int32 nsegs, i, totsegs = 0, totlen = 0;
-		struct scatterlist *sg, _sg[MAX_DMA_SEGS * 2];
-		struct sk_buff *skb;
-		for (skb = (struct sk_buff *)p; skb != NULL; skb = PKTNEXT(osh, skb)) {
-			sg = &_sg[totsegs];
-			if (skb_is_nonlinear(skb)) {
-				nsegs = skb_to_sgvec(skb, sg, 0, PKTLEN(osh, skb));
-				ASSERT((nsegs > 0) && (totsegs + nsegs <= MAX_DMA_SEGS));
-				pci_map_sg(osh->pdev, sg, nsegs, dir);
-			} else {
-				nsegs = 1;
-				ASSERT(totsegs + nsegs <= MAX_DMA_SEGS);
-				sg->page_link = 0;
-				sg_set_buf(sg, PKTDATA(osh, skb), PKTLEN(osh, skb));
-				pci_map_single(osh->pdev, PKTDATA(osh, skb), PKTLEN(osh, skb), dir);
-			}
-			totsegs += nsegs;
-			totlen += PKTLEN(osh, skb);
-		}
-		dmah->nsegs = totsegs;
-		dmah->origsize = totlen;
-		for (i = 0, sg = _sg; i < totsegs; i++, sg++) {
-			dmah->segs[i].addr = sg_phys(sg);
-			dmah->segs[i].length = sg->length;
-		}
-		return dmah->segs[0].addr;
-	}
-#endif /* __ARM_ARCH_7A__ && BCMDMASGLISTOSL */
 
 	return (pci_map_single(osh->pdev, va, size, dir));
 }
@@ -1189,45 +1141,6 @@ osl_dma_unmap(osl_t *osh, uint pa, uint size, int direction)
 	pci_unmap_single(osh->pdev, (uint32)pa, size, dir);
 }
 
-
-#if defined(__ARM_ARCH_7A__)
-
-inline void BCMFASTPATH
-osl_cache_flush(void *va, uint size)
-{
-	unsigned long paddr;
-	dmac_map_area(va, size, DMA_TX);
-	paddr = __pa(va);
-	outer_clean_range(paddr, paddr + size);
-}
-
-inline void BCMFASTPATH
-osl_cache_inv(void *va, uint size)
-{
-	unsigned long paddr;
-	dmac_map_area(va, size, DMA_RX);
-	paddr = __pa(va);
-	outer_inv_range(paddr, paddr + size);
-
-	/* WAR : Call it once more, to make sure INVALIDATE really happens.
-	 * On 4708 ARM platforms, intermittently, we are seeing corrupt/dirty data after
-	 * INVALIDATE. Calling outer_inv_range twice seems to solve the problem.
-	 */
-	dmac_map_area(va, size, DMA_RX);
-	paddr = __pa(va);
-	outer_inv_range(paddr, paddr + size);
-}
-
-inline void osl_prefetch(const void *ptr)
-{
-	/* Borrowed from linux/linux-2.6/include/asm-arm/processor.h */
-	__asm__ __volatile__(
-		"pld\t%0"
-		:
-		: "o" (*(char *)ptr)
-		: "cc");
-}
-#endif 
 
 #if defined(BCMASSERT_LOG)
 void

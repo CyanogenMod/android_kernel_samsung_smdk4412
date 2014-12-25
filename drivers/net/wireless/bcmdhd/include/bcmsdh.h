@@ -3,7 +3,7 @@
  *     export functions to client drivers
  *     abstract OS and BUS specific details of SDIO
  *
- * Copyright (C) 1999-2013, Broadcom Corporation
+ * Copyright (C) 1999-2014, Broadcom Corporation
  * 
  *      Unless you and Broadcom execute a separate written software license
  * agreement governing use of this software, this software is licensed to you
@@ -23,7 +23,7 @@
  * software in any way with any other Broadcom software provided under a license
  * other than the GPL, without Broadcom's express prior written consent.
  *
- * $Id: bcmsdh.h 433655 2013-11-01 20:46:06Z $
+ * $Id: bcmsdh.h 455573 2014-02-14 17:49:31Z $
  */
 
 /**
@@ -48,7 +48,7 @@ extern const uint bcmsdh_msglevel;
 typedef struct bcmsdh_info bcmsdh_info_t;
 typedef void (*bcmsdh_cb_fn_t)(void *);
 
-extern bcmsdh_info_t *bcmsdh_attach(osl_t *osh, void *sdioh, uint32 *regsva);
+extern bcmsdh_info_t *bcmsdh_attach(osl_t *osh, void *sdioh, ulong *regsva);
 /**
  * BCMSDH API context
  */

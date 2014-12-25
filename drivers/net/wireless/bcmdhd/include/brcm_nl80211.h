@@ -1,4 +1,6 @@
 /*
+ * Definitions for nl80211 testmode access to host driver
+ *
  * Copyright (C) 1999-2014, Broadcom Corporation
  * 
  *      Unless you and Broadcom execute a separate written software license
@@ -19,32 +21,36 @@
  * software in any way with any other Broadcom software provided under a license
  * other than the GPL, without Broadcom's express prior written consent.
  *
- * Fundamental types and constants relating to 802.1D
+ * $Id: brcm_nl80211.h 454792 2014-02-11 20:40:19Z $
  *
- * $Id: 802.1d.h 382882 2013-02-04 23:24:31Z $
  */
 
-#ifndef _802_1_D_
-#define _802_1_D_
+#ifndef _brcm_nl80211_h_
+#define _brcm_nl80211_h_
 
-/* 802.1D priority defines */
-#define	PRIO_8021D_NONE		2	/* None = - */
-#define	PRIO_8021D_BK		1	/* BK - Background */
-#define	PRIO_8021D_BE		0	/* BE - Best-effort */
-#define	PRIO_8021D_EE		3	/* EE - Excellent-effort */
-#define	PRIO_8021D_CL		4	/* CL - Controlled Load */
-#define	PRIO_8021D_VI		5	/* Vi - Video */
-#define	PRIO_8021D_VO		6	/* Vo - Voice */
-#define	PRIO_8021D_NC		7	/* NC - Network Control */
-#define	MAXPRIO			7	/* 0-7 */
-#define NUMPRIO			(MAXPRIO + 1)
+struct bcm_nlmsg_hdr {
+	uint cmd;	/* common ioctl definition */
+	uint len;	/* attached buffer length */
+	uint offset;	/* user buffer offset */
+	uint set;	/* get or set request optional */
+	uint magic;	/* magic number for verification */
+};
 
-#define ALLPRIO		-1	/* All prioirty */
+enum bcmnl_attrs {
+	BCM_NLATTR_UNSPEC,
 
-/* Converts prio to precedence since the numerical value of
- * PRIO_8021D_BE and PRIO_8021D_NONE are swapped.
- */
-#define PRIO2PREC(prio) \
-	(((prio) == PRIO_8021D_NONE || (prio) == PRIO_8021D_BE) ? ((prio^2)) : (prio))
+	BCM_NLATTR_LEN,
+	BCM_NLATTR_DATA,
 
-#endif /* _802_1_D__ */
+	__BCM_NLATTR_AFTER_LAST,
+	BCM_NLATTR_MAX = __BCM_NLATTR_AFTER_LAST - 1
+};
+
+struct nl_prv_data {
+	int err;			/* return result */
+	void *data;			/* ioctl return buffer pointer */
+	uint len;			/* ioctl return buffer length */
+	struct bcm_nlmsg_hdr *nlioc;	/* bcm_nlmsg_hdr header pointer */
+};
+
+#endif /* _brcm_nl80211_h_ */

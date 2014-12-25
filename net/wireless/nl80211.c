@@ -4145,10 +4145,11 @@ static int nl80211_crypto_settings(struct cfg80211_registered_device *rdev,
 			return -EINVAL;
 
 		memcpy(settings->akm_suites, data, len);
-
+#if 0 /* Below codes to validate AKM suites are not valid over the Linux Kernel ver 3.8 */
 		for (i = 0; i < settings->n_akm_suites; i++)
 			if (!nl80211_valid_akm_suite(settings->akm_suites[i]))
 				return -EINVAL;
+#endif
 	}
 
 	return 0;
