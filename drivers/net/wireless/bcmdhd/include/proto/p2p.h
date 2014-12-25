@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 1999-2012, Broadcom Corporation
+ * Copyright (C) 1999-2014, Broadcom Corporation
  * 
  *      Unless you and Broadcom execute a separate written software license
  * agreement governing use of this software, this software is licensed to you
@@ -21,7 +21,7 @@
  *
  * Fundamental types and constants relating to WFA P2P (aka WiFi Direct)
  *
- * $Id: p2p.h 356416 2012-09-12 16:40:42Z $
+ * $Id: p2p.h 444066 2013-12-18 12:49:24Z $
  */
 
 #ifndef _P2P_H_
@@ -59,36 +59,36 @@ typedef struct wifi_p2p_ie wifi_p2p_ie_t;
 #define P2P_ATTR_LEN_OFF	1
 #define P2P_ATTR_DATA_OFF	3
 
-#define P2P_ATTR_ID_LEN		1	
-#define P2P_ATTR_LEN_LEN	2	
-#define P2P_ATTR_HDR_LEN	3 
+#define P2P_ATTR_ID_LEN		1	/* ID filed length */
+#define P2P_ATTR_LEN_LEN	2	/* length field length */
+#define P2P_ATTR_HDR_LEN	3 /* ID + 2-byte length field spec 1.02 */
+
+/* P2P IE Subelement IDs from WiFi P2P Technical Spec 1.00 */
+#define P2P_SEID_STATUS			0	/* Status */
+#define P2P_SEID_MINOR_RC		1	/* Minor Reason Code */
+#define P2P_SEID_P2P_INFO		2	/* P2P Capability (capabilities info) */
+#define P2P_SEID_DEV_ID			3	/* P2P Device ID */
+#define P2P_SEID_INTENT			4	/* Group Owner Intent */
+#define P2P_SEID_CFG_TIMEOUT		5	/* Configuration Timeout */
+#define P2P_SEID_CHANNEL		6	/* Listen channel */
+#define P2P_SEID_GRP_BSSID		7	/* P2P Group BSSID */
+#define P2P_SEID_XT_TIMING		8	/* Extended Listen Timing */
+#define P2P_SEID_INTINTADDR		9	/* Intended P2P Interface Address */
+#define P2P_SEID_P2P_MGBTY		10	/* P2P Manageability */
+#define P2P_SEID_CHAN_LIST		11	/* Channel List */
+#define P2P_SEID_ABSENCE		12	/* Notice of Absence */
+#define P2P_SEID_DEV_INFO		13	/* Device Info */
+#define P2P_SEID_GROUP_INFO		14	/* Group Info */
+#define P2P_SEID_GROUP_ID		15	/* Group ID */
+#define P2P_SEID_P2P_IF			16	/* P2P Interface */
+#define P2P_SEID_OP_CHANNEL		17	/* Operating Channel */
+#define P2P_SEID_INVITE_FLAGS		18	/* Invitation Flags */
+#define P2P_SEID_VNDR			221	/* Vendor-specific subelement */
+
+#define P2P_SE_VS_ID_SERVICES	0x1b
 
 
-#define P2P_SEID_STATUS			0	
-#define P2P_SEID_MINOR_RC		1	
-#define P2P_SEID_P2P_INFO		2	
-#define P2P_SEID_DEV_ID			3	
-#define P2P_SEID_INTENT			4	
-#define P2P_SEID_CFG_TIMEOUT		5	
-#define P2P_SEID_CHANNEL		6	
-#define P2P_SEID_GRP_BSSID		7	
-#define P2P_SEID_XT_TIMING		8	
-#define P2P_SEID_INTINTADDR		9	
-#define P2P_SEID_P2P_MGBTY		10	
-#define P2P_SEID_CHAN_LIST		11	
-#define P2P_SEID_ABSENCE		12	
-#define P2P_SEID_DEV_INFO		13	
-#define P2P_SEID_GROUP_INFO		14	
-#define P2P_SEID_GROUP_ID		15	
-#define P2P_SEID_P2P_IF			16	
-#define P2P_SEID_OP_CHANNEL		17	
-#define P2P_SEID_INVITE_FLAGS		18	
-#define P2P_SEID_VNDR			221	
-
-#define P2P_SE_VS_ID_SERVICES	0x1b 
-
-
-
+/* WiFi P2P IE subelement: P2P Capability (capabilities info) */
 BWL_PRE_PACKED_STRUCT struct wifi_p2p_info_se_s {
 	uint8	eltId;		
 	uint8	len[2];		

@@ -1,6 +1,4 @@
 /*
- * 802.1Q VLAN protocol definitions
- *
  * Copyright (C) 1999-2014, Broadcom Corporation
  * 
  *      Unless you and Broadcom execute a separate written software license
@@ -21,57 +19,34 @@
  * software in any way with any other Broadcom software provided under a license
  * other than the GPL, without Broadcom's express prior written consent.
  *
- * $Id: vlan.h 346935 2012-07-25 00:24:55Z $
+ * Fundamental constants relating to 802.3
+ *
+ * $Id: 802.3.h 417943 2013-08-13 07:54:04Z $
  */
 
-#ifndef _vlan_h_
-#define _vlan_h_
+#ifndef _802_3_h_
+#define _802_3_h_
 
-#ifndef _TYPEDEFS_H_
-#include <typedefs.h>
-#endif
-
-
+/* This marks the start of a packed structure section. */
 #include <packed_section_start.h>
 
-#define VLAN_VID_MASK		0xfff	
-#define	VLAN_CFI_SHIFT		12	
-#define VLAN_PRI_SHIFT		13	
+#define SNAP_HDR_LEN	6	/* 802.3 SNAP header length */
+#define DOT3_OUI_LEN	3	/* 802.3 oui length */
 
-#define VLAN_PRI_MASK		7	
+BWL_PRE_PACKED_STRUCT struct dot3_mac_llc_snap_header {
+	uint8	ether_dhost[ETHER_ADDR_LEN];	/* dest mac */
+	uint8	ether_shost[ETHER_ADDR_LEN];	/* src mac */
+	uint16	length;				/* frame length incl header */
+	uint8	dsap;				/* always 0xAA */
+	uint8	ssap;				/* always 0xAA */
+	uint8	ctl;				/* always 0x03 */
+	uint8	oui[DOT3_OUI_LEN];		/* RFC1042: 0x00 0x00 0x00
+						 * Bridge-Tunnel: 0x00 0x00 0xF8
+						 */
+	uint16	type;				/* ethertype */
+} BWL_POST_PACKED_STRUCT;
 
-#define	VLAN_TPID_OFFSET	12	
-#define	VLAN_TCI_OFFSET		14	
-
-#define	VLAN_TAG_LEN		4
-#define	VLAN_TAG_OFFSET		(2 * ETHER_ADDR_LEN)	
-
-#define VLAN_TPID		0x8100	
-
-struct vlan_header {
-	uint16	vlan_type;		
-	uint16	vlan_tag;		
-};
-
-struct ethervlan_header {
-	uint8	ether_dhost[ETHER_ADDR_LEN];
-	uint8	ether_shost[ETHER_ADDR_LEN];
-	uint16	vlan_type;		
-	uint16	vlan_tag;		
-	uint16	ether_type;
-};
-
-#define	ETHERVLAN_HDR_LEN	(ETHER_HDR_LEN + VLAN_TAG_LEN)
-
-
-
+/* This marks the end of a packed structure section. */
 #include <packed_section_end.h>
 
-#define ETHERVLAN_MOVE_HDR(d, s) \
-do { \
-	struct ethervlan_header t; \
-	t = *(struct ethervlan_header *)(s); \
-	*(struct ethervlan_header *)(d) = t; \
-} while (0)
-
-#endif 
+#endif	/* #ifndef _802_3_h_ */
