@@ -7142,7 +7142,7 @@ int dhd_wakelock_restore(dhd_info_t *dhd)
 
 	spin_lock_irqsave(&dhd->wakelock_spinlock, flags);
 
-	if (dhd->wakelock_wd_state == DHD_WD_LOCK | DHD_WD_WAIVE) {
+	if (dhd->wakelock_wd_state == (DHD_WD_LOCK | DHD_WD_WAIVE)) {
 		dhd->wakelock_wd_state &= ~DHD_WD_WAIVE;
 		_dhd_acquire_wakelock(dhd);
 	}
