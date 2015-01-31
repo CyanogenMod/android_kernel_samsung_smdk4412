@@ -733,7 +733,6 @@ static int mass_storage_function_init(struct android_usb_function *f,
 	struct fsg_common *common;
 	int err, i;
 #ifdef CONFIG_USB_ANDROID_SAMSUNG_COMPOSITE
-	int i;
 	unsigned int cdfs = 0;
 #endif
 	config = kzalloc(sizeof(struct mass_storage_function_config),
