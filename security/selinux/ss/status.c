@@ -70,7 +70,7 @@ struct page *selinux_kernel_status_page(void)
 			 * So, application can know it was updated.
 			 */
 			status->policyload = 0;
-			status->deny_unknown = !security_get_allow_unknown();
+			status->deny_unknown = 0;
 		}
 	}
 	result = selinux_status_page;
@@ -121,7 +121,7 @@ void selinux_status_update_policyload(int seqno)
 		smp_wmb();
 
 		status->policyload = seqno;
-		status->deny_unknown = !security_get_allow_unknown();
+		status->deny_unknown = 0;
 
 		smp_wmb();
 		status->sequence++;
