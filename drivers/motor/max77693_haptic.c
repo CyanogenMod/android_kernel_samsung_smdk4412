@@ -24,7 +24,7 @@
 #include <linux/mfd/max77693.h>
 #include <linux/mfd/max77693-private.h>
 
-#define SEC_DEBUG_VIB
+#define SEC_DEBUG_VIB 0
 
 static unsigned long pwm_val = 50; /* duty in percent */
 static int pwm_duty = 27787; /* duty value, 37050=100%, 27787=50%, 18525=0% */
@@ -109,7 +109,7 @@ static void haptic_enable(struct timed_output_dev *tout_dev, int value)
 			HRTIMER_MODE_REL);
 	}
 	spin_unlock_irqrestore(&hap_data->lock, flags);
-#ifdef SEC_DEBUG_VIB
+#if SEC_DEBUG_VIB
 	printk(KERN_DEBUG "[VIB] haptic_enable is called\n");
 #endif
 }
@@ -189,7 +189,7 @@ static void haptic_work(struct work_struct *work)
 
 		hap_data->running = false;
 	}
-#ifdef SEC_DEBUG_VIB
+#if SEC_DEBUG_VIB
 	printk(KERN_DEBUG "[VIB] haptic_work is called\n");
 #endif
 	return;
@@ -231,7 +231,7 @@ void vibtonz_en(bool en)
 
 		g_hap_data->running = false;
 	}
-#ifdef SEC_DEBUG_VIB
+#if SEC_DEBUG_VIB
 	printk(KERN_DEBUG "[VIB] vibtonz_en is called\n");
 #endif
 }
@@ -255,7 +255,7 @@ void vibtonz_pwm(int nForce)
         pr_debug("[VIB] %s: setting pwm_duty=%d", __func__, pwm_duty);
 		pwm_config(g_hap_data->pwm, pwm_duty, pwm_period);
 	}
-#ifdef SEC_DEBUG_VIB
+#if SEC_DEBUG_VIB
 	printk(KERN_DEBUG "[VIB] vibtonz_pwm is called(%d)\n", nForce);
 #endif
 }
