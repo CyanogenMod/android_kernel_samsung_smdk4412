@@ -1065,11 +1065,13 @@ static void cbus_handle_msc_msg(struct sii9234_data *sii9234)
 	pr_info("sii9234: cmd_code:%d, key:%d\n", cmd_code, key);
 
 	switch (cmd_code) {
+#ifdef CONFIG_SII9234_RCP
 	case MSG_RCP:
 		pr_debug("sii9234: RCP Arrived. KEY CODE:%d\n", key);
 		sii9234_cbus_mutex_unlock(&sii9234->cbus_lock);
 		cbus_process_rcp_key(sii9234, key);
 		return;
+#endif
 	case MSG_RAP:
 		pr_debug("sii9234: RAP Arrived\n");
 		sii9234_cbus_mutex_unlock(&sii9234->cbus_lock);
@@ -4108,6 +4110,8 @@ err_msc_wq:
 err_exit1:
 #ifdef CONFIG_SII9234_RCP
 	input_free_device(input);
+#else
+	;	//do nothing
 #endif
 err_exit0:
 	kfree(sii9234);

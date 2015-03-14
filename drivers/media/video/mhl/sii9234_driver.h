@@ -39,8 +39,8 @@
 #endif
 
 #ifndef CONFIG_SII9234_RCP
-#define CONFIG_SII9234_RCP		1
-#include <linux/input.h>
+//#define CONFIG_SII9234_RCP		1
+//#include <linux/input.h>
 #endif
 #include <linux/wakelock.h>
 
