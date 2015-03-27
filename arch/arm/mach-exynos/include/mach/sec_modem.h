@@ -6,15 +6,18 @@ enum hsic_lpa_states {
 	STATE_HSIC_LPA_WAKE,
 	STATE_HSIC_LPA_PHY_INIT,
 	STATE_HSIC_LPA_CHECK,
+	STATE_HSIC_LPA_ENABLE,
 };
 
 #if defined(CONFIG_LINK_DEVICE_HSIC) || defined(CONFIG_LINK_DEVICE_USB)
 void set_host_states(struct platform_device *pdev, int type);
 void set_hsic_lpa_states(int states);
 int get_cp_active_state(void);
+int get_hostwake_state(void);
 #elif defined(CONFIG_MDM_HSIC_PM)
 int set_hsic_lpa_states(int states);
 #else
+static inline int get_hostwake_state(void) { return 0; }
 #define set_hsic_lpa_states(states) do {} while (0);
 #endif
 

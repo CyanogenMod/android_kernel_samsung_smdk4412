@@ -200,16 +200,6 @@ static void mdm_do_first_power_on(struct mdm_modem_drv *mdm_drv)
 	usleep_range(10000, 15000);
 	gpio_direction_output(mdm_drv->ap2mdm_status_gpio, 1);
 
-#ifdef CONFIG_HSIC_EURONLY_APPLY
-	for (i = 0; i  < MDM_PBLRDY_CNT; i++) {
-		pblrdy = gpio_get_value(mdm_drv->mdm2ap_pblrdy);
-		if (pblrdy)
-			break;
-		usleep_range(5000, 5000);
-	}
-
-	pr_err("%s: i:%d\n", __func__, i);
-#else
 	if (!mdm_drv->mdm2ap_pblrdy)
 		goto start_mdm_peripheral;
 
@@ -221,7 +211,6 @@ static void mdm_do_first_power_on(struct mdm_modem_drv *mdm_drv)
 	}
 
 	pr_debug("%s: i:%d\n", __func__, i);
-#endif
 
 start_mdm_peripheral:
 	mdm_peripheral_connect(mdm_drv);
@@ -237,17 +226,6 @@ static void mdm_do_soft_power_on(struct mdm_modem_drv *mdm_drv)
 	mdm_peripheral_disconnect(mdm_drv);
 	mdm_toggle_soft_reset(mdm_drv);
 
-#ifdef CONFIG_HSIC_EURONLY_APPLY
-
-	for (i = 0; i  < MDM_PBLRDY_CNT; i++) {
-		pblrdy = gpio_get_value(mdm_drv->mdm2ap_pblrdy);
-		if (pblrdy)
-			break;
-		usleep_range(5000, 5000);
-	}
-
-	pr_err("%s: i:%d\n", __func__, i);
-#else
 	if (!mdm_drv->mdm2ap_pblrdy)
 		goto start_mdm_peripheral;
 
@@ -259,7 +237,6 @@ static void mdm_do_soft_power_on(struct mdm_modem_drv *mdm_drv)
 	}
 
 	pr_debug("%s: i:%d\n", __func__, i);
-#endif
 
 start_mdm_peripheral:
 	mdm_peripheral_connect(mdm_drv);
@@ -269,14 +246,6 @@ start_mdm_peripheral:
 static void mdm_power_on_common(struct mdm_modem_drv *mdm_drv)
 {
 	power_on_count++;
-
-#ifdef CONFIG_HSIC_EURONLY_APPLY
-		if(0==(power_on_count%5))
-		{
-			mdm_power_down_common(mdm_drv);
-			pr_err("%s : power_on_count reset!\n", __func__);
-		}
-#endif
 
 	/* this gpio will be used to indicate apq readiness,
 	 * de-assert it now so that it can be asserted later.
@@ -357,6 +326,31 @@ static void mdm_modem_shutdown(struct platform_device *pdev)
 	mdm_common_modem_shutdown(pdev);
 }
 
+#ifdef CONFIG_FAST_BOOT
+static void modem_complete(struct device *pdev)
+{
+	struct mdm_platform_data *pdata;
+
+	if (!pdev) {
+		pr_err("pdev is null!!\n");
+		return;
+	}
+	pdata = pdev->platform_data;
+
+	if (!pdata) {
+		pr_err("pdata is null!!\n");
+		return;
+	}
+
+	if (pdata->modem_complete)
+		pdata->modem_complete(pdev);
+}
+
+static const struct dev_pm_ops mdm2_pm_ops = {
+	.complete = modem_complete,
+};
+#endif
+
 static struct platform_driver mdm_modem_driver = {
 	.remove         = mdm_modem_remove,
 	/**
@@ -365,6 +359,9 @@ static struct platform_driver mdm_modem_driver = {
 	 */
 	.driver         = {
 		.name = "mdm2_modem",
+#ifdef CONFIG_FAST_BOOT
+		.pm = &mdm2_pm_ops,
+#endif
 		.owner = THIS_MODULE
 	},
 };

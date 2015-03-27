@@ -524,6 +524,16 @@ long diagchar_ioctl(struct file *filp,
 	return success;
 }
 
+void silent_log_panic_handler(void)
+{
+	if (driver->silent_log_pid) {
+		pr_info("%s: killing silent log...\n", __func__);
+		kill_pid(driver->silent_log_pid, SIGTERM, 1);
+		driver->silent_log_pid = NULL;
+	}
+}
+EXPORT_SYMBOL(silent_log_panic_handler);
+
 static int diagchar_read(struct file *file, char __user *buf, size_t count,
 			  loff_t *ppos)
 {
