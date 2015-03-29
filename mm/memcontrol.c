@@ -55,6 +55,25 @@
 
 #include <trace/events/vmscan.h>
 
+struct cgroup_subsys mem_cgroup_subsys __read_mostly;
+#define MEM_CGROUP_RECLAIM_RETRIES     5
+struct mem_cgroup *root_mem_cgroup __read_mostly;
+
+#ifdef CONFIG_CGROUP_MEM_RES_CTLR_SWAP
+/* Turned on only when memory cgroup is enabled && really_do_swap_account = 1 */
+int do_swap_account __read_mostly;
+
+/* for remember boot option*/
+#ifdef CONFIG_CGROUP_MEM_RES_CTLR_SWAP_ENABLED
+static int really_do_swap_account __initdata = 1;
+#else
+static int really_do_swap_account __initdata = 0;
+#endif
+
+#else
+#define do_swap_account                (0)
+#endif
+
 /*
  * Statistics for memory cgroup.
  */
