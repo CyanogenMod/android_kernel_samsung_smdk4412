@@ -437,7 +437,7 @@ static inline int valid_io_request(struct zram *zram, struct bio *bio)
 /*
  * Handler function for all zram I/O requests.
  */
-static void zram_make_request(struct request_queue *queue, struct bio *bio)
+static int zram_make_request(struct request_queue *queue, struct bio *bio)
 {
 	struct zram *zram = queue->queuedata;
 
@@ -453,11 +453,13 @@ static void zram_make_request(struct request_queue *queue, struct bio *bio)
 	__zram_make_request(zram, bio, bio_data_dir(bio));
 	up_read(&zram->init_lock);
 
-	return;
+	return 0;
 
 error:
 	up_read(&zram->init_lock);
 	bio_io_error(bio);
+
+	return 0;
 }
 
 static void __zram_reset_device(struct zram *zram)
