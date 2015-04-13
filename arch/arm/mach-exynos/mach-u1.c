@@ -4604,9 +4604,7 @@ static struct sec_bat_adc_table_data temper_table_ADC7[] =  {
 	{ 1669,	 -60 },
 	{ 1688,	 -70 },
 };
-#endif
-/* temperature table for ADC 7 */
-#ifdef CONFIG_TARGET_LOCALE_NA
+#elif defined(CONFIG_TARGET_LOCALE_NA)
 static struct sec_bat_adc_table_data  temper_table_ADC7[] =  {
 	{  145,  670 },
 	{  165,  660 },
