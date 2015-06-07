@@ -122,10 +122,19 @@ static void __bfq_exit_single_io_context(struct bfq_data *bfqd,
 		cic->cfqq[BLK_RW_ASYNC] = NULL;
 	}
 
+	spin_lock(&bfqd->eqm_lock);
 	if (cic->cfqq[BLK_RW_SYNC] != NULL) {
+		/*
+		 * If the bic is using a shared queue, put the reference
+		 * taken on the io_context when the bic started using a
+		 * shared bfq_queue.
+		 */
+		if (bfq_bfqq_coop(cic->cfqq[BLK_RW_SYNC]))
+			put_io_context(ioc);
 		bfq_exit_bfqq(bfqd, cic->cfqq[BLK_RW_SYNC]);
 		cic->cfqq[BLK_RW_SYNC] = NULL;
 	}
+	spin_unlock(&bfqd->eqm_lock);
 }
 
 /**
@@ -172,6 +181,25 @@ static struct cfq_io_context *bfq_alloc_io_context(struct bfq_data *bfqd,
 							bfqd->queue->node);
 	if (cic != NULL) {
 		cic->last_end_request = jiffies;
+		/*
+		 * A newly created cic indicates that the process has just
+		 * started doing I/O, and is probably mapping into memory its
+		 * executable and libraries: it definitely needs weight raising.
+		 * There is however the possibility that the process performs,
+		 * for a while, I/O close to some other process. EQM intercepts
+		 * this behavior and may merge the queue corresponding to the
+		 * process  with some other queue, BEFORE the weight of the queue
+		 * is raised. Merged queues are not weight-raised (they are assumed
+		 * to belong to processes that benefit only from high throughput).
+		 * If the merge is basically the consequence of an accident, then
+		 * the queue will be split soon and will get back its old weight.
+		 * It is then important to write down somewhere that this queue
+		 * does need weight raising, even if it did not make it to get its
+		 * weight raised before being merged. To this purpose, we overload
+		 * the field raising_time_left and assign 1 to it, to mark the queue
+		 * as needing weight raising.
+		 */
+		cic->wr_time_left = 1;
 		INIT_LIST_HEAD(&cic->queue_list);
 		INIT_HLIST_NODE(&cic->cic_list);
 		cic->dtor = bfq_free_io_context;
