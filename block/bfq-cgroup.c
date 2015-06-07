@@ -322,10 +322,15 @@ static struct bfq_group *__bfq_cic_change_cgroup(struct bfq_data *bfqd,
 						 struct cfq_io_context *cic,
 						 struct cgroup *cgroup)
 {
-	struct bfq_queue *async_bfqq = cic_to_bfqq(cic, 0);
-	struct bfq_queue *sync_bfqq = cic_to_bfqq(cic, 1);
+	struct bfq_queue *async_bfqq;
+	struct bfq_queue *sync_bfqq;
 	struct bfq_entity *entity;
 	struct bfq_group *bfqg;
+
+	spin_lock(&bfqd->eqm_lock);
+
+	async_bfqq = cic_to_bfqq(cic, 0);
+	sync_bfqq = cic_to_bfqq(cic, 1);
 
 	bfqg = bfq_find_alloc_group(bfqd, cgroup);
 	if (async_bfqq != NULL) {
@@ -345,6 +350,8 @@ static struct bfq_group *__bfq_cic_change_cgroup(struct bfq_data *bfqd,
 		if (entity->sched_data != &bfqg->sched_data)
 			bfq_bfqq_move(bfqd, sync_bfqq, entity, bfqg);
 	}
+
+	spin_unlock(&bfqd->eqm_lock);
 
 	return bfqg;
 }

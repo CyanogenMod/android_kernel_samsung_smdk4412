@@ -205,6 +205,11 @@ struct bfq_group;
  * @seek_total: sum of the distances of the seeks sampled
  * @seek_mean: mean seek distance
  * @last_request_pos: position of the last request enqueued
+ * @requests_within_timer: number of consecutive pairs of request completion
+ *                         and arrival, such that the queue becomes idle
+ *                         after the completion, but the next request arrives
+ *                         within an idle time slice; used only if the queue's
+ *                         IO_bound has been cleared.
  * @pid: pid of the process owning the queue, used for logging purposes.
  * @last_wr_start_finish: start time of the current weight-raising period if
  *                        the @bfq-queue is being weight-raised, otherwise
@@ -220,6 +225,8 @@ struct bfq_group;
  *                      idle to backlogged
  * @service_from_backlogged: cumulative service received from the @bfq_queue
  *                           since the last transition from idle to backlogged
+ * @cic: pointer to the cfq_io_context owning the bfq_queue, set to %NULL if the
+ *	 queue is shared
  *
  * A bfq_queue is a leaf request queue; it can be associated with an io_context
  * or more, if it is async or shared between cooperating processes. @cgroup
@@ -276,6 +283,8 @@ struct bfq_queue {
 	unsigned int wr_coeff;
 	unsigned long last_idle_bklogged;
 	unsigned long service_from_backlogged;
+
+	struct cfq_io_context *cic;
 };
 
 enum bfq_device_speed {
@@ -287,11 +296,13 @@ enum bfq_device_speed {
  * struct bfq_data - per device data structure.
  * @queue: request queue for the managed device.
  * @root_group: root bfq_group for the device.
- * @active_numerous_groups: number of bfq_groups containing more than one
- *                          active @bfq_entity.
  * @rq_pos_tree: rbtree sorted by next_request position,
  *		used when determining if two or more queues
  *		have interleaving requests (see bfq_close_cooperator).
+ * @eqm_lock:  spinlock used to protect all data structures pertaining
+ *             the Early Queue Merge (EQM) mechanism.
+ * @active_numerous_groups: number of bfq_groups containing more than one
+ *                          active @bfq_entity.
  * @queue_weights_tree: rbtree of weight counters of @bfq_queues, sorted by
  *                      weight. Used to keep track of whether all @bfq_queues
  *			have the same weight. The tree contains one counter
@@ -344,7 +355,7 @@ enum bfq_device_speed {
  * @idle_slice_timer: timer set when idling for the next sequential request
  *                    from the queue under service.
  * @unplug_work: delayed work to restart dispatching on the request queue.
- * @in_service_queue: bfq_queue under service.
+ * @in_service_queue: @bfq_queue under service.
  * @in_service_cic: cfq_io_context (cic) associated with the @in_service_queue.
  * @last_position: on-disk position of the last served request.
  * @last_budget_start: beginning of the last budget.
@@ -373,6 +384,17 @@ enum bfq_device_speed {
  *               they are charged for the whole allocated budget, to try
  *               to preserve a behavior reasonably fair among them, but
  *               without service-domain guarantees).
+ * @bfq_coop_thresh: number of queue merges after which a @bfq_queue is
+ *                   no more granted any weight-raising.
+ * @bfq_failed_cooperations: number of consecutive failed cooperation
+ *                           chances after which weight-raising is restored
+ *                           to a queue subject to more than bfq_coop_thresh
+ *                           queue merges.
+ * @bfq_requests_within_timer: number of consecutive requests that must be
+ *                             issued within the idle time slice to set
+ *                             again idling to a queue which was marked as
+ *                             non-I/O-bound (see the definition of the
+ *                             IO_bound flag for further details).
  * @last_ins_in_burst: last time at which a queue entered the current
  *                     burst of queues being activated shortly after
  *                     each other; for more details about this and the
@@ -399,10 +421,11 @@ enum bfq_device_speed {
  *                              after which weight-raising may be
  *                              reactivated for an already busy queue
  *                              (in jiffies).
- * @bfq_raising_max_softrt_rate: max service-rate for a soft real-time queue,
- *			         sectors per seconds.
+ * @bfq_wr_max_softrt_rate: max service-rate for a soft real-time queue,
+ *			    sectors per seconds.
  * @RT_prod: cached value of the product R*T used for computing the maximum
  *	     duration of the weight raising automatically.
+ * @device_speed: device-speed class for the low-latency heuristic.
  * @oom_bfqq: fallback dummy bfqq for extreme OOM conditions.
  *
  * All the fields are protected by the @queue lock.
@@ -416,6 +439,8 @@ struct bfq_data {
 #endif
 
 	struct rb_root rq_pos_tree;
+	spinlock_t eqm_lock;
+
 	struct rb_root queue_weights_tree;
 	struct rb_root group_weights_tree;
 
@@ -507,12 +532,16 @@ enum bfqq_state_flags {
 					 * see comments to bfq_handle_burst.
 					 */
 	BFQ_BFQQ_FLAG_constantly_seeky,	/*
-					 * bfqq has proved to be slow and seeky
-					 * until budget timeout
+					 * bfqq has proved to be slow and
+					 * seeky until budget timeout
+					 */
+	BFQ_BFQQ_FLAG_softrt_update,	/*
+					 * may need softrt-next-start
+					 * update
 					 */
 	BFQ_BFQQ_FLAG_coop,		/* bfqq is shared */
-	BFQ_BFQQ_FLAG_split_coop,	/* shared bfqq will be splitted */
-	BFQ_BFQQ_FLAG_softrt_update,	/* needs softrt-next-start update */
+	BFQ_BFQQ_FLAG_split_coop,	/* shared bfqq will be split */
+	BFQ_BFQQ_FLAG_just_split,	/* queue has just been split */
 };
 
 #define BFQ_BFQQ_FNS(name)						\
@@ -541,6 +570,7 @@ BFQ_BFQQ_FNS(in_large_burst);
 BFQ_BFQQ_FNS(constantly_seeky);
 BFQ_BFQQ_FNS(coop);
 BFQ_BFQQ_FNS(split_coop);
+BFQ_BFQQ_FNS(just_split);
 BFQ_BFQQ_FNS(softrt_update);
 #undef BFQ_BFQQ_FNS
 

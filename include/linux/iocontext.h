@@ -18,6 +18,16 @@ struct cfq_io_context {
 	unsigned long ttime_samples;
 	unsigned long ttime_mean;
 
+	unsigned int wr_time_left;
+	bool saved_idle_window;
+	bool saved_IO_bound;
+
+	bool saved_in_large_burst;
+	bool was_in_burst_list;
+
+	unsigned int cooperations;
+	unsigned int failed_cooperations;
+
 	struct list_head queue_list;
 	struct hlist_node cic_list;
 
