@@ -895,7 +895,7 @@ static void cm36651_work_func_light(struct work_struct *work)
 #ifdef CM36651_DEBUG
 	pr_info("%s, red = %u green = %u blue = %u white = %u\n",
 		__func__, cm36651->color[0]+1, cm36651->color[1]+1,
-		cm36651->color[2]+1, val_whitecm36651->color[3]1);
+		cm36651->color[2]+1, cm36651->color[3]+1);
 #endif
 }
 
