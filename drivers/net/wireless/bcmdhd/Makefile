@@ -116,6 +116,9 @@ DHDCFLAGS += -DUSE_INITIAL_SHORT_DWELL_TIME
 # SKB TAILPAD to avoid out of boundary memory access
 DHDCFLAGS += -DDHDENABLE_TAILPAD
 
+# DTIM skip interval
+DHDCFLAGS += -DCUSTOM_SUSPEND_BCN_LI_DTIM=2 -DMAX_DTIM_ALLOWED_INTERVAL=400
+
 ##############################
 # Android Platform Definition
 ##############################
