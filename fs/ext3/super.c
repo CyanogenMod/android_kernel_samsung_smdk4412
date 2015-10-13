@@ -821,7 +821,7 @@ enum {
 	Opt_usrjquota, Opt_grpjquota, Opt_offusrjquota, Opt_offgrpjquota,
 	Opt_jqfmt_vfsold, Opt_jqfmt_vfsv0, Opt_jqfmt_vfsv1, Opt_quota,
 	Opt_noquota, Opt_ignore, Opt_barrier, Opt_nobarrier, Opt_err,
-	Opt_resize, Opt_usrquota, Opt_grpquota
+	Opt_resize, Opt_usrquota, Opt_grpquota, Opt_nomblk_io_submit
 };
 
 static const match_table_t tokens = {
@@ -878,6 +878,7 @@ static const match_table_t tokens = {
 	{Opt_barrier, "barrier"},
 	{Opt_nobarrier, "nobarrier"},
 	{Opt_resize, "resize"},
+	{Opt_nomblk_io_submit, "nomblk_io_submit"},
 	{Opt_err, NULL},
 };
 
@@ -1265,6 +1266,10 @@ set_qf_format:
 		case Opt_bh:
 			ext3_msg(sb, KERN_WARNING,
 				"warning: ignoring deprecated bh option");
+			break;
+		case Opt_nomblk_io_submit:
+			ext3_msg(sb, KERN_WARNING,
+				"warning: ignoring ext4 option nomblk_io_submit");
 			break;
 		default:
 			ext3_msg(sb, KERN_ERR,
