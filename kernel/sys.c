@@ -1619,7 +1619,16 @@ static void k_getrusage(struct task_struct *p, int who, struct rusage *r)
 				t = next_thread(t);
 			} while (t != p);
 			break;
+		case PR_SET_NO_NEW_PRIVS:
+			if (arg2 != 1 || arg3 || arg4 || arg5)
+				return -EINVAL;
 
+			current->no_new_privs = 1;
+			break;
+		case PR_GET_NO_NEW_PRIVS:
+			if (arg2 || arg3 || arg4 || arg5)
+				return -EINVAL;
+			return current->no_new_privs ? 1 : 0;
 		default:
 			BUG();
 	}

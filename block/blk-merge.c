@@ -6,6 +6,7 @@
 #include <linux/bio.h>
 #include <linux/blkdev.h>
 #include <linux/scatterlist.h>
+#include <linux/security.h>
 
 #include "blk.h"
 
@@ -210,6 +211,10 @@ static inline int ll_new_hw_segment(struct request_queue *q,
 
 	if (bio_integrity(bio) && blk_integrity_merge_bio(q, req, bio))
 		goto no_merge;
+
+    /* Don't merge bios of files with different encryption */
+	if (!security_allow_merge_bio(rq->bio, bio))
+		return false;
 
 	/*
 	 * This will form the start of a new hw segment.  Bump both

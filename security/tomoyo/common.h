@@ -757,7 +757,7 @@ int tomoyo_init_request_info(struct tomoyo_request_info *r,
 			     struct tomoyo_domain_info *domain,
 			     const u8 index);
 /* Check permission for mount operation. */
-int tomoyo_mount_permission(char *dev_name, struct path *path, char *type,
+int tomoyo_mount_permission(const char *dev_name, struct path *path, char *type,
 			    unsigned long flags, void *data_page);
 /* Create "aggregator" entry in exception policy. */
 int tomoyo_write_aggregator(char *data, const bool is_delete);

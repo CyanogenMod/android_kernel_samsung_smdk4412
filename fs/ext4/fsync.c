@@ -134,7 +134,7 @@ static int ext4_sync_parent(struct inode *inode)
 	while (inode && ext4_test_inode_state(inode, EXT4_STATE_NEWENTRY)) {
 		ext4_clear_inode_state(inode, EXT4_STATE_NEWENTRY);
 		dentry = list_entry(inode->i_dentry.next,
-				    struct dentry, d_alias);
+				    struct dentry, d_u.d_alias);
 		if (!dentry || !dentry->d_parent || !dentry->d_parent->d_inode)
 			break;
 		inode = dentry->d_parent->d_inode;
