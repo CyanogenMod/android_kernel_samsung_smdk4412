@@ -86,9 +86,6 @@ ifeq ($(CONFIG_BROADCOM_WIFI_RESERVED_MEM),y)
   DHDCFLAGS += -DSTATIC_WL_PRIV_STRUCT
 endif
 
-# DTIM listen interval in suspend mode(0 means follow AP's DTIM period)
-DHDCFLAGS += -DCUSTOM_SUSPEND_BCN_LI_DTIM=0
-
 # Ioctl timeout 5000ms
 DHDCFLAGS += -DIOCTL_RESP_TIMEOUT=5000
 
