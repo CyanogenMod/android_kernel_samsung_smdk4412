@@ -334,6 +334,9 @@ config SND_SOC_SPEYSIDE
 	select SND_SOC_WM8915
 	select SND_SOC_WM9081
 
+config SND_SOC_USE_EXTERNAL_MIC_BIAS
+        bool "Use External Mic Bias"
+
 config SND_DUOS_MODEM_SWITCH
 	bool "Select DUOS Modem"
 	depends on SND_SOC_SAMSUNG
