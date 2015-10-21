@@ -455,6 +455,9 @@ static void avc_audit_post_callback(struct audit_buffer *ab, void *a)
 	avc_dump_query(ab, ad->selinux_audit_data.ssid,
 			   ad->selinux_audit_data.tsid,
 			   ad->selinux_audit_data.tclass);
+    if (ad->selinux_audit_data.denied) {
+		audit_log_format(ab, " permissive=%u",
+				 ad->selinux_audit_data.result ? 0 : 1);
 }
 
 /**
@@ -536,6 +539,7 @@ int avc_audit(u32 ssid, u32 tsid,
 	a->selinux_audit_data.tsid = tsid;
 	a->selinux_audit_data.audited = audited;
 	a->selinux_audit_data.denied = denied;
+	a->selinux_audit_data.result = result;
 	a->lsm_pre_audit = avc_audit_pre_callback;
 	a->lsm_post_audit = avc_audit_post_callback;
 	common_lsm_audit(a);
