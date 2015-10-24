@@ -40,6 +40,9 @@
 #include "wm8994.h"
 #include "wm_hubs.h"
 
+#include "boeffla_sound.h"
+
+
 #define WM1811_JACKDET_MODE_NONE  0x0000
 #define WM1811_JACKDET_MODE_JACK  0x0100
 #define WM1811_JACKDET_MODE_MIC   0x0080
@@ -193,6 +196,7 @@ static int wm8994_write(struct snd_soc_codec *codec, unsigned int reg,
 	int ret;
 
 	BUG_ON(reg > WM8994_MAX_REGISTER);
+	value = Boeffla_sound_hook_wm8994_write(reg, value);
 
 #if defined(CONFIG_TARGET_LOCALE_KOR)
 	if ((reg == WM8994_GPIO_1) && (value != WM8994_GP_FN_IRQ)) {
@@ -4268,6 +4272,8 @@ static int wm8994_codec_probe(struct snd_soc_codec *codec)
 					ARRAY_SIZE(wm8958_intercon));
 		break;
 	}
+
+	Boeffla_sound_hook_wm8994_pcm_probe(codec);
 
 	return 0;
 

@@ -386,3 +386,10 @@ config SND_SOC_WM2000
 
 config SND_SOC_WM9090
 	tristate
+
+config SND_BOEFFLA
+    bool "Boeffla Sound Engine (AndiP71)"
+    default y
+    depends on SND_SOC_WM8994
+    help
+          Include the Boeffla Sound Engine by AndiP71
