@@ -24,6 +24,9 @@
 
 #define CPUFREQ_NAME_LEN 16
 
++/* CPU UV DEFINES */
++#define CPU_UV_MV_MAX 1500000
++#define CPU_UV_MV_MIN 600000
 
 /*********************************************************************
  *                     CPUFREQ NOTIFIER INTERFACE                    *
