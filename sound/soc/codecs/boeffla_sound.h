@@ -133,9 +133,9 @@ unsigned int Boeffla_sound_hook_wm8994_write(unsigned int reg, unsigned int valu
 #define STEREO_EXPANSION_GAIN_MAX		31
 
 // headphone levels
-#define HEADPHONE_DEFAULT 	57
+#define HEADPHONE_DEFAULT 	59
 
-#define HEADPHONE_MAX 		63
+#define HEADPHONE_MAX 		65
 #define HEADPHONE_MIN 		0
 
 // speaker levels
