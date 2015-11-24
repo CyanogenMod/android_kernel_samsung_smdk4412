@@ -708,6 +708,8 @@ static int encrypted_update(struct key *key, const void *data, size_t datalen)
 	char *new_master_desc = NULL;
 	int ret = 0;
 
+	if (test_bit(KEY_FLAG_NEGATIVE, &key->flags))
+		return -ENOKEY;
 	if (datalen <= 0 || datalen > 32767 || !data)
 		return -EINVAL;
 
