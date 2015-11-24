@@ -97,7 +97,10 @@ int user_update(struct key *key, const void *data, size_t datalen)
 
 	if (ret == 0) {
 		/* attach the new data, displacing the old */
-		zap = key->payload.data;
+		if (!test_bit(KEY_FLAG_NEGATIVE, &key->flags))
+			zap = key->payload.data;
+		else
+			zap = NULL;
 		rcu_assign_pointer(key->payload.data, upayload);
 		key->expiry = 0;
 	}
