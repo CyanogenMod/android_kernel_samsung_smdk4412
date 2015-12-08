@@ -1,6 +1,6 @@
 #
 # Automatically generated make config: don't edit
-# Linux/arm 3.0.64 Kernel Configuration
+# Linux/arm 3.0.101 Kernel Configuration
 #
 CONFIG_ARM=y
 CONFIG_HAVE_PWM=y
