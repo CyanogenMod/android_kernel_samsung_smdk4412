@@ -837,6 +837,7 @@ struct proto {
 #ifdef SOCK_REFCNT_DEBUG
 	atomic_t		socks;
 #endif
+	int			(*diag_destroy)(struct sock *sk, int err);
 };
 
 extern int proto_register(struct proto *prot, int alloc_slab);
