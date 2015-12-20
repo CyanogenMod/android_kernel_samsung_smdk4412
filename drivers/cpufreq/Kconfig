@@ -17,6 +17,17 @@ config CPU_FREQ
 
 if CPU_FREQ
 
+config HAS_BLUETOOTH_DEADLOCKS
+	bool "System has bluetooth deadlocks"
+	depends on BT_BCM4334
+	default y
+	help
+	  It seems that Android Lollipop introduced a bug which causes an
+	  event listener to deadlock when A2DP is used and governor forces
+	  only one core to stay awake. This hack prevents such situation by
+	  always leaving at least two cores online. I wish we could get rid
+	  of this at some point.
+
 config CPU_FREQ_TABLE
 	tristate
 
