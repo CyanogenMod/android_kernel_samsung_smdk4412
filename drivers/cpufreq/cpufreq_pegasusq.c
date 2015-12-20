@@ -155,7 +155,11 @@ static unsigned int get_nr_run_avg(void)
 #define MAX_HOTPLUG_RATE			(40u)
 
 #define DEF_MAX_CPU_LOCK			(0)
+#ifdef CONFIG_HAS_BLUETOOTH_DEADLOCKS
+#define DEF_MIN_CPU_LOCK			(2)
+#else
 #define DEF_MIN_CPU_LOCK			(0)
+#endif
 #define DEF_CPU_UP_FREQ				(500000)
 #define DEF_CPU_DOWN_FREQ			(200000)
 #define DEF_UP_NR_CPUS				(1)
