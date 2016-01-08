@@ -40,7 +40,11 @@
 /* Globals */
 static int zram_major;
 static struct zram *zram_devices;
+#ifdef CONFIG_ZRAM_LZ4_COMPRESS
+static const char *default_compressor = "lz4";
+#else
 static const char *default_compressor = "lzo";
+#endif
 
 /*
  * We don't need to see memory allocation errors more than once every 1
