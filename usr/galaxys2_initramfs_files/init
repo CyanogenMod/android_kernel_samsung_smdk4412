@@ -12,8 +12,24 @@ busybox mount -t sysfs sysfs /sys
 load_image=/stage1/boot.cpio
 
 if busybox grep -q bootmode=2 /proc/cmdline ; then
-	# recovery boot
-	load_image=/stage1/recovery.cpio
+
+    # recovery boot
+
+    # default to recovery ramdisk bundled with kernel
+    load_image=/stage1/recovery.cpio
+
+    # attempt isorec (isolated recovery) boot
+
+    # if the raw /dev/block/platform/dw_mmc/by-name/RECOVERY
+    # partition contains valid lzop-compressed data
+    if busybox lzop -dc /dev/block/mmcblk0p6 > /stage1/isorec.cpio ; then
+        # and if said data is a valid cpio archive
+        if busybox cpio -t < /stage1/isorec.cpio ; then
+            # then use it as the recovery ramdisk
+            load_image=/stage1/isorec.cpio
+        fi
+    fi
+
 fi
 
 busybox cpio -i < ${load_image}
