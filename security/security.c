@@ -646,8 +646,10 @@ int security_file_permission(struct file *file, int mask)
 
 	return fsnotify_perm(file, mask);
 }
-EXPORT_SYMBOL_GPL(security_file_permission);
 
+#if defined(CONFIG_VMWARE_MVP)
+EXPORT_SYMBOL_GPL(security_file_permission);
+#endif
 int security_file_alloc(struct file *file)
 {
 	return security_ops->file_alloc_security(file);
@@ -968,12 +970,6 @@ int security_netlink_send(struct sock *sk, struct sk_buff *skb)
 {
 	return security_ops->netlink_send(sk, skb);
 }
-
-int security_netlink_recv(struct sk_buff *skb, int cap)
-{
-	return security_ops->netlink_recv(skb, cap);
-}
-EXPORT_SYMBOL(security_netlink_recv);
 
 int security_secid_to_secctx(u32 secid, char **secdata, u32 *seclen)
 {

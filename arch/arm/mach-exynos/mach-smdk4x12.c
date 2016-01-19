@@ -104,8 +104,8 @@
 #ifdef CONFIG_FB_S5P_MIPI_DSIM
 #include <mach/mipi_ddi.h>
 #include <mach/dsim.h>
-#include <../../../drivers/video/samsung/s3cfb.h>
 #endif
+#include <plat/fb-s5p.h>
 #ifdef CONFIG_FB_S5P_EXTDSP
 struct s3cfb_extdsp_lcd {
 	int	width;
@@ -2891,24 +2891,6 @@ static struct fimg2d_platdata fimg2d_data __initdata = {
 };
 #endif
 
-#ifdef CONFIG_EXYNOS_C2C
-struct exynos_c2c_platdata smdk4x12_c2c_pdata = {
-	.setup_gpio	= NULL,
-	.shdmem_addr	= C2C_SHAREDMEM_BASE,
-	.shdmem_size	= C2C_MEMSIZE_64,
-	.ap_sscm_addr	= NULL,
-	.cp_sscm_addr	= NULL,
-	.rx_width	= C2C_BUSWIDTH_16,
-	.tx_width	= C2C_BUSWIDTH_16,
-	.clk_opp100	= 400,
-	.clk_opp50	= 266,
-	.clk_opp25	= 0,
-	.default_opp_mode	= C2C_OPP50,
-	.get_c2c_state	= NULL,
-	.c2c_sysreg	= S5P_VA_CMU + 0x12000,
-};
-#endif
-
 #ifdef CONFIG_USB_EXYNOS_SWITCH
 static struct s5p_usbswitch_platdata smdk4x12_usbswitch_pdata;
 
@@ -3155,9 +3137,6 @@ static struct platform_device *smdk4x12_devices[] __initdata = {
 	&samsung_device_keypad,
 #ifdef CONFIG_WAKEUP_ASSIST
 	&wakeup_assist_device,
-#endif
-#ifdef CONFIG_EXYNOS_C2C
-	&exynos_device_c2c,
 #endif
 	&smdk4x12_input_device,
 	&smdk4x12_smsc911x,
@@ -3510,6 +3489,16 @@ static void __init smdk4x12_set_camera_flite_platdata(void)
 static void __init exynos4_reserve_mem(void)
 {
 	static struct cma_region regions[] = {
+#ifdef CONFIG_EXYNOS_C2C
+		{
+			.name = "c2c_shdmem",
+			.size = C2C_SHAREDMEM_SIZE,
+			{
+				.alignment = C2C_SHAREDMEM_SIZE,
+			},
+			.start = 0
+		},
+#endif
 #ifndef CONFIG_VIDEOBUF2_ION
 #ifdef CONFIG_VIDEO_SAMSUNG_MEMSIZE_TV
 		{
@@ -4064,7 +4053,7 @@ static void __init smdk4x12_machine_init(void)
 	clk_add_alias("hdmiphy", "s5p-hdmi", "hdmiphy", &s5p_device_hdmi.dev);
 
 	s5p_tv_setup();
-       
+
 	/* setup dependencies between TV devices */
 	s5p_device_hdmi.dev.parent = &exynos4_device_pd[PD_TV].dev;
 	s5p_device_mixer.dev.parent = &exynos4_device_pd[PD_TV].dev;
@@ -4247,9 +4236,6 @@ static void __init smdk4x12_machine_init(void)
 	else
 		samsung_keypad_set_platdata(&smdk4x12_keypad_data1);
 	smdk4x12_smsc911x_init();
-#ifdef CONFIG_EXYNOS_C2C
-	exynos_c2c_set_platdata(&smdk4x12_c2c_pdata);
-#endif
 
 	exynos_sysmmu_init();
 
@@ -4347,33 +4333,12 @@ static void __init smdk4x12_machine_init(void)
 	register_reboot_notifier(&exynos4_reboot_notifier);
 }
 
-#ifdef CONFIG_EXYNOS_C2C
-static void __init exynos_c2c_reserve(void)
-{
-	static struct cma_region region[] = {
-		{
-			.name = "c2c_shdmem",
-			.size = 64 * SZ_1M,
-			{ .alignment    = 64 * SZ_1M },
-			.start = C2C_SHAREDMEM_BASE
-		}, {
-		.size = 0,
-		}
-	};
-
-	s5p_cma_region_reserve(region, NULL, 0, NULL);
-}
-#endif
-
 MACHINE_START(SMDK4212, "SMDK4X12")
 	.boot_params	= S5P_PA_SDRAM + 0x100,
 	.init_irq	= exynos4_init_irq,
 	.map_io		= smdk4x12_map_io,
 	.init_machine	= smdk4x12_machine_init,
 	.timer		= &exynos4_timer,
-#ifdef CONFIG_EXYNOS_C2C
-	.reserve	= &exynos_c2c_reserve,
-#endif
 MACHINE_END
 
 MACHINE_START(SMDK4412, "SMDK4X12")
@@ -4382,7 +4347,4 @@ MACHINE_START(SMDK4412, "SMDK4X12")
 	.map_io		= smdk4x12_map_io,
 	.init_machine	= smdk4x12_machine_init,
 	.timer		= &exynos4_timer,
-#ifdef CONFIG_EXYNOS_C2C
-	.reserve	= &exynos_c2c_reserve,
-#endif
 MACHINE_END

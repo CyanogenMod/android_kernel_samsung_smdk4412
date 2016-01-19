@@ -512,6 +512,42 @@ config S5K6A3_POSITION_REAR
 	  This set as rear camera
 endchoice
 
+config VIDEO_S5K6B2
+	tristate "S5K6B2 supporting camera driver"
+	depends on VIDEO_V4L2 && ((VIDEO_FIMC_MIPI || VIDEO_S5P_MIPI_CSIS) && VIDEO_EXYNOS_FIMC_IS) || VIDEO_EXYNOS5_FIMC_IS
+	---help---
+	  This driver supports S5K6B2 sensor.
+choice
+depends on VIDEO_S5K6B2
+prompt "MIPI Camera port for S5K6B2"
+default S5K6B2_CSI_C
+config S5K6B2_CSI_C
+	bool "CSI Camera A port"
+	depends on (VIDEO_FIMC_MIPI || VIDEO_S5P_MIPI_CSIS || VIDEO_EXYNOS5_FIMC_IS)
+	help
+	  This enables support for CSI A port
+config S5K6B2_CSI_D
+	bool "CSI Camera B port"
+	depends on (VIDEO_FIMC_MIPI || VIDEO_S5P_MIPI_CSIS || VIDEO_EXYNOS5_FIMC_IS)
+	help
+	  This enalbes support for CSI B port
+endchoice
+choice
+depends on (VIDEO_S5K6B2 && VIDEO_EXYNOS5_FIMC_IS)
+prompt "Camera position for S5K6B2"
+default S5K6B2_POSITION_FRONT
+config S5K6B2_POSITION_FRONT
+	bool "front camera"
+	depends on VIDEO_EXYNOS5_FIMC_IS
+	help
+	  This set as front camera
+config S5K6B2_POSITION_REAR
+	bool "rear camera"
+	depends on VIDEO_EXYNOS5_FIMC_IS
+	help
+	  This set as rear camera
+endchoice
+
 config VIDEO_M5MO
         tristate "M5MO supporting camera driver"
 	depends on I2C && VIDEO_V4L2 && VIDEO_FIMC_MIPI
@@ -523,6 +559,12 @@ config VIDEO_M9MO
 	depends on I2C && VIDEO_V4L2 && VIDEO_FIMC_MIPI
         ---help---
           This driver supports M9MO SoC camera module
+
+config VIDEO_M9MO_SPI
+	tristate "M9MO SPI driver"
+	depends on SPI && VIDEO_M9MO
+	---help---
+	  This driver supports M9MO SPI
 
 config VIDEO_S5K5BAFX
 	tristate "S5K5BAFX supporting camera driver"
@@ -536,7 +578,7 @@ config VIDEO_S5K5BBGX
 	---help---
 	  This driver supports S5K5BBGX SoC camera module
 
-config VIDEO_S5K5CCGX_COMMON
+config VIDEO_S5K5CCGX
 	tristate "S5K5CCGX supporting camera driver"
 	depends on I2C && VIDEO_V4L2
 	---help---
@@ -544,29 +586,14 @@ config VIDEO_S5K5CCGX_COMMON
 	  S5K5CCGX camera module is manufactured by Silliconfile coporate
 	  and it's maximum resolution is 2MP.
 
-config VIDEO_S5K5CCGX_P2
-	tristate "S5K5CCGX supporting camera driver for P2"
-	depends on VIDEO_S5K5CCGX_COMMON
+config VIDEO_SR300PC20
+	tristate "SR300PC20 camera driver"
+	depends on I2C && VIDEO_V4L2 && VIDEO_FIMC_MIPI
 	---help---
-	  This driver supports S5K5CCGX SoC camera module
-	  S5K5CCGX camera module is manufactured by Silliconfile coporate
-	  and it's maximum resolution is 2MP.
-
-config VIDEO_S5K5CCGX_P4W
-	tristate "S5K5CCGX supporting camera driver for P4W"
-	depends on VIDEO_S5K5CCGX_COMMON
-	---help---
-	  This driver supports S5K5CCGX SoC camera module
-	  S5K5CCGX camera module is manufactured by Silliconfile coporate
-	  and it's maximum resolution is 2MP.
-
-config VIDEO_S5K5CCGX_P8
-	tristate "S5K5CCGX supporting camera driver for P8"
-	depends on VIDEO_S5K5CCGX_COMMON
-	---help---
-	  This driver supports S5K5CCGX SoC camera module
-	  S5K5CCGX camera module is manufactured by Silliconfile coporate
-	  and it's maximum resolution is 2MP.
+	  This driver supports SR300PC20 SoC camera module.
+	  The SR300PC20 camera module uses siliconfile camera sensor
+	  supporting 3M capture with MIPI interface. And also, It support
+	  VGA recording with 30fps.
 
 config VIDEO_SR200PC20
 	tristate "SR200PC20 supporting camera driver"
@@ -620,6 +647,12 @@ config VIDEO_SLP_DB8131M
 	---help---
 	  This driver supports DB8131M SoC camera module
 
+config VIDEO_DB8131M
+	tristate "DB8131M supporting camera driver"
+	depends on I2C && VIDEO_V4L2 && VIDEO_FIMC_MIPI
+	---help---
+	  This driver supports DB8131M SoC camera module
+	  
 config VIDEO_S5K4BA
 	tristate "S5K4BA supporting camera driver"
 	depends on I2C && VIDEO_V4L2 && (VIDEO_FIMC || VIDEO_SAMSUNG_S5P_FIMC) && !(VIDEO_FIMC_MIPI || VIDEO_S5P_MIPI_CSIS)
@@ -645,6 +678,19 @@ config VIDEO_S5C73M3_SPI
 	depends on SPI && (VIDEO_S5C73M3 || VIDEO_SLP_S5C73M3)
 	---help---
 	  This driver supports s5c73m3 SPI
+
+config VIDEO_DRIME4
+	tristate "DRIME4 MIPI CSI-2 supporting camera driver"
+	depends on I2C && VIDEO_V4L2 && VIDEO_FIMC_MIPI
+	---help---
+	  This driver supports DRIMe4 ISP camera module with
+	  MIPI CSI-2 as well
+
+config VIDEO_DRIME4_SPI
+	tristate "DRIME4 SPI driver"
+	depends on SPI && VIDEO_DRIME4
+	---help---
+	  This driver supports DRIMe4 SPI
 
 config VIDEO_SLP_S5C73M3
 	tristate "S5C73M3 MIPI CSI-2 supporting camera driver for slp"

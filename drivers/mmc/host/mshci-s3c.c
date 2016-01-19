@@ -29,6 +29,8 @@
 #include <plat/clock.h>
 #include <plat/cpu.h>
 
+#include <mach/dev.h>
+
 #include "mshci.h"
 
 #ifdef CONFIG_MMC_MSHCI_S3C_DMA_MAP
@@ -464,6 +466,18 @@ static int __devinit mshci_s3c_probe(struct platform_device *pdev)
 		goto err_add_host;
 	}
 
+	if (soc_is_exynos4212()) {
+		host->bus_dev = dev_get("exynos-busfreq");
+		if (host->bus_dev == (struct device *)-ENODEV) {
+			dev_err(dev, "failed to get bus_dev\n");
+			host->bus_dev = 0;
+		}
+		host->host_dev = dev;
+	} else {
+		host->bus_dev = NULL;
+		host->host_dev = NULL;
+	}
+
 	/* Ensure we have minimal gpio selected CMD/CLK/Detect */
 	if (pdata->cfg_gpio)
 		pdata->cfg_gpio(pdev, pdata->max_width);
@@ -488,7 +502,6 @@ static int __devinit mshci_s3c_probe(struct platform_device *pdev)
 	if (pdata->cd_type == S3C_MSHCI_CD_PERMANENT) {
 		host->quirks |= MSHCI_QUIRK_BROKEN_PRESENT_BIT;
 		host->mmc->caps |= MMC_CAP_NONREMOVABLE;
-#ifndef CONFIG_WIMAX_CMC
 		if (pdata->int_power_gpio) {
 			gpio_set_value(pdata->int_power_gpio, 1);
 			s3c_gpio_cfgpin(pdata->int_power_gpio,
@@ -496,7 +509,6 @@ static int __devinit mshci_s3c_probe(struct platform_device *pdev)
 			s3c_gpio_setpull(pdata->int_power_gpio,
 					S3C_GPIO_PULL_NONE);
 		}
-#endif
 	}
 
 	/* IF SD controller's WP pin donsn't connected with SD card and there
@@ -513,15 +525,12 @@ static int __devinit mshci_s3c_probe(struct platform_device *pdev)
 	if (pdata->cd_type == S3C_MSHCI_CD_GPIO &&
 		gpio_is_valid(pdata->ext_cd_gpio)) {
 
-#ifdef CONFIG_WIMAX_CMC
-		gpio_request(pdata->ext_cd_gpio, "SDHCI EXT CD");
-#else
 		ret = gpio_request(pdata->ext_cd_gpio, "MSHCI EXT CD");
 		if (ret) {
 			dev_err(&pdev->dev, "cannot request gpio for card detect\n");
 			goto err_add_host;
 		}
-#endif
+
 		sc->ext_cd_gpio = pdata->ext_cd_gpio;
 
 		sc->ext_cd_irq = gpio_to_irq(pdata->ext_cd_gpio);
@@ -542,9 +551,7 @@ static int __devinit mshci_s3c_probe(struct platform_device *pdev)
 		goto err_add_host;
 	}
 
-#ifndef CONFIG_WIMAX_CMC
 	device_enable_async_suspend(dev);
-#endif
 
 	return 0;
 

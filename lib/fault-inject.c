@@ -192,7 +192,7 @@ static int debugfs_atomic_t_get(void *data, u64 *val)
 DEFINE_SIMPLE_ATTRIBUTE(fops_atomic_t, debugfs_atomic_t_get,
 			debugfs_atomic_t_set, "%lld\n");
 
-static struct dentry *debugfs_create_atomic_t(const char *name, mode_t mode,
+static struct dentry *_debugfs_create_atomic_t(const char *name, mode_t mode,
 				struct dentry *parent, atomic_t *value)
 {
 	return debugfs_create_file(name, mode, parent, value, &fops_atomic_t);
@@ -263,10 +263,10 @@ int init_fault_attr_dentries(struct fault_attr *attr, const char *name)
 		debugfs_create_ul("interval", mode, dir, &attr->interval);
 
 	attr->dentries.times_file =
-		debugfs_create_atomic_t("times", mode, dir, &attr->times);
+		_debugfs_create_atomic_t("times", mode, dir, &attr->times);
 
 	attr->dentries.space_file =
-		debugfs_create_atomic_t("space", mode, dir, &attr->space);
+		_debugfs_create_atomic_t("space", mode, dir, &attr->space);
 
 	attr->dentries.verbose_file =
 		debugfs_create_ul("verbose", mode, dir, &attr->verbose);

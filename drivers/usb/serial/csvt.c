@@ -344,7 +344,7 @@ static int csvt_ctrl_open(struct tty_struct *tty,
 {
 	int	retval;
 
-	dev_dbg(&port->dev, "%s port %d", __func__, port->number);
+	dev_info(&port->dev, "%s port %d", __func__, port->number);
 
 	retval = usb_submit_urb(port->interrupt_in_urb, GFP_KERNEL);
 	if (retval) {
@@ -356,15 +356,19 @@ static int csvt_ctrl_open(struct tty_struct *tty,
 	if (retval)
 		usb_kill_urb(port->interrupt_in_urb);
 
+	pr_info("%s: csvt open complete\n", __func__);
+
 	return retval;
 }
 
 static void csvt_ctrl_close(struct usb_serial_port *port)
 {
-	dev_dbg(&port->dev, "%s port %d", __func__, port->number);
+	dev_info(&port->dev, "%s port %d", __func__, port->number);
 
 	usb_serial_generic_close(port);
 	usb_kill_urb(port->interrupt_in_urb);
+
+	pr_info("%s: csvt close complete\n", __func__);
 }
 
 static int csvt_ctrl_attach(struct usb_serial *serial)
@@ -386,7 +390,7 @@ static void csvt_ctrl_release(struct usb_serial *serial)
 	struct usb_serial_port	*port = serial->port[0];
 	struct csvt_ctrl_dev	*dev = usb_get_serial_port_data(port);
 
-	dev_dbg(&port->dev, "%s", __func__);
+	dev_info(&port->dev, "%s", __func__);
 
 	kfree(dev);
 	usb_set_serial_port_data(port, NULL);

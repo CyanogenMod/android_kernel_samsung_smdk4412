@@ -58,11 +58,23 @@ static inline void pm_suspend_ignore_children(struct device *dev, bool enable)
 
 static inline void pm_runtime_get_noresume(struct device *dev)
 {
+#if defined (CONFIG_TARGET_LOCALE_USA) && defined (CONFIG_MACH_T0_USA_VZW)
+	if (!strcmp(dev_name(dev), "1-2"))
+		pr_info("[MIF] %s, usage_count : %d by %pF\n", __func__,
+				atomic_read(&dev->power.usage_count),
+				__builtin_return_address(0));
+#endif
 	atomic_inc(&dev->power.usage_count);
 }
 
 static inline void pm_runtime_put_noidle(struct device *dev)
 {
+#if defined (CONFIG_TARGET_LOCALE_USA) && defined (CONFIG_MACH_T0_USA_VZW)
+	if (!strcmp(dev_name(dev), "1-2"))
+		pr_info("[MIF] %s, usage_count : %d by %pF\n", __func__,
+				atomic_read(&dev->power.usage_count),
+				__builtin_return_address(0));
+#endif
 	atomic_add_unless(&dev->power.usage_count, -1, 0);
 }
 

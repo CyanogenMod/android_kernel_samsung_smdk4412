@@ -24,7 +24,19 @@ config VIDEO_EXYNOS_MEMSIZE_FIMC_IS
 	source "drivers/media/video/exynos/tv/Kconfig"
 	source "drivers/media/video/exynos/rotator/Kconfig"
 if ARCH_EXYNOS4
+
+config VIDEO_EXYNOS_FIMC_IS_V2
+	bool "Exynos Multimedia Devices"
+	depends on ARCH_EXYNOS4
+	default n
+
+if VIDEO_EXYNOS_FIMC_IS_V2
+	source "drivers/media/video/exynos/fimc-is-v2/Kconfig"
+endif
+if !VIDEO_EXYNOS_FIMC_IS_V2
 	source "drivers/media/video/exynos/fimc-is/Kconfig"
+endif
+
 endif
 
 if ARCH_EXYNOS5

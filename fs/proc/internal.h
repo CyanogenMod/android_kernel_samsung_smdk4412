@@ -26,6 +26,10 @@ static inline int proc_net_init(void) { return 0; }
 struct vmalloc_info {
 	unsigned long	used;
 	unsigned long	largest_chunk;
+#ifdef CONFIG_PROC_SEC_MEMINFO
+	unsigned long low_page_cnt;
+	unsigned long total_page_cnt;
+#endif
 };
 
 extern struct mm_struct *mm_for_maps(struct task_struct *);

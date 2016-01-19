@@ -20,7 +20,11 @@
 #include <linux/mfd/max77686.h>
 #include <linux/mfd/max77686-private.h>
 #if defined(CONFIG_RTC_ALARM_BOOT)
+#include <linux/wakelock.h>
 #include <linux/reboot.h>
+#endif
+#if defined(CONFIG_RTC_POWER_OFF)
+#include <linux/fake_shut_down.h>
 #endif
 
 /* RTC Control Register */
@@ -53,6 +57,16 @@
 #define MAX77686_RTC_WTSR_SMPL
 #define MAX77686_RTC_DEBUG
 
+#ifdef CONFIG_MACH_KONA
+/* 2013 */
+#define YEAR_OF_SRA 113
+#define DAY_OF_WEEK 2
+#else
+/* 2012 */
+#define YEAR_OF_SRA 112
+#define DAY_OF_WEEK 0
+#endif
+
 enum {
 	RTC_SEC = 0,
 	RTC_MIN,
@@ -73,6 +87,13 @@ struct max77686_rtc_info {
 	int irq;
 #if defined(CONFIG_RTC_ALARM_BOOT)
 	int irq2;
+	bool lpm_mode;
+	bool alarm_irq_flag;
+	struct wake_lock alarm_wake_lock;
+#elif defined(CONFIG_RTC_POWER_OFF)
+	int irq2;
+	bool fake_pwr_off;
+	bool alarm_enabled;
 #endif
 	int rtc_24hr_mode;
 };
@@ -287,6 +308,10 @@ static int max77686_rtc_stop_alarm(struct max77686_rtc_info *info)
 	int ret, i;
 	struct rtc_time tm;
 
+#if defined(CONFIG_RTC_POWER_OFF)
+	if (info->fake_pwr_off)
+		return 0;
+#endif
 	if (!mutex_is_locked(&info->lock))
 		dev_warn(info->dev, "%s: should have mutex locked\n", __func__);
 
@@ -321,7 +346,7 @@ out:
 	return ret;
 }
 
-#if defined(CONFIG_RTC_ALARM_BOOT)
+#if defined(CONFIG_RTC_POWER_OFF) || defined(CONFIG_RTC_ALARM_BOOT)
 static int max77686_rtc_stop_alarm_boot(struct max77686_rtc_info *info)
 {
 	u8 data[RTC_NR_TIME];
@@ -372,6 +397,10 @@ static int max77686_rtc_start_alarm(struct max77686_rtc_info *info)
 	int ret;
 	struct rtc_time tm;
 
+#if defined(CONFIG_RTC_POWER_OFF)
+	if (info->fake_pwr_off)
+		return 0;
+#endif
 	if (!mutex_is_locked(&info->lock))
 		dev_warn(info->dev, "%s: should have mutex locked\n", __func__);
 
@@ -413,7 +442,7 @@ static int max77686_rtc_start_alarm(struct max77686_rtc_info *info)
 out:
 	return ret;
 }
-#if defined(CONFIG_RTC_ALARM_BOOT)
+#if defined(CONFIG_RTC_POWER_OFF) || defined(CONFIG_RTC_ALARM_BOOT)
 static int max77686_rtc_start_alarm_boot(struct max77686_rtc_info *info)
 {
 	u8 data[RTC_NR_TIME];
@@ -507,7 +536,7 @@ out:
 	return ret;
 }
 
-#if defined(CONFIG_RTC_ALARM_BOOT)
+#if defined(CONFIG_RTC_POWER_OFF) || defined(CONFIG_RTC_ALARM_BOOT)
 static int max77686_rtc_set_alarm_boot(struct device *dev,
 				      struct rtc_wkalrm *alrm)
 {
@@ -563,7 +592,21 @@ out:
 	mutex_unlock(&info->lock);
 	return ret;
 }
+#endif
+#if defined(CONFIG_RTC_ALARM_BOOT)
+static int max77686_rtc_get_alarm_boot(struct device *dev,
+				      struct rtc_wkalrm *alrm)
+{
+	struct max77686_rtc_info *info = dev_get_drvdata(dev);
 
+	if (info->alarm_irq_flag)
+		alrm->enabled = 0x1;
+	else
+		alrm->enabled = 0x0;
+	printk(KERN_INFO "max77686_rtc_get_alarm_boot : %d, %d\n",
+				info->lpm_mode, alrm->enabled);
+	return info->lpm_mode;
+}
 #endif
 
 static int max77686_rtc_alarm_irq_enable(struct device *dev,
@@ -597,22 +640,59 @@ static irqreturn_t max77686_rtc_alarm_irq(int irq, void *data)
 static irqreturn_t max77686_rtc_alarm2_irq(int irq, void *data)
 {
 	struct max77686_rtc_info *info = data;
-	int ret;
-	u8 val;
 
-	dev_info(info->dev, "%s:irq(%d)\n", __func__, irq);
+	dev_info(info->dev, "%s:irq(%d), lpm_mode:(%d)\n",
+				__func__, irq, info->lpm_mode);
 
 #if defined(CONFIG_SLP)
 	if (strstr(saved_command_line, "charger_detect_boot") != 0)
 		kernel_restart(NULL);
 #else
-	if (lpcharge == 1)
-		kernel_restart(NULL);
+	if (info->lpm_mode) {
+		wake_lock(&info->alarm_wake_lock);
+		info->alarm_irq_flag = true;
+	}
 #endif
 
 	rtc_update_irq(info->rtc_dev, 1, RTC_IRQF | RTC_AF);
 
 	return IRQ_HANDLED;
+}
+#elif defined(CONFIG_RTC_POWER_OFF)
+static irqreturn_t max77686_rtc_alarm2_irq(int irq, void *data)
+{
+	struct max77686_rtc_info *info = data;
+	char temp_buf[30];
+	char *envp[2];
+
+	snprintf(temp_buf, sizeof(temp_buf), "PMEVENT=AutoPowerOff");
+	envp[0] = temp_buf;
+	envp[1] = NULL;
+
+	dev_info(info->dev, "%s: uevent: %s\n", __func__, temp_buf);
+	kobject_uevent_env(&info->dev->kobj, KOBJ_CHANGE, envp);
+
+	return IRQ_HANDLED;
+}
+
+static int max77686_rtc_alarm_enable(struct device *dev, int enable)
+{
+	struct max77686_rtc_info *info = dev_get_drvdata(dev);
+	int ret = 0;
+
+	mutex_lock(&info->lock);
+	if (enable) {
+		info->fake_pwr_off = false;
+		if (info->alarm_enabled)
+			ret = max77686_rtc_start_alarm(info);
+	} else {
+		if (!info->alarm_enabled)
+			ret = max77686_rtc_stop_alarm(info);
+		info->fake_pwr_off = true;
+	}
+	mutex_unlock(&info->lock);
+
+	return ret;
 }
 #endif
 
@@ -628,6 +708,10 @@ static const struct rtc_class_ops max77686_rtc_ops = {
 
 #if defined(CONFIG_RTC_ALARM_BOOT)
 	.set_alarm_boot = max77686_rtc_set_alarm_boot,
+	.get_alarm_boot = max77686_rtc_get_alarm_boot,
+#elif defined(CONFIG_RTC_POWER_OFF)
+	.set_alarm_poweroff = max77686_rtc_set_alarm_boot,
+	.set_alarm_enable = max77686_rtc_alarm_enable,
 #endif
 	.alarm_irq_enable = max77686_rtc_alarm_irq_enable,
 };
@@ -694,7 +778,7 @@ static int max77686_rtc_init_reg(struct max77686_rtc_info *info)
 	u8 buf;
 	int ret = 0;
 	struct rtc_time tm;
-#if defined(CONFIG_RTC_ALARM_BOOT)
+#if defined(CONFIG_RTC_POWER_OFF) || defined(CONFIG_RTC_ALARM_BOOT)
 	u8 data_alm2[RTC_NR_TIME];
 
 	ret = max77686_rtc_update(info, MAX77686_RTC_READ);
@@ -760,10 +844,10 @@ static int max77686_rtc_init_reg(struct max77686_rtc_info *info)
 		tm.tm_sec = 0;
 		tm.tm_min = 0;
 		tm.tm_hour = 0;
-		tm.tm_wday = 0;
+		tm.tm_wday = DAY_OF_WEEK;
 		tm.tm_mday = 1;
 		tm.tm_mon = 0;
-		tm.tm_year = 112;
+		tm.tm_year = YEAR_OF_SRA;
 		tm.tm_yday = 0;
 		tm.tm_isdst = 0;
 		max77686_rtc_set_time(info->dev, &tm);
@@ -789,7 +873,7 @@ static int __devinit max77686_rtc_probe(struct platform_device *pdev)
 	info->max77686 = max77686;
 	info->rtc = max77686->rtc;
 	info->irq = max77686->irq_base + MAX77686_RTCIRQ_RTCA1;
-#if defined(CONFIG_RTC_ALARM_BOOT)
+#if defined(CONFIG_RTC_POWER_OFF) || defined(CONFIG_RTC_ALARM_BOOT)
 	info->irq2 = max77686->irq_base + MAX77686_RTCIRQ_RTCA2;
 #endif
 	info->rtc_24hr_mode = 1;
@@ -802,16 +886,12 @@ static int __devinit max77686_rtc_probe(struct platform_device *pdev)
 		dev_err(&pdev->dev, "Failed to initialize RTC reg:%d\n", ret);
 		goto err_rtc;
 	}
-
 #ifdef MAX77686_RTC_WTSR_SMPL
 	if (max77686->wtsr_smpl & MAX77686_WTSR_ENABLE)
 		max77686_rtc_enable_wtsr(info, true);
-#if !defined(CONFIG_TARGET_LOCALE_KOR)
 	if (max77686->wtsr_smpl & MAX77686_SMPL_ENABLE)
 		max77686_rtc_enable_smpl(info, true);
 #endif
-#endif
-
 	device_init_wakeup(&pdev->dev, 1);
 
 	info->rtc_dev = rtc_device_register("max77686-rtc", &pdev->dev,
@@ -835,7 +915,6 @@ static int __devinit max77686_rtc_probe(struct platform_device *pdev)
 			info->irq, ret);
 		goto err_rtc;
 	}
-
 #if defined(CONFIG_RTC_ALARM_BOOT)
 	ret = request_threaded_irq(info->irq2, NULL, max77686_rtc_alarm2_irq, 0,
 			"rtc-alarm0", info);
@@ -844,6 +923,20 @@ static int __devinit max77686_rtc_probe(struct platform_device *pdev)
 		free_irq(info->irq, info);
 		dev_err(&pdev->dev, "Failed to request alarm2 IRQ: %d: %d\n",
 			info->irq2, ret);
+		goto err_rtc;
+	}
+
+	info->lpm_mode = lpcharge;
+	if (info->lpm_mode)
+		wake_lock_init(&info->alarm_wake_lock,
+			WAKE_LOCK_SUSPEND, "alarm_wake_lock");
+#elif defined(CONFIG_RTC_POWER_OFF)
+	ret = request_threaded_irq(info->irq2, NULL, max77686_rtc_alarm2_irq, 0,
+			"rtc-alarm0", info);
+	if (ret < 0) {
+		rtc_device_unregister(info->rtc_dev);
+		dev_err(&pdev->dev, "Failed to request alarm2 IRQ: %d: %d\n",
+			info->irq, ret);
 		goto err_rtc;
 	}
 #endif
@@ -862,7 +955,7 @@ static int __devexit max77686_rtc_remove(struct platform_device *pdev)
 
 	if (info) {
 		free_irq(info->irq, info);
-#if defined(CONFIG_RTC_ALARM_BOOT)
+#if defined(CONFIG_RTC_POWER_OFF) || defined(CONFIG_RTC_ALARM_BOOT)
 		free_irq(info->irq2, info);
 #endif
 		rtc_device_unregister(info->rtc_dev);
@@ -903,10 +996,42 @@ static const struct platform_device_id rtc_id[] = {
 	{},
 };
 
+#if defined(CONFIG_RTC_POWER_OFF)
+static int max77686_rtc_resume(struct device *dev)
+{
+	struct max77686_rtc_info *info = dev_get_drvdata(dev);
+	int ret;
+
+	mutex_lock(&info->lock);
+	ret = max77686_rtc_stop_alarm_boot(info);
+	mutex_unlock(&info->lock);
+
+	return ret;
+}
+
+static int max77686_rtc_suspend(struct device *dev)
+{
+	struct max77686_rtc_info *info = dev_get_drvdata(dev);
+
+	if (fake_shut_down)
+		disable_irq(info->irq);
+
+	return 0;
+}
+
+static const struct dev_pm_ops max77686_rtc_pm_ops = {
+	.resume = max77686_rtc_resume,
+	.suspend = max77686_rtc_suspend,
+};
+#endif
+
 static struct platform_driver max77686_rtc_driver = {
 	.driver		= {
 		.name	= "max77686-rtc",
 		.owner	= THIS_MODULE,
+#if defined(CONFIG_RTC_POWER_OFF)
+		.pm	= &max77686_rtc_pm_ops,
+#endif
 	},
 	.probe		= max77686_rtc_probe,
 	.remove		= __devexit_p(max77686_rtc_remove),

@@ -436,6 +436,12 @@ static long felica_uart_ioctl(struct file *file, unsigned int cmd,
 	int ret;
 	FELICA_LOG_DEBUG("[MFDD] %s START", __func__);
 
+	/* Ignore [TCGETS:0x5401] and [TCSBRK:0x5409] */
+	if (TCGETS == cmd || TCSBRK == cmd) {
+		FELICA_LOG_DEBUG("[MFDD] %s cmd throw [0x%x]", __func__, cmd);
+		return 0;
+	}
+
 	if (down_interruptible(&dev_sem->felica_sem)) {
 		FELICA_LOG_ERR("[MFDD] %s ERROR(down_interruptible)", \
 				__func__);
@@ -574,13 +580,13 @@ static void felica_nl_recv_msg(struct sk_buff *skb)
 			gfa_pid = nlh->nlmsg_pid;
 
 #if defined(CONFIG_MACH_T0)
-			port_threshold = 0x09;
+			port_threshold = 0x0a;
 #elif defined(CONFIG_MACH_M3)
 			port_threshold = 0x02;
 #endif
 		if (felica_get_tamper_fuse_cmd() != 1) {
 			if (system_rev >= port_threshold) {
-				s3c_gpio_cfgall_range(FELICA_UART1RX, 4,\
+				s3c_gpio_cfgall_range(FELICA_UART1RX, 2,\
 				S3C_GPIO_SFN(2), S3C_GPIO_PULL_DOWN);
 				felica_uart_port = 1;
 			} else {
@@ -675,10 +681,10 @@ static void felica_nl_wait_ret_msg(void)
 
 static int felica_smc_read_oemflag(u32 ctrl_word, u32 *val)
 {
-	register u32 reg0 __asm__("r0");
-	register u32 reg1 __asm__("r1");
-	register u32 reg2 __asm__("r2");
-	register u32 reg3 __asm__("r3");
+	register u32 reg0 __asm__("r0")=0;
+	register u32 reg1 __asm__("r1")=0;
+	register u32 reg2 __asm__("r2")=0;
+	register u32 reg3 __asm__("r3")=0;
 	u32 idx = 0;
 
 	for (idx = 0; reg2 != ctrl_word; idx++) {

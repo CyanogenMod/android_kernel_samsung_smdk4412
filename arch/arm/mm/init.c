@@ -410,6 +410,8 @@ static inline int free_area(unsigned long pfn, unsigned long end, char *s)
 
 	for (; pfn < end; pfn++) {
 		struct page *page = pfn_to_page(pfn);
+		if (is_pfn_hole(pfn))
+			continue;
 		ClearPageReserved(page);
 		init_page_count(page);
 		__free_page(page);

@@ -27,26 +27,6 @@
 #include <linux/proc_fs.h>
 #include <linux/jiffies.h>
 
-static enum power_supply_property sec_battery_props[] = {
-	POWER_SUPPLY_PROP_STATUS,
-	POWER_SUPPLY_PROP_CHARGE_TYPE,
-	POWER_SUPPLY_PROP_HEALTH,
-	POWER_SUPPLY_PROP_PRESENT,
-	POWER_SUPPLY_PROP_ONLINE,
-	POWER_SUPPLY_PROP_TECHNOLOGY,
-	POWER_SUPPLY_PROP_VOLTAGE_NOW,
-	POWER_SUPPLY_PROP_VOLTAGE_AVG,
-	POWER_SUPPLY_PROP_CURRENT_NOW,
-	POWER_SUPPLY_PROP_CURRENT_AVG,
-	POWER_SUPPLY_PROP_CAPACITY,
-	POWER_SUPPLY_PROP_TEMP,
-	POWER_SUPPLY_PROP_TEMP_AMBIENT,
-};
-
-static enum power_supply_property sec_power_props[] = {
-	POWER_SUPPLY_PROP_ONLINE,
-};
-
 #define ADC_CH_COUNT		10
 #define ADC_SAMPLE_COUNT	10
 
@@ -65,6 +45,7 @@ struct sec_battery_info {
 	struct power_supply psy_bat;
 	struct power_supply psy_usb;
 	struct power_supply psy_ac;
+	struct power_supply psy_ps;
 	unsigned int irq;
 
 	int status;
@@ -76,6 +57,7 @@ struct sec_battery_info {
 	int voltage_ocv;		/* open circuit voltage (mV) */
 	int current_now;		/* current (mA) */
 	int current_avg;		/* average current (mA) */
+	int current_max;		/* input current limit (mA) */
 	int current_adc;
 
 	unsigned int capacity;			/* SOC (%) */
@@ -86,7 +68,7 @@ struct sec_battery_info {
 	/* keep awake until monitor is done */
 	struct wake_lock monitor_wake_lock;
 	struct workqueue_struct *monitor_wqueue;
-	struct work_struct monitor_work;
+	struct delayed_work monitor_work;
 	unsigned int polling_count;
 	unsigned int polling_time;
 	bool polling_in_sleep;
@@ -112,12 +94,14 @@ struct sec_battery_info {
 	unsigned long charging_start_time;
 	unsigned long charging_passed_time;
 	unsigned long charging_next_time;
+	unsigned long charging_fullcharged_time;
 
 	/* temperature check */
 	int temperature;	/* battery temperature */
 	int temper_amb;		/* target temperature */
 
 	int temp_adc;
+	int temp_ambient_adc;
 
 	int temp_high_threshold;
 	int temp_high_recovery;
@@ -130,6 +114,7 @@ struct sec_battery_info {
 
 	/* charging */
 	unsigned int charging_mode;
+	bool is_recharging;
 	int cable_type;
 	int extended_cable_type;
 	struct wake_lock cable_wake_lock;
@@ -138,13 +123,20 @@ struct sec_battery_info {
 	unsigned int full_check_cnt;
 	unsigned int recharge_check_cnt;
 
-	/* test mode */
-	bool test_activated;
-	bool factory_mode;
-};
+	/* wireless charging enable */
+	int wc_enable;
 
-static char *supply_list[] = {
-	"battery",
+	/* wearable charging */
+	int ps_enable;
+	int ps_status;
+	int ps_changed;
+
+	/* test mode */
+	int test_mode;
+	bool factory_mode;
+	bool slate_mode;
+
+	int siop_level;
 };
 
 ssize_t sec_bat_show_attrs(struct device *dev,
@@ -175,50 +167,8 @@ ssize_t sec_bat_store_attrs(struct device *dev,
 #define EVENT_WIFI				(0x1 << 9)
 #define EVENT_WIBRO				(0x1 << 10)
 #define EVENT_LTE				(0x1 << 11)
-
-static struct device_attribute sec_battery_attrs[] = {
-	SEC_BATTERY_ATTR(batt_reset_soc),
-	SEC_BATTERY_ATTR(batt_read_raw_soc),
-	SEC_BATTERY_ATTR(batt_read_adj_soc),
-	SEC_BATTERY_ATTR(batt_type),
-	SEC_BATTERY_ATTR(batt_vfocv),
-	SEC_BATTERY_ATTR(batt_vol_adc),
-	SEC_BATTERY_ATTR(batt_vol_adc_cal),
-	SEC_BATTERY_ATTR(batt_vol_aver),
-	SEC_BATTERY_ATTR(batt_vol_adc_aver),
-	SEC_BATTERY_ATTR(batt_temp_adc),
-	SEC_BATTERY_ATTR(batt_temp_aver),
-	SEC_BATTERY_ATTR(batt_temp_adc_aver),
-	SEC_BATTERY_ATTR(batt_vf_adc),
-
-	SEC_BATTERY_ATTR(batt_lp_charging),
-	SEC_BATTERY_ATTR(siop_activated),
-	SEC_BATTERY_ATTR(batt_charging_source),
-	SEC_BATTERY_ATTR(fg_reg_dump),
-	SEC_BATTERY_ATTR(fg_reset_cap),
-	SEC_BATTERY_ATTR(fg_capacity),
-	SEC_BATTERY_ATTR(auth),
-	SEC_BATTERY_ATTR(chg_current_adc),
-	SEC_BATTERY_ATTR(wc_adc),
-	SEC_BATTERY_ATTR(wc_status),
-	SEC_BATTERY_ATTR(factory_mode),
-	SEC_BATTERY_ATTR(update),
-	SEC_BATTERY_ATTR(test_mode),
-
-	SEC_BATTERY_ATTR(2g_call),
-	SEC_BATTERY_ATTR(3g_call),
-	SEC_BATTERY_ATTR(music),
-	SEC_BATTERY_ATTR(video),
-	SEC_BATTERY_ATTR(browser),
-	SEC_BATTERY_ATTR(hotspot),
-	SEC_BATTERY_ATTR(camera),
-	SEC_BATTERY_ATTR(camcorger),
-	SEC_BATTERY_ATTR(data_call),
-	SEC_BATTERY_ATTR(wifi),
-	SEC_BATTERY_ATTR(wibro),
-	SEC_BATTERY_ATTR(lte),
-	SEC_BATTERY_ATTR(event),
-};
+#define EVENT_LCD			(0x1 << 12)
+#define EVENT_GPS			(0x1 << 13)
 
 enum {
 	BATT_RESET_SOC = 0,
@@ -230,13 +180,18 @@ enum {
 	BATT_VOL_ADC_CAL,
 	BATT_VOL_AVER,
 	BATT_VOL_ADC_AVER,
+	BATT_CURRENT_UA_NOW,
+	BATT_CURRENT_UA_AVG,
+	BATT_TEMP,
 	BATT_TEMP_ADC,
 	BATT_TEMP_AVER,
 	BATT_TEMP_ADC_AVER,
 	BATT_VF_ADC,
+	BATT_SLATE_MODE,
 
 	BATT_LP_CHARGING,
 	SIOP_ACTIVATED,
+	SIOP_LEVEL,
 	BATT_CHARGING_SOURCE,
 	FG_REG_DUMP,
 	FG_RESET_CAP,
@@ -245,12 +200,16 @@ enum {
 	CHG_CURRENT_ADC,
 	WC_ADC,
 	WC_STATUS,
+	WC_ENABLE,
 	FACTORY_MODE,
 	UPDATE,
 	TEST_MODE,
 
+	BATT_EVENT_CALL,
 	BATT_EVENT_2G_CALL,
+	BATT_EVENT_TALK_GSM,
 	BATT_EVENT_3G_CALL,
+	BATT_EVENT_TALK_WCDMA,
 	BATT_EVENT_MUSIC,
 	BATT_EVENT_VIDEO,
 	BATT_EVENT_BROWSER,
@@ -261,7 +220,13 @@ enum {
 	BATT_EVENT_WIFI,
 	BATT_EVENT_WIBRO,
 	BATT_EVENT_LTE,
+	BATT_EVENT_LCD,
+	BATT_EVENT_GPS,
 	BATT_EVENT,
+	BATT_TEMP_TABLE,
+#if defined(CONFIG_SAMSUNG_BATTERY_ENG_TEST)
+	BATT_TEST_CHARGE_CURRENT,
+#endif
 };
 
 #endif /* __SEC_BATTERY_H */

@@ -157,7 +157,6 @@ int fc8150_tuner_init(HANDLE hDevice, u32 band)
 	u8  RFAGC_PD2[6], RFAGC_PD2_AVG, RFAGC_PD2_MAX, RFAGC_PD2_MIN;
 	u8  RFAGC_PD1[6], RFAGC_PD1_AVG, RFAGC_PD1_MAX, RFAGC_PD1_MIN;
 
-	int res = BBM_OK;
 
 	PRINTF(hDevice, "fc8150_init\n");
 
@@ -187,7 +186,6 @@ int fc8150_tuner_init(HANDLE hDevice, u32 band)
 	fc8150_write(hDevice, 0xA0, 0xC0);
 	fc8150_write(hDevice, 0xD0, 0x00);
 
-	fc8150_write(hDevice, 0xA5, 0x65);
 
 	RFAGC_PD1[0]	=	0;
 	RFAGC_PD1[1]	=	0;
@@ -238,19 +236,23 @@ int fc8150_tuner_init(HANDLE hDevice, u32 band)
 
 	fc8150_write(hDevice, 0x7E , RFAGC_PD2_AVG);
 
-	res = fc8150_read(hDevice, 0xD6, &RFPD_REF);
+	fc8150_read(hDevice, 0xD6, &RFPD_REF);
 
-	if (0x86 <= RFPD_REF)
+	if (0x80 <= RFPD_REF)
 		fc8150_write(hDevice, 0x7B, 0x8F);
-	else if (RFPD_REF < 0x86)
+	else if (RFPD_REF < 0x80)
 		fc8150_write(hDevice, 0x7B, 0x88);
 
 	fc8150_write(hDevice, 0x79, 0x32);
 	fc8150_write(hDevice, 0x7A, 0x2C);
-	fc8150_write(hDevice, 0x7C, 0x10);
+	fc8150_write(hDevice, 0x7C, 0x12);
 	fc8150_write(hDevice, 0x7D, 0x0C);
 	fc8150_write(hDevice, 0x81, 0x0A);
 	fc8150_write(hDevice, 0x84, 0x00);
+	fc8150_write(hDevice, 0x92, 0x00);
+	fc8150_write(hDevice, 0x93, 0x0C);
+	fc8150_write(hDevice, 0xA5, 0x69);
+	fc8150_write(hDevice, 0xA6, 0x25);
 
 	fc8150_write(hDevice, 0x02, 0x81);
 
@@ -293,14 +295,18 @@ int fc8150_set_freq(HANDLE hDevice, enum band_type band, u32 rf_kHz)
 		fc8150_write(hDevice, 0x1E, 0x04);
 		fc8150_write(hDevice, 0x1F, 0x36);
 		fc8150_write(hDevice, 0x14, 0x84);
-	} else if (551143 < rf_kHz && rf_kHz <= 563143) {
+	} else if (551143 < rf_kHz && rf_kHz <= 557143) {
+		fc8150_write(hDevice, 0x1E, 0x04);
+		fc8150_write(hDevice, 0x1F, 0x3E);
+		fc8150_write(hDevice, 0x14, 0x84);
+	} else if (557143 < rf_kHz && rf_kHz <= 563143) {
 		fc8150_write(hDevice, 0x1E, 0x03);
 		fc8150_write(hDevice, 0x1F, 0x3E);
-		fc8150_write(hDevice, 0x14, 0xC4);
+		fc8150_write(hDevice, 0x14, 0x84);
 	} else if (563143 < rf_kHz && rf_kHz <= 593143) {
-		fc8150_write(hDevice, 0x1E, 0x02);
+		fc8150_write(hDevice, 0x1E, 0x04);
 		fc8150_write(hDevice, 0x1F, 0x3E);
-		fc8150_write(hDevice, 0x14, 0xC4);
+		fc8150_write(hDevice, 0x14, 0x84);
 	} else if (593143 < rf_kHz && rf_kHz <= 659143) {
 		fc8150_write(hDevice, 0x1E, 0x02);
 		fc8150_write(hDevice, 0x1F, 0x36);
@@ -335,8 +341,8 @@ int fc8150_set_freq(HANDLE hDevice, enum band_type band, u32 rf_kHz)
 		fc8150_write(hDevice, 0x55, 0x06);
 
 	if (rf_kHz <= 491143) {
-		fc8150_write(hDevice, 0x79, 0x28);
-		fc8150_write(hDevice, 0x7A, 0x24);
+		fc8150_write(hDevice, 0x79, 0x2a);
+		fc8150_write(hDevice, 0x7A, 0x26);
 	} else if (491143 < rf_kHz && rf_kHz <= 659143) {
 		fc8150_write(hDevice, 0x79, 0x2A);
 		fc8150_write(hDevice, 0x7A, 0x26);
@@ -349,8 +355,8 @@ int fc8150_set_freq(HANDLE hDevice, enum band_type band, u32 rf_kHz)
 	}
 
 	if (rf_kHz <= 707143) {
-		fc8150_write(hDevice, 0x54, 0x00);
-		fc8150_write(hDevice, 0x53, 0x5F);
+		fc8150_write(hDevice, 0x54, 0x01);
+		fc8150_write(hDevice, 0x53, 0x9F);
 	} else if (707143 < rf_kHz) {
 		fc8150_write(hDevice, 0x54, 0x04);
 		fc8150_write(hDevice, 0x53, 0x9F);
@@ -362,9 +368,11 @@ int fc8150_set_freq(HANDLE hDevice, enum band_type band, u32 rf_kHz)
 int fc8150_get_rssi(HANDLE hDevice, int *rssi)
 {
 	int res = BBM_OK;
-	u8  LNA, RFVGA, CSF, PREAMP_PGA = 0x00;
-	int K = -101.25;
+	u8  LNA, RFVGA, CSF, PREAMP_PGA, CRNTMODE1, CRNTMODE0 = 0x00;
+	int K = -101;
 	int PGA = 0;
+	int A2 = 5;
+	int A3 = 2;
 
 	res = fc8150_read(hDevice, 0xA3, &LNA);
 	res = fc8150_read(hDevice, 0xA4, &RFVGA);
@@ -379,10 +387,14 @@ int fc8150_get_rssi(HANDLE hDevice, int *rssi)
 	else if (PREAMP_PGA <= 127)
 		PGA = PREAMP_PGA;
 
+	CRNTMODE1 = (LNA >> 6) & 0x01;
+	CRNTMODE0 = (LNA >> 5) & 0x01;
 	/* *rssi = (LNA & 0x07) * 6 + (RFVGA & 0x1F)
-	+ ((CSF & 0x03)+((CSF & 0x70) >> 4) ) * 6 - PGA * 0.25f + K ; */
+	+ ((CSF & 0x03)+((CSF & 0x70) >> 4) ) * 6 - PGA * 0.25f
+	+ A2 * CRNTMODE1 + A3 * CRNTMODE0 + K ; */
 	*rssi = (LNA & 0x07) * 6 + (RFVGA & 0x1F)
-		+ ((CSF & 0x03) + ((CSF & 0x70) >> 4)) * 6 - PGA / 4 + K;
+		+ ((CSF & 0x03) + ((CSF & 0x70) >> 4)) * 6 - PGA / 4
+		+ A2 * CRNTMODE1 + A3 * CRNTMODE0 + K;
 
 	return BBM_OK;
 }

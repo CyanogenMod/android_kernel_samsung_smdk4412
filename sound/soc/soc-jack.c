@@ -23,12 +23,12 @@
 #include <linux/jack.h>
 #endif
 
-#ifdef CONFIG_SWITCH
+#ifdef CONFIG_SND_SOC_ANDROID_SWITCH
 #include <linux/switch.h>
 #endif
 #include <linux/sec_jack.h>
 
-#ifdef CONFIG_SWITCH
+#ifdef CONFIG_SND_SOC_ANDROID_SWITCH
 /* Android jack detection */
 static struct switch_dev android_switch = {
 	.name = "h2w",
@@ -56,8 +56,9 @@ int snd_soc_jack_new(struct snd_soc_codec *codec, const char *id, int type,
 	INIT_LIST_HEAD(&jack->pins);
 	INIT_LIST_HEAD(&jack->jack_zones);
 	BLOCKING_INIT_NOTIFIER_HEAD(&jack->notifier);
+	mutex_init(&jack->mutex);
 
-#ifdef CONFIG_SWITCH
+#ifdef CONFIG_SND_SOC_ANDROID_SWITCH
 	switch_dev_register(&android_switch);
 #endif
 
@@ -87,7 +88,7 @@ void snd_soc_jack_report(struct snd_soc_jack *jack, int status, int mask)
 	int enable;
 	int oldstatus;
 
-#ifdef CONFIG_SWITCH
+#ifdef CONFIG_SND_SOC_ANDROID_SWITCH
 	if (mask & SND_JACK_HEADSET) {
 		if (status & SND_JACK_MICROPHONE)
 			switch_set_state(&android_switch, SEC_HEADSET_4POLE);
@@ -117,7 +118,7 @@ void snd_soc_jack_report(struct snd_soc_jack *jack, int status, int mask)
 	codec = jack->codec;
 	dapm =  &codec->dapm;
 
-	mutex_lock(&codec->mutex);
+	mutex_lock(&jack->mutex);
 
 	oldstatus = jack->status;
 
@@ -131,27 +132,13 @@ void snd_soc_jack_report(struct snd_soc_jack *jack, int status, int mask)
 
 	trace_snd_soc_jack_notify(jack, status);
 
-	list_for_each_entry(pin, &jack->pins, list) {
-		enable = pin->mask & jack->status;
-
-		if (pin->invert)
-			enable = !enable;
-
-		if (enable)
-			snd_soc_dapm_enable_pin(dapm, pin->pin);
-		else
-			snd_soc_dapm_disable_pin(dapm, pin->pin);
-	}
-
 	/* Report before the DAPM sync to help users updating micbias status */
 	blocking_notifier_call_chain(&jack->notifier, status, jack);
-
-	snd_soc_dapm_sync(dapm);
 
 	snd_jack_report(jack->jack, jack->status);
 
 out:
-	mutex_unlock(&codec->mutex);
+	mutex_unlock(&jack->mutex);
 }
 EXPORT_SYMBOL_GPL(snd_soc_jack_report);
 
@@ -215,6 +202,8 @@ int snd_soc_jack_add_pins(struct snd_soc_jack *jack, int count,
 			  struct snd_soc_jack_pin *pins)
 {
 	int i;
+
+	WARN_ON(0 == "Implementation removed");
 
 	for (i = 0; i < count; i++) {
 		if (!pins[i].pin) {

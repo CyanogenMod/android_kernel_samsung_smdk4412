@@ -26,6 +26,10 @@
 #include <linux/workqueue.h>
 #include <linux/gpio.h>
 #include <linux/irqdesc.h>
+#ifdef CONFIG_FAST_BOOT
+#include <linux/fake_shut_down.h>
+#include <linux/wakelock.h>
+#endif
 
 extern struct class *sec_class;
 
@@ -47,19 +51,20 @@ struct gpio_keys_drvdata {
 	unsigned int n_buttons;
 	int (*enable)(struct device *dev);
 	void (*disable)(struct device *dev);
+#ifdef CONFIG_MACH_GC1
+	int gpio_strobe_insert;
+	bool strobe_insert;
+	struct delayed_work strobe_insert_dwork;
+#endif
 #ifdef CONFIG_SENSORS_HALL
 	int gpio_flip_cover;
 	bool flip_cover;
 	struct delayed_work flip_cover_dwork;
 #endif
+
 	struct gpio_button_data data[0];
 	/* WARNING: this area can be expanded. Do NOT add any member! */
 };
-
-#ifdef CONFIG_SENSORS_HALL
-int flip_cover_open;
-extern ts_powered_on;
-#endif
 
 /*
  * SYSFS interface for enabling/disabling keys and switches:
@@ -343,7 +348,13 @@ static ssize_t key_pressed_show(struct device *dev,
 
 	for (i = 0; i < ddata->n_buttons; i++) {
 		struct gpio_button_data *bdata = &ddata->data[i];
-		keystate |= bdata->key_state;
+		if (bdata->button->code != SW_FLIP) {
+			keystate |= bdata->key_state;
+#if defined(CONFIG_MACH_IPCAM)
+			if (bdata->button->code == KEY_POWER)
+				keystate |= !gpio_get_value(GPIO_RESET_KEY);
+#endif
+		}
 	}
 
 	if (keystate)
@@ -391,14 +402,19 @@ static ssize_t hall_detect_show(struct device *dev,
 				struct device_attribute *attr, char *buf)
 {
 	struct gpio_keys_drvdata *ddata = dev_get_drvdata(dev);
+	int i = 0;
+	int keystate = 0;
 
-	if (ddata->flip_cover){
-	        printk("%s: OPEN",__func__);
-		sprintf(buf, "OPEN");
-	}else{
-	        printk("%s: CLOSE",__func__);
-		sprintf(buf, "CLOSE");
+	for (i = 0; i < ddata->n_buttons; i++) {
+		struct gpio_button_data *bdata = &ddata->data[i];
+		if (bdata->button->code == SW_FLIP)
+			keystate = bdata->key_state;
 	}
+
+	if (keystate)
+		sprintf(buf, "OPEN");
+	else
+		sprintf(buf, "CLOSE");
 
 	return strlen(buf);
 }
@@ -450,13 +466,43 @@ void gpio_keys_check_zoom_exception(unsigned int code,
 	}
 	*zoomkey = true;
 }
+
+#define ZOOM_OUT    0
+#define ZOOM_MIDDLE 1
+#define ZOOM_IN     2
+
+bool is_zoom_key(unsigned int code, unsigned int *type)
+{
+	if (code == KEY_CAMERA_ZOOMIN ||
+		code == 0x221) {
+		*type = ZOOM_IN;
+		return true;
+	} else if (code == KEY_CAMERA_ZOOMOUT ||
+		code == 0x222) {
+		*type == ZOOM_OUT;
+		return true;
+	}
+
+	*type = ZOOM_MIDDLE;
+	return false;
+}
+
+unsigned int check_zoom_state(struct gpio_keys_drvdata *ddata)
+{
+	if (ddata->data[5].key_state || ddata->data[3].key_state)
+		return ZOOM_IN;
+	else if (ddata->data[6].key_state || ddata->data[4].key_state)
+		return ZOOM_OUT;
+
+	return ZOOM_MIDDLE;
+}
 #endif
 
 #ifdef CONFIG_FAST_BOOT
-extern bool fake_shut_down;
-
 struct timer_list fake_timer;
 bool fake_pressed;
+
+struct wake_lock fake_lock;
 
 static void gpio_keys_fake_off_check(unsigned long _data)
 {
@@ -476,6 +522,22 @@ static void gpio_keys_fake_off_check(unsigned long _data)
 }
 #endif
 
+#if defined(CONFIG_MACH_KONA)
+//#define AUTO_POWER_ON_OFF_FLAG //for auto power-onoff test 2012 12 31 sexykyu
+#ifdef AUTO_POWER_ON_OFF_FLAG
+static struct timer_list poweroff_keypad_timer;
+static void poweroff_keypad_timer_handler(unsigned long data)
+{
+	struct gpio_button_data *bdata	= (struct gpio_button_data *)data;
+	struct gpio_keys_button *button = bdata->button;
+	struct input_dev *input = bdata->input;
+	unsigned int type = button->type ?: EV_KEY;
+	printk("force to press powerkey.\n");
+	input_event(input, type, KEY_POWER, 1);
+	input_sync(input);
+}
+#endif
+#endif
 static void gpio_keys_report_event(struct gpio_button_data *bdata)
 {
 	struct gpio_keys_button *button = bdata->button;
@@ -492,19 +554,25 @@ static void gpio_keys_report_event(struct gpio_button_data *bdata)
 	bool zoomkey = false;
 
 #ifdef CONFIG_FAST_BOOT
+
 	/*Fake pwr off control*/
-	if (fake_shut_down) {
+	if (fake_shut_down || fake_pressed) {
 		if (button->code == KEY_POWER) {
 			if (!!state) {
 				printk(KERN_DEBUG"[Keys] start fake check\n");
 				fake_pressed = true;
+				if (!wake_lock_active(&fake_lock))
+					wake_lock(&fake_lock);
 				mod_timer(&fake_timer,
-					jiffies + msecs_to_jiffies(1000));
+					jiffies + msecs_to_jiffies(500));
 			} else {
 				printk(KERN_DEBUG"[Keys] end fake checkPwr 0\n");
 				fake_pressed = false;
+				if (wake_lock_active(&fake_lock))
+					wake_unlock(&fake_lock);
 			}
 		}
+		bdata->wakeup = false;
 		return ;
 	}
 #endif
@@ -526,6 +594,31 @@ static void gpio_keys_report_event(struct gpio_button_data *bdata)
 
 		gpio_keys_check_zoom_exception(button->code, &zoomkey,
 				&hotkey, &index_hotkey);
+	} else if (system_rev >= 6) {
+		/*exclusive check for zoom dial*/
+		unsigned int zoom_type = 0;
+		unsigned int current_zoom_state = 0;
+		bool pass_cur_event = false;
+
+		if (is_zoom_key(button->code, &zoom_type)) {
+			current_zoom_state = check_zoom_state(ddata);
+
+			if (zoom_type == ZOOM_IN
+				&& current_zoom_state == ZOOM_OUT)
+					pass_cur_event = true;
+			else if (zoom_type == ZOOM_OUT
+				&& current_zoom_state == ZOOM_IN)
+					pass_cur_event = true;
+
+			if (pass_cur_event) {
+#if !defined(CONFIG_SAMSUNG_PRODUCT_SHIP)
+				printk(KERN_DEBUG "[keys] Pass zoom"
+					"current %d, code %d\n",
+					current_zoom_state, button->code);
+#endif
+				return ;
+			}
+		}
 	}
 #endif
 
@@ -564,17 +657,55 @@ static void gpio_keys_report_event(struct gpio_button_data *bdata)
 				overlapped = true;
 			}
 		}
-#endif
-#ifdef CONFIG_SENSORS_HALL
-	      if(!flip_cover_open && button->code == KEY_POWER){
-	        printk(KERN_DEBUG" cover closed...ignoring PWR button");
-	      }else{ 
+
+		if (system_rev >= 6) {
+			/* forced release*/
+			if (button->code == KEY_CAMERA_ZOOMIN && !state) {
+				tmp_bdata = &ddata->data[5];
+				if (tmp_bdata->key_state) {
+					input_event(input, type, 0x221,
+						!!state);
+					input_sync(input);
+					printk(KERN_DEBUG"[KEYS] forced 0x221 key release\n");
+				}
+			}
+
+			if (button->code == KEY_CAMERA_ZOOMOUT && !state) {
+				tmp_bdata = &ddata->data[6];
+				if (tmp_bdata->key_state) {
+					input_event(input, type, 0x222,
+						!!state);
+					input_sync(input);
+					printk(KERN_DEBUG"[KEYS] forced 0x222 key release\n");
+				}
+			}
+
+			/*forced press*/
+			if (button->code == 0x221 && state) {
+				tmp_bdata = &ddata->data[3];
+				if (!tmp_bdata->key_state) {
+					input_event(input, type,
+						KEY_CAMERA_ZOOMIN, !!state);
+					input_sync(input);
+					printk(KERN_DEBUG"[KEYS] forced 0x215 key press\n");
+				}
+			}
+
+			if (button->code == 0x222 && state) {
+				tmp_bdata = &ddata->data[4];
+				if (!tmp_bdata->key_state) {
+					input_event(input, type,
+						KEY_CAMERA_ZOOMOUT, !!state);
+					input_sync(input);
+					printk(KERN_DEBUG"[KEYS] forced 0x216 key press\n");
+				}
+			}
+		}
+
 #endif
 		input_event(input, type, button->code, !!state);
 		input_sync(input);
-#ifdef CONFIG_SENSORS_HALL
-	      }
-#endif
+
 		if (button->code == KEY_POWER)
 			printk(KERN_DEBUG"[keys]PWR %d\n", !!state);
 	}
@@ -693,41 +824,29 @@ fail2:
 	return error;
 }
 
-#ifdef CONFIG_SENSORS_HALL
-static void flip_cover_work(struct work_struct *work)
-{  
+
+#ifdef CONFIG_MACH_GC1
+static void strobe_insert_work(struct work_struct *work)
+{
 	struct gpio_keys_drvdata *ddata =
 		container_of(work, struct gpio_keys_drvdata,
-				flip_cover_dwork.work);
+				strobe_insert_dwork.work);
 
-	ddata->flip_cover = gpio_get_value(ddata->gpio_flip_cover);
+	ddata->strobe_insert = gpio_get_value(ddata->gpio_strobe_insert);
 
 	printk(KERN_DEBUG "[keys] %s : %d\n",
-		__func__, ddata->flip_cover);
+		__func__, ddata->strobe_insert);
 
- /*       input_report_switch(ddata->input, SW_FLIP, ddata->flip_cover);
-	input_sync(ddata->input);*/
-	
-	flip_cover_open = ddata->flip_cover;
-	
-	if(!ts_powered_on && !ddata->flip_cover){
-	  printk("[keys] screen already off\n");
-        }else if(ts_powered_on && ddata->flip_cover){
-          printk("[keys] screen already on\n");
-	}else{
-          input_report_key(ddata->input, KEY_POWER, 1);
- 	  input_sync(ddata->input);
-          input_report_key(ddata->input, KEY_POWER, 0);
-	  input_sync(ddata->input);
-	}
+	input_report_switch(ddata->input,
+		SW_STROBE_INSERT, ddata->strobe_insert);
+	input_sync(ddata->input);
 }
-
-static irqreturn_t flip_cover_detect(int irq, void *dev_id)
+static irqreturn_t strobe_pen_detect(int irq, void *dev_id)
 {
 	struct gpio_keys_drvdata *ddata = dev_id;
 
-	cancel_delayed_work_sync(&ddata->flip_cover_dwork);
-	schedule_delayed_work(&ddata->flip_cover_dwork, HZ / 20);
+	cancel_delayed_work_sync(&ddata->strobe_insert_dwork);
+	schedule_delayed_work(&ddata->strobe_insert_dwork, HZ / 20);
 	return IRQ_HANDLED;
 }
 #endif
@@ -735,43 +854,30 @@ static irqreturn_t flip_cover_detect(int irq, void *dev_id)
 static int gpio_keys_open(struct input_dev *input)
 {
 	struct gpio_keys_drvdata *ddata = input_get_drvdata(input);
-	
-#ifdef CONFIG_SENSORS_HALL
+
+#ifdef CONFIG_MACH_GC1
 	int ret = 0;
-	int irq = gpio_to_irq(ddata->gpio_flip_cover);
+	int irq = gpio_to_irq(ddata->gpio_strobe_insert);
 
-	INIT_DELAYED_WORK(&ddata->flip_cover_dwork, flip_cover_work);
+	INIT_DELAYED_WORK(&ddata->strobe_insert_dwork, strobe_insert_work);
 
-	ret = request_threaded_irq(
+	ret =
+		request_threaded_irq(
 		irq, NULL,
-		flip_cover_detect,
+		strobe_pen_detect,
 		IRQF_DISABLED | IRQF_TRIGGER_RISING |
 		IRQF_TRIGGER_FALLING | IRQF_ONESHOT,
-		"flip_cover", ddata);
-
-	if (ret) {
+		"strobe_insert", ddata);
+	if (ret < 0)
 		printk(KERN_ERR
-		"keys: failed to request flip cover irq %d gpio %d\n",
-		irq, ddata->gpio_flip_cover);
-		goto hall_sensor_error;
-	}
-
-	ret = enable_irq_wake(irq);
-	if (ret < 0) {
-		printk(KERN_ERR
-           "keys: Failed to Enable Wakeup Source(%d) \n",
-		ret);
-		goto hall_sensor_error;
-	}
+		"keys: failed to request strobe insert irq %d gpio %d\n",
+		irq, ddata->gpio_strobe_insert);
 
 	/* update the current status */
-	schedule_delayed_work(&ddata->flip_cover_dwork, HZ / 2);
-
-hall_sensor_error:
-
+	schedule_delayed_work(&ddata->strobe_insert_dwork, HZ / 2);
 #endif
 
-       return ddata->enable ? ddata->enable(input->dev.parent) : 0;
+	return ddata->enable ? ddata->enable(input->dev.parent) : 0;
 }
 
 static void gpio_keys_close(struct input_dev *input)
@@ -805,8 +911,8 @@ static int __devinit gpio_keys_probe(struct platform_device *pdev)
 	ddata->n_buttons = pdata->nbuttons;
 	ddata->enable = pdata->enable;
 	ddata->disable = pdata->disable;
-#ifdef CONFIG_SENSORS_HALL
-	ddata->gpio_flip_cover = pdata->gpio_flip_cover;
+#ifdef CONFIG_MACH_GC1
+	ddata->gpio_strobe_insert = pdata->gpio_strobe_insert;
 #endif
 	mutex_init(&ddata->disable_lock);
 
@@ -816,10 +922,11 @@ static int __devinit gpio_keys_probe(struct platform_device *pdev)
 	input->name = pdata->name ? : pdev->name;
 	input->phys = "gpio-keys/input0";
 	input->dev.parent = &pdev->dev;
-/*#ifdef CONFIG_SENSORS_HALL
+#ifdef CONFIG_MACH_GC1
 	input->evbit[0] |= BIT_MASK(EV_SW);
-	input_set_capability(input, EV_SW, SW_FLIP);
-#endif*/
+	input_set_capability(input, EV_SW, SW_STROBE_INSERT);
+#endif
+
 	input->open = gpio_keys_open;
 	input->close = gpio_keys_close;
 
@@ -886,9 +993,21 @@ static int __devinit gpio_keys_probe(struct platform_device *pdev)
 	input_set_capability(input, EV_KEY, KEY_FAKE_PWR);
 	setup_timer(&fake_timer, gpio_keys_fake_off_check,
 			(unsigned long)input);
+	wake_lock_init(&fake_lock, WAKE_LOCK_SUSPEND, "fake_lock");
 #endif
 	device_init_wakeup(&pdev->dev, wakeup);
 
+#if defined(CONFIG_MACH_KONA)
+#ifdef AUTO_POWER_ON_OFF_FLAG
+	init_timer(&poweroff_keypad_timer);
+	poweroff_keypad_timer.function = poweroff_keypad_timer_handler;
+	poweroff_keypad_timer.data = (unsigned long)&ddata->data[0];
+	poweroff_keypad_timer.expires = jiffies + 40*HZ;
+	add_timer(&poweroff_keypad_timer);
+
+	printk("AUTO_POWER_ON_OFF_FLAG Test Start !!!\n");
+#endif
+#endif
 	return 0;
 
  fail3:
@@ -947,6 +1066,10 @@ static int gpio_keys_suspend(struct device *dev)
 	if (device_may_wakeup(&pdev->dev)) {
 		for (i = 0; i < pdata->nbuttons; i++) {
 			struct gpio_keys_button *button = &pdata->buttons[i];
+#if defined(CONFIG_SENSORS_HALL)
+			if (button->code == SW_FLIP)
+				button->wakeup = 1;
+#endif
 			if (button->wakeup) {
 				int irq = gpio_to_irq(button->gpio);
 				enable_irq_wake(irq);
@@ -967,6 +1090,15 @@ static int gpio_keys_resume(struct device *dev)
 	for (i = 0; i < pdata->nbuttons; i++) {
 
 		struct gpio_keys_button *button = &pdata->buttons[i];
+
+#if defined(CONFIG_SENSORS_HALL)
+		if (button->code == SW_FLIP)
+			button->wakeup = 1;
+#endif
+
+		if (button->code == 0x220)
+			continue;
+
 		if (button->wakeup && device_may_wakeup(&pdev->dev)) {
 			int irq = gpio_to_irq(button->gpio);
 			disable_irq_wake(irq);

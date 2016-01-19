@@ -27,6 +27,11 @@
 #define PRIME_DMC_MAX_THRESHOLD		30
 #define EXYNOS4412_DMC_MAX_THRESHOLD	30
 #define EXYNOS4212_DMC_MAX_THRESHOLD	30
+#if defined(CONFIG_MACH_P4NOTE) || defined(CONFIG_MACH_SP7160LTE) || defined(CONFIG_MACH_M0) || defined(CONFIG_MACH_C1) || defined(CONFIG_MACH_T0)
+#define DECODING_LOAD 5
+#else
+#define DECODING_LOAD 10
+#endif
 
 extern unsigned int up_threshold;
 extern unsigned int ppmu_threshold;
@@ -58,7 +63,10 @@ struct busfreq_data {
 	unsigned long long last_time;
 	unsigned int load_history[PPMU_END][LOAD_HISTORY_SIZE];
 	int index;
-
+	int rate_mult;
+#ifdef CONFIG_BUSFREQ_INTERLOCK_CPUFREQ
+	int is_lcd_on;
+#endif
 	struct notifier_block exynos_buspm_notifier;
 	struct notifier_block exynos_reboot_notifier;
 	struct notifier_block exynos_request_notifier;

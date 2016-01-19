@@ -17,7 +17,7 @@ static ssize_t get_slot_switch(struct device *dev, struct device_attribute *attr
 	//return '0' slot path is '||', return '1' slot path is 'X'
 	value = gpio_get_value(GPIO_UIM_SIM_SEL);
 #if defined(CONFIG_MACH_T0_CHN_CTC)
-	if (system_rev < 7)
+	if (system_rev <= 7)
 		value = (~value & 0x1);
 #endif
 	printk("Current Slot is %x\n", value);
@@ -34,7 +34,7 @@ static ssize_t set_slot_switch(struct device *dev, struct device_attribute *attr
 	switch(value) {
 		case 0:
 #if defined(CONFIG_MACH_T0_CHN_CTC)
-			if (system_rev < 7)
+			if (system_rev <= 7)
 				gpio_set_value(GPIO_UIM_SIM_SEL, 1);
 			else
 #endif
@@ -43,7 +43,7 @@ static ssize_t set_slot_switch(struct device *dev, struct device_attribute *attr
 			break;
 		case 1:
 #if defined(CONFIG_MACH_T0_CHN_CTC)
-			if (system_rev < 7)
+			if (system_rev <= 7)
 				gpio_set_value(GPIO_UIM_SIM_SEL, 0);
 			else
 #endif
@@ -57,7 +57,8 @@ static ssize_t set_slot_switch(struct device *dev, struct device_attribute *attr
 	return size;
 }
 
-static DEVICE_ATTR(slot_sel, S_IRUGO |S_IWUGO | S_IRUSR | S_IWUSR, get_slot_switch, set_slot_switch);
+static DEVICE_ATTR(slot_sel, S_IRUGO | S_IWUSR | S_IWGRP,
+	get_slot_switch, set_slot_switch);
 
 static int __init slot_switch_manager_init(void)
 {
@@ -75,7 +76,7 @@ static int __init slot_switch_manager_init(void)
 		gpio_direction_output(GPIO_UIM_SIM_SEL, 1);
 		s3c_gpio_setpull(GPIO_UIM_SIM_SEL, S3C_GPIO_PULL_NONE);
 #if defined(CONFIG_MACH_T0_CHN_CTC)
-	if (system_rev < 7)
+	if (system_rev <= 7)
 		gpio_set_value(GPIO_UIM_SIM_SEL, 1);
 	else
 #endif

@@ -414,9 +414,12 @@ int usb_gadget_probe_driver(struct usb_gadget_driver *driver,
 #if defined(CONFIG_USB_EXYNOS_SWITCH) || defined(CONFIG_MFD_MAX77693)\
 	|| defined(CONFIG_MFD_MAX8997) || defined(CONFIG_MFD_MAX77686)
 	printk(KERN_INFO "usb: Skip udc_enable\n");
+
 #else
 	printk(KERN_INFO "usb: udc_enable\n");
+#ifndef CONFIG_MACH_WATCH
 	udc_enable(dev);
+#endif
 	dev->udc_enabled = 1;
 #endif
 	return 0;
@@ -657,6 +660,7 @@ static void reconfig_usbd(void)
 	__raw_writel(utemp, dev->regs + S3C_UDC_OTG_DCTL);
 
 	reset_usbd();
+
 }
 
 static void set_max_pktsize(struct s3c_udc *dev, enum usb_device_speed speed)
@@ -1322,7 +1326,11 @@ static int s3c_udc_probe(struct platform_device *pdev)
 	create_proc_files();
 
 	INIT_DELAYED_WORK(&dev->usb_ready_work, usb_ready);
+#ifdef CONFIG_MACH_ZEST
+	schedule_delayed_work(&dev->usb_ready_work, msecs_to_jiffies(10000));
+#else
 	schedule_delayed_work(&dev->usb_ready_work, msecs_to_jiffies(15000));
+#endif
 	mutex_init(&dev->mutex);
 
 	return retval;

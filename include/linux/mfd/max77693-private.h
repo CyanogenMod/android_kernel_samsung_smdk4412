@@ -24,6 +24,9 @@
 
 #include <linux/i2c.h>
 
+#ifdef CONFIG_FAST_BOOT
+#include <linux/fake_shut_down.h>
+#endif
 #define MAX77693_NUM_IRQ_MUIC_REGS	3
 #define MAX77693_REG_INVALID		(0xff)
 
@@ -341,6 +344,10 @@ struct max77693_dev {
 	int irq_masks_cur[MAX77693_IRQ_GROUP_NR];
 	int irq_masks_cache[MAX77693_IRQ_GROUP_NR];
 
+#if defined(CONFIG_MUIC_MAX77693_RESET_WA)
+	struct work_struct *muic_init_work;
+#endif
+
 #ifdef CONFIG_HIBERNATION
 	/* For hibernation */
 	u8 reg_pmic_dump[MAX77693_PMIC_REG_END];
@@ -357,10 +364,6 @@ enum max77693_types {
 	TYPE_MAX77693,
 };
 
-#ifdef CONFIG_FAST_BOOT
-extern bool fake_shut_down;
-#endif
-
 extern struct device *switch_dev;
 extern int max77693_irq_init(struct max77693_dev *max77693);
 extern void max77693_irq_exit(struct max77693_dev *max77693);
@@ -374,6 +377,8 @@ extern int max77693_bulk_write(struct i2c_client *i2c, u8 reg, int count,
 				u8 *buf);
 extern int max77693_update_reg(struct i2c_client *i2c,
 				u8 reg, u8 val, u8 mask);
+
+/* muic api functions */
 extern int max77693_muic_get_charging_type(void);
 extern int max77693_muic_get_status1_adc1k_value(void);
 extern int max77693_muic_get_status1_adc_value(void);
@@ -394,12 +399,21 @@ enum cable_type_muic {
 	CABLE_TYPE_JIG_UART_ON_MUIC,
 	CABLE_TYPE_JIG_USB_OFF_MUIC,
 	CABLE_TYPE_JIG_USB_ON_MUIC,
+#if defined(CONFIG_MUIC_MAX77693_SUPPORT_MHL_CABLE_DETECTION)
 	CABLE_TYPE_MHL_MUIC,
 	CABLE_TYPE_MHL_VB_MUIC,
+#endif /* CONFIG_MUIC_MAX77693_SUPPORT_MHL_CABLE_DETECTION */
+	CABLE_TYPE_CEA936ATYPE2_CHG,
 	CABLE_TYPE_SMARTDOCK_MUIC,
 	CABLE_TYPE_SMARTDOCK_TA_MUIC,
 	CABLE_TYPE_SMARTDOCK_USB_MUIC,
 	CABLE_TYPE_AUDIODOCK_MUIC,
+#if defined(CONFIG_MUIC_MAX77693_SUPPORT_REMOTE_SWITCH)
+	CABLE_TYPE_REMOTE_SWITCH_MUIC,
+#endif /* CONFIG_MUIC_MAX77693_SUPPORT_REMOTE_SWITCH */
+#if defined(CONFIG_MUIC_MAX77693_SUPPORT_PS_CABLE)
+	CABLE_TYPE_POWER_SHARING_MUIC,
+#endif /* CONFIG_MUIC_MAX77693_SUPPORT_PS_CABLE */
 #if defined(CONFIG_MUIC_DET_JACK)
 	CABLE_TYPE_EARJACK_MUIC,
 #endif

@@ -101,7 +101,12 @@ void __init exynos4_fimc_is_set_platdata(struct exynos4_platform_fimc_is *pd)
 			npd->clk_get = exynos_fimc_is_clk_get;
 		if (!npd->clk_put)
 			npd->clk_put = exynos_fimc_is_clk_put;
-
+#ifdef CONFIG_MACH_IPCAM
+		if (!npd->filter_on)
+			npd->filter_on = exynos_fimc_is_filter_on;
+		if (!npd->filter_off)
+			npd->filter_off = exynos_fimc_is_filter_off;
+#endif
 		exynos4_device_fimc_is.dev.platform_data = npd;
 	}
 }

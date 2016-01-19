@@ -24,6 +24,13 @@
 
 #define L2_CACHE_SKIP_MARK 256*4
 
+#define LV1_PT_SIZE		SZ_1M
+#define LV2_PT_SIZE		SZ_1K
+#define LV1_SHIFT		20
+#define LV2_BASE_MASK		0x3ff
+#define LV2_PT_MASK		0xff000
+#define LV2_SHIFT		12
+
 void g2d_pagetable_clean(const void *start_addr, unsigned long size, unsigned long pgd)
 {
 	void *l1d_vir, *l1d_phy, *l2d_phy;
@@ -377,3 +384,45 @@ int g2d_check_need_dst_cache_clean(g2d_params * params)
 	
 	return true;
 }
+
+void g2d_clean_outer_pagetable(struct mm_struct *mm, unsigned long vaddr,
+				size_t size)
+{
+	unsigned long *pgd;
+	unsigned long *lv1, *lv1end;
+	unsigned long lv2pa;
+
+	pgd = (unsigned long *)mm->pgd;
+
+	lv1 = pgd + (vaddr >> LV1_SHIFT);
+	lv1end = pgd + ((vaddr + size + LV1_PT_SIZE-1) >> LV1_SHIFT);
+
+	/* clean level1 page table */
+	outer_clean_range(virt_to_phys(lv1), virt_to_phys(lv1end));
+
+	do {
+		lv2pa = *lv1 & ~LV2_BASE_MASK;	/* lv2 pt base */
+		/* clean level2 page table */
+		outer_clean_range(lv2pa, lv2pa + LV2_PT_SIZE);
+		lv1++;
+	} while (lv1 != lv1end);
+}
+
+void g2d_mmutable_value_replace(struct mm_struct *mm,
+				unsigned long fault_addr, unsigned long l2d_value)
+{
+	unsigned long *pgd;
+	unsigned long *lv1d, *lv2d;
+
+	pgd = (unsigned long *)mm->pgd;
+	lv1d = pgd + (fault_addr >> LV1_SHIFT);
+
+	lv2d = (unsigned long *)phys_to_virt(*lv1d & ~LV2_BASE_MASK) +
+			((fault_addr & LV2_PT_MASK) >> LV2_SHIFT);
+
+	*lv2d = l2d_value;
+	dmac_flush_range(lv2d, lv2d + 4);
+	g2d_clean_outer_pagetable(mm, fault_addr, 4);
+	printk(KERN_DEBUG "MMU Level2 value replaced [0x%lx]", l2d_value);
+}
+

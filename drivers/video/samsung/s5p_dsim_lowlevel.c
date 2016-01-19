@@ -95,7 +95,7 @@ void s5p_dsim_init_fifo_pointer(unsigned int dsim_base, unsigned char cfg)
 /*
  * this function set PLL P, M and S value in D-PHY
  */
-void s5p_dsim_set_phy_tunning(unsigned int dsim_base, unsigned int value)
+void s5p_dsim_set_phy_tuning(unsigned int dsim_base, unsigned int value)
 {
 	writel(DSIM_AFC_CTL(value), dsim_base + S5P_DSIM_PHYACCHR);
 

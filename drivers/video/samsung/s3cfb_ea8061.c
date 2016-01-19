@@ -489,9 +489,8 @@ elvss_err:
 
 static int init_elvss_table(struct lcd_info *lcd)
 {
-	int i, ret = 0;
 #ifdef SMART_DIMMING_DEBUG
-	int j;
+	int i, j;
 #endif
 	lcd->elvss_table = (unsigned char **)ELVSS_CONTROL_TABLE;
 
@@ -504,15 +503,6 @@ static int init_elvss_table(struct lcd_info *lcd)
 #endif
 
 	return 0;
-
-err_alloc_elvss:
-	while (i > 0) {
-		kfree(lcd->elvss_table[i-1]);
-		i--;
-	}
-	kfree(lcd->elvss_table);
-err_alloc_elvss_table:
-	return ret;
 }
 
 #ifdef SMART_DIMMING
@@ -679,8 +669,8 @@ static int update_brightness(struct lcd_info *lcd, u8 force)
 
 	brightness = lcd->bd->props.brightness;
 
-	if (unlikely(!lcd->auto_brightness && brightness > 250))
-		brightness = 250;
+	if (unlikely(!lcd->auto_brightness && brightness > MAX_BRIGHTNESS))
+		brightness = MAX_BRIGHTNESS;
 
 	lcd->bl = get_backlight_level_from_brightness(brightness);
 
@@ -725,6 +715,8 @@ static int ea8061_ldi_init(struct lcd_info *lcd)
 	ea8061_write(lcd, SEQ_APPLY_LEVEL_2_KEY_ENABLE, ARRAY_SIZE(SEQ_APPLY_LEVEL_2_KEY_ENABLE));
 	ea8061_write(lcd, SEQ_APPLY_LEVEL_3_KEY, ARRAY_SIZE(SEQ_APPLY_LEVEL_3_KEY));
 	if (lcd->id[1] == 0x13) {  /* M4 */
+		ea8061_write(lcd, SEQ_MAGNA_GP, ARRAY_SIZE(SEQ_MAGNA_GP));
+		ea8061_write(lcd, SEQ_MAGNA_REFRESH_DISABLE, ARRAY_SIZE(SEQ_MAGNA_REFRESH_DISABLE));
 		ea8061_write(lcd, SEQ_M4_PANEL_CONDITION_SET, ARRAY_SIZE(SEQ_M4_PANEL_CONDITION_SET));
 		ea8061_write(lcd, SEQ_DISPLAY_CONDITION_SET, ARRAY_SIZE(SEQ_DISPLAY_CONDITION_SET));
 /*		ea8061_write(lcd, SEQ_FRAME_GAMMA_UPDATE_KEY, ARRAY_SIZE(SEQ_FRAME_GAMMA_UPDATE_KEY));
@@ -736,6 +728,8 @@ static int ea8061_ldi_init(struct lcd_info *lcd)
 		ea8061_write(lcd, SEQ_ETC_WCABC_CONTROL, ARRAY_SIZE(SEQ_ETC_WCABC_CONTROL));
 		ea8061_write(lcd, SEQ_M4_SLEW, ARRAY_SIZE(SEQ_M4_SLEW));
 	} else {  /* SM2 */
+		ea8061_write(lcd, SEQ_MAGNA_GP, ARRAY_SIZE(SEQ_MAGNA_GP));
+		ea8061_write(lcd, SEQ_MAGNA_REFRESH_DISABLE, ARRAY_SIZE(SEQ_MAGNA_REFRESH_DISABLE));
 		ea8061_write(lcd, SEQ_PANEL_CONDITION_SET, ARRAY_SIZE(SEQ_PANEL_CONDITION_SET));
 		ea8061_write(lcd, SEQ_DISPLAY_CONDITION_SET, ARRAY_SIZE(SEQ_DISPLAY_CONDITION_SET));
 /*		ea8061_write(lcd, SEQ_FRAME_GAMMA_UPDATE_KEY, ARRAY_SIZE(SEQ_FRAME_GAMMA_UPDATE_KEY));
@@ -892,10 +886,9 @@ static int ea8061_get_brightness(struct backlight_device *bd)
 
 static int ea8061_check_fb(struct lcd_device *ld, struct fb_info *fb)
 {
-	struct s3cfb_window *win = fb->par;
 	struct lcd_info *lcd = lcd_get_data(ld);
 
-	//dev_info(&lcd->ld->dev, "%s, fb%d\n", __func__, win->id);
+	dev_info(&lcd->ld->dev, "%s, fb%d\n", __func__, fb->node);
 
 	return 0;
 }

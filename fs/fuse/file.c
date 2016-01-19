@@ -663,6 +663,13 @@ static int fuse_readpages_fill(void *_data, struct page *page)
 			return -ENOMEM;
 		}
 
+		if (is_cma_pageblock(newpage)) {
+			page_cache_release(oldpage);
+			__free_page(newpage);
+			printk(KERN_ERR "[%s] still on cma pgblk\n", __func__);
+			return -ENOMEM;
+		}
+
 		err = replace_page_cache_page(oldpage, newpage, GFP_KERNEL);
 		if (err) {
 			__free_page(newpage);

@@ -41,6 +41,10 @@
 #include <linux/pm_runtime.h>
 #endif
 
+#if defined(CONFIG_MACH_GC1) || defined(CONFIG_MACH_GC2PD) || defined(CONFIG_MACH_GD2)
+#define FIMC_FRAME_START_END_IRQ_ENABLE
+#endif
+#include <asm/uaccess.h>
 #define FIMC_NAME		"s3c-fimc"
 #define FIMC_CMA_NAME		"fimc"
 
@@ -113,6 +117,13 @@ extern int fimc_clk_rate(void);
 
 #define L2_FLUSH_ALL	SZ_1M
 #define L1_FLUSH_ALL	SZ_64K
+
+#if defined(CONFIG_MACH_GD2)
+#define U1_PREVIEW_WSIZE 1296
+#define U1_PREVIEW_HSIZE 720
+#define U1_WINDOW_OFFSETH 8
+#define U1_WINDOW_OFFSETH2 8
+#endif
 
 /*
  * ENUMERATIONS
@@ -469,7 +480,7 @@ struct fimc_control {
 	struct mutex			lock;		/* controller lock */
 	struct mutex			v4l2_lock;
 	spinlock_t			outq_lock;
-        spinlock_t			inq_lock;
+	spinlock_t			inq_lock;
 	wait_queue_head_t		wq;
 	struct device			*dev;
 #if defined(CONFIG_BUSFREQ_OPP) || defined(CONFIG_BUSFREQ_LOCK_WRAPPER)
@@ -499,14 +510,13 @@ struct fimc_control {
 	int 				suspend_framecnt;
 	enum fimc_sysmmu_flag		sysmmu_flag;
 	enum fimc_power_status		power_status;
-	struct timeval			curr_time;
-	struct timeval			before_time;
 	char 				cma_name[16];
 	bool				restart;
 #ifdef CONFIG_SLP_DMABUF
 	struct vb2_buffer       *out_bufs[VIDEO_MAX_FRAME];
 	struct vb2_buffer       *cap_bufs[VIDEO_MAX_FRAME];
 #endif
+	int is_frame_end_irq;
 };
 
 /* global */
@@ -627,6 +637,7 @@ extern int fimc_try_fmt_vid_capture(struct file *file, void *fh, struct v4l2_for
 extern int fimc_reqbufs_capture(void *fh, struct v4l2_requestbuffers *b);
 extern int fimc_querybuf_capture(void *fh, struct v4l2_buffer *b);
 extern int fimc_g_ctrl_capture(void *fh, struct v4l2_control *c);
+extern int fimc_noti_ctrl_capture(void *fh, struct v4l2_noti_control *c);
 extern int fimc_g_ext_ctrls_capture(void *fh, struct v4l2_ext_controls *c);
 extern int fimc_s_ctrl_capture(void *fh, struct v4l2_control *c);
 extern int fimc_s_ext_ctrls_capture(void *fh, struct v4l2_ext_controls *c);
@@ -702,6 +713,7 @@ extern int fimc_hwset_clear_irq(struct fimc_control *ctrl);
 extern int fimc_hwset_reset(struct fimc_control *ctrl);
 extern int fimc_hwset_sw_reset(struct fimc_control *ctrl);
 extern int fimc_hwget_frame_end(struct fimc_control *ctrl);
+extern int fimc_hwget_frame_end_sync(struct fimc_control *ctrl);
 extern int fimc_hwset_clksrc(struct fimc_control *ctrl, int src_clk);
 extern int fimc_hwget_overflow_state(struct fimc_control *ctrl);
 extern int fimc_hwset_camera_offset(struct fimc_control *ctrl);

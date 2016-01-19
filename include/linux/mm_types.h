@@ -218,8 +218,17 @@ enum {
 	MM_FILEPAGES,
 	MM_ANONPAGES,
 	MM_SWAPENTS,
+#ifdef CONFIG_LOWMEM_CHECK
+	MM_FILE_LOWPAGES, /* pages from lower zones in file rss*/
+	MM_ANON_LOWPAGES, /* pages from lower zones in anon rss*/
+	MM_LOW_SWAPENTS,
+#endif
 	NR_MM_COUNTERS
 };
+
+#ifdef CONFIG_LOWMEM_CHECK
+#define LOWMEM_COUNTER	3
+#endif
 
 #if USE_SPLIT_PTLOCKS && defined(CONFIG_MMU)
 #define SPLIT_RSS_COUNTING

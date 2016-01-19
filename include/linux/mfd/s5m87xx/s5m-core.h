@@ -321,7 +321,6 @@ struct s5m87xx_dev {
 	u8 irq_masks_cache[NUM_IRQ_REGS];
 	int type;
 	bool wakeup;
-	bool wtsr_smpl;
 };
 
 int s5m_irq_init(struct s5m87xx_dev *s5m87xx);
@@ -333,6 +332,13 @@ extern int s5m_bulk_read(struct i2c_client *i2c, u8 reg, int count, u8 *buf);
 extern int s5m_reg_write(struct i2c_client *i2c, u8 reg, u8 value);
 extern int s5m_bulk_write(struct i2c_client *i2c, u8 reg, int count, u8 *buf);
 extern int s5m_reg_update(struct i2c_client *i2c, u8 reg, u8 val, u8 mask);
+
+struct s5m_wtsr_smpl {
+	bool wtsr_en;
+	bool smpl_en;
+	int wtsr_time;
+	int smpl_time;
+};
 
 struct s5m_platform_data {
 	struct s5m_regulator_data	*regulators;
@@ -376,7 +382,7 @@ struct s5m_platform_data {
 	bool                            buck3_ramp_enable;
 	bool                            buck4_ramp_enable;
 
-	bool				wtsr_smpl;
+	struct s5m_wtsr_smpl		*wtsr_smpl;
 
 	int				buck1_init;
 	int				buck2_init;

@@ -378,6 +378,7 @@ static long secmem_ioctl(struct file *filp, unsigned int cmd, unsigned long arg)
 		dma_free_coherent(NULL, region.len, region.virt_addr,
 					region.phys_addr);
 #endif
+
 		break;
 	}
 

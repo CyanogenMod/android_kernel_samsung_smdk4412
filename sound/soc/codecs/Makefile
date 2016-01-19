@@ -73,11 +73,7 @@ snd-soc-wm8988-objs := wm8988.o
 snd-soc-wm8990-objs := wm8990.o
 snd-soc-wm8991-objs := wm8991.o
 snd-soc-wm8993-objs := wm8993.o
-ifeq ($(CONFIG_MACH_KONA),y)
-snd-soc-wm8994-objs := wm8994_kona.o wm8994-tables.o wm8958-dsp2.o
-else
 snd-soc-wm8994-objs := wm8994.o wm8994-tables.o wm8958-dsp2.o
-endif
 snd-soc-wm8995-objs := wm8995.o
 snd-soc-wm9081-objs := wm9081.o
 snd-soc-wm9705-objs := wm9705.o
@@ -176,8 +172,6 @@ obj-$(CONFIG_SND_SOC_WM9705)	+= snd-soc-wm9705.o
 obj-$(CONFIG_SND_SOC_WM9712)	+= snd-soc-wm9712.o
 obj-$(CONFIG_SND_SOC_WM9713)	+= snd-soc-wm9713.o
 obj-$(CONFIG_SND_SOC_WM_HUBS)	+= snd-soc-wm-hubs.o
-obj-$(CONFIG_SND_SOC_MC1N2)	+= mc1n2/
-obj-$(CONFIG_SND_SOC_YAMAHA_YMU831)	+= ymu831/
 
 # Amp
 obj-$(CONFIG_SND_SOC_LM4857)	+= snd-soc-lm4857.o

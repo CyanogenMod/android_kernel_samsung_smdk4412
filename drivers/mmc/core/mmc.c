@@ -30,9 +30,7 @@
 #else
 /* For debugging about ext_csd register value */
 #if 0
-#ifndef CONFIG_WIMAX_CMC
 #define MMC_CHECK_EXT_CSD
-#endif
 #endif
 #endif
 #endif
@@ -218,7 +216,7 @@ static int mmc_decode_csd(struct mmc_card *card)
 	return 0;
 }
 
-#if defined(MMC_CHECK_EXT_CSD) && !defined(CONFIG_WIMAX_CMC)
+#if defined(MMC_CHECK_EXT_CSD)
 /* For debugging about ext_csd register value */
 static u8 *ext_csd_backup;
 static void mmc_error_ext_csd(struct mmc_card *card, u8 *ext_csd,
@@ -342,7 +340,7 @@ static int mmc_get_ext_csd(struct mmc_card *card, u8 **new_ext_csd)
 	} else
 		*new_ext_csd = ext_csd;
 
-#if defined(MMC_CHECK_EXT_CSD) && !defined(CONFIG_WIMAX_CMC)
+#if defined(MMC_CHECK_EXT_CSD)
 /* For debugging about ext_csd register value */
 	mmc_error_ext_csd(card, ext_csd, 1, 0);
 #endif
@@ -371,7 +369,7 @@ static int mmc_read_ext_csd(struct mmc_card *card, u8 *ext_csd)
 				"version %d\n", mmc_hostname(card->host),
 					card->ext_csd.raw_ext_csd_structure);
 			err = -EINVAL;
-#if defined(MMC_CHECK_EXT_CSD) && !defined(CONFIG_WIMAX_CMC)
+#if defined(MMC_CHECK_EXT_CSD)
 			/* For debugging about ext_csd register value */
 			mmc_error_ext_csd(card, ext_csd, 0, EXT_CSD_STRUCTURE);
 #endif
@@ -388,7 +386,7 @@ static int mmc_read_ext_csd(struct mmc_card *card, u8 *ext_csd)
 		printk(KERN_ERR "%s: unrecognised EXT_CSD revision %d\n",
 			mmc_hostname(card->host), card->ext_csd.rev);
 		err = -EINVAL;
-#if defined(MMC_CHECK_EXT_CSD) && !defined(CONFIG_WIMAX_CMC)
+#if defined(MMC_CHECK_EXT_CSD)
 		/* For debugging about ext_csd register value */
 		mmc_error_ext_csd(card, ext_csd, 0, EXT_CSD_REV);
 #endif
@@ -411,35 +409,6 @@ static int mmc_read_ext_csd(struct mmc_card *card, u8 *ext_csd)
 			mmc_card_set_blockaddr(card);
 	}
 	card->ext_csd.raw_card_type = ext_csd[EXT_CSD_CARD_TYPE];
-#ifdef CONFIG_WIMAX_CMC
-	switch (ext_csd[EXT_CSD_CARD_TYPE] & EXT_CSD_CARD_TYPE_MASK) {
-	case EXT_CSD_CARD_TYPE_DDR_52 | EXT_CSD_CARD_TYPE_52 |
-	     EXT_CSD_CARD_TYPE_26:
-		card->ext_csd.hs_max_dtr = 52000000;
-		card->ext_csd.card_type = EXT_CSD_CARD_TYPE_DDR_52;
-		break;
-	case EXT_CSD_CARD_TYPE_DDR_1_2V | EXT_CSD_CARD_TYPE_52 |
-	     EXT_CSD_CARD_TYPE_26:
-		card->ext_csd.hs_max_dtr = 52000000;
-		card->ext_csd.card_type = EXT_CSD_CARD_TYPE_DDR_1_2V;
-		break;
-	case EXT_CSD_CARD_TYPE_DDR_1_8V | EXT_CSD_CARD_TYPE_52 |
-	     EXT_CSD_CARD_TYPE_26:
-		card->ext_csd.hs_max_dtr = 52000000;
-		card->ext_csd.card_type = EXT_CSD_CARD_TYPE_DDR_1_8V;
-		break;
-	case EXT_CSD_CARD_TYPE_52 | EXT_CSD_CARD_TYPE_26:
-		card->ext_csd.hs_max_dtr = 52000000;
-		break;
-	case EXT_CSD_CARD_TYPE_26:
-		card->ext_csd.hs_max_dtr = 26000000;
-		break;
-	default:
-		/* MMC v4 spec says this cannot happen */
-		printk(KERN_WARNING "%s: card is mmc v4 but doesn't "
-			"support any high-speed modes.\n",
-			mmc_hostname(card->host));
-#else
 	if (card->host->caps2 & MMC_CAP2_HS200) {
 		switch (ext_csd[EXT_CSD_CARD_TYPE] & EXT_CSD_CARD_TYPE_MASK) {
 		case EXT_CSD_CARD_TYPE_SDR_ALL:
@@ -538,7 +507,6 @@ static int mmc_read_ext_csd(struct mmc_card *card, u8 *ext_csd)
 			goto out;
 #endif
 		}
-#endif
 	}
 
 	card->ext_csd.raw_s_a_timeout = ext_csd[EXT_CSD_S_A_TIMEOUT];
@@ -640,13 +608,16 @@ static int mmc_read_ext_csd(struct mmc_card *card, u8 *ext_csd)
 			card->host->card = card;
 			movi_ver_check = mmc_start_movi_smart(card);
 		}
-#ifndef CONFIG_WIMAX_CMC
+
 		/* enable discard feature if emmc is 4.41+ moviNand */
 		if ((ext_csd[EXT_CSD_VENDOR_SPECIFIC_FIELD + 0] & 0x1) &&
 			(card->cid.manfid == 0x15))
 			card->ext_csd.feature_support |= MMC_DISCARD_FEATURE;
-#endif
-		/* enable PON feature if moviNAND VHX/VMX devices */
+
+		/*
+		 * enable PON feature if it is specific moviNAND VHX devices
+		 * VHX  : eMMC 4.41 or 4.5
+		 */
 		if (CHECK_MOVI_PON_SUPPORT) {
 			if ((movi_ver_check & MMC_MOVI_VER_VHX0) &&
 					(CHECK_MOVI_VHX4_41 ||
@@ -656,18 +627,6 @@ static int mmc_read_ext_csd(struct mmc_card *card, u8 *ext_csd)
 				card->ext_csd.generic_cmd6_time = 100;
 				card->ext_csd.power_off_longtime = 600;
 			}
-			if (movi_ver_check & MMC_MOVI_VER_VMX0) {
-				card->ext_csd.feature_support |=
-					MMC_POWEROFF_NOTIFY_FEATURE;
-			}
-			pr_info("%s : %s PON feature : "
-					"%02x : %02x(%02x) : %08x\n",
-					mmc_hostname(card->host),
-					card->ext_csd.feature_support & MMC_POWEROFF_NOTIFY_FEATURE ?
-					"enable" : "disable",
-					movi_ver_check,
-					card->movi_fwver,  ext_csd[82],
-					card->movi_fwdate);
 		}
 
 		/*
@@ -707,6 +666,29 @@ static int mmc_read_ext_csd(struct mmc_card *card, u8 *ext_csd)
 	if (card->ext_csd.rev >= 6) {
 		card->ext_csd.feature_support |= MMC_DISCARD_FEATURE;
 
+		/*
+		 * enable PON feature if moviNAND VHX2/VMX devices
+		 * VHX2 : eMMC 4.5
+		 * VMX  : eMMC 4.5 or later
+		 */
+		if (CHECK_MOVI_PON_SUPPORT) {
+			if (movi_ver_check &
+					(MMC_MOVI_VER_VMX0 |
+					 MMC_MOVI_VER_VHX2)) {
+				card->ext_csd.feature_support |=
+					MMC_POWEROFF_NOTIFY_FEATURE;
+			}
+		}
+
+		/*
+		 * enable PON feature on eMMC 4.5 or later,
+		 * if it is not moviNAND.
+		 */
+		if (card->cid.manfid != 0x15) {
+			card->ext_csd.feature_support |=
+				MMC_POWEROFF_NOTIFY_FEATURE;
+		}
+
 		card->ext_csd.generic_cmd6_time = 10 *
 			ext_csd[EXT_CSD_GENERIC_CMD6_TIME];
 		card->ext_csd.power_off_longtime = 10 *
@@ -723,6 +705,18 @@ static int mmc_read_ext_csd(struct mmc_card *card, u8 *ext_csd)
 		card->ext_csd.max_packed_reads =
 			ext_csd[EXT_CSD_MAX_PACKED_READS];
 	}
+
+	/* If eMMC doesn't support PON, unset flag on caps2. */
+	if (!CHECK_PON_ENABLE)
+		card->host->caps2 &= ~MMC_CAP2_POWEROFF_NOTIFY;
+
+	pr_info("%s : %s PON feature : %02x : %02x : %08x\n",
+			mmc_hostname(card->host),
+			card->host->caps2 & MMC_CAP2_POWEROFF_NOTIFY ?
+			"enable" : "disable",
+			movi_ver_check ? movi_ver_check : card->cid.manfid,
+			card->movi_fwver,
+			card->movi_fwdate);
 
 out:
 	return err;
@@ -810,6 +804,16 @@ MMC_DEV_ATTR(enhanced_area_offset, "%llu\n",
 		card->ext_csd.enhanced_area_offset);
 MMC_DEV_ATTR(enhanced_area_size, "%u\n", card->ext_csd.enhanced_area_size);
 MMC_DEV_ATTR(fwver, "%02x : %x\n", card->movi_fwver, card->movi_fwdate);
+MMC_DEV_ATTR(caps, "0x%08x\n", (unsigned int)(card->host->caps));
+MMC_DEV_ATTR(caps2, "0x%08x\n", card->host->caps2);
+MMC_DEV_ATTR(erase_type, "MMC_CAP_ERASE %s, type %s, SECURE %s, Sanitize %s\n",
+		card->host->caps & MMC_CAP_ERASE ? "enabled" : "disabled",
+		mmc_can_discard(card) ? "DISCARD" :
+		(mmc_can_trim(card) ? "TRIM" : "NORMAL"),
+		(!mmc_can_sanitize(card) && mmc_can_secure_erase_trim(card) &&
+		 !(card->quirks & MMC_QUIRK_MOVINAND_SECURE)) ?
+		"supportable" : "disabled",
+		mmc_can_sanitize(card) ? "enabled" : "disabled");
 
 static struct attribute *mmc_std_attrs[] = {
 	&dev_attr_cid.attr,
@@ -826,6 +830,9 @@ static struct attribute *mmc_std_attrs[] = {
 	&dev_attr_enhanced_area_offset.attr,
 	&dev_attr_enhanced_area_size.attr,
 	&dev_attr_fwver.attr,
+	&dev_attr_caps.attr,
+	&dev_attr_caps2.attr,
+	&dev_attr_erase_type.attr,
 	NULL,
 };
 
@@ -922,7 +929,6 @@ static int mmc_select_powerclass(struct mmc_card *card,
 	return err;
 }
 
-#ifndef CONFIG_WIMAX_CMC
 /*
  * Selects the desired buswidth and switch to the HS200 mode
  * if bus width set without error
@@ -995,7 +1001,7 @@ static int mmc_select_hs200(struct mmc_card *card)
 err:
 	return err;
 }
-#endif
+
 /*
  * Handle the detection and initialisation of a card.
  *
@@ -1109,7 +1115,7 @@ static int mmc_init_card(struct mmc_host *host, u32 ocr,
 		/*
 		 * Fetch and process extended CSD.
 		 */
-#if defined(MMC_RETRY_READ_EXT_CSD) && !defined(CONFIG_WIMAX_CMC)
+#if defined(MMC_RETRY_READ_EXT_CSD)
 		{
 			int i = 0;
 			for (i = 0 ; i < 3 ; i++) {
@@ -1188,6 +1194,16 @@ static int mmc_init_card(struct mmc_host *host, u32 ocr,
 	}
 
 	/*
+	 * Ensure eMMC boot partition Write protection
+	 */
+	err = mmc_switch(card, EXT_CSD_CMD_SET_NORMAL,
+			EXT_CSD_BOOT_WP,
+			EXT_CSD_BOOT_WP_PERM_WP_DIS | EXT_CSD_BOOT_WP_PWR_WP_EN,
+			card->ext_csd.part_time);
+	if (err && err != -EBADMSG)
+		goto free_card;
+
+	/*
 	 * Ensure eMMC boot config is protected.
 	 */
 	if (!(card->ext_csd.boot_part_prot & (0x1<<4)) &&
@@ -1205,19 +1221,18 @@ static int mmc_init_card(struct mmc_host *host, u32 ocr,
 	 * If the host supports the power_off_notify capability then
 	 * set the notification byte in the ext_csd register of device
 	 */
+	/*
+	 * Change condition about ext_csd.rev from 6 to 5.
+	 * moviNAND VHX 4.41 has 5 as ext_csd.rev value.
+	 */
 	if ((host->caps2 & MMC_CAP2_POWEROFF_NOTIFY) &&
-	    ((card->ext_csd.rev >= 5) && CHECK_PON_ENABLE)) {
+	    (card->ext_csd.rev >= 5)) {
 		err = mmc_switch(card, EXT_CSD_CMD_SET_NORMAL,
 				 EXT_CSD_POWER_OFF_NOTIFICATION,
 				 EXT_CSD_POWER_ON,
 				 card->ext_csd.generic_cmd6_time);
 		if (err && err != -EBADMSG)
 			goto free_card;
-#ifdef CONFIG_WIMAX_CMC
-	if (!err)
-#else
-	if (!err && (host->caps2 & MMC_CAP2_POWEROFF_NOTIFY))
-#endif
 		/*
 		 * The err can be -EBADMSG or 0,
 		 * so check for success and update the flag
@@ -1230,20 +1245,13 @@ static int mmc_init_card(struct mmc_host *host, u32 ocr,
 	 * Activate high speed (if supported)
 	 */
 	if (card->ext_csd.hs_max_dtr != 0) {
-#ifndef CONFIG_WIMAX_CMC
 		err = 0;
 		if (card->ext_csd.hs_max_dtr > 52000000 &&
 		    host->caps2 & MMC_CAP2_HS200)
 			err = mmc_select_hs200(card);
 		else if	(host->caps & MMC_CAP_MMC_HIGHSPEED)
-#else
-			err = mmc_switch(card, EXT_CSD_CMD_SET_NORMAL,
-					 EXT_CSD_HS_TIMING, 1, card->ext_csd.generic_cmd6_time);
-#endif
-#ifndef CONFIG_WIMAX_CMC
 			err = mmc_switch(card, EXT_CSD_CMD_SET_NORMAL,
 					 EXT_CSD_HS_TIMING, 1, 0);
-#endif
 
 		if (err && err != -EBADMSG)
 			goto free_card;
@@ -1600,13 +1608,15 @@ static int mmc_resume(struct mmc_host *host)
 	mmc_claim_host(host);
 	err = mmc_init_card(host, host->ocr, host->card);
 
+#if defined(CONFIG_MMC_MOVI_OPERATION)
 	if (host->card->movi_ops == 0x2) {
 		err = mmc_start_movi_operation(host->card);
 		if (err) {
 			pr_warning("%s: movi operation is failed\n",
-							mmc_hostname(host));
+					mmc_hostname(host));
 		}
 	}
+#endif
 
 	mmc_release_host(host);
 
@@ -1621,13 +1631,15 @@ static int mmc_power_restore(struct mmc_host *host)
 	mmc_claim_host(host);
 	ret = mmc_init_card(host, host->ocr, host->card);
 
+#if defined(CONFIG_MMC_MOVI_OPERATION)
 	if (host->card->movi_ops == 0x2) {
 		ret = mmc_start_movi_operation(host->card);
 		if (ret) {
 			pr_warning("%s: movi operation is failed\n",
-							mmc_hostname(host));
+					mmc_hostname(host));
 		}
 	}
+#endif
 
 	mmc_release_host(host);
 
@@ -1759,19 +1771,21 @@ int mmc_attach_mmc(struct mmc_host *host)
 	if (err)
 		goto remove_card;
 
+#if defined(CONFIG_MMC_MOVI_OPERATION)
 	if (!strncmp(host->card->cid.prod_name, "VTU00M", 6) &&
-		(host->card->cid.prod_rev == 0xf1) &&
-		(host->card->movi_fwdate == 0x20120413)) {
+			(host->card->cid.prod_rev == 0xf1) &&
+			(host->card->movi_fwdate == 0x20120413)) {
 		/* It needs host work-around codes */
 		host->card->movi_ops = 0x2;
 
 		err = mmc_start_movi_operation(host->card);
 		if (err) {
 			pr_warning("%s: movi operation is failed\n",
-							mmc_hostname(host));
+					mmc_hostname(host));
 			goto remove_card;
 		}
 	}
+#endif
 
 	return 0;
 

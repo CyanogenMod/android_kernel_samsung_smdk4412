@@ -121,8 +121,8 @@ void dmb_drv_isr()
 
 unsigned char dmb_drv_init(void)
 {
-	int i;
 #ifdef FEATURE_INTERFACE_TEST_MODE
+	int i;
 	u8 data;
 	u16 wdata;
 	u32 ldata;
@@ -394,6 +394,8 @@ struct sub_channel_info_type *dmb_drv_get_fic_dmb(int subchannel_count)
 						= svc_info->dscty;
 					dmb_subchannel_info.ulServiceID
 						= svc_info->sid;
+					dmb_subchannel_info.scids
+						= svc_info->scids;
 
 					num_of_user_appl =
 						svc_info->num_of_user_appl;
@@ -422,6 +424,7 @@ struct sub_channel_info_type *dmb_drv_get_fic_dmb(int subchannel_count)
 					else
 						dmb_subchannel_info.uiEnsembleID
 						= 0;
+					dmb_subchannel_info.ecc	= esb->ecc;
 
 					break;
 				}
@@ -461,6 +464,9 @@ struct sub_channel_info_type *dmb_drv_get_fic_dab(int subchannel_count)
 						svc_info->ascty;
 					dab_subchannel_info.ulServiceID =
 						svc_info->sid;
+					dab_subchannel_info.scids =
+						svc_info->scids;
+
 					esb = fic_decoder_get_ensemble_info(0);
 					if (esb->flag == 99)
 						dmb_subchannel_info.uiEnsembleID
@@ -468,6 +474,7 @@ struct sub_channel_info_type *dmb_drv_get_fic_dab(int subchannel_count)
 					else
 						dmb_subchannel_info.uiEnsembleID
 						= 0;
+					dab_subchannel_info.ecc	= esb->ecc;
 
 					break;
 				}
@@ -538,6 +545,50 @@ unsigned long frequency
 
 	if (bbm_com_tuner_set_freq(NULL, frequency) != BBM_OK)
 		return TDMB_FAIL;
+
+	if (sevice_type == 0x18)
+		bbm_com_video_select(NULL, subchannel, 0, 0);
+	else if (sevice_type == 0x00)
+		bbm_com_audio_select(NULL, subchannel, 3);
+	else
+		bbm_com_data_select(NULL, subchannel, 2);
+
+#ifdef FEATURE_FC8050_DEBUG
+	if (sevice_type == 0x18)
+		dmb_mode = FC8050_DMB;
+	else if (sevice_type == 0x00)
+		dmb_mode = FC8050_DAB;
+	else
+		dmb_mode = FC8050_DATA;
+#endif
+
+	return TDMB_SUCCESS;
+}
+
+unsigned char dmb_drv_set_ch_factory(
+unsigned long frequency
+, unsigned char subchannel
+, unsigned char sevice_type)
+{
+	if (!dmb_initialize)
+		return TDMB_FAIL;
+
+	current_service_type = sevice_type;
+	current_subchannel_id = subchannel;
+
+	bbm_com_video_deselect(NULL, 0, 0, 0);
+	bbm_com_audio_deselect(NULL, 0, 3);
+	bbm_com_data_deselect(NULL, 0, 2);
+
+	bbm_com_word_write(NULL, BBM_BUF_INT, 0x00ff);
+
+	if (bbm_com_tuner_set_freq(NULL, frequency) != BBM_OK)
+		return TDMB_FAIL;
+
+	if (bbm_com_scan_status(NULL)) {
+		DPRINTK("%s scan fail\n", __func__);
+		return TDMB_FAIL;
+	}
 
 	if (sevice_type == 0x18)
 		bbm_com_video_select(NULL, subchannel, 0, 0);

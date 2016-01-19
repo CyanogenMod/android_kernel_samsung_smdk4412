@@ -399,7 +399,6 @@ int ctrl_bridge_write(unsigned int id, char *data, size_t size)
 	struct usb_ctrlrequest	*out_ctlreq;
 	struct usb_device	*udev;
 	struct ctrl_bridge	*dev;
-	int			spin = 50;
 
 	if (id >= MAX_BRIDGE_DEVICES) {
 		result = -EINVAL;
@@ -413,16 +412,9 @@ int ctrl_bridge_write(unsigned int id, char *data, size_t size)
 		goto free_data;
 	}
 
-	/* move it to mdm _hsic pm .c, check return code */
-	while (lpa_handling && spin--) {
-		pr_info("%s: lpa wake wait loop\n", __func__);
-		msleep(20);
-	}
-
-	if (lpa_handling) {
-		pr_err("%s: in lpa wakeup, return EAGAIN\n", __func__);
+	/* wait till, LPA wake complete */
+	if (pm_dev_wait_lpa_wake() < 0)
 		return -EAGAIN;
-	}
 
 	udev = interface_to_usbdev(dev->intf);
 

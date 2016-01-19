@@ -307,8 +307,17 @@ static int s3c_pwm_probe(struct platform_device *pdev)
 		ret = gpio_request(pdata->gpio_no, pdata->gpio_name);
 		if (ret)
 			printk(KERN_ERR "failed to get GPIO for PWM0\n");
+#ifdef CONFIG_MACH_IPCAM
+		if (id == 1) {
+			s3c_gpio_cfgpin(pdata->gpio_no, S3C_GPIO_OUTPUT);
+			gpio_set_value(pdata->gpio_no, 0);
+			s3c_gpio_setpull(pdata->gpio_no, S3C_GPIO_PULL_DOWN);
+		}
+		else
+			s3c_gpio_cfgpin(pdata->gpio_no, pdata->gpio_set_value);
+#else
 		s3c_gpio_cfgpin(pdata->gpio_no, pdata->gpio_set_value);
-
+#endif
 		/* Inserting the following for commit 2010.02.26: [BACKLIGHT] Fix PWM
 		   driver handling GPIO routine (request but not free)*/
 		gpio_free(pdata->gpio_no);

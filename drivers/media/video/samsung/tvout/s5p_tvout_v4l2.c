@@ -11,6 +11,7 @@
  */
 #include <linux/version.h>
 #include <linux/slab.h>
+#include <linux/dma-mapping.h>
 
 #include <media/v4l2-common.h>
 #include <media/v4l2-ioctl.h>
@@ -88,11 +89,15 @@ extern struct s5p_tvout_vp_bufferinfo s5ptv_vp_buff;
 #define V4L2_STD_1080P_30	((v4l2_std_id)0x12000000)
 
 #ifdef	CONFIG_HDMI_14A_3D
-#define V4L2_STD_TVOUT_720P_60_SBS_HALF	((v4l2_std_id)0x13000000)
-#define V4L2_STD_TVOUT_720P_59_SBS_HALF	((v4l2_std_id)0x14000000)
-#define V4L2_STD_TVOUT_720P_50_TB	((v4l2_std_id)0x15000000)
-#define V4L2_STD_TVOUT_1080P_24_TB	((v4l2_std_id)0x16000000)
-#define V4L2_STD_TVOUT_1080P_23_TB	((v4l2_std_id)0x17000000)
+#define V4L2_STD_TVOUT_720P_60_SBS_HALF		((v4l2_std_id)0x13000000)
+#define V4L2_STD_TVOUT_720P_59_SBS_HALF		((v4l2_std_id)0x14000000)
+#define V4L2_STD_TVOUT_720P_50_TB		((v4l2_std_id)0x15000000)
+#define V4L2_STD_TVOUT_1080P_24_TB		((v4l2_std_id)0x16000000)
+#define V4L2_STD_TVOUT_1080P_23_TB		((v4l2_std_id)0x17000000)
+#define V4L2_STD_TVOUT_720P_60_TB		((v4l2_std_id)0x18000000)
+#define V4L2_STD_TVOUT_1080P_24_SBS_HALF	((v4l2_std_id)0x19000000)
+#define V4L2_STD_TVOUT_1080P_60_SBS_HALF	((v4l2_std_id)0x20000000)
+#define V4L2_STD_TVOUT_1080P_60_TB		((v4l2_std_id)0x21000000)
 #endif
 
 #define CVBS_S_VIDEO (V4L2_STD_NTSC_M | V4L2_STD_NTSC_M_JP| \
@@ -254,26 +259,46 @@ static const struct v4l2_standard s5p_tvout_tvif_standard[] = {
 #ifdef CONFIG_HDMI_14A_3D
 	{
 		.index	= 22,
+		.id	= V4L2_STD_TVOUT_1080P_60_SBS_HALF,
+		.name	= "1080P_60_SBS_HALF",
+	},
+	{
+		.index	= 23,
 		.id	= V4L2_STD_TVOUT_720P_60_SBS_HALF,
 		.name	= "720P_60_SBS_HALF",
 	},
 	{
-		.index	= 23,
+		.index	= 24,
 		.id	= V4L2_STD_TVOUT_720P_59_SBS_HALF,
 		.name	= "720P_59_SBS_HALF",
 	},
 	{
-		.index	= 24,
+		.index	= 25,
+		.id	= V4L2_STD_TVOUT_1080P_24_SBS_HALF,
+		.name	= "1080P_24_SBS_HALF",
+	},
+	{
+		.index	= 26,
+		.id	= V4L2_STD_TVOUT_1080P_60_TB,
+		.name	= "1080P_60_TB",
+	},
+	{
+		.index	= 27,
+		.id	= V4L2_STD_TVOUT_720P_60_TB,
+		.name	= "720P_60_SBS_TB",
+	},
+	{
+		.index	= 28,
 		.id	= V4L2_STD_TVOUT_720P_50_TB,
 		.name	= "720P_50_TB",
 	},
 	{
-		.index	= 25,
+		.index	= 29,
 		.id	= V4L2_STD_TVOUT_1080P_24_TB,
 		.name	= "1080P_24_TB",
 	},
 	{
-		.index	= 26,
+		.index	= 30,
 		.id	= V4L2_STD_TVOUT_1080P_23_TB,
 		.name	= "1080P_23_TB",
 	},
@@ -326,6 +351,13 @@ struct s5p_tvout_v4l2_private_data {
 
 	atomic_t			tvif_use;
 	atomic_t			vo_use;
+
+#ifdef CONFIG_USE_TVOUT_CMA
+	void				*vir_addr;
+	dma_addr_t			dma_addr;
+#endif
+
+	struct device			*dev;
 };
 
 static struct s5p_tvout_v4l2_private_data s5p_tvout_v4l2_private = {
@@ -561,11 +593,23 @@ static int s5p_tvout_tvif_s_output(
 		break;
 
 #ifdef CONFIG_HDMI_14A_3D
+	case V4L2_STD_TVOUT_1080P_60_SBS_HALF:
+		tv_std = TVOUT_1080P_60_SBS_HALF;
+		break;
 	case V4L2_STD_TVOUT_720P_60_SBS_HALF:
 		tv_std = TVOUT_720P_60_SBS_HALF;
 		break;
 	case V4L2_STD_TVOUT_720P_59_SBS_HALF:
 		tv_std = TVOUT_720P_59_SBS_HALF;
+		break;
+	case V4L2_STD_TVOUT_1080P_24_SBS_HALF:
+		tv_std = TVOUT_1080P_24_SBS_HALF;
+		break;
+	case V4L2_STD_TVOUT_1080P_60_TB:
+		tv_std = TVOUT_1080P_60_TB;
+		break;
+	case V4L2_STD_TVOUT_720P_60_TB:
+		tv_std = TVOUT_720P_60_TB;
 		break;
 	case V4L2_STD_TVOUT_720P_50_TB:
 		tv_std = TVOUT_720P_50_TB;
@@ -883,17 +927,14 @@ long s5p_tvout_tvif_ioctl(
 			goto end_tvif_ioctl;
 		}
 		for (i = 0; i < S5PTV_VP_BUFF_CNT; i++) {
-			if (cma_is_registered_region(buffs[i].phy_base,
-							buffs[i].size)) {
-				s5ptv_vp_buff.vp_buffs[i].phy_base =
-							buffs[i].phy_base;
+			if (cma_is_registered_region(buffs[i].phy_base, buffs[i].size)) {
+				s5ptv_vp_buff.vp_buffs[i].phy_base = buffs[i].phy_base;
 				s5ptv_vp_buff.vp_buffs[i].vir_base =
 					(unsigned int)phys_to_virt(buffs[i].phy_base);
 				s5ptv_vp_buff.vp_buffs[i].size = buffs[i].size;
-				tvout_dbg("s5ptv_vp_buff phy_base = 0x%x, "
-						"vir_base = 0x%8x\n",
-					s5ptv_vp_buff.vp_buffs[i].phy_base,
-					s5ptv_vp_buff.vp_buffs[i].vir_base);
+				tvout_dbg("s5ptv_vp_buff phy_base = 0x%x, vir_base = 0x%8x\n",
+						s5ptv_vp_buff.vp_buffs[i].phy_base,
+						s5ptv_vp_buff.vp_buffs[i].vir_base);
 			} else {
 				s5ptv_vp_buff.vp_buffs[i].phy_base = 0;
 				s5ptv_vp_buff.vp_buffs[i].vir_base = 0;
@@ -942,18 +983,75 @@ end_tvif_ioctl:
 	return ret;
 }
 
+#ifdef CONFIG_USE_TVOUT_CMA
+static inline int alloc_vp_buff(void)
+{
+	int i;
+
+	s5p_tvout_v4l2_private.vir_addr = dma_alloc_coherent(
+				s5p_tvout_v4l2_private.dev,
+				S5PTV_VP_BUFF_CNT * S5PTV_VP_BUFF_SIZE,
+				&s5p_tvout_v4l2_private.dma_addr, 0);
+
+	if (!s5p_tvout_v4l2_private.vir_addr) {
+		printk(KERN_ERR "S5P-TVOUT: %s: dma_alloc_coherent returns "
+			"-ENOMEM\n", __func__);
+		return -ENOMEM;
+	}
+
+	printk(KERN_INFO "%s[%d] size 0x%x, vaddr 0x%x, base 0x%x\n",
+				__func__, __LINE__,
+				S5PTV_VP_BUFF_CNT * S5PTV_VP_BUFF_SIZE,
+				(int) s5p_tvout_v4l2_private.vir_addr,
+				(int) s5p_tvout_v4l2_private.dma_addr);
+
+	for (i = 0; i < S5PTV_VP_BUFF_CNT; i++) {
+		s5ptv_vp_buff.vp_buffs[i].phy_base =
+			(unsigned int) s5p_tvout_v4l2_private.dma_addr +
+					(i * S5PTV_VP_BUFF_SIZE);
+		s5ptv_vp_buff.vp_buffs[i].vir_base =
+			(unsigned int) s5p_tvout_v4l2_private.vir_addr +
+					(i * S5PTV_VP_BUFF_SIZE);
+	}
+
+	return 0;
+}
+
+static inline void free_vp_buff(void)
+{
+	dma_free_coherent(s5p_tvout_v4l2_private.dev,
+			S5PTV_VP_BUFF_CNT * S5PTV_VP_BUFF_SIZE,
+			s5p_tvout_v4l2_private.vir_addr,
+			s5p_tvout_v4l2_private.dma_addr);
+
+	printk(KERN_INFO "%s[%d] size 0x%x, vaddr 0x%x, base 0x%x\n",
+			__func__, __LINE__,
+			S5PTV_VP_BUFF_CNT * S5PTV_VP_BUFF_SIZE,
+			(int) s5p_tvout_v4l2_private.vir_addr,
+			(int) s5p_tvout_v4l2_private.dma_addr);
+}
+#else
+static inline int alloc_vp_buff(void) { return 0; }
+static inline void free_vp_buff(void) { }
+#endif
 
 static int s5p_tvout_tvif_open(struct file *file)
 {
+	int ret = 0;
+
 	mutex_lock(&s5p_tvout_tvif_mutex);
 
-	atomic_inc(&s5p_tvout_v4l2_private.tvif_use);
+	if (atomic_read(&s5p_tvout_v4l2_private.tvif_use) == 0)
+		ret = alloc_vp_buff();
+
+	if (!ret)
+		atomic_inc(&s5p_tvout_v4l2_private.tvif_use);
 
 	mutex_unlock(&s5p_tvout_tvif_mutex);
 
 	tvout_dbg("count=%d\n", atomic_read(&s5p_tvout_v4l2_private.tvif_use));
 
-	return 0;
+	return ret;
 }
 
 static int s5p_tvout_tvif_release(struct file *file)
@@ -968,9 +1066,15 @@ static int s5p_tvout_tvif_release(struct file *file)
 	atomic_dec(&s5p_tvout_v4l2_private.tvif_use);
 
 	if (atomic_read(&s5p_tvout_v4l2_private.tvif_use) == 0) {
+		// Stop VP 
+		s5p_mixer_ctrl_disable_vsync_interrupt();
+		s5p_vp_ctrl_stop();
+
 		s5p_tvout_mutex_lock();
 		s5p_tvif_ctrl_stop();
 		s5p_tvout_mutex_unlock();
+
+		free_vp_buff();
 	}
 
 	on_stop_process = false;
@@ -1148,28 +1252,20 @@ static int s5p_tvout_vo_s_fmt_type_private(
 #else
 	if (pix_fmt->priv) {
 		if (pix_fmt->pixelformat == V4L2_PIX_FMT_NV12T
-			|| pix_fmt->pixelformat == V4L2_PIX_FMT_NV21T) {
-			y_size = ALIGN(ALIGN(pix_fmt->width, 128) *
-				ALIGN(pix_fmt->height, 32), SZ_8K);
-			cbcr_size = ALIGN(ALIGN(pix_fmt->width, 128) *
-				ALIGN(pix_fmt->height >> 1, 32), SZ_8K);
+				|| pix_fmt->pixelformat == V4L2_PIX_FMT_NV21T) {
+			y_size = ALIGN(ALIGN(pix_fmt->width, 128) * ALIGN(pix_fmt->height, 32), SZ_8K);
+			cbcr_size = ALIGN(ALIGN(pix_fmt->width, 128) * ALIGN(pix_fmt->height >> 1, 32), SZ_8K);
 		} else {
 			y_size = pix_fmt->width * pix_fmt->height;
 			cbcr_size = pix_fmt->width * (pix_fmt->height >> 1);
 		}
-		if (!cma_is_registered_region((unsigned int)vparam.base_y,
-								y_size) ||
-			!cma_is_registered_region((unsigned int)vparam.base_c,
-								cbcr_size)) {
-			printk(KERN_ERR "Source image for VP is not"
-					"CMA region\n");
+		if (!cma_is_registered_region((unsigned int)vparam.base_y, y_size) ||
+				!cma_is_registered_region((unsigned int)vparam.base_c, cbcr_size)) {
+			printk(KERN_ERR "Source image for VP is not CMA region\n");
 			goto error_on_s_fmt_type_private;
 		}
 
-		copy_buff_idx =
-			s5ptv_vp_buff.
-				copy_buff_idxs[s5ptv_vp_buff.curr_copy_idx];
-
+		copy_buff_idx = s5ptv_vp_buff.copy_buff_idxs[s5ptv_vp_buff.curr_copy_idx];
 		if ((void *)s5ptv_vp_buff.vp_buffs[copy_buff_idx].vir_base
 			== NULL) {
 			s5p_vp_ctrl_set_src_plane(
@@ -1350,12 +1446,7 @@ static int s5p_tvout_vo_overlay(
 #endif
 	if (i) {
 		s5p_vp_ctrl_start();
-		/* restore vsync interrupt setting */
-		s5p_mixer_set_vsync_interrupt(
-			s5p_mixer_ctrl_get_vsync_interrupt());
 	} else {
-		/* disable vsync interrupt when VP is disabled */
-		s5p_mixer_ctrl_disable_vsync_interrupt();
 		s5p_vp_ctrl_stop();
 	}
 
@@ -1464,6 +1555,7 @@ int s5p_tvout_v4l2_constructor(struct platform_device *pdev)
 		}
 	}
 
+	s5p_tvout_v4l2_private.dev = &pdev->dev;
 	s5p_tvout_v4l2_init_private();
 
 	return 0;

@@ -75,7 +75,7 @@ IMMVIBESPIAPI VibeStatus ImmVibeSPI_ForceOut_AmpDisable(VibeUInt8 nActuatorIndex
 	if (g_bAmpEnabled) {
 
 		g_bAmpEnabled = false;
-#if !defined(CONFIG_MACH_P4NOTE)
+#if !defined(CONFIG_MACH_P4NOTE) && !defined(CONFIG_MACH_TAB3) && !defined(CONFIG_MACH_SP7160LTE)
 		vibtonz_pwm(0);
 		vibtonz_en(false);
 #endif
@@ -112,7 +112,7 @@ IMMVIBESPIAPI VibeStatus ImmVibeSPI_ForceOut_AmpEnable(VibeUInt8 nActuatorIndex)
 #endif
 
 	if (!g_bAmpEnabled) {
-#if !defined(CONFIG_MACH_P4NOTE)
+#if !defined(CONFIG_MACH_P4NOTE) && !defined(CONFIG_MACH_TAB3) && !defined(CONFIG_MACH_SP7160LTE)
 		vibtonz_en(true);
 #endif
 
@@ -240,7 +240,7 @@ IMMVIBESPIAPI VibeStatus ImmVibeSPI_ForceOut_SetSamples(VibeUInt8 nActuatorIndex
 	} else {
 		/* Map force from [-127, 127] to [0, PWM_DUTY_MAX] */
 		ImmVibeSPI_ForceOut_AmpEnable(0);
-#if !defined(CONFIG_MACH_P4NOTE)
+#if !defined(CONFIG_MACH_P4NOTE) && !defined(CONFIG_MACH_TAB3) && !defined(CONFIG_MACH_SP7160LTE)
 		vibtonz_pwm(nForce);
 #endif
 	}

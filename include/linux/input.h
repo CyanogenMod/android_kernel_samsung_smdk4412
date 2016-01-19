@@ -384,6 +384,9 @@ struct input_keymap_entry {
 #define KEY_F23			193
 #define KEY_F24			194
 
+#define KEY_SYM			198
+#define KEY_CENTER		199
+
 #define KEY_PLAYCD		200
 #define KEY_PAUSECD		201
 #define KEY_PROG3		202
@@ -449,6 +452,15 @@ struct input_keymap_entry {
 #define KEY_FOLDER_CLOSE	252  /*only use Grande CHN CTC */
 #define KEY_3G	253  /*only use Grande CHN CTC */
 
+/* Dummy touchkey code */
+#define KEY_DUMMY_HOME1		249
+#define KEY_DUMMY_HOME2		250
+#define KEY_DUMMY_MENU		251
+#define KEY_DUMMY_HOME		252
+#define KEY_DUMMY_BACK		253
+
+#define KEY_RECENT			254
+
 /* kona dummy touchkey */
 #define KEY_DUMMY_1     251
 #define KEY_DUMMY_2     252
@@ -509,6 +521,7 @@ struct input_keymap_entry {
 #define BTN_MODE		0x13c
 #define BTN_THUMBL		0x13d
 #define BTN_THUMBR		0x13e
+#define BTN_GAME		0x13f	/* Add game button for samsung bluetooth keypad */
 
 #define BTN_DIGI		0x140
 #define BTN_TOOL_PEN		0x140
@@ -692,6 +705,23 @@ struct input_keymap_entry {
 #define KEY_DMB_ANT_DET_UP		0x21b
 #define KEY_DMB_ANT_DET_DOWN	0x21c
 
+#define KEY_CAMERA_SHUTTER		0x220
+#define KEY_CAMERA_JOG_L   			0x221
+#define KEY_CAMERA_JOG_R   		0x222
+#define KEY_CAMERA_STROBE			0x223
+
+#define KEY_ZOOM_RING_MOVE			0x224
+#define KEY_ZOOM_RING_IN			0x225
+#define KEY_ZOOM_RING_OUT			0x226
+#define KEY_ZOOM_RING_SPEED1		0x231
+#define KEY_ZOOM_RING_SPEED2		0x232
+#define KEY_ZOOM_RING_SPEED3		0x233
+#define KEY_ZOOM_RING_SPEED4		0x234
+
+#define KEY_CAMERA_IFUNC			0x227
+#define KEY_CAMERA_FOCUS_L		0x228
+#define KEY_CAMERA_FOCUS_R		0x229
+
 #define KEY_PEN_PDCT		0x230 /* E-PEN PDCT flag*/
 
 #define KEY_FAKE_PWR		0x240 /* Fake Power off flag*/
@@ -808,14 +838,14 @@ struct input_keymap_entry {
 #define ABS_MT_PRESSURE		0x3a	/* Pressure on contact area */
 #define ABS_MT_DISTANCE		0x3b	/* Contact hover distance */
 #define ABS_MT_ANGLE		0x3c	/* touch angle */
-#define ABS_MT_COMPONENT	0x3c	/* touch component */
 #define ABS_MT_PALM		0x3d	/* palm touch */
-#define ABS_MT_SUMSIZE		0x3d	/* touch sumsize */
+#define ABS_MT_COMPONENT	0x3e	/* touch component */
+#define ABS_MT_SUMSIZE		0x3f	/* touch sumsize */
 
 #ifdef __KERNEL__
 /* Implementation details, userspace should not care about these */
 #define ABS_MT_FIRST		ABS_MT_TOUCH_MAJOR
-#define ABS_MT_LAST		ABS_MT_PALM
+#define ABS_MT_LAST		ABS_MT_SUMSIZE
 #endif
 
 #define ABS_MAX			0x3f
@@ -840,15 +870,10 @@ struct input_keymap_entry {
 #define SW_KEYPAD_SLIDE		0x0a  /* set = keypad slide out */
 #define SW_FRONT_PROXIMITY	0x0b  /* set = front proximity sensor active */
 #define SW_ROTATE_LOCK		0x0c  /* set = rotate locked/disabled */
-#define SW_PEN_INSERT			0x0e	/* set = pen out */
+#define SW_PEN_INSERT			0x13	/* set = pen out */
 #define SW_STROBE_INSERT		0x0f	/* set = strobe out */
-//#ifdef CONFIG_SENSORS_HALL
-//#define SW_FLIP			0x10  /* set = flip cover... */
-//#define SW_MAX			0x17
-//#else
-#define SW_MAX			0x10
-//#endif
-
+#define SW_FLIP			0x15  /* set = flip cover... */
+#define SW_MAX			0x17
 #define SW_CNT			(SW_MAX+1)
 
 /*
@@ -929,6 +954,8 @@ struct input_keymap_entry {
 #define BUS_GSC			0x1A
 #define BUS_ATARI		0x1B
 #define BUS_SPI			0x1C
+
+#define BUS_RMI         0x1D
 
 /*
  * MT_TOOL types

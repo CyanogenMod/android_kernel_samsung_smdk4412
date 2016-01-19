@@ -27,6 +27,28 @@ config SENSORS_AK8963C
 	  If you say yes here you get support for Asahi Kasei's
 	  orientation sensor AK8963.
 
+config SENSORS_AK8963C_FACTORY
+	tristate "AK8963C factory test"
+	default n
+	depends on SENSORS_AK8963C
+	help
+	  If you say yes here you will support
+	  factory test for AK8963C on the
+	  device driver.
+	  If you say no here you will support
+	  it on the HAL layer.
+
+config SENSORS_AK8975C_FACTORY
+	tristate "AK8975C factory test"
+	default n
+	depends on SENSORS_AK8975C
+	help
+	  If you say yes here you will support
+	  factory test for AK8975C on the
+	  device driver.
+	  If you say no here you will support
+	  it on the HAL layer.
+
 config SENSORS_BMP180
 	depends on I2C && SYSFS
 	tristate "BMP180 digital pressure sensor"
@@ -42,7 +64,11 @@ config SENSORS_CM3663
 	tristate "CM3663 ambient light and proximity input device"
 	default n
 	help
-	  This option enables proximity & light sensors using cm3663 driver.
+	  Say Y here if you use CM3663.
+	  This option enables lproximity & light sensors using
+	  Capella AL3201 device driver.
+
+	  Say N here if you do not use CM3663.
 
 config SENSORS_PAS2M110
 	depends on I2C && GENERIC_GPIO
@@ -70,14 +96,33 @@ config SENSORS_GP2A
 	tristate "GP2AP020A00F driver"
 	default n
 	help
-	  This option enables proximity & light sensors using gp2ap020a00f driver.
+	  Say Y here if you use GP2AP020A00F.
+	  This option enables lproximity & light sensors using
+	  SHARP GP2AP020A00F device driver.
+
+	  Say N here if you do not use GP2AP020A00F.
 
 config SENSORS_GP2A_ANALOG
 	depends on I2C
 	tristate "GP2A analog driver"
 	default n
 	help
-	  This option enables proximity & light sensors using analog gp2a driver.
+	  Say Y here if you use GP2A_ANALOG.
+	  This option enables lproximity & light sensors using
+	  SHARP GP2A_ANALOG device driver.
+
+	  Say N here if you do not use GP2A_ANALOG.
+
+config SENSORS_GP2A_VDD_CONTROL
+	depends on I2C
+	tristate "GP2A vdd power control"
+	default n
+	help
+	  Say Y here if you use GP2A vdd control
+	  This option enables proximity & light sensors using
+	  SHARP GP2A vdd power control.
+
+	  Say N here if you do not use GP2A vdd power control.
 
 config SENSORS_CM36651
 	depends on I2C
@@ -90,6 +135,39 @@ config SENSORS_CM36651
 
 	  Say N here if you do not use cm36651.
 
+config SENSORS_CM36653
+	depends on I2C
+	tristate "CM36653 driver"
+	default n
+	help
+	  Say Y here if you use cm36653.
+	  This option enables proximity & RGB sensors using
+	  Capella cm36653 device driver.
+
+	  Say N here if you do not use cm36653.
+
+config SENSORS_CM36653_ENABLE_RIL
+	depends on I2C
+	tristate "CM36653 prox_enable_store_ril"
+	default n
+	help
+	  Say Y here if you use prox_enable_store_ril.
+	  This option enables enable_store_ril on
+	  proximity & RGB sensor device driver.
+
+	  Say N here if you do not use prox_enable_store_ril.
+
+config SENSORS_CM3323
+	depends on I2C
+	tristate "CM3323 driver"
+	default n
+	help
+	  Say Y here if you use cm3323.
+	  This option enables RGB sensors using
+	  Capella cm3323 device driver.
+
+	  Say N here if you do not use cm3323.
+
 config SENSORS_BH1721
 	depends on I2C
 	tristate "BH1721 driver"
@@ -100,6 +178,17 @@ config SENSORS_BH1721
 	  ROHM BH1721 device driver.
 
 	  Say N here if you do not use BH1721.
+
+config SENSORS_BH1730
+	depends on I2C
+	tristate "BH1730 driver"
+	default n
+	help
+	  Say Y here if you use BH1730.
+	  This option enables light sensor using
+	  ROHM BH1730 device driver.
+
+	  Say N here if you do not use BH1730.
 
 config SENSORS_AL3201
 	depends on I2C
@@ -112,6 +201,28 @@ config SENSORS_AL3201
 
 	  Say N here if you do not use AL3201.
 
+config SENSORS_K3DH
+	tristate "K3DH acceleration sensor support"
+	depends on I2C
+        default n
+	help
+	  Say Y here if you use K3DH.
+	  This option enables accelerometer sensors using
+	  STM K3DH device driver.
+
+	  Say N here if you do not use K3DH.
+
+config SENSOR_K3DH_INPUTDEV
+	bool "K3DH acceleration sensor input dev support"
+	depends on SENSORS_K3DH
+        default n
+	help
+	  Say Y here if you use K3DH_INPUTDEV.
+	  This option enables accelerometer sensors using
+	  STM K3DH_INPUTDEV device driver.
+
+	  Say N here if you do not use K3DH_INPUTDEV.
+
 config SENSORS_K2DH
 	tristate "K2DH acceleration sensor support"
 	depends on I2C
@@ -119,64 +230,64 @@ config SENSORS_K2DH
 	help
 	  Say Y here if you use K2DH.
 	  This option enables accelerometer sensors using
-	  STM K2DH in K2DH device driver.
+	  STM K2DH in K3DH device driver.
 
 	  Say N here if you do not use K2DH.
-
-config SENSORS_K3DH
-	tristate "K3DH acceleration sensor support"
-	depends on I2C
-        default n
-	help
-	  Driver for STMicroelectronic K3DH accelerometer.
-
-config SENSOR_K3DH_INPUTDEV
-	bool "K3DH acceleration sensor input dev support"
-	depends on SENSORS_K3DH
-        default n
-	help
-	  Say Y here if you use K3DH.
-	  This option enables accelerometer sensor using
-	  K3DH device driver.
-
-	  Say N here if you do not use K3DH.
 
 config SENSORS_K3G
 	tristate "K3G driver for s5pc210"
 	depends on I2C
 	default n
 	help
-	  This option enables gyro sensors using K3G driver.
+	  Say Y here if you use K3G.
+	  This option enables gyro sensors using
+	  STM K3G device driver.
+
+	  Say N here if you do not use K3G.
 
 config SENSORS_LSM330DLC
 	depends on I2C
 	tristate "STMicro LSM330DLC driver"
 	default n
 	help
-	  Driver for STMicro LSM330DLC
+	  Say Y here if you use LSM330DLC.
+	  This option enables aceel & gyro sensors using
+	  STM LSM330DLC device driver.
+
+	  Say N here if you do not use LSM330DLC.
 
 config SENSORS_LPS331
 	tristate "STMicro LPS331 driver"
 	default n
 	depends on I2C
 	help
-	  Driver for STMicro LPS331
+	  Say Y here if you use LPS331.
+	  This option enables pressure sensors using
+	  STM LPS331 device driver.
+
+	  Say N here if you do not use LPS331.
 
 config SENSORS_YAS532
 	depends on I2C
-	tristate "yas532 Sensor Support"
+	tristate "YAS532 Sensor Support"
 	default n
 	help
-	  Say Y to enable YAS532 Magnetic Sensor support.
-	  This allows control of supported Magnetic Sensor.
+	  Say Y here if you use YAS532.
+	  This option enables geomagnetic sensors using
+	  YAMAHA YAS532 device driver.
+
+	  Say N here if you do not use YAS532.
 
 config SENSORS_YAS_ORI
 	depends on I2C
 	tristate "yas orientation Sensor Support"
 	default n
 	help
-	  Say Y to enable YAS532 Magnetic Sensor support.
-	  This allows control of supported Magnetic Sensor.
+	  Say Y here if you use YAS_ORI.
+	  This option enables orientation sensors using
+	  YAMAHA YAS_ORI device driver.
+
+	  Say N here if you do not use YAS_ORI.
 
 config INPUT_YAS_MAGNETOMETER_POSITION
          int "YAS Geomagnetic Sensor Mounting Position on Board"
@@ -193,4 +304,73 @@ config INPUT_YAS_MAGNETOMETER_POSITION
               6: bottom, lower-right
               7: bottom, lower-left
 
+config SENSORS_ASP01
+	depends on I2C
+	tristate "ASP01 Grip Sensor Support"
+	default n
+	help
+	  Say Y here if you use ASP01.
+	  This option enables Grip sensors using
+	  AD SEMICON ASP01 device driver.
+
+	  Say N here if you do not use ASP01.
+config SENSORS_K330
+	depends on I2C
+	tristate "STMicro K330 driver"
+	default n
+	help
+	   Say Y here if you use K330.
+	   This option enables gyro & accelerometer sensors using
+	   STMicro K330 device driver.
+	   Say N here if you do not use K330.
+config SENSORS_SMART_ALERT
+	depends on I2C
+	tristate "Smart Alert"
+	default n
+	help
+	   Say Y here if you use Smart Alert.
+	   This option enables Smart Alert on accelerometer
+	   sensor device driver.
+	   Say N here if you do not use Smart Alert.
+
+config K330_SMART_ALERT_INT2
+	depends on I2C
+	tristate "Smart Alert INT2"
+	default n
+	help
+	   Say Y here if you use Smart Alert INT2
+	   This option enables Smart Alert INT2 on accelerometer
+	   sensor device driver.
+
+	   Say N here if you use Smart Alert INT1.
+
+config SENSORS_TMD27723
+	depends on I2C
+	tristate "TMD27723 driver"
+	default n
+	help
+	   Say Y here if you use tmd27723
+	   This option enables proximity & light sensors using
+	   TAOS TMD27723 device driver
+
+	   Say N here if you do not use tmd27723.
 endif
+
+config SENSORS_SEC_SHTC1
+	tristate "Sensiron SHTC1 humidity and temperature sensor."
+	depends on I2C
+	help
+	   If you say yes here you get support for the Sensiron SHTC1
+	   humidity and temperature sensor.
+
+	   This driver can also be built as a module.  If so, the module
+	   will be called shtc1.
+
+config SENSORS_SEC_SHTC1_VER
+	string "Sensors shtc1 version name"
+	default "No_Version_Name"
+	depends on SENSORS_SEC_SHTC1
+	help
+	  shtc1 version for temphumid factory test in ssp driver.
+          If you give version name here you get shtc1 version for
+	  lcd test.

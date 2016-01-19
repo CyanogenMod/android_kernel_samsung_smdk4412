@@ -27,4 +27,14 @@
 /* Required by ION to allocate scatterlist(sglist) with nents > 256 */
 #define ARCH_HAS_SG_CHAIN
 
+#ifdef CONFIG_EXYNOS_MARK_PAGE_HOLES
+#define PAGE_HOLE_EVEN_ODD	1 /* if even, 0 */
+#define RAMCH_UNBALANCE_START_OFF (SZ_1G) /* + SZ_512M */
+#define is_pfn_hole(pfn)						      \
+	((pfn >= (PHYS_PFN_OFFSET + (RAMCH_UNBALANCE_START_OFF / PAGE_SIZE))) \
+	&& ((pfn & 1) == PAGE_HOLE_EVEN_ODD))
+#else
+#define is_pfn_hole(pfn) 0
+#endif
+
 #endif /* __ASM_ARCH_MEMORY_H */

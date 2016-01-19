@@ -14,30 +14,58 @@
 #define __S5K5CCGX_H__
 #include <linux/i2c.h>
 #include <linux/delay.h>
-#include <linux/version.h>
-#include <linux/vmalloc.h>
-#include <linux/completion.h>
 #include <media/v4l2-device.h>
 #include <media/v4l2-subdev.h>
-#include <media/s5k5ccgx_platform.h>
-#include <linux/videodev2_exynos_camera.h>
 #include <linux/workqueue.h>
+#include <linux/vmalloc.h>
+#include <linux/videodev2_exynos_camera.h>
+#include <media/s5k5ccgx_platform.h>
 
-#define S5K5CCGX_DRIVER_NAME	"S5K5CCGX"
+#ifndef false
+#define false 0
+#endif
+#ifndef true
+#define true 1
+#endif
 
-#define S5K5CCGX_DELAY		0xFFFF0000
+#define S5K5CCGX_DRIVER_NAME	S5K5CCGX_DEVICE_NAME
+static const char driver_name[] = S5K5CCGX_DRIVER_NAME;
 
 /************************************
  * FEATURE DEFINITIONS
  ************************************/
-#define FEATURE_YUV_CAPTURE
-/* #define CONFIG_LOAD_FILE */ /* for tuning */
+#ifdef CONFIG_MACH_PX
+#define CONFIG_SUPPORT_AF			true
+#define CONFIG_SUPPORT_FLASH			true
+#define CONFIG_SUPPORT_CAMSYSFS			false
+#define CONFIG_SUPPORT_WAIT_STREAMOFF_V2	false
+#else
+#define CONFIG_SUPPORT_AF			false
+#define CONFIG_SUPPORT_FLASH			false
+#define CONFIG_SUPPORT_CAMSYSFS			true
+#define CONFIG_SUPPORT_WAIT_STREAMOFF_V2	false
+#endif
+
+/* for tuning */
+#define CONFIG_LOAD_FILE		false
 
 /** Debuging Feature **/
-#define CONFIG_CAM_DEBUG
-/* #define CONFIG_CAM_TRACE*/ /* Enable it with CONFIG_CAM_DEBUG */
-/* #define CONFIG_CAM_AF_DEBUG *//* Enable it with CONFIG_CAM_DEBUG */
-/* #define DEBUG_WRITE_REGS */
+#ifdef CONFIG_MACH_TAB3
+#define CONFIG_CAM_DEBUG		true
+#define CONFIG_CAM_TRACE		true /* Enable me with CONFIG_CAM_DEBUG */
+#define CONFIG_CAM_AF_DEBUG 		false /* Enable me with CONFIG_CAM_DEBUG */
+#define DEBUG_WRITE_REGS		true
+
+#define CONFIG_DEBUG_STREAMOFF		true
+#else
+#define CONFIG_CAM_DEBUG		false
+#define CONFIG_CAM_TRACE		false /* Enable me with CONFIG_CAM_DEBUG */
+#define CONFIG_CAM_AF_DEBUG 		false /* Enable me with CONFIG_CAM_DEBUG */
+#define DEBUG_WRITE_REGS		false
+
+#define CONFIG_DEBUG_STREAMOFF		false
+#endif
+
 /***********************************/
 
 #ifdef CONFIG_VIDEO_S5K5CCGX_DEBUG
@@ -57,37 +85,37 @@ module_param_named(debug_mask, s5k5ccgx_debug_mask, uint, S_IWUSR | S_IRUGO);
 #define s5k5ccgx_debug(mask, x...)
 #endif
 
-#define TAG_NAME	"["S5K5CCGX_DRIVER_NAME"]"" "
 #define cam_err(fmt, ...)	\
-	printk(KERN_ERR TAG_NAME fmt, ##__VA_ARGS__)
+	printk(KERN_ERR "[""%s""] " fmt, driver_name, ##__VA_ARGS__)
 #define cam_warn(fmt, ...)	\
-	printk(KERN_WARNING TAG_NAME fmt, ##__VA_ARGS__)
+	printk(KERN_WARNING "[""%s""] " fmt, driver_name, ##__VA_ARGS__)
 #define cam_info(fmt, ...)	\
-	printk(KERN_INFO TAG_NAME fmt, ##__VA_ARGS__)
+	printk(KERN_INFO "[""%s""] " fmt, driver_name, ##__VA_ARGS__)
 
-#if defined(CONFIG_CAM_DEBUG)
+#if CONFIG_CAM_DEBUG
 #define cam_dbg(fmt, ...)	\
-	printk(KERN_DEBUG TAG_NAME fmt, ##__VA_ARGS__)
+	printk(KERN_DEBUG "[""%s""] " fmt, driver_name, ##__VA_ARGS__)
+
 #else
 #define cam_dbg(fmt, ...)	\
 	do { \
-		if (*to_state(sd)->dbg_level & CAMDBG_LEVEL_DEBUG) \
-			printk(KERN_DEBUG TAG_NAME fmt, ##__VA_ARGS__); \
+		if (dbg_level & CAMDBG_LEVEL_DEBUG) \
+			printk(KERN_DEBUG "[""%s""] " fmt, driver_name, ##__VA_ARGS__); \
 	} while (0)
 #endif
 
-#if defined(CONFIG_CAM_DEBUG) && defined(CONFIG_CAM_TRACE)
+#if CONFIG_CAM_DEBUG && CONFIG_CAM_TRACE
 #define cam_trace(fmt, ...)	cam_dbg("%s: " fmt, __func__, ##__VA_ARGS__);
 #else
 #define cam_trace(fmt, ...)	\
 	do { \
-		if (*to_state(sd)->dbg_level & CAMDBG_LEVEL_TRACE) \
-			printk(KERN_DEBUG TAG_NAME "%s: " fmt, \
-				__func__, ##__VA_ARGS__); \
+		if (dbg_level & CAMDBG_LEVEL_TRACE) \
+			printk(KERN_DEBUG "[""%s""] " fmt, \
+				driver_name, ##__VA_ARGS__); \
 	} while (0)
 #endif
 
-#if defined(CONFIG_CAM_DEBUG) && defined(CONFIG_CAM_AF_DEBUG)
+#if CONFIG_CAM_DEBUG && CONFIG_CAM_AF_DEBUG
 #define af_dbg(fmt, ...)	cam_dbg(fmt, ##__VA_ARGS__);
 #else
 #define af_dbg(fmt, ...)
@@ -106,9 +134,10 @@ module_param_named(debug_mask, s5k5ccgx_debug_mask, uint, S_IWUSR | S_IRUGO);
 	CHECK_ERR_COND_MSG(((x) < 0), (x), fmt, ##__VA_ARGS__)
 
 
-#ifdef CONFIG_LOAD_FILE
-#define S5K5CCGX_BURST_WRITE_REGS(sd, A) ({ \
-	int ret; \
+#if CONFIG_LOAD_FILE
+#define S5K5CCGX_BURST_WRITE_REGS(sd, A) \
+	({ \
+		int ret; \
 		cam_info("BURST_WRITE_REGS: reg_name=%s from setfile\n", #A); \
 		ret = s5k5ccgx_write_regs_from_sd(sd, #A); \
 		ret; \
@@ -156,55 +185,55 @@ enum wide_req_cmd {
 };
 
 enum s5k5ccgx_preview_frame_size {
-	S5K5CCGX_PREVIEW_QCIF = 0,	/* 176x144 */
-	S5K5CCGX_PREVIEW_320x240,	/* 320x240 */
-	S5K5CCGX_PREVIEW_CIF,		/* 352x288 */
-	S5K5CCGX_PREVIEW_528x432,	/* 528x432 */
-	S5K5CCGX_PREVIEW_VGA,		/* 640x480 */
-	S5K5CCGX_PREVIEW_D1,		/* 720x480 */
-	S5K5CCGX_PREVIEW_SVGA,		/* 800x600 */
-#ifdef CONFIG_VIDEO_S5K5CCGX_P2
-	S5K5CCGX_PREVIEW_1024x552,	/* 1024x552, ? */
+	PREVIEW_SZ_QCIF = 0,	/* 176x144 */
+	PREVIEW_SZ_QVGA,	/* 320x240 */
+	PREVIEW_SZ_CIF,		/* 352x288 */
+	PREVIEW_SZ_528x432,	/* 528x432 */
+	PREVIEW_SZ_VGA,		/* 640x480 */
+	PREVIEW_SZ_D1,		/* 720x480 */
+	PREVIEW_SZ_SVGA,		/* 800x600 */
+#ifdef CONFIG_MACH_P2
+	PREVIEW_SZ_1024x552,	/* 1024x552, ? */
 #else
-	S5K5CCGX_PREVIEW_1024x576,	/* 1024x576, 16:9 */
+	PREVIEW_SZ_1024x576,	/* 1024x576, 16:9 */
 #endif
-	S5K5CCGX_PREVIEW_1024x616,	/* 1024x616, ? */
-	S5K5CCGX_PREVIEW_XGA,		/* 1024x768*/
-	S5K5CCGX_PREVIEW_PVGA,		/* 1280*720*/
-	S5K5CCGX_PREVIEW_SXGA,		/* 1280x1024*/
-	S5K5CCGX_PREVIEW_MAX,
+	PREVIEW_SZ_1024x616,	/* 1024x616, ? */
+	PREVIEW_SZ_XGA,		/* 1024x768*/
+	PREVIEW_SZ_PVGA,		/* 1280*720*/
+	PREVIEW_SZ_SXGA,		/* 1280x1024*/
+	PREVIEW_SZ_MAX,
 };
 
 /* Capture Size List: Capture size is defined as below.
  *
- *	S5K5CCGX_CAPTURE_VGA:		640x480
- *	S5K5CCGX_CAPTURE_WVGA:		800x480
- *	S5K5CCGX_CAPTURE_SVGA:		800x600
- *	S5K5CCGX_CAPTURE_WSVGA:		1024x600
- *	S5K5CCGX_CAPTURE_1MP:		1280x960
- *	S5K5CCGX_CAPTURE_W1MP:		1600x960
- *	S5K5CCGX_CAPTURE_2MP:		UXGA - 1600x1200
- *	S5K5CCGX_CAPTURE_W2MP:		35mm Academy Offset Standard 1.66
+ *	CAPTURE_SZ_VGA:		640x480
+ *	CAPTURE_SZ_WVGA:		800x480
+ *	CAPTURE_SZ_SVGA:		800x600
+ *	CAPTURE_SZ_WSVGA:		1024x600
+ *	CAPTURE_SZ_1MP:		1280x960
+ *	CAPTURE_SZ_W1MP:		1600x960
+ *	CAPTURE_SZ_2MP:		UXGA - 1600x1200
+ *	CAPTURE_SZ_W2MP:		35mm Academy Offset Standard 1.66
  *					2048x1232, 2.4MP
- *	S5K5CCGX_CAPTURE_3MP:		QXGA  - 2048x1536
- *	S5K5CCGX_CAPTURE_W4MP:		WQXGA - 2560x1536
- *	S5K5CCGX_CAPTURE_5MP:		2560x1920
+ *	CAPTURE_SZ_3MP:		QXGA  - 2048x1536
+ *	CAPTURE_SZ_W4MP:		WQXGA - 2560x1536
+ *	CAPTURE_SZ_5MP:		2560x1920
  */
 
 enum s5k5ccgx_capture_frame_size {
-	S5K5CCGX_CAPTURE_VGA = 0,	/* 640x480 */
-	S5K5CCGX_CAPTURE_W2MP,		/* 35mm Academy Offset Standard 1.66 */
+	CAPTURE_SZ_VGA = 0,	/* 640x480 */
+	CAPTURE_SZ_W2MP,		/* 35mm Academy Offset Standard 1.66 */
 					/* 2048x1232, 2.4MP */
-	S5K5CCGX_CAPTURE_3MP,		/* QXGA  - 2048x1536 */
-	S5K5CCGX_CAPTURE_MAX,
+	CAPTURE_SZ_3MP,		/* QXGA  - 2048x1536 */
+	CAPTURE_SZ_MAX,
 };
 
-#ifdef CONFIG_VIDEO_S5K5CCGX_P2
-#define PREVIEW_WIDE_SIZE	S5K5CCGX_PREVIEW_1024x552
+#ifdef CONFIG_MACH_P2
+#define PREVIEW_WIDE_SIZE	PREVIEW_SZ_1024x552
 #else
-#define PREVIEW_WIDE_SIZE	S5K5CCGX_PREVIEW_1024x576
+#define PREVIEW_WIDE_SIZE	PREVIEW_SZ_1024x576
 #endif
-#define CAPTURE_WIDE_SIZE	S5K5CCGX_CAPTURE_W2MP
+#define CAPTURE_WIDE_SIZE	CAPTURE_SZ_W2MP
 
 enum s5k5ccgx_fps_index {
 	I_FPS_0,
@@ -242,10 +271,21 @@ struct s5k5ccgx_framesize {
 	u32 height;
 };
 
-#define FRM_RATIO(framesize) \
-	(((framesize)->width) * 10 / ((framesize)->height))
+enum {
+    FRMRATIO_QCIF   = 12,   /* 11 : 9 */
+    FRMRATIO_VGA    = 13,   /* 4 : 3 */
+    FRMRATIO_D1     = 15,   /* 3 : 2 */
+    FRMRATIO_WVGA   = 16,   /* 5 : 3 */
+    FRMRATIO_HD     = 17,   /* 16 : 9 */
+    FRMRATIO_SQUARE     = 10,   /* 1 : 1 */
+};
 
-struct s5k5ccgx_interval {
+#define FRM_RATIO(w, h)	((w) * 10 / (h))
+
+#define FRAMESIZE_RATIO(framesize) \
+	FRM_RATIO((framesize)->width, (framesize)->height)
+
+struct s5k5ccgx_stream_time {
 	struct timeval curr_time;
 	struct timeval before_time;
 };
@@ -270,14 +310,16 @@ struct s5k5ccgx_date_info {
 	u32 date;
 };
 
-enum s5k5ccgx_runmode {
-	S5K5CCGX_RUNMODE_NOTREADY,
-	S5K5CCGX_RUNMODE_INIT,
-	/*S5K5CCGX_RUNMODE_IDLE,*/
-	S5K5CCGX_RUNMODE_RUNNING, /* previewing */
-	S5K5CCGX_RUNMODE_RUNNING_STOP,
-	S5K5CCGX_RUNMODE_CAPTURING,
-	S5K5CCGX_RUNMODE_CAPTURE_STOP,
+enum runmode {
+	RUNMODE_NOTREADY,
+	RUNMODE_INIT,
+	/*RUNMODE_IDLE,*/
+	RUNMODE_RUNNING, /* previewing */
+	RUNMODE_RUNNING_STOP,
+	RUNMODE_CAPTURING,
+	RUNMODE_CAPTURING_STOP,
+	RUNMODE_RECORDING,	/* camcorder mode */
+	RUNMODE_RECORDING_STOP,
 };
 
 struct s5k5ccgx_firmware {
@@ -320,22 +362,78 @@ struct s5k5ccgx_gps_info {
 	s32 gps_timeStamp;
 };
 
-struct s5k5ccgx_focus {
-	struct s5k5ccgx_interval win_stable;
+struct s5k5ccgx_mode {
+	enum v4l2_sensor_mode sensor;
+	enum runmode runmode;
 
+	u32 hd_video:1;
+} ;
+
+struct s5k5ccgx_preview {
+	const struct s5k5ccgx_framesize *frmsize;
+	u32 update_frmsize:1;
+	u32 fast_ae:1;
+};
+
+struct s5k5ccgx_capture {
+	const struct s5k5ccgx_framesize *frmsize;
+	u32 pre_req;	/* for fast capture */
+	u32 ae_manual_mode:1;
+	u32 lowlux_night:1;
+	u32 ready:1;	/* for fast capture */
+};
+
+struct s5k5ccgx_focus {
 	enum v4l2_focusmode mode;
 	enum af_result_status status;
-	enum preflash_status preflash;
+	struct s5k5ccgx_stream_time win_stable;
 
 	u32 pos_x;
 	u32 pos_y;
 
+	u32 support:1;
 	u32 start:1;	/* enum v4l2_auto_focus*/
-	u32 ae_lock:1;
-	u32 awb_lock:1;
 	u32 touch:1;
+
+	/* It means that cancel has been done and then each AF regs-table
+	 * has been written. */
 	u32 reset_done:1;
-	u32 cancel:1;
+};
+
+/* struct for sensor specific data */
+struct s5k5ccgx_ae_gain_offset {
+	u32	ae_auto;
+	u32	ae_now;
+	u32	ersc_auto;
+	u32	ersc_now;
+
+	u32	ae_ofsetval;
+	u32	ae_maxdiff;
+};
+
+/* Flash struct */
+struct s5k5ccgx_flash {
+	struct s5k5ccgx_ae_gain_offset ae_offset;
+	enum v4l2_flash_mode mode;
+	enum preflash_status preflash;
+	u32 awb_delay;
+	u32 ae_scl;	/* for back-up */
+	u32 on:1;	/* flash on/off */
+	u32 ignore_flash:1;
+	u32 ae_flash_lock:1;
+	u32 support:1;	/* to support flash */
+};
+
+/* Exposure struct */
+struct s5k5ccgx_exposure {
+	s32 val;	/* exposure value */
+	u32 ae_lock:1;
+};
+
+/* White Balance struct */
+struct s5k5ccgx_whitebalance {
+	enum v4l2_wb_mode mode; /* wb mode */
+	u32 awb_lock:1;
 };
 
 struct s5k5ccgx_exif {
@@ -358,52 +456,56 @@ struct s5k5ccgx_regset {
 	u8 *data;
 };
 
-#ifdef CONFIG_LOAD_FILE
-#define DEBUG_WRITE_REGS
-struct s5k5ccgx_regset_table {
+#if CONFIG_LOAD_FILE
+#if !(DEBUG_WRITE_REGS)
+#undef DEBUG_WRITE_REGS
+#define DEBUG_WRITE_REGS	true
+#endif
+
+struct regset_table {
 	const char	*const name;
 };
 
-#define S5K5CCGX_REGSET(x, y)		\
+#define REGSET(x, y)		\
 	[(x)] = {			\
 		.name		= #y,	\
 }
 
-#define S5K5CCGX_REGSET_TABLE(y)	\
+#define REGSET_TABLE(y)	\
 	{				\
 		.name		= #y,	\
 }
 #else
-struct s5k5ccgx_regset_table {
+struct regset_table {
 	const u32	*const reg;
 	const u32	array_size;
-#ifdef DEBUG_WRITE_REGS
+#if DEBUG_WRITE_REGS
 	const char	*const name;
 #endif
 };
 
-#ifdef DEBUG_WRITE_REGS
-#define S5K5CCGX_REGSET(x, y)		\
+#if DEBUG_WRITE_REGS
+#define REGSET(x, y)		\
 	[(x)] = {					\
 		.reg		= (y),			\
 		.array_size	= ARRAY_SIZE((y)),	\
 		.name		= #y,			\
 }
 
-#define S5K5CCGX_REGSET_TABLE(y)		\
+#define REGSET_TABLE(y)		\
 	{					\
 		.reg		= (y),			\
 		.array_size	= ARRAY_SIZE((y)),	\
 		.name		= #y,			\
 }
 #else
-#define S5K5CCGX_REGSET(x, y)		\
+#define REGSET(x, y)		\
 	[(x)] = {					\
 		.reg		= (y),			\
 		.array_size	= ARRAY_SIZE((y)),	\
 }
 
-#define S5K5CCGX_REGSET_TABLE(y)		\
+#define REGSET_TABLE(y)		\
 	{					\
 		.reg		= (y),			\
 		.array_size	= ARRAY_SIZE((y)),	\
@@ -415,83 +517,89 @@ struct s5k5ccgx_regset_table {
 #define GET_EV_INDEX(EV)	((EV) - (EV_MIN_VLAUE))
 
 struct s5k5ccgx_regs {
-	struct s5k5ccgx_regset_table ev[GET_EV_INDEX(EV_MAX_V4L2)];
-	struct s5k5ccgx_regset_table metering[METERING_MAX];
-	struct s5k5ccgx_regset_table iso[ISO_MAX];
-	struct s5k5ccgx_regset_table effect[IMAGE_EFFECT_MAX];
-	struct s5k5ccgx_regset_table white_balance[WHITE_BALANCE_MAX];
-	struct s5k5ccgx_regset_table preview_size[S5K5CCGX_PREVIEW_MAX];
-	struct s5k5ccgx_regset_table capture_start[S5K5CCGX_CAPTURE_MAX];
-	struct s5k5ccgx_regset_table scene_mode[SCENE_MODE_MAX];
-	struct s5k5ccgx_regset_table saturation[SATURATION_MAX];
-	struct s5k5ccgx_regset_table contrast[CONTRAST_MAX];
-	struct s5k5ccgx_regset_table sharpness[SHARPNESS_MAX];
-	struct s5k5ccgx_regset_table fps[I_FPS_MAX];
-	struct s5k5ccgx_regset_table preview_return;
-	struct s5k5ccgx_regset_table flash_start;
-	struct s5k5ccgx_regset_table flash_end;
-	struct s5k5ccgx_regset_table af_pre_flash_start;
-	struct s5k5ccgx_regset_table af_pre_flash_end;
-	struct s5k5ccgx_regset_table flash_ae_set;
-	struct s5k5ccgx_regset_table flash_ae_clear;
-	struct s5k5ccgx_regset_table ae_lock_on;
-	struct s5k5ccgx_regset_table ae_lock_off;
-	struct s5k5ccgx_regset_table awb_lock_on;
-	struct s5k5ccgx_regset_table awb_lock_off;
-	struct s5k5ccgx_regset_table restore_cap;
-	struct s5k5ccgx_regset_table change_wide_cap;
-#ifdef CONFIG_VIDEO_S5K5CCGX_P8
-	struct s5k5ccgx_regset_table set_lowlight_cap;
+	struct regset_table ev[GET_EV_INDEX(EV_MAX_V4L2)];
+	struct regset_table metering[METERING_MAX];
+	struct regset_table iso[ISO_MAX];
+	struct regset_table effect[IMAGE_EFFECT_MAX];
+	struct regset_table white_balance[WHITE_BALANCE_MAX];
+	struct regset_table preview_size[PREVIEW_SZ_MAX];
+	struct regset_table scene_mode[SCENE_MODE_MAX];
+	struct regset_table saturation[SATURATION_MAX];
+	struct regset_table contrast[CONTRAST_MAX];
+	struct regset_table sharpness[SHARPNESS_MAX];
+	struct regset_table fps[I_FPS_MAX];
+	struct regset_table flash_start;
+	struct regset_table flash_end;
+	struct regset_table af_pre_flash_start;
+	struct regset_table af_pre_flash_end;
+	struct regset_table flash_ae_set;
+	struct regset_table flash_ae_clear;
+	struct regset_table ae_lock_on;
+	struct regset_table ae_lock_off;
+	struct regset_table awb_lock_on;
+	struct regset_table awb_lock_off;
+	struct regset_table restore_cap;
+	struct regset_table change_wide_cap;
+#ifdef CONFIG_MACH_P8
+	struct regset_table set_lowlight_cap;
 #endif
-	struct s5k5ccgx_regset_table af_macro_mode;
-	struct s5k5ccgx_regset_table af_normal_mode;
-#if !defined(CONFIG_VIDEO_S5K5CCGX_P2)
-	struct s5k5ccgx_regset_table af_night_normal_mode;
+
+	/* AF */
+	struct regset_table af_macro_mode;
+	struct regset_table af_normal_mode;
+#if !defined(CONFIG_MACH_P2)
+	struct regset_table af_night_normal_mode;
 #endif
-#ifdef CONFIG_VIDEO_S5K5CCGX_P4W
-	struct s5k5ccgx_regset_table af_off;
-#endif
-	struct s5k5ccgx_regset_table hd_af_start;
-	struct s5k5ccgx_regset_table hd_first_af_start;
-	struct s5k5ccgx_regset_table single_af_start;
-	struct s5k5ccgx_regset_table init_reg;
-	struct s5k5ccgx_regset_table get_light_level;
-	struct s5k5ccgx_regset_table get_esd_status;
-	struct s5k5ccgx_regset_table get_iso;
-	struct s5k5ccgx_regset_table get_ae_stable;
-	struct s5k5ccgx_regset_table get_shutterspeed;
-	struct s5k5ccgx_regset_table update_preview;
-	struct s5k5ccgx_regset_table update_hd_preview;
-	struct s5k5ccgx_regset_table stream_stop;
-#ifdef CONFIG_VIDEO_S5K5CCGX_P8
-	struct s5k5ccgx_regset_table antibanding;
-#endif /* CONFIG_VIDEO_S5K5CCGX_P8 */
+	struct regset_table af_off;
+	struct regset_table hd_af_start;
+	struct regset_table hd_first_af_start;
+	struct regset_table single_af_start;
+
+	/* Init */
+	struct regset_table init;
+
+	struct regset_table get_light_level;
+	struct regset_table get_esd_status;
+	struct regset_table get_iso;
+	struct regset_table get_ae_stable;
+	struct regset_table get_shutterspeed;
+
+	/* Mode */
+	struct regset_table preview_mode;
+	struct regset_table preview_hd_mode;
+	struct regset_table return_preview_mode;
+	struct regset_table capture_mode[CAPTURE_SZ_MAX];
+	struct regset_table stream_stop;
+#ifdef CONFIG_MACH_P8
+	struct regset_table antibanding;
+#endif /* CONFIG_MACH_P8 */
 };
 
 struct s5k5ccgx_state {
 	struct s5k5ccgx_platform_data *pdata;
 	struct v4l2_subdev sd;
 	struct v4l2_pix_format req_fmt;
-	struct s5k5ccgx_framesize *preview;
-	struct s5k5ccgx_framesize *capture;
+	struct s5k5ccgx_preview preview;
+	struct s5k5ccgx_capture capture;
 	struct s5k5ccgx_focus focus;
+	struct s5k5ccgx_flash flash;
+	struct s5k5ccgx_exposure exposure;
+	struct s5k5ccgx_whitebalance wb;
 	struct s5k5ccgx_exif exif;
-#if !defined(FEATURE_YUV_CAPTURE)
-	struct s5k5ccgx_jpeg_param jpeg;
-#endif
-	struct s5k5ccgx_interval stream_time;
+	struct s5k5ccgx_stream_time stream_time;
 	const struct s5k5ccgx_regs *regs;
 	struct mutex ctrl_lock;
 	struct mutex af_lock;
 	struct work_struct af_work;
 	struct work_struct af_win_work;
+#if CONFIG_DEBUG_STREAMOFF
+	struct work_struct streamoff_work;
+#endif
 	struct workqueue_struct *workqueue;
-	enum s5k5ccgx_runmode runmode;
+	enum runmode runmode;
 	enum v4l2_sensor_mode sensor_mode;
 	enum v4l2_pix_format_mode format_mode;
-	enum v4l2_flash_mode flash_mode;
 	enum v4l2_scene_mode scene_mode;
-	enum v4l2_wb_mode wb_mode;
 
 	/* To switch from nornal ratio to wide ratio.*/
 	enum wide_req_cmd wide_cmd;
@@ -502,37 +610,50 @@ struct s5k5ccgx_state {
 	s32 freq;		/* MCLK in Hz */
 	u32 one_frame_delay_ms;
 	u32 light_level;	/* light level */
-	u8 *dbg_level;
+	/* u32 streamoff_delay;*/
+	u32 *dbg_level;
+#ifdef CONFIG_DEBUG_STREAMOFF
+	atomic_t streamoff_check;
+#endif
+	pid_t af_pid;
 
 	u32 recording:1;
 	u32 hd_videomode:1;
-	u32 flash_on:1;
-	u32 ignore_flash:1;
-	u32 need_update_frmsize:1;
 	u32 need_wait_streamoff:1;
+	u32 reset_done:1;	/* reset is done */
 	u32 initialized:1;
 };
 
+#define TO_STATE(p, m)		(container_of(p, struct s5k5ccgx_state, m))
+#define IS_FLASH_SUPPORTED()	(CONFIG_SUPPORT_FLASH)
+#define IS_AF_SUPPORTED()	(CONFIG_SUPPORT_AF)
+
+extern struct class *camera_class;
+
 static inline struct  s5k5ccgx_state *to_state(struct v4l2_subdev *sd)
 {
-	return container_of(sd, struct s5k5ccgx_state, sd);
+	return TO_STATE(sd, sd);
 }
 
-static inline void debug_msleep(struct v4l2_subdev *sd, u32 msecs)
+static inline int check_af_pid(struct v4l2_subdev *sd)
 {
-	cam_dbg("delay for %dms\n", msecs);
-	msleep(msecs);
+	struct s5k5ccgx_state *state = to_state(sd);
+
+	if (state->af_pid && (task_pid_nr(current) == state->af_pid))
+		return -EPERM;
+	else
+		return 0;
 }
 
-#if !defined(FEATURE_YUV_CAPTURE)
-/* JPEG MEMORY SIZE */
-#define SENSOR_JPEG_OUTPUT_MAXSIZE	0x29999A /*2726298bytes, 2.6M */
-#define EXTRA_MEMSIZE			(0 * SZ_1K)
-#define SENSOR_JPEG_SNAPSHOT_MEMSIZE \
-	(((SENSOR_JPEG_OUTPUT_MAXSIZE + EXTRA_MEMSIZE  + SZ_16K-1) / SZ_16K) * SZ_16K)
-#endif
+static int s5k5ccgx_init(struct v4l2_subdev *, u32);
+static int s5k5ccgx_reset(struct v4l2_subdev *, u32);
+static int s5k5ccgx_post_init(struct v4l2_subdev *, u32);
+static int s5k5ccgx_s_ctrl(struct v4l2_subdev *, struct v4l2_control *);
+static int s5k5ccgx_restore_parameter(struct v4l2_subdev *);
 
 /*********** Sensor specific ************/
+#define S5K5CCGX_DELAY		0xFFFF0000
+
 #define S5K5CCGX_CHIP_ID	0x05CC
 #define S5K5CCGX_CHIP_REV	0x0001
 
@@ -549,18 +670,19 @@ static inline void debug_msleep(struct v4l2_subdev *sd, u32 msecs)
 #define ONE_FRAME_DELAY_MS_NIGHTMODE		166
 
 /* level at or below which we need to enable flash when in auto mode */
-#ifdef CONFIG_VIDEO_S5K5CCGX_P2
+#ifdef CONFIG_MACH_P2
 #define FLASH_LOW_LIGHT_LEVEL		0x3A
-#elif defined(CONFIG_VIDEO_S5K5CCGX_P8)
+#elif defined(CONFIG_MACH_P8)
 #define FLASH_LOW_LIGHT_LEVEL		0x46 /* 70 */
 #define CAPTURE_LOW_LIGHT_LEVEL		0x20
 #else
 #define FLASH_LOW_LIGHT_LEVEL		0x4A
-#endif /* CONFIG_VIDEO_S5K5CCGX_P2 */
+#endif /* CONFIG_MACH_P2 */
 
 #define FIRST_AF_SEARCH_COUNT		220
 #define SECOND_AF_SEARCH_COUNT		220
 #define AE_STABLE_SEARCH_COUNT		22
+#define STREAMOFF_CHK_COUNT		150
 
 #define AF_SEARCH_DELAY			33
 #define AE_STABLE_SEARCH_DELAY		33
@@ -573,13 +695,7 @@ static inline void debug_msleep(struct v4l2_subdev *sd, u32 msecs)
 #define SCND_WINSIZE_Y			306
 
 /* The Path of Setfile */
-#ifdef CONFIG_LOAD_FILE
-#include <linux/vmalloc.h>
-#include <linux/fs.h>
-#include <linux/mm.h>
-#include <linux/slab.h>
-#include <linux/uaccess.h>
-
+#if CONFIG_LOAD_FILE
 struct test {
 	u8 data;
 	struct test *nextBuf;
@@ -593,25 +709,29 @@ static s32 large_file;
 	.nextBuf = NULL;	\
 }
 
-#if defined(CONFIG_VIDEO_S5K5CCGX_P4W)
+#if defined(CONFIG_MACH_P4W)
 #define TUNING_FILE_PATH "/mnt/sdcard/s5k5ccgx_regs-p4w.h"
-#elif defined(CONFIG_VIDEO_S5K5CCGX_P8)
+#elif defined(CONFIG_MACH_P8)
 #define TUNING_FILE_PATH "/mnt/sdcard/s5k5ccgx_regs-p8.h"
-#elif defined(CONFIG_VIDEO_S5K5CCGX_P2)
+#elif defined(CONFIG_MACH_P2)
 #define TUNING_FILE_PATH "/mnt/sdcard/s5k5ccgx_regs-p2.h"
+#elif defined(CONFIG_MACH_TAB3)
+#define TUNING_FILE_PATH "/mnt/sdcard/s5k5ccgx_regs-tab3.h"
 #else
 #define TUNING_FILE_PATH NULL
 #endif
 #endif /* CONFIG_LOAD_FILE*/
 
-#if defined(CONFIG_VIDEO_S5K5CCGX_P4W)
+#if defined(CONFIG_MACH_P4W)
 #include "s5k5ccgx_regs-p4w.h"
-#elif defined(CONFIG_VIDEO_S5K5CCGX_P8)
+#elif defined(CONFIG_MACH_P8)
 #include "s5k5ccgx_regs-p8.h"
-#elif defined(CONFIG_VIDEO_S5K5CCGX_P2)
+#elif defined(CONFIG_MACH_P2)
 #include "s5k5ccgx_regs-p2.h"
+#elif defined(CONFIG_MACH_TAB3)
+#include "s5k5ccgx_regs-tab3.h"
 #else
 #include "s5k5ccgx_regs-p4w.h"
-#endif /* CONFIG_VIDEO_S5K5CCGX_P4W*/
+#endif
 
 #endif /* __S5K5CCGX_H__ */

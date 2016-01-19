@@ -521,7 +521,7 @@ static int s6evr02_set_elvss(struct lcd_info *lcd, u8 force)
 	case 240 ... 250:
 		elvss_level = ELVSS_STATUS_240;
 		break;
-	case 255 ... 299:
+	case 299:
 		elvss_level = ELVSS_STATUS_300;
 		break;
 	}
@@ -925,10 +925,9 @@ static int s6evr02_get_brightness(struct backlight_device *bd)
 
 static int s6evr02_check_fb(struct lcd_device *ld, struct fb_info *fb)
 {
-	struct s3cfb_window *win = fb->par;
 	struct lcd_info *lcd = lcd_get_data(ld);
 
-	//dev_info(&lcd->ld->dev, "%s, fb%d\n", __func__, win->id);
+	dev_info(&lcd->ld->dev, "%s, fb%d\n", __func__, fb->node);
 
 	return 0;
 }

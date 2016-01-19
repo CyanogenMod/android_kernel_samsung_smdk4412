@@ -47,12 +47,12 @@
 #define COM_CHECKSUM       0x63
 
 /*I2C address for digitizer and its boot loader*/
+#define WACOM_I2C_ADDR 0x56
 #ifdef CONFIG_EPEN_WACOM_G9PL
 #define WACOM_I2C_BOOT 0x09
 #else
 #define WACOM_I2C_BOOT 0x57
 #endif
-#define WACOM_I2C_BOOT 0x57
 
 /*Information for input_dev*/
 #define EMR 0
@@ -72,12 +72,15 @@
 /* #define INIT_FIRMWARE_FLASH */
 
 #define WACOM_PDCT_WORK_AROUND
+#define WACOM_USE_QUERY_DATA
 
 /*PDCT Signal*/
 #define PDCT_NOSIGNAL 1
 #define PDCT_DETECT_PEN 0
 
-#ifdef CONFIG_MACH_KONA
+#ifdef CONFIG_MACH_T0
+#define WACOM_PRESSURE_MAX 1023
+#elif defined(CONFIG_MACH_KONA)
 #define WACOM_PRESSURE_MAX 1024
 #else
 #define WACOM_PRESSURE_MAX 255
@@ -88,7 +91,14 @@
 #define EPEN_DTYPE_B713 2
 #define EPEN_DTYPE_B746 3
 
-#if defined(CONFIG_MACH_P4NOTE) || defined(CONFIG_MACH_P4)
+#define WACOM_I2C_MODE_BOOT 1
+#define WACOM_I2C_MODE_NORMAL 0
+
+#define EPEN_RESUME_DELAY 180
+
+#if defined(CONFIG_MACH_P4NOTE) \
+	|| defined(CONFIG_MACH_P4) \
+	|| defined(CONFIG_MACH_SP7160LTE)
 #define WACOM_DVFS_LOCK_FREQ 800000
 #ifdef CONFIG_SEC_TOUCHSCREEN_DVFS_LOCK
 #define SEC_BUS_LOCK
@@ -108,6 +118,9 @@
 #define WACOM_PEN_DETECT
 #define WACOM_MAX_COORD_X WACOM_POSX_MAX
 #define WACOM_MAX_COORD_Y WACOM_POSY_MAX
+#define WACOM_X_INVERT 0
+#define WACOM_Y_INVERT 0
+#define WACOM_XY_SWITCH 0
 
 #elif defined(CONFIG_MACH_Q1_BD)
 
@@ -125,6 +138,7 @@
 #define COOR_WORK_AROUND_X_MAX		0x2C80
 #define COOR_WORK_AROUND_Y_MAX		0x1BD0
 #define COOR_WORK_AROUND_PRESSURE_MAX	0xFF
+#define WACOM_USE_PDATA
 
 #define WACOM_I2C_TRANSFER_STYLE
 #if !defined(WACOM_I2C_TRANSFER_STYLE)
@@ -134,6 +148,7 @@
 #define WACOM_MAX_COORD_X 11392
 #define WACOM_MAX_COORD_Y 7120
 #define WACOM_MAX_PRESSURE 0xFF
+#define WACOM_USE_PDATA
 
 /* For Android origin */
 #define WACOM_POSX_MAX WACOM_MAX_COORD_Y
@@ -151,6 +166,10 @@
 /* For Android origin */
 #define WACOM_POSX_MAX WACOM_MAX_COORD_Y
 #define WACOM_POSY_MAX WACOM_MAX_COORD_X
+#define WACOM_X_INVERT 1
+#define WACOM_Y_INVERT 0
+#define WACOM_XY_SWITCH 1
+#define WACOM_USE_PDATA
 
 #define COOR_WORK_AROUND
 #define WACOM_IMPORT_FW_ALGO
@@ -170,6 +189,7 @@
 #define MAX_HAND		2
 
 #define WACOM_PEN_DETECT
+#define WACOM_HAVE_FWE_PIN
 
 /* origin offset */
 #define EPEN_B660_ORG_X 456
@@ -291,22 +311,35 @@
 
 #define BATTERY_SAVING_MODE
 #define WACOM_CONNECTION_CHECK
-
 #define WACOM_MAX_COORD_X 10804
 #define WACOM_MAX_COORD_Y 17322
 #define WACOM_POSX_OFFSET 100
 #define WACOM_POSY_OFFSET 100
 #define WACOM_MAX_PRESSURE 1023
 
-#define WACOM_IRQ_WORK_AROUND
 #define WACOM_PEN_DETECT
+#define WACOM_DISCARD_EVENT_ON_EDGE
+
+#define WACOM_X_INVERT 0
+#define WACOM_Y_INVERT 0
+#define WACOM_XY_SWITCH 0
+
 /* For Android origin */
 #define WACOM_POSX_MAX WACOM_MAX_COORD_Y
 #define WACOM_POSY_MAX WACOM_MAX_COORD_X
 
 #define COOR_WORK_AROUND
-
 #endif /*End of Model config*/
+
+#ifndef WACOM_X_INVERT
+#define WACOM_X_INVERT 1
+#endif
+#ifndef WACOM_Y_INVERT
+#define WACOM_Y_INVERT 0
+#endif
+#ifndef WACOM_XY_SWITCH
+#define WACOM_XY_SWITCH 1
+#endif
 
 #if !defined(WACOM_SLEEP_WITH_PEN_SLP)
 #define WACOM_SLEEP_WITH_PEN_LDO_EN
@@ -318,13 +351,17 @@
 #endif
 #endif
 
+#ifdef WACOM_USE_PDATA
+#undef WACOM_USE_QUERY_DATA
+#endif
+
 /*Parameters for wacom own features*/
 struct wacom_features {
 	int x_max;
 	int y_max;
 	int pressure_max;
 	char comstat;
-#if defined(CONFIG_MACH_P4NOTE) || defined(CONFIG_MACH_P4)
+#if defined(CONFIG_MACH_P4NOTE) || defined(CONFIG_MACH_SP7160LTE) || defined(CONFIG_MACH_P4)
 	u8 data[COM_QUERY_NUM];
 #else
 	u8 data[COM_COORD_NUM];
@@ -337,7 +374,7 @@ struct wacom_features {
 extern struct class *sec_class;
 
 static struct wacom_features wacom_feature_EMR = {
-#if defined(CONFIG_MACH_P4NOTE) || defined(CONFIG_MACH_P4)
+#if defined(CONFIG_MACH_P4NOTE) || defined(CONFIG_MACH_SP7160LTE) || defined(CONFIG_MACH_P4)
 	.x_max = 0x54C0,
 	.y_max = 0x34F8,
 	.pressure_max = 0xFF,
@@ -379,14 +416,16 @@ struct wacom_g5_platform_data {
 	int gpio_pen_insert;
 #endif
 #ifdef WACOM_HAVE_FWE_PIN
-	int gpio_fwe;
+	void (*compulsory_flash_mode)(bool);
 #endif
 	int (*init_platform_hw)(void);
 	int (*exit_platform_hw)(void);
 	int (*suspend_platform_hw)(void);
 	int (*resume_platform_hw)(void);
+#ifdef CONFIG_HAS_EARLYSUSPEND
 	int (*early_suspend_platform_hw)(void);
 	int (*late_resume_platform_hw)(void);
+#endif
 	int (*reset_platform_hw)(void);
 	void (*register_cb)(struct wacom_g5_callbacks *);
 };
@@ -396,8 +435,11 @@ struct wacom_i2c {
 	struct i2c_client *client;
 	struct i2c_client *client_boot;
 	struct input_dev *input_dev;
+#ifdef CONFIG_HAS_EARLYSUSPEND
 	struct early_suspend early_suspend;
+#endif
 	struct mutex lock;
+	struct mutex update_lock;
 	struct wake_lock wakelock;
 	struct device	*dev;
 	int irq;
@@ -427,6 +469,7 @@ struct wacom_i2c {
 #endif
 #ifdef WACOM_HAVE_FWE_PIN
 	int gpio_fwe;
+	bool have_fwe_pin;
 #endif
 #ifdef WACOM_IMPORT_FW_ALGO
 	bool use_offset_table;
@@ -448,7 +491,7 @@ struct wacom_i2c {
 	struct delayed_work dvfs_work;
 	struct device *bus_dev;
 #endif
-#ifdef CONFIG_MACH_P4NOTE
+#if defined(CONFIG_MACH_P4NOTE) || defined(CONFIG_MACH_SP7160LTE)
 	bool pen_type;
 #endif
 #ifdef WACOM_CONNECTION_CHECK
@@ -457,6 +500,7 @@ struct wacom_i2c {
 #ifdef BATTERY_SAVING_MODE
 	bool battery_saving_mode;
 #endif
+	bool pwr_flag;
 	bool power_enable;
 	bool boot_mode;
 	bool query_status;

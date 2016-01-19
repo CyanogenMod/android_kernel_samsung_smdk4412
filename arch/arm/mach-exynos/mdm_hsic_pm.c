@@ -35,17 +35,17 @@
 #include <linux/usb.h>
 #include <linux/usb/hcd.h>
 #include <linux/usb/ehci_def.h>
+#include <mach/mdm2.h>
 
 #ifdef CONFIG_CPU_FREQ_TETHERING
-#include <linux/kernel.h>
 #include <linux/netdevice.h>
-#include <mach/mdm2.h>
 #endif
+
 #ifdef CONFIG_USB_ANDROID_SAMSUNG_COMPOSITE
 #include <linux/usb/android_composite.h>
 #endif
+
 #ifdef CONFIG_USBIRQ_BALANCING_LTE_HIGHTP
-#include <mach/mdm2.h>
 #include <linux/cpu.h>
 #include <linux/cpufreq_pegasusq.h>
 #define dev_put devput
@@ -104,6 +104,7 @@ struct mdm_hsic_pm_data {
 #ifdef CONFIG_USB_ANDROID_SAMSUNG_COMPOSITE
 	struct notifier_block usb_composite_notifier;
 #endif
+
 #ifdef CONFIG_USBIRQ_BALANCING_LTE_HIGHTP
 	struct notifier_block rndis_notifier;
 	struct notifier_block cpu_hotplug_notifier;
@@ -404,6 +405,7 @@ void request_active_lock_release(const char *name)
 	pr_info("%s\n", __func__);
 	if (pm_data)
 		wake_unlock(&pm_data->l2_wake);
+
 }
 
 void request_boot_lock_set(const char *name)
@@ -1066,7 +1068,9 @@ static int link_pm_netdev_event(struct notifier_block *this,
 	}
 	return NOTIFY_DONE;
 }
+#endif
 
+#ifdef CONFIG_USB_ANDROID_SAMSUNG_COMPOSITE
 static int usb_composite_notifier_event(struct notifier_block *this,
 		unsigned long event, void *ptr)
 {
@@ -1092,6 +1096,7 @@ static int usb_composite_notifier_event(struct notifier_block *this,
 	return NOTIFY_DONE;
 }
 #endif
+
 #ifdef CONFIG_USBIRQ_BALANCING_LTE_HIGHTP
 int boost_busfreq(struct device *dev, int enable)
 {
@@ -1271,11 +1276,14 @@ static int mdm_hsic_pm_probe(struct platform_device *pdev)
 #ifdef CONFIG_CPU_FREQ_TETHERING
 	pm_data->netdev_notifier.notifier_call = link_pm_netdev_event;
 	register_netdevice_notifier(&pm_data->netdev_notifier);
+#endif
 
+#ifdef CONFIG_USB_ANDROID_SAMSUNG_COMPOSITE
 	pm_data->usb_composite_notifier.notifier_call =
 		usb_composite_notifier_event;
 	register_usb_composite_notifier(&pm_data->usb_composite_notifier);
 #endif
+
 #ifdef CONFIG_USBIRQ_BALANCING_LTE_HIGHTP
 	pm_data->is_rndis_running = false;
 	INIT_DELAYED_WORK(&pm_data->hotplug_work, hotplug_work_start);

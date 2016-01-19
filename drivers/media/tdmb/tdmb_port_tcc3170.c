@@ -55,6 +55,12 @@
 
 #include "tcbd_hal.h"
 
+#if defined(CONFIG_MACH_U1_KOR_SKT) || defined(CONFIG_MACH_U1_KOR_KT)
+#define TCBD_CLOCK CLOCK_19200KHZ
+#else	/* for baffin */
+#define TCBD_CLOCK CLOCK_24576KHZ
+#endif
+
 /* #define TDMB_DEBUG_SCAN */
 
 static DEFINE_MUTEX(tcc3170_mutex);
@@ -99,7 +105,7 @@ static bool __get_ensemble_info(struct ensemble_info_type *e_info
 	ensbl_info = tcc_fic_get_ensbl_info(1);
 	esbl = &ensbl_info->ensbl;
 
-	memset(e_info, 0, sizeof(e_info));
+	memset(e_info, 0, sizeof(struct ensemble_info_type));
 
 	e_info->ensem_freq = freq;
 	e_info->ensem_id = esbl->eid;
@@ -200,7 +206,7 @@ static bool tcc3170_power_on(void)
 #error
 #endif /* CONFIG_TDMB_SPI */
 			if (tcbd_device_start \
-				(&tcc3170_device, CLOCK_19200KHZ) < 0) {
+				(&tcc3170_device, TCBD_CLOCK) < 0) {
 				DPRINTK("could not start device!!\n");
 				tcbd_io_close(&tcc3170_device);
 				tdmb_control_gpio(false);

@@ -223,6 +223,14 @@ static inline void ptrace_release_task(struct task_struct *task)
 #define force_successful_syscall_return() do { } while (0)
 #endif
 
+#ifndef is_syscall_success
+/*
+ * On most systems we can tell if a syscall is a success based on if the retval
+ * is an error value.  On some systems like ia64 and powerpc they have different
+ * indicators of success/failure and must define their own.
+ */
+#define is_syscall_success(regs) (!IS_ERR_VALUE((unsigned long)(regs_return_value(regs))))
+#endif
 /*
  * <asm/ptrace.h> should define the following things inside #ifdef __KERNEL__.
  *

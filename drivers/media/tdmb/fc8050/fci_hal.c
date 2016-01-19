@@ -29,9 +29,13 @@
 #include "bbm.h"
 #include "fci_hal.h"
 /* #include "fc8050_hpi.h" */
-#include "fc8050_spi.h"
-/* #include "fc8050_ppi.h" */
 #include "fc8050_i2c.h"
+#if defined(CONFIG_TDMB_SPI)
+#include "fc8050_spi.h"
+#endif
+#if defined(CONFIG_TDMB_EBI)
+#include "fc8050_ppi.h"
+#endif
 
 #define FEATURE_INTERFACE_DEBUG
 struct interface_port {
@@ -67,6 +71,7 @@ int bbm_hostif_select(HANDLE hDevice, u8 hostif)
 	hostif_type = hostif;
 
 	switch (hostif) {
+#if defined(CONFIG_TDMB_SPI)
 	case BBM_SPI:
 		ifport.init = fc8050_spi_init;
 		ifport.byteread = fc8050_spi_byteread;
@@ -83,6 +88,7 @@ int bbm_hostif_select(HANDLE hDevice, u8 hostif)
 
 		ifport.deinit = fc8050_spi_deinit;
 		break;
+#endif
 #ifndef FEATURE_INTERFACE_DEBUG
 	case BBM_HPI:
 		ifport.init = fc8050_hpi_init;
@@ -116,6 +122,8 @@ int bbm_hostif_select(HANDLE hDevice, u8 hostif)
 
 		ifport.deinit = fc8050_i2c_deinit;
 		break;
+#endif
+#if defined(CONFIG_TDMB_EBI)
 	case BBM_PPI:
 		ifport.init = fc8050_ppi_init;
 		ifport.byteread = fc8050_ppi_byteread;

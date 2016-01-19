@@ -200,14 +200,14 @@ static int aat1290a_led_probe(struct platform_device *pdev)
 	}
 
 	aat1290a_dev = device_create(camera_class, NULL, 0, NULL, "flash");
-	if (IS_ERR(aat1290a_dev))
+	if (IS_ERR(aat1290a_dev)) {
 		LED_ERROR("Failed to create device(flash)!\n");
-
-	if (device_create_file(aat1290a_dev, &dev_attr_rear_flash) < 0) {
-		LED_ERROR("failed to create device file, %s\n",
-				dev_attr_rear_flash.attr.name);
+	} else {
+		if (device_create_file(aat1290a_dev, &dev_attr_rear_flash) < 0) {
+			LED_ERROR("failed to create device file, %s\n",
+					dev_attr_rear_flash.attr.name);
+		}
 	}
-
 	if (led_pdata)
 		led_pdata->initGpio();
 	aat1290a_setGpio();

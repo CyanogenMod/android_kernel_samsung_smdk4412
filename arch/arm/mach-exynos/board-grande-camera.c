@@ -208,7 +208,7 @@ static struct s3c_platform_camera writeback = {
 
 #ifdef CONFIG_VIDEO_EXYNOS_FIMC_IS
 #ifdef CONFIG_VIDEO_S5K6A3
-#ifdef CONFIG_MACH_P4NOTE
+#if defined(CONFIG_MACH_P4NOTE) || defined(CONFIG_MACH_TAB3)
 /* For P4Note PegasusQ */
 static int s5k6a3_power_on(void)
 {
@@ -489,7 +489,7 @@ error_out:
 
 static const char *s5k6a3_get_clk_name(void)
 {
-#ifdef CONFIG_MACH_P4NOTE
+#if defined(CONFIG_MACH_P4NOTE) || defined(CONFIG_MACH_TAB3)
 	return "sclk_cam1";
 #else
 	if (system_rev <= FRONT_CAM_MCLK_DEVIDED_REVISION)
@@ -3462,7 +3462,7 @@ void __init midas_camera_init(void)
 #endif
 #endif /* CONFIG_VIDEO_S5P_FIMC */
 
-#if defined(CONFIG_MACH_P4NOTE) && defined(CONFIG_VIDEO_ISX012)
+#if (defined(CONFIG_MACH_P4NOTE) || defined(CONFIG_MACH_TAB3)) && defined(CONFIG_VIDEO_ISX012)
 	px_cam_cfg_init();
 #endif
 }

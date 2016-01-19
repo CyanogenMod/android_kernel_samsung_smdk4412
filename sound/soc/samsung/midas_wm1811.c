@@ -1160,7 +1160,8 @@ static int midas_wm1811_aif2_hw_params(struct snd_pcm_substream *substream,
 	if (ret < 0)
 		dev_err(codec_dai->dev, "Unable to switch to FLL2: %d\n", ret);
 
-#ifndef CONFIG_MACH_BAFFIN
+#if defined(CONFIG_MACH_BAFFIN) || (defined(CONFIG_MACH_C1) && defined(CONFIG_TARGET_LOCALE_KOR)) 
+#else
 	if (!(snd_soc_read(codec, WM8994_INTERRUPT_RAW_STATUS_2)
 		& WM8994_FLL2_LOCK_STS)) {
 		dev_info(codec_dai->dev, "%s: use mclk1 for FLL2\n", __func__);

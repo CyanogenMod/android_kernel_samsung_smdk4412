@@ -19,10 +19,15 @@ struct platform_device; /* don't need the contents */
 
 void s3c_i2c3_cfg_gpio(struct platform_device *dev)
 {
+#if defined(CONFIG_MACH_TAB3)
+	s3c_gpio_cfgall_range(EXYNOS4_GPA1(2), 2,
+		S3C_GPIO_SFN(3), S3C_GPIO_PULL_NONE);
+#else
 	if (soc_is_exynos5210() || soc_is_exynos5250())
 		s3c_gpio_cfgall_range(EXYNOS5_GPA1(2), 2,
 			S3C_GPIO_SFN(3), S3C_GPIO_PULL_UP);
 	else
 		s3c_gpio_cfgall_range(EXYNOS4_GPA1(2), 2,
 			S3C_GPIO_SFN(3), S3C_GPIO_PULL_UP);
+#endif
 }

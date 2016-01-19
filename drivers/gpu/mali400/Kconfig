@@ -20,7 +20,6 @@ config MALI_VER_R3P2
 
 if MALI_VER_R3P2
 source "drivers/gpu/mali400/r3p2/mali/Kconfig"
-source "drivers/gpu/mali400/r3p2/ump/Kconfig"
 endif
 
 endchoice

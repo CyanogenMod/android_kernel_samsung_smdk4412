@@ -33,7 +33,9 @@
 #include "fc8050_regs.h"
 #include "fci_hal.h"
 
-/* #define FEATURE_FCI_I2C_CHECK_STATUS */
+#ifdef CONFIG_TDMB_EBI
+#define FEATURE_FCI_I2C_CHECK_STATUS
+#endif
 
 #define I2CSTAT_TIP	0x02	/* Tip bit */
 #define I2CSTAT_NACK	0x80	/* Nack bit */

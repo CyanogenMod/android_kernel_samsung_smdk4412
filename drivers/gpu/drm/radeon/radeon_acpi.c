@@ -35,8 +35,7 @@ static int radeon_atif_call(acpi_handle handle)
 
 	/* Fail only if calling the method fails and ATIF is supported */
 	if (ACPI_FAILURE(status) && status != AE_NOT_FOUND) {
-		DRM_DEBUG_DRIVER("failed to evaluate ATIF got %s\n",
-				 acpi_format_exception(status));
+		printk(KERN_DEBUG "failed to evaluate ATIF got %s\n", acpi_format_exception(status));
 		kfree(buffer.pointer);
 		return 1;
 	}
@@ -51,12 +50,12 @@ int radeon_acpi_init(struct radeon_device *rdev)
 	acpi_handle handle;
 	int ret;
 
+	/* No need to proceed if we're sure that ATIF is not supported */
+	if (!ASIC_IS_AVIVO(rdev) || !rdev->bios)
+		return 0;
+
 	/* Get the device handle */
 	handle = DEVICE_ACPI_HANDLE(&rdev->pdev->dev);
-
-	/* No need to proceed if we're sure that ATIF is not supported */
-	if (!ASIC_IS_AVIVO(rdev) || !rdev->bios || !handle)
-		return 0;
 
 	/* Call the ATIF method */
 	ret = radeon_atif_call(handle);

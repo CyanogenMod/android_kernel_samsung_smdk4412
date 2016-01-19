@@ -1043,6 +1043,15 @@ config USB_ANDROID_SAMSUNG_MTP
 	  If you enable this option,
 	  google mtp will be changed to samsung mtp.
 
+config USB_ANDROID_SAMSUNG_SIDESYNC
+	boolean "Samsung SIDESYNC function"
+	depends on USB_G_ANDROID
+	help
+	  Provides SIDESYNC support
+	  for samsung gadget driver.
+	  If you enable this option,
+	  SIDESYNC feature will be enabled.
+
 config USB_DUN_SUPPORT
 	boolean "DUN support function"
 	depends on USB_G_ANDROID

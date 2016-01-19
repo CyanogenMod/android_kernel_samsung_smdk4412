@@ -58,6 +58,7 @@ void scu_enable(void __iomem *scu_base)
 		return;
 
 	if ((soc_is_exynos4412() && (samsung_rev() >= EXYNOS4412_REV_1_0)) ||
+		soc_is_exynos4212() ||
 		soc_is_exynos4210())
 		scu_ctrl |= (1<<3);
 

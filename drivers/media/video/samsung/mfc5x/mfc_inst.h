@@ -158,6 +158,10 @@ struct mfc_inst_ctx {
 	int busfreq_flag;		/* context bus frequency flag */
 #endif
 
+#if defined(CONFIG_MACH_GC1) && defined(CONFIG_EXYNOS4_CPUFREQ)
+	int cpufreq_flag; /* context CPU frequency flag*/
+#endif
+
 #if defined(CONFIG_CPU_EXYNOS4210) && defined(CONFIG_EXYNOS4_CPUFREQ)
 	int cpufreq_flag; /* context CPU frequency flag*/
 #endif

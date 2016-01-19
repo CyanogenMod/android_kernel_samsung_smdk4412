@@ -326,6 +326,24 @@ config MFD_MAX8925
 	  accessing the device, additional drivers must be enabled in order
 	  to use the functionality of the device.
 
+config MFD_MUIC_ADD_PLATFORM_DEVICE
+	bool "Using MFD MUIC platform device register utility"
+	depends on USE_MUIC
+	default n
+	help
+	  If you say yes here you will get support for
+	  the MFD MUIC platform device register utility.
+
+config MFD_MAX14577
+	bool "Maxim Semiconductor MAX14577 MUIC + Charger Support"
+	depends on I2C=y && GENERIC_HARDIRQS
+	select MFD_CORE
+	help
+	  Say yes here to support for Maxim Semiconductor MAX14577.
+	  This is a Micro-USB IC with Charger controls on chip.
+	  This driver provides common support for accessing the device;
+	  additional drivers
+
 config MFD_MAX8997
 	bool "Maxim Semiconductor MAX8997/8966 PMIC Support"
 	depends on I2C=y && GENERIC_HARDIRQS
@@ -372,7 +390,7 @@ config MFD_MAX77686
 
 config MFD_MAX77693
 	bool "Maxim Semiconductor MAX77693 PMIC Support"
-	depends on I2C=y && GENERIC_HARDIRQS
+	depends on I2C=y && GENERIC_HARDIRQS && (SAMSUNG_MUIC || DI_MUIC)
 	select MFD_CORE
 	help
 	  Say yes here to support for Maxim Semiconductor MAX77963.

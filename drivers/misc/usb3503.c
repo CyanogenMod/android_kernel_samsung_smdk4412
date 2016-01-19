@@ -38,8 +38,8 @@ static int usb3503_register_write(struct i2c_client *i2c_dev, char reg,
 
 	ret = i2c_transfer(i2c_dev->adapter, msg, 1);
 	if (ret < 0)
-		pr_err(HUB_TAG "%s: reg: %x data: %x write failed\n",
-		__func__, reg, data);
+		pr_err(HUB_TAG "%s: reg: %x data: %x write failed (err %d)\n",
+						__func__, reg, data, ret);
 
 	return ret;
 }
@@ -65,7 +65,8 @@ static int usb3503_register_read(struct i2c_client *i2c_dev, char reg,
 
 	ret = i2c_transfer(i2c_dev->adapter, msgs, 2);
 	if (ret < 0)
-		pr_err(HUB_TAG "%s: reg: %x read failed\n", __func__, reg);
+		pr_err(HUB_TAG "%s: reg: %x read failed (err %d)\n",
+						__func__, reg, ret);
 
 	return ret;
 }
@@ -81,6 +82,7 @@ static int reg_write(struct i2c_client *i2c_dev, char reg, char req, int retry)
 	char data = 0;
 
 	pr_debug(HUB_TAG "%s: write %02X, data: %02x\n", __func__, reg, req);
+
 	do {
 		err = usb3503_register_write(i2c_dev, reg, req);
 		if (err < 0) {
@@ -94,7 +96,7 @@ static int reg_write(struct i2c_client *i2c_dev, char reg, char req, int retry)
 			pr_err(HUB_TAG "%s: usb3503_register_read failed"
 					" - retry(%d)", __func__, cnt);
 	} while (data != req && cnt--);
-exit:
+
 	pr_info(HUB_TAG "%s: write %02X, req:%02x, val:%02x\n", __func__, reg,
 		req, data);
 
@@ -107,6 +109,7 @@ static int reg_update(struct i2c_client *i2c_dev, char reg, char req, int retry)
 	char data;
 
 	pr_debug(HUB_TAG "%s: update %02X, data: %02x\n", __func__, reg, req);
+
 	do {
 		err = usb3503_register_read(i2c_dev, reg, &data);
 		if (err < 0) {
@@ -127,7 +130,7 @@ static int reg_update(struct i2c_client *i2c_dev, char reg, char req, int retry)
 			pr_err(HUB_TAG "%s: usb3503_register_write failed"
 					" - retry(%d)", __func__, cnt);
 	} while (cnt--);
-exit:
+
 	pr_info(HUB_TAG "%s: update %02X, req:%02x, val:%02x\n", __func__, reg,
 		req, data);
 	return err;
@@ -141,8 +144,11 @@ static int reg_clear(struct i2c_client *i2c_dev, char reg, char req, int retry)
 	pr_debug(HUB_TAG "%s: clear %X, data %x\n", __func__, reg, req);
 	do {
 		err = usb3503_register_read(i2c_dev, reg, &data);
-		if (err < 0)
-			goto exit;
+		if (err < 0) {
+			pr_err(HUB_TAG "%s: usb3503_register_read failed"
+					" - retry(%d)", __func__, cnt);
+			continue;
+		}
 		pr_debug(HUB_TAG "%s: read %02X, data %02x\n", __func__, reg,
 			data);
 		if (!(data & req)) {
@@ -152,9 +158,10 @@ static int reg_clear(struct i2c_client *i2c_dev, char reg, char req, int retry)
 		}
 		err = usb3503_register_write(i2c_dev, reg, data & ~req);
 		if (err < 0)
-			goto exit;
+			pr_err(HUB_TAG "%s: usb3503_register_write failed"
+					" - retry(%d)", __func__, cnt);
 	} while (cnt--);
-exit:
+
 	pr_info(HUB_TAG "%s: clear %02X, req:%02x, val:%02x\n", __func__, reg,
 		req, data);
 	return err;
@@ -176,7 +183,7 @@ static int usb3503_set_mode(struct usb3503_hubctl *hc, int mode)
 			(SPILOCK_CONNECT_N | SPILOCK_CONFIG_N), 3);
 		if (err < 0) {
 			pr_err(HUB_TAG "SP_ILOCK write fail err = %d\n", err);
-			goto exit;
+			break;
 		}
 #ifdef USB3503_ES_VER
 /* ES version issue
@@ -186,27 +193,27 @@ static int usb3503_set_mode(struct usb3503_hubctl *hc, int mode)
 		err = reg_update(i2c_dev, CFGP_REG, CFGP_CLKSUSP, 1);
 		if (err < 0) {
 			pr_err(HUB_TAG "CFGP update fail err = %d\n", err);
-			goto exit;
+			break;
 		}
 #endif
 		/* PDS : Port2,3 Disable For Self Powered Operation */
 		err = reg_update(i2c_dev, PDS_REG, (PDS_PORT2 | PDS_PORT3), 1);
 		if (err < 0) {
 			pr_err(HUB_TAG "PDS update fail err = %d\n", err);
-			goto exit;
+			break;
 		}
 		/* CFG1 : SELF_BUS_PWR -> Self-Powerd operation */
 		err = reg_update(i2c_dev, CFG1_REG, CFG1_SELF_BUS_PWR, 1);
 		if (err < 0) {
 			pr_err(HUB_TAG "CFG1 update fail err = %d\n", err);
-			goto exit;
+			break;
 		}
 		/* SP_LOCK: clear connect_n, config_n for hub connect */
 		err = reg_clear(i2c_dev, SP_ILOCK_REG,
-			(SPILOCK_CONNECT_N | SPILOCK_CONFIG_N), 1);
+			(SPILOCK_CONNECT_N | SPILOCK_CONFIG_N), 3);
 		if (err < 0) {
 			pr_err(HUB_TAG "SP_ILOCK clear err = %d\n", err);
-			goto exit;
+			break;
 		}
 		hc->mode = mode;
 
@@ -222,10 +229,15 @@ static int usb3503_set_mode(struct usb3503_hubctl *hc, int mode)
 	default:
 		pr_err(HUB_TAG "%s: Invalid mode %d\n", __func__, mode);
 		err = -EINVAL;
-		goto exit;
 		break;
 	}
-exit:
+
+	if (err < 0) {
+		hc->reset_n(0);
+		hc->mode = USB3503_MODE_STANDBY;
+		pr_err(HUB_TAG "%s: set to standby due to error\n", __func__);
+	}
+
 	return err;
 }
 

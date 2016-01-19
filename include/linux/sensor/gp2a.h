@@ -55,19 +55,28 @@ enum {
 	LIGHT_INIT  = 17,
 };
 
+enum {
+	LIGHT_ENABLED = BIT(0),
+	PROXIMITY_ENABLED = BIT(1),
+};
+
 /* extern variables */
 extern u8 lightsensor_mode; /* 0 = low, 1 = high */
 extern int proximity_enable;
 extern char proximity_sensor_detection;
+extern u8 gp2a_power_state;
+extern u8 gp2a_enabled;
 
 /* prototype */
 int opt_i2c_read(u8 reg, unsigned char *rbuf, int len);
 int opt_i2c_write(u8 reg, u8 *val);
-int lightsensor_get_adcvalue(void);
 int is_gp2a030a(void);
 
 struct gp2a_platform_data {
 	int (*gp2a_led_on) (bool);
+#ifdef CONFIG_SENSORS_GP2A_VDD_CONTROL
+	int (*gp2a_vdd_on) (bool);
+#endif
 	int p_out; /* proximity-sensor-output gpio */
 	unsigned long (*gp2a_get_threshold)(u8 *);
 };

@@ -16,32 +16,56 @@
 #define __ISX012_H__
 #include <linux/i2c.h>
 #include <linux/delay.h>
-#include <linux/version.h>
-#include <linux/vmalloc.h>
-#include <linux/completion.h>
 #include <media/v4l2-device.h>
 #include <media/v4l2-subdev.h>
-#include <media/isx012_platform.h>
-#include <linux/videodev2_exynos_camera.h>
 #include <linux/workqueue.h>
+#include <linux/vmalloc.h>
+#include <linux/videodev2_exynos_camera.h>
+#include <media/isx012_platform.h>
+#include <linux/gpio.h>
 
-#define ISX012_DRIVER_NAME	"ISX012"
+#ifndef false
+#define false 0
+#endif
+#ifndef true
+#define true 1
+#endif
+
+#define ISX012_DRIVER_NAME	ISX012_DEVICE_NAME
+static const char driver_name[] = ISX012_DRIVER_NAME;
 
 #define ISX012_DELAY		0xFFFF0000
 
 /************************************
  * FEATURE DEFINITIONS
  ************************************/
-#define CONFIG_CAM_YUV_CAPTURE
-#define CONFIG_CAM_I2C_LITTLE_ENDIAN
-/* #define CONFIG_LOAD_FILE */ /* for tuning */
-/* #define CONFIG_DEBUG_NO_FRAME */
+#define CONFIG_SUPPORT_AF		true
+#define CONFIG_SUPPORT_FLASH		true
+#define CONFIG_I2C_RW_LE		true /* use little endian */
+#define CONFIG_LOAD_FILE		false /* for tuning */
+
+#if defined(CONFIG_MACH_P4NOTE) || defined(CONFIG_MACH_KONA) \
+	|| defined(CONFIG_MACH_ZEST)
+#define CONFIG_FULL_AEAWB_LOCK_BY_USER		false
+#define CONFIG_ENHANCED_SOFTLANDING		false
+#else
+#define CONFIG_FULL_AEAWB_LOCK_BY_USER		true
+#define CONFIG_ENHANCED_SOFTLANDING		true
+#endif
 
 /** Debuging Feature **/
-#define CONFIG_CAM_DEBUG
-#define CONFIG_CAM_TRACE /* Enable it with CONFIG_CAM_DEBUG */
-#define CONFIG_CAM_AF_DEBUG //* Enable it with CONFIG_CAM_DEBUG */
-/* #define DEBUG_WRITE_REGS */
+#define CONFIG_DEBUG_NO_FRAME		false
+
+#if defined(CONFIG_MACH_P4NOTE) || defined(CONFIG_MACH_KONA) || defined(CONFIG_TARGET_TAB3_3G8) || defined(CONFIG_TARGET_TAB3_WIFI8) || defined(CONFIG_TARGET_TAB3_LTE8)
+#define CONFIG_CAM_DEBUG		false
+#else
+#define CONFIG_CAM_DEBUG		true
+#endif
+#define CONFIG_CAM_TRACE		false /* Enable me with CAM_DEBUG */
+#define CONFIG_CAM_AF_DEBUG		false /* Enable me with CAM_DEBUG */
+#define CONFIG_CAM_BOOT_DEBUG		false /* Enable me with CAM_DEBUG */
+#define DEBUG_WRITE_REGS		false /* Enable me with CAM_DEBUG */
+
 /***********************************/
 
 #ifdef CONFIG_VIDEO_ISX012_DEBUG
@@ -61,52 +85,42 @@ module_param_named(debug_mask, isx012_debug_mask, uint, S_IWUSR | S_IRUGO);
 #define isx012_debug(mask, x...)
 #endif
 
-#define TAG_NAME	"["ISX012_DRIVER_NAME"]"" "
-
-/* Define debug level */
-#define CAMDBG_LEVEL_ERR		(1 << 0)
-#define CAMDBG_LEVEL_WARN		(1 << 1)
-#define CAMDBG_LEVEL_INFO		(1 << 2)
-#define CAMDBG_LEVEL_DEBUG		(1 << 3)
-#define CAMDBG_LEVEL_TRACE		(1 << 4)
-#define CAMDBG_LEVEL_DEFAULT	\
-	(CAMDBG_LEVEL_ERR | CAMDBG_LEVEL_WARN | CAMDBG_LEVEL_INFO)
-
 #define cam_err(fmt, ...)	\
-	printk(KERN_ERR TAG_NAME fmt, ##__VA_ARGS__)
+	printk(KERN_ERR "[""%s""] " fmt, driver_name,##__VA_ARGS__)
 #define cam_warn(fmt, ...)	\
-	printk(KERN_WARNING TAG_NAME fmt, ##__VA_ARGS__)
+	printk(KERN_WARNING "[""%s""] " fmt, driver_name, ##__VA_ARGS__)
 #define cam_info(fmt, ...)	\
-	printk(KERN_INFO TAG_NAME fmt, ##__VA_ARGS__)
+	printk(KERN_INFO "[""%s""] " fmt, driver_name, ##__VA_ARGS__)
 
-#if defined(CONFIG_CAM_DEBUG)
+#if CONFIG_CAM_DEBUG
 #define cam_dbg(fmt, ...)	\
-	printk(KERN_DEBUG TAG_NAME fmt, ##__VA_ARGS__)
+	printk(KERN_DEBUG "[""%s""] " fmt, driver_name, ##__VA_ARGS__)
 #else
 #define cam_dbg(fmt, ...)	\
 	do { \
 		if (dbg_level & CAMDBG_LEVEL_DEBUG) \
-			printk(KERN_DEBUG TAG_NAME fmt, ##__VA_ARGS__); \
+			printk(KERN_DEBUG "[""%s""] " fmt, driver_name, ##__VA_ARGS__); \
 	} while (0)
 #endif
 
-#if defined(CONFIG_CAM_DEBUG) && defined(CONFIG_CAM_TRACE)
+#if CONFIG_CAM_DEBUG && CONFIG_CAM_TRACE
 #define cam_trace(fmt, ...)	cam_dbg("%s: " fmt, __func__, ##__VA_ARGS__);
 #else
 #define cam_trace(fmt, ...)	\
 	do { \
 		if (dbg_level & CAMDBG_LEVEL_TRACE) \
-			printk(KERN_DEBUG TAG_NAME "%s: " fmt, \
-				__func__, ##__VA_ARGS__); \
+			printk(KERN_DEBUG "[""%s""] ""%s: " fmt, \
+				driver_name, __func__, ##__VA_ARGS__); \
 	} while (0)
 #endif
 
-#if defined(CONFIG_CAM_DEBUG) && defined(CONFIG_CAM_AF_DEBUG)
+#if CONFIG_CAM_DEBUG && CONFIG_CAM_AF_DEBUG
 #define af_dbg(fmt, ...)	cam_dbg(fmt, ##__VA_ARGS__);
 #else
 #define af_dbg(fmt, ...)
 #endif
-#if defined(CONFIG_CAM_DEBUG) && defined(CONFIG_CAM_BOOT_DEBUG)
+
+#if CONFIG_CAM_DEBUG && CONFIG_CAM_BOOT_DEBUG
 #define boot_dbg(fmt, ...)	cam_dbg(fmt, ##__VA_ARGS__);
 #else
 #define boot_dbg(fmt, ...)
@@ -130,25 +144,6 @@ module_param_named(debug_mask, isx012_debug_mask, uint, S_IWUSR | S_IRUGO);
 #define CHECK_ERR(x)	CHECK_ERR_COND(((x) < 0), (x))
 #define CHECK_ERR_MSG(x, fmt, ...) \
 	CHECK_ERR_COND_MSG(((x) < 0), (x), fmt, ##__VA_ARGS__)
-
-
-#ifdef CONFIG_LOAD_FILE
-#define ISX012_BURST_WRITE_REGS(sd, A) ({ \
-	int ret; \
-		cam_info("BURST_WRITE_REGS: reg_name=%s from setfile\n", #A); \
-		ret = isx012_write_regs_from_sd(sd, #A); \
-		ret; \
-	})
-#else
-
-#define ISX012_BURST_WRITE_REGS(sd, A) \
-	isx012_burst_write_regs(sd, A, (sizeof(A) / sizeof(A[0])), #A)
-#endif
-
-#define ISX012_WRITE_LIST(A) \
-	isx012_i2c_write_list(A, (sizeof(A) / sizeof(A[0])), #A)
-#define ISX012_BURST_WRITE_LIST(A) \
-	isx012_i2c_burst_write_list(sd, A, (sizeof(A) / sizeof(A[0])), #A)
 
 /* result values returned to HAL */
 enum af_result_status {
@@ -306,8 +301,10 @@ struct isx012_framesize {
 	u32 height;
 };
 
-#define FRM_RATIO(framesize) \
-	(((framesize)->width) * 10 / ((framesize)->height))
+#define FRM_RATIO(w, h)	((w) * 10 / (h))
+
+#define FRAMESIZE_RATIO(framesize) \
+	FRM_RATIO((framesize)->width, (framesize)->height)
 
 struct isx012_fps {
 	u32 index;
@@ -373,10 +370,10 @@ struct isx012_preview {
 
 struct isx012_capture {
 	const struct isx012_framesize *frmsize;
-	u32 pre_req;	/* for fast capture */
+	u32 pre_req;		/* for fast capture */
 	u32 ae_manual_mode:1;
 	u32 lowlux_night:1;
-	u32 ready:1;	/* for fast capture */
+	u32 ready:1;		/* for fast capture */
 };
 
 /* Focus struct */
@@ -387,9 +384,15 @@ struct isx012_focus {
 	u32 pos_x;
 	u32 pos_y;
 
-	u32 start:1;	/* enum v4l2_auto_focus*/
+	u32 support:1;
+	u32 start:1;		/* enum v4l2_auto_focus*/
 	u32 touch:1;
-	u32 lock:1;	/* set if single AF is done */
+
+	/* It means that cancel has been done and then each AF regs-table
+	 * has been written. */
+	u32 reset_done:1;
+
+	u32 lock:1;		/* set if single AF is done */
 };
 
 /* struct for sensor specific data */
@@ -409,22 +412,29 @@ struct isx012_flash {
 	enum v4l2_flash_mode mode;
 	enum preflash_status preflash;
 	u32 awb_delay;
-	u32 ae_scl;	/* for back-up */
-	u32 on:1;	/* flash on/off */
+	u32 ae_scl;		/* for back-up */
+	u32 on:1;		/* flash on/off */
 	u32 ignore_flash:1;
 	u32 ae_flash_lock:1;
+	u32 support:1;		/* to support flash */
 };
 
 /* Exposure struct */
 struct isx012_exposure {
-	s32 val;	/* exposure value */
+	s32 val;		/* exposure value */
+	s32 pending_val;	/* pending lock value */
 	u32 ae_lock:1;
+	u32 restore_lock:1;	/* set if AE lock is needed after completing AF */
+	u32 pending_lock:1;	/* set if there is pending locks */
 };
 
 /* White Balance struct */
 struct isx012_whitebalance {
 	enum v4l2_wb_mode mode; /* wb mode */
+	s32 pending_val;	/* pending lock value */
 	u32 awb_lock:1;
+	u32 restore_lock:1;	/* set if AWB lock is needed after completing AF */
+	u32 pending_lock:1;	/* set if there is pending locks */
 };
 
 struct isx012_exif {
@@ -457,18 +467,22 @@ typedef struct isx012_regset {
 	u32 len;
 } isx012_regset_t;
 
-#ifdef CONFIG_LOAD_FILE
-#define DEBUG_WRITE_REGS
+#if CONFIG_LOAD_FILE
+#if !(DEBUG_WRITE_REGS)
+#undef DEBUG_WRITE_REGS
+#define DEBUG_WRITE_REGS	true
+#endif
+
 struct regset_table {
 	const char	*const name;
 };
 
-#define ISX012_REGSET(x, y, z)		\
+#define REGSET(x, y, z)		\
 	[(x)] = {			\
 		.name		= #y,	\
 	}
 
-#define ISX012_REGSET_TABLE(y, z)	\
+#define REGSET_TABLE(y, z)	\
 	{				\
 		.name		= #y,	\
 	}
@@ -478,21 +492,21 @@ struct regset_table {
 struct regset_table {
 	const isx012_regset_t * const reg;
 	const u32	array_size;
-#ifdef DEBUG_WRITE_REGS
+#if DEBUG_WRITE_REGS
 	const char	* const name;
 #endif
 	const u32	burst;	/* on/off */
 };
 
-#ifdef DEBUG_WRITE_REGS
-#define ISX012_REGSET(x, y, z)		\
+#if DEBUG_WRITE_REGS
+#define REGSET(x, y, z)		\
 	[(x)] = {					\
 		.reg		= (y),			\
 		.array_size	= ARRAY_SIZE((y)),	\
 		.name		= #y,			\
 		.burst		= z,			\
 	}
-#define ISX012_REGSET_TABLE(y, z)		\
+#define REGSET_TABLE(y, z)		\
 	{					\
 		.reg		= (y),			\
 		.array_size	= ARRAY_SIZE((y)),	\
@@ -500,13 +514,13 @@ struct regset_table {
 		.burst		= z,			\
 	}
 #else /* !DEBUG_WRITE_REGS */
-#define ISX012_REGSET(x, y, z)		\
+#define REGSET(x, y, z)		\
 	[(x)] = {					\
 		.reg		= (y),			\
 		.array_size	= ARRAY_SIZE((y)),	\
 		.burst		= z,			\
 	}
-#define ISX012_REGSET_TABLE(y, z)		\
+#define REGSET_TABLE(y, z)		\
 	{					\
 		.reg		= (y),			\
 		.array_size	= ARRAY_SIZE((y)),	\
@@ -553,6 +567,7 @@ struct isx012_regs {
 	struct regset_table af_touch_saf_off;
 	struct regset_table af_camcorder_start;
 	struct regset_table softlanding;
+	struct regset_table softlanding2;	/* Enhanced Softlanding */
 
 	struct regset_table get_esd_status;
 
@@ -589,17 +604,15 @@ struct isx012_state {
 	struct isx012_exposure exposure;
 	struct isx012_whitebalance wb;
 	struct isx012_exif exif;
-#if !defined(CONFIG_CAM_YUV_CAPTURE)
-	struct isx012_jpeg_param jpeg;
-#endif
 	struct isx012_stream_time stream_time;
 	const struct isx012_regs *regs;
 	struct mutex ctrl_lock;
 	struct mutex af_lock;
+	struct mutex aeawb_lock;
 	struct workqueue_struct *workqueue;
 	struct work_struct af_work;
 	struct work_struct af_win_work;
-#ifdef CONFIG_DEBUG_NO_FRAME
+#if CONFIG_DEBUG_NO_FRAME
 	struct work_struct frame_work;
 #endif
 	enum runmode runmode;
@@ -616,37 +629,51 @@ struct isx012_state {
 	u32 light_level;	/* light level */
 	u32 lux_level_flash;
 	u32 shutter_level_flash;
-	u8 *dbg_level;
-#ifdef CONFIG_DEBUG_NO_FRAME
-	bool frame_check;
+	u32 *dbg_level;
+#if CONFIG_DEBUG_NO_FRAME
+	atomic_t frame_check;
 #endif
+	pid_t af_pid;
 	u32 recording:1;
 	u32 hd_videomode:1;
 	u32 need_wait_streamoff:1;
 	u32 initialized:1;
 };
 
+#define TO_STATE(p, m)		(container_of(p, struct isx012_state, m))
+#define IS_FLASH_SUPPORTED()	(CONFIG_SUPPORT_FLASH)
+#define IS_AF_SUPPORTED()	(CONFIG_SUPPORT_AF)
+#define IS_FULL_USER_AEAWB_LOCK_SUPPORTED() \
+				(CONFIG_FULL_AEAWB_LOCK_BY_USER)
+#define IS_ENHANCED_SOFTLAND_ENABLED()	(CONFIG_ENHANCED_SOFTLANDING)
+
 static inline struct  isx012_state *to_state(struct v4l2_subdev *sd)
 {
-	return container_of(sd, struct isx012_state, sd);
+	return TO_STATE(sd, sd);
+}
+
+static inline int check_af_pid(struct v4l2_subdev *sd)
+{
+	struct isx012_state *state = to_state(sd);
+
+	if (state->af_pid && (task_pid_nr(current) == state->af_pid))
+		return -EPERM;
+	else
+		return 0;
 }
 
 static inline int isx012_restore_sensor_flash(struct v4l2_subdev *sd);
 static int isx012_set_capture(struct v4l2_subdev *sd);
 static int isx012_prepare_fast_capture(struct v4l2_subdev *sd);
+static int isx012_get_exif(struct v4l2_subdev *sd);
 
 extern struct class *camera_class;
-extern int isx012_create_file(struct class *cls);
+extern int isx012_create_flash_sysfs(void);
 
-#if !defined(CONFIG_CAM_YUV_CAPTURE)
-/* JPEG MEMORY SIZE */
-#define SENSOR_JPEG_OUTPUT_MAXSIZE	0x29999A /*2726298bytes, 2.6M */
-#define EXTRA_MEMSIZE			(0 * SZ_1K)
-#define SENSOR_JPEG_SNAPSHOT_MEMSIZE \
-	(((SENSOR_JPEG_OUTPUT_MAXSIZE + EXTRA_MEMSIZE  + SZ_16K-1) / SZ_16K) * SZ_16K)
-#endif
 
 /*********** Sensor specific ************/
+#define UNINITIALIZED_VENDORID	0xDEADDEAD
+
 #define ISX012_INTSRC_VINT		(0x01 << 5)
 
 #define POLL_TIME_MS		10
@@ -741,18 +768,16 @@ extern int isx012_create_file(struct class *cls);
 #define REG_INTBIT_VINT			(0x01 << 5)
 
 /* The Path of Setfile */
-#ifdef CONFIG_LOAD_FILE
-#include <linux/vmalloc.h>
-#include <linux/fs.h>
-#include <linux/mm.h>
-#include <linux/slab.h>
-#include <linux/uaccess.h>
-
+#if CONFIG_LOAD_FILE
 #define TUNING_FILE_PATH "/mnt/sdcard/isx012_regs.h"
 #endif /* CONFIG_LOAD_FILE*/
 
 #ifdef CONFIG_MACH_KONA
 #include "isx012_regs_kona.h"
+#elif defined(CONFIG_MACH_ZEST)
+#include "isx012_regs_zest.h"
+#elif defined(CONFIG_TARGET_TAB3_3G8) || defined(CONFIG_TARGET_TAB3_WIFI8) || defined(CONFIG_TARGET_TAB3_LTE8)
+#include "isx012_regs_lt01.h"
 #else /* P4NOTE */
 #include "isx012_regs.h"
 #endif

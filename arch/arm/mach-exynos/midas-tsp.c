@@ -17,18 +17,31 @@
 #include <linux/i2c/mxt224_u1.h>
 #elif defined(CONFIG_TOUCHSCREEN_MELFAS_GC)
 #include <linux/platform_data/mms_ts_gc.h>
+#elif defined(CONFIG_TOUCHSCREEN_MELFAS_W)
+#include <linux/platform_data/mms_ts_w.h>
 #elif defined(CONFIG_TOUCHSCREEN_ATMEL_MXT540E)
 #include <linux/delay.h>
 #include <linux/i2c/mxt540e.h>
-#elif defined(CONFIG_TOUCHSCREEN_MELFAS_NOTE)
+#elif defined(CONFIG_TOUCHSCREEN_MELFAS_NOTE) || \
+defined(CONFIG_TOUCHSCREEN_MELFAS_GD2)
 #include <linux/platform_data/mms152_ts.h>
-#elif defined(CONFIG_TOUCHSCREEN_ATMEL_MXT540S)
-#include <linux/i2c/mxt540s.h>
-#elif defined(CONFIG_TOUCHSCREEN_CYTTSP4)
-#include <linux/platform_data/cypress_cyttsp4.h>
+#elif defined(CONFIG_TOUCHSCREEN_ATMEL_MXTS)
+#include <linux/i2c/mxts.h>
+#include <linux/interrupt.h>
+#elif defined(CONFIG_TOUCHSCREEN_CYPRESS_TMA46X)
+#include <linux/cyttsp4_bus.h>
+#include <linux/cyttsp4_core.h>
+#include <linux/cyttsp4_btn.h>
+#include <linux/cyttsp4_mt.h>
 #include <linux/delay.h>
 #include <linux/input.h>
-
+#include <linux/interrupt.h>
+#elif defined(CONFIG_TOUCHSCREEN_SYNAPTICS_I2C_RMI)
+#include <linux/i2c/synaptics_rmi.h>
+#include <linux/interrupt.h>
+#elif defined(CONFIG_TOUCHSCREEN_ATMEL_MXT224E)
+#include <linux/delay.h>
+#include <linux/i2c/mxt224e.h>
 #else
 #include <linux/platform_data/mms_ts.h>
 #endif
@@ -55,6 +68,16 @@ void tsp_register_callback(void *function)
 void tsp_read_ta_status(void *ta_status)
 {
 	*(bool *) ta_status = is_cable_attached;
+}
+
+void tsp_charger_infom(bool en)
+{
+	if (charging_cbs.tsp_set_charging_cable)
+		charging_cbs.tsp_set_charging_cable(en);
+}
+
+void __init midas_tsp_set_lcdtype(int lcd_type)
+{
 }
 
 static void mxt224_power_on(void)
@@ -94,6 +117,7 @@ static void mxt224_power_off(void)
 	regulator_disable(regulator);
 
 	regulator_put(regulator);
+
 	printk(KERN_INFO "mxt224_power_off is finished\n");
 }
 
@@ -309,6 +333,7 @@ static u8 t48_config_chrg_e[] = { PROCG_NOISESUPPRESSION_T48,
 	10, 5, 40, 10, 0, 10, 10, 143, 40, 143,
 	80, 18, 15, 2
 };
+
 #else
 
 static u8 t7_config_e[] = { GEN_POWERCONFIG_T7,
@@ -776,6 +801,180 @@ void __init midas_tsp_init(void)
 	i2c_register_board_info(3, i2c_devs3, ARRAY_SIZE(i2c_devs3));
 }
 
+#elif defined(CONFIG_TOUCHSCREEN_MELFAS_W)
+
+void __init midas_tsp_set_lcdtype(int lcd_type)
+{
+}
+
+static bool enabled;
+int melfas_power(int on)
+{
+	struct regulator *regulator_pwr;
+	struct regulator *regulator_vdd;
+	int ret = 0;
+
+	if (enabled == on) {
+		pr_err("melfas-ts : %s same state!", __func__);
+		return 0;
+	}
+
+	regulator_pwr = regulator_get(NULL, "tsp_avdd_3.3v");
+	regulator_vdd = regulator_get(NULL, "tsp_vdd_1.8v");
+
+	if (IS_ERR(regulator_pwr)) {
+		pr_err("melfas-ts : %s regulator_pwr error!", __func__);
+		return PTR_ERR(regulator_pwr);
+	}
+	if (IS_ERR(regulator_vdd)) {
+		pr_err("melfas-ts : %s regulator_vdd error!", __func__);
+		return PTR_ERR(regulator_vdd);
+	}
+
+	if (on) {
+		regulator_enable(regulator_vdd);
+		regulator_enable(regulator_pwr);
+	} else {
+		if (regulator_is_enabled(regulator_pwr))
+			regulator_disable(regulator_pwr);
+		if (regulator_is_enabled(regulator_vdd))
+			regulator_disable(regulator_vdd);
+	}
+
+	if (regulator_is_enabled(regulator_pwr) == !!on &&
+		regulator_is_enabled(regulator_vdd) == !!on) {
+		pr_info("melfas-ts : %s %s", __func__, !!on ? "ON" : "OFF");
+		enabled = on;
+	} else {
+		pr_err("melfas-ts : regulator_is_enabled value error!");
+		ret = -1;
+	}
+
+	regulator_put(regulator_vdd);
+	regulator_put(regulator_pwr);
+
+	return ret;
+}
+
+int melfas_mux_fw_flash(bool to_gpios)
+{
+	pr_info("melfas-ts : %s:to_gpios=%d\n", __func__, to_gpios);
+
+	/* TOUCH_EN is always an output */
+	if (to_gpios) {
+		if (gpio_request(GPIO_TSP_SCL_18V, "GPIO_TSP_SCL"))
+			pr_err("failed to request gpio(GPIO_TSP_SCL)\n");
+		if (gpio_request(GPIO_TSP_SDA_18V, "GPIO_TSP_SDA"))
+			pr_err("failed to request gpio(GPIO_TSP_SDA)\n");
+
+		gpio_direction_output(GPIO_TSP_INT, 0);
+		s3c_gpio_cfgpin(GPIO_TSP_INT, S3C_GPIO_OUTPUT);
+		s3c_gpio_setpull(GPIO_TSP_INT, S3C_GPIO_PULL_NONE);
+
+		gpio_direction_output(GPIO_TSP_SCL_18V, 0);
+		s3c_gpio_cfgpin(GPIO_TSP_SCL_18V, S3C_GPIO_OUTPUT);
+		s3c_gpio_setpull(GPIO_TSP_SCL_18V, S3C_GPIO_PULL_NONE);
+
+		gpio_direction_output(GPIO_TSP_SDA_18V, 0);
+		s3c_gpio_cfgpin(GPIO_TSP_SDA_18V, S3C_GPIO_OUTPUT);
+		s3c_gpio_setpull(GPIO_TSP_SDA_18V, S3C_GPIO_PULL_NONE);
+
+	} else {
+		gpio_direction_output(GPIO_TSP_INT, 1);
+		gpio_direction_input(GPIO_TSP_INT);
+		s3c_gpio_cfgpin(GPIO_TSP_INT, S3C_GPIO_SFN(0xf));
+		/*s3c_gpio_cfgpin(GPIO_TSP_INT, S3C_GPIO_INPUT); */
+		s3c_gpio_setpull(GPIO_TSP_INT, S3C_GPIO_PULL_NONE);
+		/*S3C_GPIO_PULL_UP */
+
+		gpio_direction_output(GPIO_TSP_SCL_18V, 1);
+		gpio_direction_input(GPIO_TSP_SCL_18V);
+		s3c_gpio_cfgpin(GPIO_TSP_SCL_18V, S3C_GPIO_SFN(3));
+		s3c_gpio_setpull(GPIO_TSP_SCL_18V, S3C_GPIO_PULL_NONE);
+
+		gpio_direction_output(GPIO_TSP_SDA_18V, 1);
+		gpio_direction_input(GPIO_TSP_SDA_18V);
+		s3c_gpio_cfgpin(GPIO_TSP_SDA_18V, S3C_GPIO_SFN(3));
+		s3c_gpio_setpull(GPIO_TSP_SDA_18V, S3C_GPIO_PULL_NONE);
+
+		gpio_free(GPIO_TSP_SCL_18V);
+		gpio_free(GPIO_TSP_SDA_18V);
+	}
+	return 0;
+}
+
+struct tsp_callbacks *charger_callbacks;
+struct tsp_callbacks {
+	void (*inform_charger)(struct tsp_callbacks *, bool);
+};
+
+void tsp_charger_infom(bool en)
+{
+	if (charger_callbacks && charger_callbacks->inform_charger)
+		charger_callbacks->inform_charger(charger_callbacks, en);
+}
+
+static void melfas_register_callback(void *cb)
+{
+	charger_callbacks = cb;
+	pr_info("melfas-ts : melfas_register_callback");
+}
+
+static struct melfas_tsi_platform_data mms_ts_pdata = {
+	.max_x = 320,
+	.max_y = 320,
+	.invert_x = 0,
+	.invert_y = 0,
+	.gpio_int = GPIO_TSP_INT,
+	.gpio_scl = GPIO_TSP_SCL_18V,
+	.gpio_sda = GPIO_TSP_SDA_18V,
+	.power = melfas_power,
+	.mux_fw_flash = melfas_mux_fw_flash,
+	.tsp_vendor = "MELFAS",
+	.tsp_ic	= "MMS128S",
+	.tsp_tx = 7,	/* TX_NUM (Reg Addr : 0xEF) */
+	.tsp_rx = 7,	/* RX_NUM (Reg Addr : 0xEE) */
+	.config_fw_version = "V700_ME_0523",
+	.register_cb = melfas_register_callback,
+};
+
+static struct i2c_board_info i2c_devs3[] = {
+	{
+	 I2C_BOARD_INFO(MELFAS_TS_NAME, 0x48),
+	 .platform_data = &mms_ts_pdata},
+};
+
+void __init midas_tsp_set_platdata(struct melfas_tsi_platform_data *pdata)
+{
+	if (!pdata)
+		pdata = &mms_ts_pdata;
+
+	i2c_devs3[0].platform_data = pdata;
+}
+
+void __init midas_tsp_init(void)
+{
+	int gpio;
+	int ret;
+	pr_info("melfas-ts : W TSP init() is called : [%d]", system_rev);
+
+	/* TSP_INT: XEINT_4 */
+	gpio = GPIO_TSP_INT;
+	ret = gpio_request(gpio, "TSP_INT");
+	if (ret)
+		pr_err("melfas-ts : failed to request gpio(TSP_INT)");
+	s3c_gpio_cfgpin(gpio, S3C_GPIO_SFN(0xf));
+	s3c_gpio_setpull(gpio, S3C_GPIO_PULL_NONE);
+
+	s5p_register_gpio_interrupt(gpio);
+	i2c_devs3[0].irq = gpio_to_irq(gpio);
+
+	pr_info("melfas-ts : %s touch : %d\n", __func__, i2c_devs3[0].irq);
+
+	i2c_register_board_info(3, i2c_devs3, ARRAY_SIZE(i2c_devs3));
+}
+
+
 #elif defined(CONFIG_TOUCHSCREEN_ATMEL_MXT540E)
 static struct charging_status_callbacks {
 	void (*tsp_set_charging_cable) (int type);
@@ -1083,8 +1282,31 @@ void __init midas_tsp_init(void)
 	i2c_register_board_info(3, i2c_devs3, ARRAY_SIZE(i2c_devs3));
 }
 
-#elif defined(CONFIG_TOUCHSCREEN_ATMEL_MXT540S)
-#define MXT_FIRMWARE_540S	"tsp_atmel/mXT540S.fw"
+#elif defined(CONFIG_TOUCHSCREEN_ATMEL_MXTS)
+#define MXT_BOOT_ADDRESS	0x24
+#define MXT_APP_ADDRESS		0x4A
+
+/* We need to support two types of IC revision at once,
+ * So two firmwwares are loaded, and we need to add proper firmware name
+ * to platform data according to revision of IC.
+ *
+ * REV_G : Firmware version is like 1.x.
+ * REV_I : Firmware version is like 2.x and it added Hovering functionality
+ * compared with REV_G.
+ */
+#define MXT_FIRMWARE_NAME_REVISION_I	"mXT540Si.fw"
+#if defined(CONFIG_MACH_GC2PD)
+#define MXT_FIRMWARE_NAME_REVISION_G	"mXT336S.fw"
+#else
+#define MXT_FIRMWARE_NAME_REVISION_G	"mXT540Sg.fw"
+#endif
+
+/* To display configuration version on *#2663# */
+#if defined(CONFIG_MACH_GC2PD)
+#define MXT_PROJECT_NAME	"SM-C101"
+#else
+#define MXT_PROJECT_NAME	"GT-I95XX"
+#endif
 
 struct mxt_callbacks *charger_callbacks;
 
@@ -1110,6 +1332,15 @@ static int ts_power_on(void)
 {
 	struct regulator *regulator;
 
+	/* enable AVDD */
+	regulator = regulator_get(NULL, "touch");
+	if (IS_ERR(regulator)) {
+		printk(KERN_ERR "[TSP]ts_power_on : tsp_avdd regulator_get failed\n");
+		return -EIO;
+	}
+	regulator_enable(regulator);
+	regulator_put(regulator);
+
 	/* enable I2C pullup */
 	regulator = regulator_get(NULL, "touch_1.8v");
 	if (IS_ERR(regulator)) {
@@ -1119,19 +1350,12 @@ static int ts_power_on(void)
 	regulator_enable(regulator);
 	regulator_put(regulator);
 
+#if !defined(CONFIG_MACH_GC2PD)
 	/* enable DVDD */
 	s3c_gpio_cfgpin(GPIO_TSP_LDO_28V_EN, S3C_GPIO_OUTPUT);
 	s3c_gpio_setpull(GPIO_TSP_LDO_28V_EN, S3C_GPIO_PULL_NONE);
 	gpio_direction_output(GPIO_TSP_LDO_28V_EN, GPIO_LEVEL_HIGH);
-
-	/* enable AVDD */
-	regulator = regulator_get(NULL, "touch");
-	if (IS_ERR(regulator)) {
-		printk(KERN_ERR "[TSP]ts_power_on : tsp_avdd regulator_get failed\n");
-		return -EIO;
-	}
-	regulator_enable(regulator);
-	regulator_put(regulator);
+#endif
 
 	/* touch interrupt pin */
 	s3c_gpio_cfgpin(GPIO_TSP_INT, S3C_GPIO_SFN(0xf));
@@ -1157,11 +1381,12 @@ static int ts_power_off(void)
 		regulator_force_disable(regulator);
 	regulator_put(regulator);
 
+#if !defined(CONFIG_MACH_GC2PD)
 	/* disable DVDD */
 	s3c_gpio_cfgpin(GPIO_TSP_LDO_28V_EN, S3C_GPIO_OUTPUT);
 	s3c_gpio_setpull(GPIO_TSP_LDO_28V_EN, S3C_GPIO_PULL_NONE);
 	gpio_direction_output(GPIO_TSP_LDO_28V_EN, GPIO_LEVEL_LOW);
-
+#endif
 	/* disable I2C pullup */
 	regulator = regulator_get(NULL, "touch_1.8v");
 	if (IS_ERR(regulator)) {
@@ -1182,17 +1407,18 @@ static int ts_power_off(void)
 	return 0;
 }
 
-static int ts_power_reset(void)
+static bool ts_read_chg(void)
 {
-	return 0;
+	return gpio_get_value(GPIO_TSP_INT);
 }
 
 static void ts_gpio_init(void)
 {
+#if !defined(CONFIG_MACH_GC2PD)
 	gpio_request(GPIO_TSP_LDO_28V_EN, "TSP_LDO_28V_EN");
 	gpio_direction_output(GPIO_TSP_LDO_28V_EN, GPIO_LEVEL_LOW);
 	gpio_export(GPIO_TSP_LDO_28V_EN, 0);
-
+#endif
 	/* touch interrupt */
 	gpio_request(GPIO_TSP_INT, "TSP_INT");
 	s3c_gpio_cfgpin(GPIO_TSP_INT, S3C_GPIO_INPUT);
@@ -1201,27 +1427,31 @@ static void ts_gpio_init(void)
 }
 
 static struct mxt_platform_data mxt_data = {
-	.max_finger_touches = 10,
-	.gpio_read_done = GPIO_TSP_INT,
-	.min_x = 0,
+#if defined(CONFIG_MACH_GC2PD)
+	.num_xnode = 24,
+	.num_ynode = 14,
+	.max_x = 540,
+	.max_y = 960,
+#else
+	.num_xnode = 30,
+	.num_ynode = 17,
 	.max_x = 4095,
-	.min_y = 0,
 	.max_y = 4095,
-	.min_z = 0,
-	.max_z = 255,
-	.min_w = 0,
-	.max_w = 255,
+#endif
+	.irqflags = IRQF_TRIGGER_LOW | IRQF_ONESHOT,
+	.boot_address = MXT_BOOT_ADDRESS,
+	.firmware_name = MXT_FIRMWARE_NAME_REVISION_G,
+	.project_name = MXT_PROJECT_NAME,
+	.revision = MXT_REVISION_G,
+	.read_chg = ts_read_chg,
 	.power_on = ts_power_on,
 	.power_off = ts_power_off,
-	.power_reset = ts_power_reset,
-	.boot_address = 0x24,
-	.firmware_name = MXT_FIRMWARE_540S,
 	.register_cb = ts_register_callback,
 };
 
 static struct i2c_board_info i2c_devs3[] __initdata = {
 	{
-		I2C_BOARD_INFO(MXT_DEV_NAME, 0x4a),
+		I2C_BOARD_INFO(MXT_DEV_NAME, MXT_APP_ADDRESS),
 		.platform_data = &mxt_data,
 	}
 };
@@ -1238,7 +1468,167 @@ void __init midas_tsp_init(void)
 		 __func__, i2c_devs3[0].irq);
 }
 
-#elif defined(CONFIG_TOUCHSCREEN_MELFAS_NOTE)
+#elif defined(CONFIG_TOUCHSCREEN_SYNAPTICS_I2C_RMI)
+static struct synaptics_rmi_callbacks *charger_callbacks;
+void tsp_charger_infom(bool en)
+{
+	if (charger_callbacks && charger_callbacks->inform_charger)
+		charger_callbacks->inform_charger(charger_callbacks, en);
+}
+
+#ifdef CONFIG_LCD_FREQ_SWITCH
+static struct tsp_lcd_callbacks *lcd_callbacks;
+struct tsp_lcd_callbacks {
+	void (*inform_lcd)(struct tsp_lcd_callbacks *, bool);
+};
+
+void tsp_lcd_infom(bool en)
+{
+	if (lcd_callbacks && lcd_callbacks->inform_lcd)
+		lcd_callbacks->inform_lcd(lcd_callbacks, en);
+}
+#endif
+
+void __init midas_tsp_set_lcdtype(int lcd_type)
+{
+}
+
+static int synaptics_power(bool on)
+{
+	struct regulator *regulator_vdd;
+	struct regulator *regulator_avdd;
+	static bool enabled;
+
+	if (enabled == on)
+		return 0;
+
+	regulator_vdd = regulator_get(NULL, "touch_1.8v");
+	if (IS_ERR(regulator_vdd)) {
+		printk(KERN_ERR "[TSP]ts_power_on : tsp_vdd regulator_get failed\n");
+		return PTR_ERR(regulator_vdd);
+	}
+
+	regulator_avdd = regulator_get(NULL, "touch");
+	if (IS_ERR(regulator_avdd)) {
+		printk(KERN_ERR "[TSP]ts_power_on : tsp_avdd regulator_get failed\n");
+		return PTR_ERR(regulator_avdd);
+	}
+
+	printk(KERN_INFO "[TSP] %s %s\n", __func__, on ? "on" : "off");
+
+	if (on) {
+		regulator_enable(regulator_vdd);
+		regulator_enable(regulator_avdd);
+	} else {
+		/*
+		 * TODO: If there is a case the regulator must be disabled
+		 * (e,g firmware update?), consider regulator_force_disable.
+		 */
+		if (regulator_is_enabled(regulator_avdd))
+			regulator_disable(regulator_avdd);
+		if (regulator_is_enabled(regulator_vdd))
+			regulator_disable(regulator_vdd);
+	}
+
+	enabled = on;
+	regulator_put(regulator_vdd);
+	regulator_put(regulator_avdd);
+
+	return 0;
+}
+
+static int synaptics_gpio_setup(unsigned gpio, bool configure)
+{
+	if (configure) {
+		gpio_request(gpio, "TSP_INT");
+		s3c_gpio_cfgpin(gpio, S3C_GPIO_SFN(0xf));
+		s3c_gpio_setpull(gpio, S3C_GPIO_PULL_NONE);
+		s5p_register_gpio_interrupt(gpio);
+	} else {
+		pr_warn("%s: No way to deconfigure gpio %d.",
+		       __func__, gpio);
+	}
+
+	return 0;
+}
+
+#if NO_0D_WHILE_2D
+static unsigned char tm1940_f1a_button_codes[] = {KEY_MENU, KEY_BACK};
+
+static struct synaptics_rmi_f1a_button_map tm1940_f1a_button_map = {
+	.nbuttons = ARRAY_SIZE(tm1940_f1a_button_codes),
+	.map = tm1940_f1a_button_codes,
+};
+
+static int ts_led_power_on(bool on)
+{
+	struct regulator *regulator;
+
+	if (on) {
+		regulator = regulator_get(NULL, "touchkey_led");
+		if (IS_ERR(regulator)) {
+			printk(KERN_ERR
+			"[TSP_KEY] ts_led_power_on : TK_LED regulator_get failed\n");
+			return -EIO;
+		}
+
+		regulator_enable(regulator);
+		regulator_put(regulator);
+	} else {
+		regulator = regulator_get(NULL, "touchkey_led");
+		if (IS_ERR(regulator)) {
+			printk(KERN_ERR
+			"[TSP_KEY] ts_led_power_on : TK_LED regulator_get failed\n");
+			return -EIO;
+		}
+
+		if (regulator_is_enabled(regulator))
+			regulator_force_disable(regulator);
+		regulator_put(regulator);
+	}
+
+	return 0;
+}
+#endif
+
+#define TM1940_ADDR 0x20
+#define TM1940_ATTN 130
+
+static struct synaptics_rmi4_platform_data rmi4_platformdata = {
+	.irq_type = IRQF_TRIGGER_FALLING,
+	.gpio = GPIO_TSP_INT,
+	.power = synaptics_power,
+	.gpio_config = synaptics_gpio_setup,
+#if NO_0D_WHILE_2D
+	.led_power_on = ts_led_power_on,
+	.f1a_button_map = &tm1940_f1a_button_map,
+#endif
+};
+
+static struct i2c_board_info i2c_devs3[] = {
+	{
+		I2C_BOARD_INFO("synaptics_rmi4_i2c", 0x20),
+		.platform_data = &rmi4_platformdata,
+	}
+};
+
+void __init midas_tsp_init(void)
+{
+	/* touch interrupt */
+	gpio_request(GPIO_TSP_INT, "TSP_INT");
+	s3c_gpio_cfgpin(GPIO_TSP_INT, S3C_GPIO_SFN(0xf));
+	s3c_gpio_setpull(GPIO_TSP_INT, S3C_GPIO_PULL_NONE);
+	s5p_register_gpio_interrupt(GPIO_TSP_INT);
+
+	i2c_devs3[0].irq = gpio_to_irq(GPIO_TSP_INT);
+	i2c_register_board_info(3, i2c_devs3, ARRAY_SIZE(i2c_devs3));
+
+	printk(KERN_ERR "%s touch : %d\n",
+		 __func__, i2c_devs3[0].irq);
+}
+
+#elif defined(CONFIG_TOUCHSCREEN_MELFAS_NOTE) || \
+defined(CONFIG_TOUCHSCREEN_MELFAS_GD2)
 /* MELFAS TSP(T0) */
 static bool enabled;
 int TSP_VDD_18V(int on)
@@ -1278,6 +1668,15 @@ int melfas_power(bool on)
 	if (enabled == on)
 		return 0;
 
+#if defined(CONFIG_TOUCHSCREEN_MELFAS_GD2)
+	regulator_vdd = regulator_get(NULL, "tsp_vdd_1.8v");
+	if (IS_ERR(regulator_vdd))
+			return PTR_ERR(regulator_vdd);
+
+	regulator_avdd = regulator_get(NULL, "tsp_avdd_3.3v");
+	if (IS_ERR(regulator_avdd))
+		return PTR_ERR(regulator_avdd);
+#else
 	regulator_vdd = regulator_get(NULL, "touch_1.8v");
 	if (IS_ERR(regulator_vdd))
 			return PTR_ERR(regulator_vdd);
@@ -1285,6 +1684,7 @@ int melfas_power(bool on)
 	regulator_avdd = regulator_get(NULL, "touch");
 	if (IS_ERR(regulator_avdd))
 		return PTR_ERR(regulator_avdd);
+#endif
 
 	printk(KERN_DEBUG "[TSP] %s %s\n", __func__, on ? "on" : "off");
 
@@ -1316,7 +1716,11 @@ int is_melfas_vdd_on(void)
 	static struct regulator *regulator;
 
 	if (!regulator) {
+#if defined(CONFIG_TOUCHSCREEN_MELFAS_GD2)
+		regulator = regulator_get(NULL, "tsp_avdd_3.3v");
+#else
 		regulator = regulator_get(NULL, "touch");
+#endif
 		if (IS_ERR(regulator)) {
 			ret = PTR_ERR(regulator);
 			pr_err("could not get touch, rc = %d\n", ret);
@@ -1515,91 +1919,255 @@ void __init midas_tsp_init(void)
 	i2c_register_board_info(3, i2c_devs3, ARRAY_SIZE(i2c_devs3));
 }
 
-#elif defined(CONFIG_TOUCHSCREEN_CYTTSP4)
+#elif defined(CONFIG_TOUCHSCREEN_CYPRESS_TMA46X)
 
-#define CY_I2C_NAME     "cyttsp4-i2c"
+#define CONFIG_TOUCHSCREEN_CYPRESS_CYTTSP4_INCLUDE_FW
 
-#define CY_USE_TMA400_SP2
-/* use the following define if the device is a TMA400 family part
- */
-#define CY_USE_TMA400
-#define CY_USE_BUTTON_TEST_PANEL
+#ifdef CONFIG_TOUCHSCREEN_CYPRESS_CYTTSP4_INCLUDE_FW
+#include "cyttsp4_img.h"
+static struct cyttsp4_touch_firmware cyttsp4_firmware = {
+	.img = cyttsp4_img,
+	.size = ARRAY_SIZE(cyttsp4_img),
+	.ver = cyttsp4_ver,
+	.vsize = ARRAY_SIZE(cyttsp4_ver),
+};
+#else
+static struct cyttsp4_touch_firmware cyttsp4_firmware = {
+	.img = NULL,
+	.size = 0,
+	.ver = NULL,
+	.vsize = 0,
+};
+#endif
 
-#ifdef CY_USE_TMA400
-#define CY_I2C_TCH_ADR	0x24
-#define CY_I2C_LDR_ADR	0x24
-#ifdef CY_USE_BUTTON_TEST_PANEL
+#define CYTTSP4_USE_I2C
+
+#ifdef CYTTSP4_USE_I2C
+#define CYTTSP4_I2C_NAME "cyttsp4_i2c_adapter"
+#define CYTTSP4_I2C_TCH_ADR 0x24
+#define CYTTSP4_LDR_TCH_ADR 0x24
+
+#define CYTTSP4_I2C_IRQ_GPIO GPIO_TSP_INT
+#define TMA400_GPIO_TSP_INT GPIO_TSP_INT
+
+#define CYTTSP4_I2C_IRQ_UDELAY 0
+#endif
+
 #define CY_MAXX 480
 #define CY_MAXY 800
-#else
-#define CY_MAXX 880
-#define CY_MAXY 1280
-#endif
 #define CY_MINX 0
 #define CY_MINY 0
-#endif /* --CY_USE_TMA400 */
 
 #define CY_ABS_MIN_X CY_MINX
 #define CY_ABS_MIN_Y CY_MINY
-#define CY_ABS_MIN_P 0
-#define CY_ABS_MIN_W 0
-#ifdef CY_USE_TMA400
-#define CY_ABS_MIN_T 0
-#endif /* --CY_USE_TMA400 */
-
 #define CY_ABS_MAX_X CY_MAXX
 #define CY_ABS_MAX_Y CY_MAXY
+#define CY_ABS_MIN_P 0
 #define CY_ABS_MAX_P 255
+#define CY_ABS_MIN_W 0
 #define CY_ABS_MAX_W 255
-#ifdef CY_USE_TMA400
+
+#define CY_ABS_MIN_T 0
+
 #define CY_ABS_MAX_T 15
-#endif /* --CY_USE_TMA400 */
+
 #define CY_IGNORE_VALUE 0xFFFF
 
+#define P_BOARD 0
 
+static bool enabled;
 
-#include "cyttsp4_params.h"
+int cyttsp4_hw_power(int on, int use_irq, int irq_gpio)
+{
 
-static struct touch_settings cyttsp4_sett_param_regs = {
-	.data = (uint8_t *)&cyttsp4_param_regs[0],
-	.size = ARRAY_SIZE(cyttsp4_param_regs),
-	.tag = 0,
-};
+	struct regulator *regulator_vdd;
+	struct regulator *regulator_avdd;
+	int ret = 0;
 
-static struct touch_settings cyttsp4_sett_param_size = {
-	.data = (uint8_t *)&cyttsp4_param_size[0],
-	.size = ARRAY_SIZE(cyttsp4_param_size),
-	.tag = 0,
-};
+	printk(KERN_INFO "%s : %d, on: %d\n", __func__, __LINE__, on);
 
+	regulator_vdd = regulator_get(NULL, "touch_1.8v");
+	if (IS_ERR(regulator_vdd)) {
+		ret = PTR_ERR(regulator_vdd);
+		goto exit;
+	}
 
-/* Design Data Table */
-static u8 cyttsp4_ddata[] = {
-	0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15,
-	16, 17, 18, 19, 20, 21, 22, 23, 24 /* test padding
-	, 25, 26, 27, 28, 29, 30, 31 */
-};
+	regulator_avdd = regulator_get(NULL, "touch");
+	if (IS_ERR(regulator_avdd)) {
+		ret = PTR_ERR(regulator_avdd);
+		goto exit;
+	}
 
-static struct touch_settings cyttsp4_sett_ddata = {
-	.data = (uint8_t *)&cyttsp4_ddata[0],
-	.size = ARRAY_SIZE(cyttsp4_ddata),
-	.tag = 0,
-};
+	if (on) {
+		if (!regulator_is_enabled(regulator_vdd))
+			regulator_enable(regulator_vdd);
+		if (!regulator_is_enabled(regulator_avdd))
+			regulator_enable(regulator_avdd);
 
-/* Manufacturing Data Table */
-static u8 cyttsp4_mdata[] = {
-	65, 64, /* test truncation */63, 62, 61, 60, 59, 58, 57, 56, 55,
-	54, 53, 52, 51, 50, 49, 48,
-	47, 46, 45, 44, 43, 42, 41, 40, 39, 38, 37, 36, 35, 34, 33, 32,
-	31, 30, 29, 28, 27, 26, 25, 24, 23, 22, 21, 20, 19, 18, 17, 16,
-	15, 14, 13, 12, 11, 10, 9, 8, 7, 6, 5, 4, 3, 2, 1, 0
-};
+		/* Enable the IRQ */
+		if (use_irq) {
+			enable_irq(gpio_to_irq(irq_gpio));
+			pr_debug("Enabled IRQ %d for TSP\n",
+				gpio_to_irq(irq_gpio));
+		}
+	} else {
+		/* Disable the IRQ */
+		if (use_irq) {
+			pr_debug("Disabling IRQ %d for TSP\n",
+				gpio_to_irq(irq_gpio));
+			disable_irq_nosync(gpio_to_irq(irq_gpio));
+		}
 
-static struct touch_settings cyttsp4_sett_mdata = {
-	.data = (uint8_t *)&cyttsp4_mdata[0],
-	.size = ARRAY_SIZE(cyttsp4_mdata),
-	.tag = 0,
-};
+		if (regulator_is_enabled(regulator_vdd))
+			regulator_disable(regulator_vdd);
+		if (regulator_is_enabled(regulator_avdd))
+			regulator_disable(regulator_avdd);
+	}
+
+	regulator_put(regulator_vdd);
+	regulator_put(regulator_avdd);
+
+exit:
+	return ret;
+}
+
+static int cyttsp4_xres(struct cyttsp4_core_platform_data *pdata,
+		struct device *dev)
+{
+	int irq_gpio = pdata->irq_gpio;
+	int rc = 0;
+
+	printk(KERN_INFO "%s : %d\n", __func__, __LINE__);
+
+	cyttsp4_hw_power(0, true, irq_gpio);
+
+	/* Delay for 10 msec */
+	mdelay(10);
+
+	cyttsp4_hw_power(1, true, irq_gpio);
+
+	return rc;
+}
+
+static int cyttsp4_init(struct cyttsp4_core_platform_data *pdata,
+		int on, struct device *dev)
+{
+	int irq_gpio = pdata->irq_gpio;
+	int rc = 0;
+
+	printk(KERN_INFO "%s : %d\n", __func__, __LINE__);
+
+	if (on) {
+		rc = gpio_request(irq_gpio, NULL);
+		if (rc < 0) {
+			gpio_free(irq_gpio);
+			rc = gpio_request(irq_gpio, NULL);
+		}
+		if (rc < 0)
+			dev_err(dev, "%s: Fail request gpio=%d\n",
+				__func__, irq_gpio);
+		else
+			gpio_direction_input(irq_gpio);
+
+		cyttsp4_hw_power(1, false, 0);
+	} else {
+		cyttsp4_hw_power(0, false, 0);
+		gpio_free(irq_gpio);
+	}
+
+	dev_info(dev, "%s: INIT CYTTSP IRQ gpio=%d r=%d\n",
+			__func__, irq_gpio, rc);
+
+	return rc;
+}
+
+static int cyttsp4_wakeup(struct cyttsp4_core_platform_data *pdata,
+		struct device *dev, atomic_t *ignore_irq)
+{
+	int irq_gpio = pdata->irq_gpio;
+
+	printk(KERN_INFO "%s : %d\n", __func__, __LINE__);
+
+	return cyttsp4_hw_power(1, true, irq_gpio);
+}
+
+static int cyttsp4_sleep(struct cyttsp4_core_platform_data *pdata,
+		struct device *dev, atomic_t *ignore_irq)
+{
+	int irq_gpio = pdata->irq_gpio;
+
+	printk(KERN_INFO "%s : %d\n", __func__, __LINE__);
+
+	return cyttsp4_hw_power(0, true, irq_gpio);
+}
+
+static int cyttsp4_power(struct cyttsp4_core_platform_data *pdata,
+		int on, struct device *dev, atomic_t *ignore_irq)
+{
+	if (on)
+		return cyttsp4_wakeup(pdata, dev, ignore_irq);
+	else
+		return cyttsp4_sleep(pdata, dev, ignore_irq);
+}
+
+static int cyttsp4_irq_stat(struct cyttsp4_core_platform_data *pdata,
+		struct device *dev)
+{
+	int irq_stat = 0;
+	int retval = 0;
+
+	retval = gpio_request(TMA400_GPIO_TSP_INT, NULL);
+	if (retval < 0) {
+		pr_err("%s: Fail request IRQ pin r=%d\n", __func__, retval);
+		pr_err("%s: Try free IRQ gpio=%d\n", __func__,
+			TMA400_GPIO_TSP_INT);
+		gpio_free(TMA400_GPIO_TSP_INT);
+		retval = gpio_request(TMA400_GPIO_TSP_INT, NULL);
+		if (retval < 0) {
+			pr_err("%s: Fail 2nd request IRQ pin r=%d\n",
+				__func__, retval);
+		}
+	}
+
+	if (!(retval < 0)) {
+		irq_stat = gpio_get_value(TMA400_GPIO_TSP_INT);
+		gpio_free(TMA400_GPIO_TSP_INT);
+	}
+
+	return irq_stat;
+#if P_BOARD
+	return gpio_get_value(pdata->irq_gpio);
+#endif
+}
+
+int cyttsp4_led_power(int on)
+{
+	printk(KERN_INFO "%s - on: %d\n", __func__, on);
+
+	if (on) {
+		s3c_gpio_cfgpin(GPIO_LED_VDD_EN, S3C_GPIO_OUTPUT);
+		s3c_gpio_setpull(GPIO_LED_VDD_EN, S3C_GPIO_PULL_NONE);
+		gpio_direction_output(GPIO_LED_VDD_EN, GPIO_LEVEL_HIGH);
+		mdelay(1);
+
+		s3c_gpio_cfgpin(GPIO_KEY_LED_CTRL, S3C_GPIO_OUTPUT);
+		s3c_gpio_setpull(GPIO_KEY_LED_CTRL, S3C_GPIO_PULL_NONE);
+		gpio_direction_output(GPIO_KEY_LED_CTRL, GPIO_LEVEL_HIGH);
+
+		return 1;
+	} else {
+		s3c_gpio_setpull(GPIO_KEY_LED_CTRL, S3C_GPIO_PULL_NONE);
+		gpio_direction_output(GPIO_KEY_LED_CTRL, GPIO_LEVEL_LOW);
+		mdelay(1);
+
+		s3c_gpio_setpull(GPIO_LED_VDD_EN, S3C_GPIO_PULL_NONE);
+		gpio_direction_output(GPIO_LED_VDD_EN, GPIO_LEVEL_LOW);
+
+		return 1;
+	}
+
+	return -1;
+}
 
 /* Button to keycode conversion */
 static u16 cyttsp4_btn_keys[] = {
@@ -1614,44 +2182,50 @@ static struct touch_settings cyttsp4_sett_btn_keys = {
 	.tag = 0,
 };
 
-/* use this define to include auto boot image
- */
-#define CY_USE_INCLUDE_FBL
-#ifdef CY_USE_INCLUDE_FBL
-#include "cyttsp4_img.h"
-static struct touch_firmware cyttsp4_firmware = {
-	.img = cyttsp4_img,
-	.size = ARRAY_SIZE(cyttsp4_img),
-	.ver = cyttsp4_ver,
-	.vsize = ARRAY_SIZE(cyttsp4_ver),
+static struct cyttsp4_core_platform_data _cyttsp4_core_platform_data = {
+	.irq_gpio = CYTTSP4_I2C_IRQ_GPIO,
+	.level_irq_udelay = CYTTSP4_I2C_IRQ_UDELAY,
+	.xres = cyttsp4_xres,
+	.init = cyttsp4_init,
+	.power = cyttsp4_power,
+	.irq_stat = cyttsp4_irq_stat,
+	.led_power = cyttsp4_led_power,
+	.sett = {
+		NULL,	/* Reserved */
+		NULL,	/* Command Registers */
+		NULL,	/* Touch Report */
+		NULL,	/* Cypress Data Record */
+		NULL,	/* Test Record */
+		NULL,	/* Panel Configuration Record */
+		NULL, /* &cyttsp4_sett_param_regs, */
+		NULL, /* &cyttsp4_sett_param_size, */
+		NULL,	/* Reserved */
+		NULL,	/* Reserved */
+		NULL,	/* Operational Configuration Record */
+		NULL, /* &cyttsp4_sett_ddata, *//* Design Data Record */
+		NULL, /* &cyttsp4_sett_mdata, *//* Manufacturing Data Record */
+		NULL,	/* Config and Test Registers */
+		&cyttsp4_sett_btn_keys,	/* button-to-keycode table */
+	},
+	.fw = &cyttsp4_firmware,
 };
-#else
-static struct touch_firmware cyttsp4_firmware = {
-	.img = NULL,
-	.size = 0,
-	.ver = NULL,
-	.vsize = 0,
+
+static struct cyttsp4_core_info cyttsp4_core_device = {
+	.name = CYTTSP4_CORE_NAME,
+	.id = "main_ttsp_core",
+	.adap_id = CYTTSP4_I2C_NAME,
+	.platform_data = &_cyttsp4_core_platform_data,
 };
-#endif
 
 static const uint16_t cyttsp4_abs[] = {
 	ABS_MT_POSITION_X, CY_ABS_MIN_X, CY_ABS_MAX_X, 0, 0,
 	ABS_MT_POSITION_Y, CY_ABS_MIN_Y, CY_ABS_MAX_Y, 0, 0,
 	ABS_MT_PRESSURE, CY_ABS_MIN_P, CY_ABS_MAX_P, 0, 0,
-#ifdef CY_USE_TMA400
 	CY_IGNORE_VALUE, CY_ABS_MIN_W, CY_ABS_MAX_W, 0, 0,
-#endif /* --CY_USE_TMA400 */
-#ifndef CY_USE_TMA400
-	ABS_MT_TOUCH_MAJOR, CY_ABS_MIN_W, CY_ABS_MAX_W, 0, 0,
-#endif /* --CY_USE_TMA400 */
 	ABS_MT_TRACKING_ID, CY_ABS_MIN_T, CY_ABS_MAX_T, 0, 0,
-#ifdef CY_USE_TMA400_SP2
-#ifdef CY_USE_TMA400
 	ABS_MT_TOUCH_MAJOR, 0, 255, 0, 0,
 	ABS_MT_TOUCH_MINOR, 0, 255, 0, 0,
 	ABS_MT_ORIENTATION, -128, 127, 0, 0,
-#endif /* --CY_USE_TMA400 */
-#endif /* --CY_USE_TMA400_SP2 */
 };
 
 struct touch_framework cyttsp4_framework = {
@@ -1660,144 +2234,349 @@ struct touch_framework cyttsp4_framework = {
 	.enable_vkeys = 0,
 };
 
-static bool enabled;
-int TSP_VDD_18V(int on)
+static struct cyttsp4_mt_platform_data _cyttsp4_mt_platform_data = {
+	.frmwrk = &cyttsp4_framework,
+	.flags = 0x00,
+	.inp_dev_name = CYTTSP4_MT_NAME,
+};
+
+struct cyttsp4_device_info cyttsp4_mt_device = {
+	.name = CYTTSP4_MT_NAME,
+	.core_id = "main_ttsp_core",
+	.platform_data = &_cyttsp4_mt_platform_data,
+};
+
+static struct cyttsp4_btn_platform_data _cyttsp4_btn_platform_data = {
+	.inp_dev_name = CYTTSP4_BTN_NAME,
+};
+
+struct cyttsp4_device_info cyttsp4_btn_device = {
+	.name = CYTTSP4_BTN_NAME,
+	.core_id = "main_ttsp_core",
+	.platform_data = &_cyttsp4_btn_platform_data,
+};
+
+#ifdef CYTTSP4_VIRTUAL_KEYS
+static ssize_t cyttps4_virtualkeys_show(struct kobject *kobj,
+		struct kobj_attribute *attr, char *buf)
+{
+	return sprintf(buf,
+		__stringify(EV_KEY) ":"
+		__stringify(KEY_BACK) ":1360:90:160:180"
+		":" __stringify(EV_KEY) ":"
+		__stringify(KEY_MENU) ":1360:270:160:180"
+		":" __stringify(EV_KEY) ":"
+		__stringify(KEY_HOME) ":1360:450:160:180"
+		":" __stringify(EV_KEY) ":"
+		__stringify(KEY_SEARCH) ":1360:630:160:180"
+		"\n");
+}
+
+static struct kobj_attribute cyttsp4_virtualkeys_attr = {
+	.attr = {
+		.name = "virtualkeys.cyttsp4_mt",
+		.mode = S_IRUGO,
+	},
+	.show = &cyttps4_virtualkeys_show,
+};
+
+static struct attribute *cyttsp4_properties_attrs[] = {
+	&cyttsp4_virtualkeys_attr.attr,
+	NULL
+};
+
+static struct attribute_group cyttsp4_properties_attr_group = {
+	.attrs = cyttsp4_properties_attrs,
+};
+#endif
+
+static struct i2c_board_info i2c_devs3[] = {
+	{
+		I2C_BOARD_INFO(CYTTSP4_I2C_NAME, CYTTSP4_I2C_TCH_ADR),
+		.platform_data = CYTTSP4_I2C_NAME,
+	},
+};
+
+void __init midas_tsp_init(void)
+{
+	int gpio;
+	int ret;
+	printk(KERN_INFO "[TSP] midas_tsp_init() is called\n");
+
+	/* TSP_INT: XEINT_4 */
+	gpio = GPIO_TSP_INT;
+
+	ret = gpio_request(gpio, "TSP_INT");
+	if (ret)
+		pr_err("failed to request gpio(TSP_INT)\n");
+	s3c_gpio_cfgpin(gpio, S3C_GPIO_SFN(0xf));
+	/* s3c_gpio_setpull(gpio, S3C_GPIO_PULL_UP); */
+	s3c_gpio_setpull(gpio, S3C_GPIO_PULL_NONE);
+
+	s5p_register_gpio_interrupt(gpio);
+	gpio_direction_input(gpio);
+
+	i2c_devs3[0].irq = gpio_to_irq(gpio);
+
+	printk(KERN_INFO "%s touch : %d\n", __func__, i2c_devs3[0].irq);
+
+	i2c_register_board_info(3, i2c_devs3, ARRAY_SIZE(i2c_devs3));
+
+	gpio = GPIO_LED_VDD_EN;
+	ret = gpio_request(gpio, "LED_VDD_EN");
+	if (ret)
+		pr_err("failed to request gpio(LED_VDD_EN)\n");
+
+	gpio = GPIO_KEY_LED_CTRL;
+	ret = gpio_request(gpio, "KEY_LED_CTRL");
+	if (ret)
+		pr_err("failed to request gpio(KEY_LED_CTRL)\n");
+
+	cyttsp4_register_core_device(&cyttsp4_core_device);
+	cyttsp4_register_device(&cyttsp4_mt_device);
+	cyttsp4_register_device(&cyttsp4_btn_device);
+}
+
+#elif defined(CONFIG_TOUCHSCREEN_ATMEL_MXT224E)
+/* mxt224 TSP */
+extern bool is_cable_attached;
+
+static struct charging_status_callbacks {
+	void (*tsp_set_charging_cable) (int type);
+} charging_cbs;
+
+void tsp_register_callback(void *function)
+{
+	charging_cbs.tsp_set_charging_cable = function;
+}
+
+void tsp_read_ta_status(void *ta_status)
+{
+	*(bool *) ta_status = is_cable_attached;
+}
+
+void tsp_charger_infom(bool en)
+{
+	if (charging_cbs.tsp_set_charging_cable)
+		charging_cbs.tsp_set_charging_cable(en);
+}
+
+void __init midas_tsp_set_lcdtype(int lcd_type)
+{
+}
+
+static int mxt224_power_on(void)
 {
 	struct regulator *regulator;
+	struct regulator *regulator_pullup;
 
-	if (enabled == on)
-		return 0;
-
-	regulator = regulator_get(NULL, "touch_1.8v");
+	regulator = regulator_get(NULL, "touch");
 	if (IS_ERR(regulator))
-		return PTR_ERR(regulator);
+		return -1;
+	regulator_pullup = regulator_get(NULL, "touch_1.8v");
+	if (IS_ERR(regulator_pullup))
+		return -1;
 
-	if (on) {
-		regulator_enable(regulator);
-		/*printk(KERN_INFO "[TSP] melfas power on\n"); */
-	} else {
-		/*
-		 * TODO: If there is a case the regulator must be disabled
-		 * (e,g firmware update?), consider regulator_force_disable.
-		 */
-		if (regulator_is_enabled(regulator))
-			regulator_disable(regulator);
-	}
+	regulator_enable(regulator);
+	regulator_enable(regulator_pullup);
 
-	enabled = on;
 	regulator_put(regulator);
+	regulator_put(regulator_pullup);
+
+	msleep(130);
+
+	printk(KERN_INFO "mxt224_power_on is finished\n");
 
 	return 0;
 }
 
-int melfas_power(int on)
+EXPORT_SYMBOL(mxt224_power_on);
+
+static int mxt224_power_off(void)
 {
-	struct regulator *regulator_vdd;
-	struct regulator *regulator_avdd;
-	int ret;
-	if (enabled == on)
-		return 0;
+	struct regulator *regulator;
+	struct regulator *regulator_pullup;
 
-	regulator_vdd = regulator_get(NULL, "touch_1.8v");
-	if (IS_ERR(regulator_vdd))
-			return PTR_ERR(regulator_vdd);
-
-	regulator_avdd = regulator_get(NULL, "touch");
-	if (IS_ERR(regulator_avdd))
-		return PTR_ERR(regulator_avdd);
-
-	printk(KERN_DEBUG "[TSP] %s %s\n", __func__, on ? "on" : "off");
-
-	if (on) {
-		regulator_enable(regulator_vdd);
-		regulator_enable(regulator_avdd);
-	} else {
-		/*
-		 * TODO: If there is a case the regulator must be disabled
-		 * (e,g firmware update?), consider regulator_force_disable.
-		 */
-		if (regulator_is_enabled(regulator_vdd))
-			regulator_disable(regulator_vdd);
-		if (regulator_is_enabled(regulator_avdd))
-			regulator_disable(regulator_avdd);
-	}
-
-	enabled = on;
-	regulator_put(regulator_vdd);
-	regulator_put(regulator_avdd);
-
-	return 0;
-}
-
-int is_melfas_vdd_on(void)
-{
-	int ret;
-	/* 3.3V */
-	static struct regulator *regulator;
-
-	if (!regulator) {
-		regulator = regulator_get(NULL, "touch");
-		if (IS_ERR(regulator)) {
-			ret = PTR_ERR(regulator);
-			pr_err("could not get touch, rc = %d\n", ret);
-			return ret;
-		}
-	}
+	regulator = regulator_get(NULL, "touch");
+	if (IS_ERR(regulator))
+		return -1;
+	regulator_pullup = regulator_get(NULL, "touch_1.8v");
+	if (IS_ERR(regulator_pullup))
+		return -1;
 
 	if (regulator_is_enabled(regulator))
-		return 1;
+		regulator_disable(regulator);
 	else
-		return 0;
-}
+		regulator_force_disable(regulator);
 
-int melfas_mux_fw_flash(bool to_gpios)
-{
-	pr_info("%s:to_gpios=%d\n", __func__, to_gpios);
+	if (regulator_is_enabled(regulator_pullup))
+		regulator_disable(regulator_pullup);
+	else
+		regulator_force_disable(regulator_pullup);
 
-	/* TOUCH_EN is always an output */
-	if (to_gpios) {
-		if (gpio_request(GPIO_TSP_SCL_18V, "GPIO_TSP_SCL"))
-			pr_err("failed to request gpio(GPIO_TSP_SCL)\n");
-		if (gpio_request(GPIO_TSP_SDA_18V, "GPIO_TSP_SDA"))
-			pr_err("failed to request gpio(GPIO_TSP_SDA)\n");
+	regulator_put(regulator);
+	regulator_put(regulator_pullup);
 
-		gpio_direction_output(GPIO_TSP_INT, 0);
-		s3c_gpio_cfgpin(GPIO_TSP_INT, S3C_GPIO_OUTPUT);
-		s3c_gpio_setpull(GPIO_TSP_INT, S3C_GPIO_PULL_NONE);
+	printk(KERN_INFO "mxt224_power_off is finished\n");
 
-		gpio_direction_output(GPIO_TSP_SCL_18V, 0);
-		s3c_gpio_cfgpin(GPIO_TSP_SCL_18V, S3C_GPIO_OUTPUT);
-		s3c_gpio_setpull(GPIO_TSP_SCL_18V, S3C_GPIO_PULL_NONE);
-
-		gpio_direction_output(GPIO_TSP_SDA_18V, 0);
-		s3c_gpio_cfgpin(GPIO_TSP_SDA_18V, S3C_GPIO_OUTPUT);
-		s3c_gpio_setpull(GPIO_TSP_SDA_18V, S3C_GPIO_PULL_NONE);
-
-	} else {
-		gpio_direction_output(GPIO_TSP_INT, 1);
-		gpio_direction_input(GPIO_TSP_INT);
-		s3c_gpio_cfgpin(GPIO_TSP_INT, S3C_GPIO_SFN(0xf));
-		/*s3c_gpio_cfgpin(GPIO_TSP_INT, S3C_GPIO_INPUT); */
-		s3c_gpio_setpull(GPIO_TSP_INT, S3C_GPIO_PULL_NONE);
-		/*S3C_GPIO_PULL_UP */
-
-		gpio_direction_output(GPIO_TSP_SCL_18V, 1);
-		gpio_direction_input(GPIO_TSP_SCL_18V);
-		s3c_gpio_cfgpin(GPIO_TSP_SCL_18V, S3C_GPIO_SFN(3));
-		s3c_gpio_setpull(GPIO_TSP_SCL_18V, S3C_GPIO_PULL_NONE);
-
-		gpio_direction_output(GPIO_TSP_SDA_18V, 1);
-		gpio_direction_input(GPIO_TSP_SDA_18V);
-		s3c_gpio_cfgpin(GPIO_TSP_SDA_18V, S3C_GPIO_SFN(3));
-		s3c_gpio_setpull(GPIO_TSP_SDA_18V, S3C_GPIO_PULL_NONE);
-
-		gpio_free(GPIO_TSP_SCL_18V);
-		gpio_free(GPIO_TSP_SDA_18V);
-	}
 	return 0;
 }
 
-void melfas_set_touch_i2c(void)
+EXPORT_SYMBOL(mxt224_power_off);
+
+#define MXT224E_FW_NAME	    "mXT224e.fw"
+
+#define MXT224E_THRESHOLD_BATT		27
+#define MXT224E_THRESHOLD_CHRG		40
+#define MXT224E_CALCFG_BATT		0x52
+#define MXT224E_CALCFG_CHRG		0x52
+#define MXT224E_ATCHFRCCALTHR_NORMAL		40
+#define MXT224E_ATCHFRCCALRATIO_NORMAL		55
+#define MXT224E_GHRGTIME_BATT		22
+#define MXT224E_GHRGTIME_CHRG		22
+#define MXT224E_ATCHCALST		4
+#define MXT224E_ATCHCALTHR		35
+#define MXT224E_BLEN_BATT		0
+#define MXT224E_BLEN_CHRG		0
+#define MXT224E_MOVFILTER_BATT		81
+#define MXT224E_MOVFILTER_CHRG		81
+#define MXT224E_ACTVSYNCSPERX_NORMAL		22
+#define MXT224E_NEXTTCHDI_NORMAL		0
+
+static u8 t7_config_e[] = { GEN_POWERCONFIG_T7,
+	48, 255, 25
+};
+
+static u8 t8_config_e[] = { GEN_ACQUISITIONCONFIG_T8,
+	22, 0, 5, 1, 0, 0, 4, 35, 40, 55
+};
+
+static u8 t9_config_e[] = { TOUCH_MULTITOUCHSCREEN_T9,
+	139, 0, 0, 19, 11, 0, MXT224E_BLEN_BATT, MXT224E_THRESHOLD_BATT, 2, 7,
+	10,
+	15,			/* MOVHYSTI */
+	1, MXT224E_MOVFILTER_BATT, MXT224_MAX_MT_FINGERS, 5, 40, 10, 31, 3,
+	223, 1, 10, 10, 10, 10, 143, 40, 143, 80,
+	18, 15, 50, 50, MXT224E_NEXTTCHDI_NORMAL
+};
+
+static u8 t15_config_e[] = { TOUCH_KEYARRAY_T15,
+	0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0
+};
+
+static u8 t18_config_e[] = { SPT_COMCONFIG_T18,
+	0, 0
+};
+
+static u8 t23_config_e[] = { TOUCH_PROXIMITY_T23,
+	0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0
+};
+
+static u8 t25_config_e[] = { SPT_SELFTEST_T25,
+	0, 0, 0, 0, 0, 0, 0, 0
+};
+
+static u8 t38_config_e[] = { SPT_USERDATA_T38,
+	0, 1, 14, 23, 44, 0, 0, 0
+};
+
+static u8 t40_config_e[] = { PROCI_GRIPSUPPRESSION_T40,
+	0, 0, 0, 0, 0
+};
+
+static u8 t42_config_e[] = { PROCI_TOUCHSUPPRESSION_T42,
+	0, 0, 0, 0, 0, 0, 0, 0
+};
+
+static u8 t46_config_e[] = { SPT_CTECONFIG_T46,
+	0, 3, 16, MXT224E_ACTVSYNCSPERX_NORMAL, 0, 0, 1, 0, 0
+};
+
+static u8 t47_config_e[] = { PROCI_STYLUS_T47,
+	0, 0, 0, 0, 0, 0, 0, 0, 0, 0
+};
+
+static u8 t48_config_chrg_e[] = { PROCG_NOISESUPPRESSION_T48,
+	3, 132, MXT224E_CALCFG_CHRG, 10, 0, 0, 0, 0, 10, 15,
+	0, 0, 0, 6, 6, 0, 0, 64, 4, 64,
+	10, 0, 9, 5, 0, 15, 0, 20, 0, 0,
+	0, 0, 0, 0, 0, MXT224E_THRESHOLD_CHRG, 2,
+	15,			/* MOVHYSTI */
+	1, 81,
+	MXT224_MAX_MT_FINGERS, 5, 40, 241, 241, 20, 20, 178, 50, 178,
+	40, 18, 10, 0
+};
+
+static u8 t48_config_e[] = { PROCG_NOISESUPPRESSION_T48,
+	3, 132, MXT224E_CALCFG_BATT, 23, 0, 0, 0, 0, 10, 15,
+	0, 0, 0, 6, 6, 0, 0, 48, 4, 48,
+	10, 0, 100, 5, 0, 100, 0, 5, 0, 0,
+	0, 0, 0, 0, 0, MXT224E_THRESHOLD_BATT, 2,
+	15,
+	1, 81,
+	MXT224_MAX_MT_FINGERS, 5, 40, 241, 241, 20, 20, 178, 50, 178,
+	40, 18, 7, 0
+};
+
+static u8 end_config_e[] = { RESERVED_T255 };
+
+static const u8 *mxt224e_config[] = {
+	t7_config_e,
+	t8_config_e,
+	t9_config_e,
+	t15_config_e,
+	t18_config_e,
+	t23_config_e,
+	t25_config_e,
+	t38_config_e,
+	t40_config_e,
+	t42_config_e,
+	t46_config_e,
+	t47_config_e,
+	t48_config_e,
+	end_config_e,
+};
+
+static struct mxt224_platform_data mxt224_data = {
+	.max_finger_touches = MXT224_MAX_MT_FINGERS,
+	.gpio_read_done = GPIO_TSP_INT,
+	.config_e = mxt224e_config,
+	.t48_config_batt_e = t48_config_e,
+	.t48_config_chrg_e = t48_config_chrg_e,
+	.firmware_name = MXT224E_FW_NAME,
+	.num_xnode = 19,
+	.num_ynode = 11,
+	.min_x = 0,
+	.max_x = 479,
+	.min_y = 0,
+	.max_y = 799,
+	.min_z = 0,
+	.max_z = 255,
+	.min_w = 0,
+	.max_w = 30,
+	.atchcalst_e = MXT224E_ATCHCALST,
+	.atchcalsthr_e = MXT224E_ATCHCALTHR,
+	.tchthr_batt_e = MXT224E_THRESHOLD_BATT,
+	.tchthr_charging_e = MXT224E_THRESHOLD_CHRG,
+	.calcfg_batt_e = MXT224E_CALCFG_BATT,
+	.calcfg_charging_e = MXT224E_CALCFG_CHRG,
+	.atchfrccalthr_e = MXT224E_ATCHFRCCALTHR_NORMAL,
+	.atchfrccalratio_e = MXT224E_ATCHFRCCALRATIO_NORMAL,
+	.chrgtime_batt_e = MXT224E_GHRGTIME_BATT,
+	.chrgtime_charging_e = MXT224E_GHRGTIME_CHRG,
+	.blen_batt_e = MXT224E_BLEN_BATT,
+	.blen_charging_e = MXT224E_BLEN_CHRG,
+	.movfilter_batt_e = MXT224E_MOVFILTER_BATT,
+	.movfilter_charging_e = MXT224E_MOVFILTER_CHRG,
+	.actvsyncsperx_e = MXT224E_ACTVSYNCSPERX_NORMAL,
+	.nexttchdi_e = MXT224E_NEXTTCHDI_NORMAL,
+	.power_on = mxt224_power_on,
+	.power_off = mxt224_power_off,
+	.register_cb = tsp_register_callback,
+	.read_ta_status = tsp_read_ta_status,
+};
+
+void mxt224_set_touch_i2c(void)
 {
 	s3c_gpio_cfgpin(GPIO_TSP_SDA_18V, S3C_GPIO_SFN(3));
 	s3c_gpio_setpull(GPIO_TSP_SDA_18V, S3C_GPIO_PULL_UP);
@@ -1810,7 +2589,7 @@ void melfas_set_touch_i2c(void)
 	s3c_gpio_setpull(GPIO_TSP_INT, S3C_GPIO_PULL_NONE);
 }
 
-void melfas_set_touch_i2c_to_gpio(void)
+void mxt224_set_touch_i2c_to_gpio(void)
 {
 	int ret;
 	s3c_gpio_cfgpin(GPIO_TSP_SDA_18V, S3C_GPIO_OUTPUT);
@@ -1823,189 +2602,19 @@ void melfas_set_touch_i2c_to_gpio(void)
 	ret = gpio_request(GPIO_TSP_SCL_18V, "GPIO_TSP_SCL");
 	if (ret)
 		pr_err("failed to request gpio(GPIO_TSP_SCL)\n");
-
 }
 
-int get_lcd_type;
-void __init midas_tsp_set_lcdtype(int lcd_type)
-{
-	get_lcd_type = lcd_type;
-}
-
-int melfas_get_lcdtype(void)
-{
-	return get_lcd_type;
-}
-struct tsp_callbacks *charger_callbacks;
-struct tsp_callbacks {
-	void (*inform_charger)(struct tsp_callbacks *, bool);
-};
-
-void tsp_charger_infom(bool en)
-{
-	if (charger_callbacks && charger_callbacks->inform_charger)
-		charger_callbacks->inform_charger(charger_callbacks, en);
-}
-
-static void melfas_register_callback(void *cb)
-{
-	charger_callbacks = cb;
-	pr_debug("[TSP] melfas_register_callback\n");
-}
-
-int cyttsp4_hw_reset(void)
-{
-	struct regulator *regulator;
-	int ret = 0;
-
-	regulator = regulator_get(NULL, "touch");
-
-	regulator_enable(regulator);
-	TSP_VDD_18V(1);
-	mdelay(20);
-
-	if (regulator_is_enabled(regulator)) {
-		regulator_disable(regulator);
-		TSP_VDD_18V(0);
-	}
-	mdelay(40);
-
-	regulator_enable(regulator);
-	TSP_VDD_18V(1);
-	mdelay(20);
-
-	regulator_put(regulator);
-
-	return ret;
-}
-
-int cyttsp4_hw_power(int on)
-{
-	struct regulator *regulator_vdd;
-	struct regulator *regulator_avdd;
-	int ret;
-
-	if (enabled == on)
-		return 0;
-
-	regulator_vdd = regulator_get(NULL, "touch_1.8v");
-	if (IS_ERR(regulator_vdd))
-		return PTR_ERR(regulator_vdd);
-
-	regulator_avdd = regulator_get(NULL, "touch");
-	if (IS_ERR(regulator_avdd))
-		return PTR_ERR(regulator_avdd);
-
-	printk(KERN_DEBUG "[TSP] %s %s\n", __func__, on ? "on" : "off");
-
-	if (on) {
-		regulator_enable(regulator_vdd);
-		regulator_enable(regulator_avdd);
-	} else {
-		if (regulator_is_enabled(regulator_vdd))
-			regulator_disable(regulator_vdd);
-		if (regulator_is_enabled(regulator_avdd))
-			regulator_disable(regulator_avdd);
-	}
-
-	enabled = on;
-	regulator_put(regulator_vdd);
-	regulator_put(regulator_avdd);
-
-	return 0;
-}
-
-#define CY_WAKE_DFLT                99	/* causes wake strobe on INT line
-					 * in sample board configuration
-					 * platform data->hw_recov() function
-					 */
-int cyttsp4_hw_recov(int on)
-{
-	int retval = 0;
-	int gpio;
-	int ret;
-
-	switch (on) {
-	case 0:
-		cyttsp4_hw_reset();
-		retval = 0;
-		break;
-	case CY_WAKE_DFLT:
-		gpio = GPIO_TSP_INT;
-		ret = gpio_request(gpio, "TSP_INT");
-		retval = gpio_direction_output(gpio, 0);
-		if (retval < 0) {
-			pr_err("%s: Fail switch IRQ pin to OUT r=%d\n",
-				__func__, retval);
-		} else {
-			udelay(2000);
-			retval = gpio_direction_input(gpio);
-			if (retval < 0) {
-				pr_err("%s: Fail switch IRQ pin to IN"
-					" r=%d\n", __func__, retval);
-			}
-		}
-		break;
-	default:
-		retval = -ENOSYS;
-		break;
-	}
-
-	return retval;
-}
-
-int cyttsp4_irq_stat(void)
-{
-	int irq_stat = 0;
-	int gpio;
-	int ret;
-
-	gpio = GPIO_TSP_INT;
-	ret = gpio_request(gpio, "TSP_INT");
-	irq_stat = gpio_get_value(gpio);
-
-	return irq_stat;
-}
-
-struct touch_platform_data cyttsp4_i2c_touch_platform_data = {
-	.sett = {
-		NULL,	/* Reserved */
-		NULL,	/* Command Registers */
-		NULL,	/* Touch Report */
-		NULL,	/* Cypress Data Record */
-		NULL,	/* Test Record */
-		NULL,	/* Panel Configuration Record */
-		&cyttsp4_sett_param_regs, /* &cyttsp4_sett_param_regs, */
-		&cyttsp4_sett_param_size, /* &cyttsp4_sett_param_size, */
-		NULL,	/* Reserved */
-		NULL,	/* Reserved */
-		NULL,	/* Operational Configuration Record */
-		NULL, /* &cyttsp4_sett_ddata, *//* Design Data Record */
-		NULL, /* &cyttsp4_sett_mdata, *//* Manufacturing Data Record */
-		NULL,	/* Config and Test Registers */
-		&cyttsp4_sett_btn_keys,	/* button-to-keycode table */
-	},
-	.fw = &cyttsp4_firmware,
-	.frmwrk = &cyttsp4_framework,
-	.addr = {CY_I2C_TCH_ADR, CY_I2C_LDR_ADR},
-	.flags = 0x00,
-	.hw_reset = cyttsp4_hw_reset,
-	.hw_power = cyttsp4_hw_power,
-	.hw_recov = cyttsp4_hw_recov,
-	.irq_stat = cyttsp4_irq_stat,
-};
-
-static struct i2c_board_info i2c_devs3[] = {
+/* I2C3 */
+static struct i2c_board_info i2c_devs3[] __initdata = {
 	{
-		I2C_BOARD_INFO(CY_I2C_NAME, CY_I2C_TCH_ADR),
-		.platform_data = &cyttsp4_i2c_touch_platform_data
-	},
+	 I2C_BOARD_INFO(MXT224E_DEV_NAME, 0x4a),
+	 .platform_data = &mxt224_data},
 };
 
-void __init midas_tsp_set_platdata(struct touch_platform_data *pdata)
+void midas_tsp_set_platdata(struct mxt224_platform_data *pdata)
 {
 	if (!pdata)
-		pdata = &cyttsp4_i2c_touch_platform_data;
+		pdata = &mxt224_data;
 
 	i2c_devs3[0].platform_data = pdata;
 }
@@ -2022,16 +2631,15 @@ void __init midas_tsp_init(void)
 	if (ret)
 		pr_err("failed to request gpio(TSP_INT)\n");
 	s3c_gpio_cfgpin(gpio, S3C_GPIO_SFN(0xf));
-	/* s3c_gpio_setpull(gpio, S3C_GPIO_PULL_UP); */
 	s3c_gpio_setpull(gpio, S3C_GPIO_PULL_NONE);
 
 	s5p_register_gpio_interrupt(gpio);
 	i2c_devs3[0].irq = gpio_to_irq(gpio);
 
 	printk(KERN_INFO "%s touch : %d\n", __func__, i2c_devs3[0].irq);
-
 	i2c_register_board_info(3, i2c_devs3, ARRAY_SIZE(i2c_devs3));
 }
+
 
 #else /* CONFIG_TOUCHSCREEN_ATMEL_MXT224_U1 */
 
@@ -2206,15 +2814,20 @@ static void melfas_register_callback(void *cb)
 static struct melfas_tsi_platform_data mms_ts_pdata = {
 	.max_x = 720,
 	.max_y = 1280,
+#if defined(CONFIG_MACH_M3_USA_TMO)
+	.invert_x = 1,
+	.invert_y = 1,
+#else
 	.invert_x = 0,
 	.invert_y = 0,
+#endif
 	.gpio_int = GPIO_TSP_INT,
 	.gpio_scl = GPIO_TSP_SCL_18V,
 	.gpio_sda = GPIO_TSP_SDA_18V,
 	.power = melfas_power,
 	.mux_fw_flash = melfas_mux_fw_flash,
 	.is_vdd_on = is_melfas_vdd_on,
-	.config_fw_version = "I9300_Me_0507",
+	.config_fw_version = "I9300_Me_0924",
 	.lcd_type = melfas_get_lcdtype,
 	.register_cb = melfas_register_callback,
 };
@@ -2298,4 +2911,3 @@ void midas_tsp_request_qos(void *data)
 	schedule_delayed_work_on(0, &busqos_work, HZ / 5);
 }
 #endif
-

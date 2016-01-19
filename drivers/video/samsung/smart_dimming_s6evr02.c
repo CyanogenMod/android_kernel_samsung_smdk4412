@@ -77,11 +77,6 @@ static const unsigned char gamma_id_list[GAMMA_300CD_MAX] = {
 	0x80, 0x81, 0x82, 0xA2
 };
 
-static s16 s9_to_s16(s16 v)
-{
-	return (s16)(v << 7) >> 7;
-}
-
 static u32 calc_vt_volt(s16 gamma, int rgb_index, u32 adjust_volt[CI_MAX][AD_IVMAX])
 {
 	u32 ret = 0;

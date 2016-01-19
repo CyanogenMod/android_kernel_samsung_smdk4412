@@ -25,6 +25,7 @@
 #include <mach/map.h>
 #include <mach/regs-clock.h>
 #include <media/exynos_fimc_is.h>
+#include <linux/delay.h>
 
 struct platform_device; /* don't need the contents */
 
@@ -323,6 +324,120 @@ int exynos_fimc_is_clk_put(struct platform_device *pdev)
 		clk_put(pdata->control_clock[i]);
 	return 0;
 }
+
+#ifdef CONFIG_MACH_IPCAM
+int exynos_fimc_is_filter_on(void)
+{
+	int ret = 0;
+
+	ret = gpio_request(GPIO_IR_FILTER_ON_18V, "GPM0_1");
+	if (ret) {
+		printk(KERN_ERR "fail to request gpio(GPIO_IR_FILTER_ON_18V)\n");
+		return ret;
+	}
+
+	ret = gpio_request(GPIO_IR_FILTER_OFF_18V, "GPM0_2");
+	if (ret) {
+		printk(KERN_ERR "fail to request gpio(GPIO_IR_FILTER_OFF_18V)\n");
+		return ret;
+	}
+
+	ret = gpio_request(GPIO_IR_FILTER_EN_18V, "GPM0_3");
+	if (ret) {
+		printk(KERN_ERR "fail to request gpio(GPIO_IR_FILTER_EN_18V)\n");
+		return ret;
+	}
+
+	/* INA : H, INB : L ==> CW */
+	ret = gpio_direction_output(GPIO_IR_FILTER_EN_18V, 1);
+	if (unlikely((ret) < 0))
+		goto out;
+
+
+	ret = gpio_direction_output(GPIO_IR_FILTER_ON_18V, 1);
+	if (unlikely((ret) < 0))
+		goto out;
+
+
+	mdelay(300);
+
+	/* PS : L, INA : L, INB : L ==> OPEN */
+	ret = gpio_direction_output(GPIO_IR_FILTER_EN_18V, 0);
+	if (unlikely((ret) < 0))
+		goto out;
+
+
+	ret = gpio_direction_output(GPIO_IR_FILTER_ON_18V, 0);
+	if (unlikely((ret) < 0))
+		goto out;
+
+
+	ret = gpio_direction_output(GPIO_IR_FILTER_OFF_18V, 0);
+	if (unlikely((ret) < 0))
+		goto out;
+
+out:
+	gpio_free(GPIO_IR_FILTER_ON_18V);
+	gpio_free(GPIO_IR_FILTER_OFF_18V);
+	gpio_free(GPIO_IR_FILTER_EN_18V);
+
+	return ret;
+}
+
+int exynos_fimc_is_filter_off(void)
+{
+	int ret = 0;
+
+	ret = gpio_request(GPIO_IR_FILTER_ON_18V, "GPM0_1");
+	if (ret) {
+		printk(KERN_ERR "fail to request gpio(GPIO_IR_FILTER_ON_18V)\n");
+		return ret;
+	}
+
+	ret = gpio_request(GPIO_IR_FILTER_OFF_18V, "GPM0_2");
+	if (ret) {
+		printk(KERN_ERR "fail to request gpio(GPIO_IR_FILTER_OFF_18V)\n");
+		return ret;
+	}
+
+	ret = gpio_request(GPIO_IR_FILTER_EN_18V, "GPM0_3");
+	if (ret) {
+		printk(KERN_ERR "fail to request gpio(GPIO_IR_FILTER_EN_18V)\n");
+		return ret;
+	}
+
+	/* INA : L, INB : H ==> CCW */
+	ret = gpio_direction_output(GPIO_IR_FILTER_EN_18V, 1);
+	if (unlikely((ret) < 0))
+		goto out;
+
+	ret = gpio_direction_output(GPIO_IR_FILTER_OFF_18V, 1);
+	if (unlikely((ret) < 0))
+		goto out;
+
+	mdelay(300);
+	
+	/* PS : L, INA : L, INB : L ==> OPEN */
+	ret = gpio_direction_output(GPIO_IR_FILTER_EN_18V, 0);
+	if (unlikely((ret) < 0))
+		goto out;
+
+	ret = gpio_direction_output(GPIO_IR_FILTER_ON_18V, 0);
+	if (unlikely((ret) < 0))
+		goto out;
+
+	ret = gpio_direction_output(GPIO_IR_FILTER_OFF_18V, 0);
+	if (unlikely((ret) < 0))
+		goto out;
+
+out:
+	gpio_free(GPIO_IR_FILTER_ON_18V);
+	gpio_free(GPIO_IR_FILTER_OFF_18V);
+	gpio_free(GPIO_IR_FILTER_EN_18V);
+
+	return ret;
+}
+#endif /* CONFIG_MACH_IPCAM */
 #endif
 
 #if defined(CONFIG_ARCH_EXYNOS5)

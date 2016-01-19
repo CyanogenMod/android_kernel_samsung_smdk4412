@@ -1,16 +1,3 @@
-/*
- * haptic motor driver for max8997 - max8997_vibrator.c
- *
- * Copyright (C) 2011 Unknown Samsung Employees (Original file was missing copyright header)
- * Copyright (C) 2012 The CyanogenMod Project
- *                    Daniel Hillenbrand <codeworkx@cyanogenmod.com>
- *                    Andrew Dodd <atd7@cornell.edu>
- *
- * This program is free software; you can redistribute it and/or modify
- * it under the terms of the GNU General Public License version 2 as
- * published by the Free Software Foundation.
- */
-
 #include <linux/module.h>
 #include <linux/kernel.h>
 #include <linux/timed_output.h>
@@ -27,12 +14,6 @@
 #include "mach/gpio.h"
 #endif
 
-static int pwm_duty_max;
-static int pwm_duty_min;
-
-static unsigned long pwm_val = 50; /* duty in percent */
-static int pwm_duty; /* duty value */
-
 struct vibrator_drvdata {
 	struct max8997_motor_data *pdata;
 	struct pwm_device	*pwm;
@@ -47,7 +28,7 @@ struct vibrator_drvdata {
 };
 
 #ifdef CONFIG_VIBETONZ
-static struct vibrator_drvdata *g_data;
+struct vibrator_drvdata *g_data;
 #endif
 
 static int vibetonz_clk_on(struct device *dev, bool en)
@@ -108,7 +89,7 @@ static void vibrator_work(struct work_struct *_work)
 	struct vibrator_drvdata *data =
 		container_of(_work, struct vibrator_drvdata, work);
 
-	pr_debug("[VIB] time = %dms\n", data->timeout);
+	printk(KERN_DEBUG "[VIB] time = %dms\n", data->timeout);
 
 	if (0 == data->timeout) {
 		if (!data->running)
@@ -129,8 +110,8 @@ static void vibrator_work(struct work_struct *_work)
 		else
 			regulator_enable(data->regulator);
 		i2c_max8997_hapticmotor(data, true);
-		pwm_config(data->pwm, pwm_duty, data->pdata->period);
-		pr_info("[VIB] %s: pwm_config duty=%d\n", __func__, pwm_duty);
+		pwm_config(data->pwm,
+			data->pdata->duty, data->pdata->period);
 		pwm_enable(data->pwm);
 
 		data->running = true;
@@ -208,6 +189,7 @@ void vibtonz_pwm(int nForce)
 	/* add to avoid the glitch issue */
 	static int prev_duty;
 	int pwm_period = data->pdata->period;
+	int pwm_duty = pwm_period/2 + ((pwm_period/2 - 2) * nForce)/127;
 
 #if defined(CONFIG_MACH_P4)
 	if (pwm_duty > data->pdata->duty)
@@ -219,50 +201,10 @@ void vibtonz_pwm(int nForce)
 	/* add to avoid the glitch issue */
 	if (prev_duty != pwm_duty) {
 		prev_duty = pwm_duty;
-		pr_debug("[VIB] %s: setting pwm_duty=%d", __func__, pwm_duty);
 		pwm_config(data->pwm, pwm_duty, pwm_period);
 	}
 }
 EXPORT_SYMBOL(vibtonz_pwm);
-
-static ssize_t pwm_value_show(struct device *dev,
-		struct device_attribute *attr, char *buf)
-{
-	int count;
-
-	pwm_val = ((pwm_duty - pwm_duty_min) * 100) / pwm_duty_min;
-
-	count = sprintf(buf, "%lu\n", pwm_val);
-	pr_debug("[VIB] pwm_value: %lu\n", pwm_val);
-
-	return count;
-}
-
-ssize_t pwm_value_store(struct device *dev,
-		struct device_attribute *attr,
-		const char *buf, size_t size)
-{
-	if (kstrtoul(buf, 0, &pwm_val))
-		pr_err("[VIB] %s: error on storing pwm_value\n", __func__);
-
-	pr_info("[VIB] %s: pwm_value=%lu\n", __func__, pwm_val);
-
-	pwm_duty = (pwm_val * pwm_duty_min) / 100 + pwm_duty_min;
-
-	/* make sure new pwm duty is in range */
-	if(pwm_duty > pwm_duty_max) {
-		pwm_duty = pwm_duty_max;
-	}
-	else if (pwm_duty < pwm_duty_min) {
-		pwm_duty = pwm_duty_min;
-	}
-
-	pr_info("[VIB] %s: pwm_duty=%d\n", __func__, pwm_duty);
-
-	return size;
-}
-static DEVICE_ATTR(pwm_value, S_IRUGO | S_IWUSR,
-		pwm_value_show, pwm_value_store);
 #endif
 
 static int __devinit vibrator_probe(struct platform_device *pdev)
@@ -323,17 +265,8 @@ static int __devinit vibrator_probe(struct platform_device *pdev)
 		goto err_timed_output_register;
 	}
 
-	/* User controllable pwm level */
-	error = device_create_file(ddata->dev.dev, &dev_attr_pwm_value);
-	if (error < 0) {
-		pr_err("[VIB] create sysfs fail: pwm_value\n");
-	}
-
 #ifdef CONFIG_VIBETONZ
 	g_data = ddata;
-	pwm_duty_max = g_data->pdata->duty;
-	pwm_duty_min = pwm_duty_max/2;
-	pwm_duty = (pwm_duty_min + pwm_duty_max)/2;
 #endif
 
 	return 0;

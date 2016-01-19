@@ -16,8 +16,10 @@
  #ifndef __FEM34_WE395_H__
 #define __FM34_WE395_H__
 
-#ifdef CONFIG_MACH_C1_KOR_LGT
+#if defined(CONFIG_MACH_C1_KOR_LGT)
 #include "./fm34_cmd/fm34_we395_c1_lgt.h"
+#elif defined(CONFIG_MACH_BAFFIN_KOR_LGT)
+#include "./fm34_cmd/fm34_we395_baffinlte_lgt.h"
 #else
 #include "./fm34_cmd/fm34_we395_default.h"
 #endif

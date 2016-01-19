@@ -44,9 +44,9 @@ rdev_freq_to_chan(struct cfg80211_registered_device *rdev,
 	return chan;
 }
 
-int cfg80211_can_beacon_sec_chan(struct wiphy *wiphy,
-				  struct ieee80211_channel *chan,
-				  enum nl80211_channel_type channel_type)
+static bool can_beacon_sec_chan(struct wiphy *wiphy,
+				struct ieee80211_channel *chan,
+				enum nl80211_channel_type channel_type)
 {
 	struct ieee80211_channel *sec_chan;
 	int diff;
@@ -75,7 +75,6 @@ int cfg80211_can_beacon_sec_chan(struct wiphy *wiphy,
 
 	return true;
 }
-EXPORT_SYMBOL(cfg80211_can_beacon_sec_chan);
 
 int cfg80211_set_freq(struct cfg80211_registered_device *rdev,
 		      struct wireless_dev *wdev, int freq,
@@ -110,8 +109,8 @@ int cfg80211_set_freq(struct cfg80211_registered_device *rdev,
 		switch (channel_type) {
 		case NL80211_CHAN_HT40PLUS:
 		case NL80211_CHAN_HT40MINUS:
-			if (!cfg80211_can_beacon_sec_chan(&rdev->wiphy, chan,
-							  channel_type)) {
+			if (!can_beacon_sec_chan(&rdev->wiphy, chan,
+						 channel_type)) {
 				printk(KERN_DEBUG
 				       "cfg80211: Secondary channel not "
 				       "allowed to initiate communication\n");

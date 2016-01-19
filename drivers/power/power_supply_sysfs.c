@@ -42,9 +42,14 @@ static ssize_t power_supply_show_property(struct device *dev,
 					  struct device_attribute *attr,
 					  char *buf) {
 	static char *type_text[] = {
-		"Battery", "UPS", "Mains", "USB",
+		"Unknown", "Battery", "UPS", "Mains", "USB",
 		"USB_DCP", "USB_CDP", "USB_ACA",
-		"DOCK", "MISC", "WIRELESS", "OTG"
+#if defined (CONFIG_CHARGER_MAX77693_BAT)
+		"MISC", "CARDOCK", "WIRELESS", "UARTOFF", "OTG",
+#else
+		"DOCK", "MISC", "WIRELESS", "CARDOCK", "UARTOFF", "OTG",
+#endif
+		"POWER_SHARING"
 	};
 	static char *status_text[] = {
 		"Unknown", "Charging", "Discharging", "Not charging", "Full"
@@ -54,7 +59,7 @@ static ssize_t power_supply_show_property(struct device *dev,
 	};
 	static char *health_text[] = {
 		"Unknown", "Good", "Overheat", "Dead", "Over voltage",
-		"Unspecified failure", "Cold",
+		"Unspecified failure", "Cold", "Under voltage"
 	};
 	static char *technology_text[] = {
 		"Unknown", "NiMH", "Li-ion", "Li-poly", "LiFe", "NiCd",

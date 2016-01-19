@@ -84,18 +84,25 @@ struct sec_fg_info {
 #define VFOCV_REG				0xFB
 #define VFSOC_REG				0xFF
 
-#define FG_LEVEL 0
-#define FG_TEMPERATURE 1
-#define FG_VOLTAGE 2
-#define FG_CURRENT 3
-#define FG_CURRENT_AVG 4
-#define FG_CHECK_STATUS 5
-#define FG_VF_SOC 6
-#define FG_AV_SOC 7
-
 #define LOW_BATT_COMP_RANGE_NUM	5
 #define LOW_BATT_COMP_LEVEL_NUM	2
 #define MAX_LOW_BATT_CHECK_CNT	10
+
+enum {
+	FG_LEVEL = 0,
+	FG_TEMPERATURE,
+	FG_VOLTAGE,
+	FG_CURRENT,
+	FG_CURRENT_AVG,
+	FG_CHECK_STATUS,
+	FG_RAW_SOC,
+	FG_VF_SOC,
+	FG_AV_SOC,
+	FG_FULLCAP,
+	FG_MIXCAP,
+	FG_AVCAP,
+	FG_REPCAP,
+};
 
 enum {
 	POSITIVE = 0,

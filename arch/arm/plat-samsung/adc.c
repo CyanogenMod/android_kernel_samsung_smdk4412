@@ -173,11 +173,6 @@ int s3c_adc_start(struct s3c_adc_client *client,
 
 	spin_lock_irqsave(&adc->lock, flags);
 
-	if (client->is_ts && adc->ts_pend) {
-		spin_unlock_irqrestore(&adc->lock, flags);
-		return -EAGAIN;
-	}
-
 	client->convert_cb = s3c_convert_done;
 	client->wait = pwake;
 	client->result = -1;

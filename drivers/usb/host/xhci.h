@@ -1514,9 +1514,9 @@ static inline void xhci_unregister_pci(void) {}
 #endif
 
 /* xHCI host controller glue */
-typedef void (*xhci_get_quirks_t)(struct device *, struct xhci_hcd *);
 int handshake(struct xhci_hcd *xhci, void __iomem *ptr,
 		u32 mask, u32 done, int usec);
+typedef void (*xhci_get_quirks_t)(struct device *, struct xhci_hcd *);
 void xhci_quiesce(struct xhci_hcd *xhci);
 int xhci_halt(struct xhci_hcd *xhci);
 int xhci_reset(struct xhci_hcd *xhci);

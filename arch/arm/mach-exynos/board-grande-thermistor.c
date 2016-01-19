@@ -26,7 +26,7 @@
 
 #ifdef CONFIG_S3C_ADC
 #if defined(CONFIG_MACH_M0) || defined(CONFIG_MACH_P4NOTE) \
-	|| defined(CONFIG_MACH_GRANDE) || defined(CONFIG_MACH_IRON)
+	|| defined(CONFIG_MACH_GRANDE) || defined(CONFIG_MACH_IRON) || defined(CONFIG_MACH_TAB3)
 static struct adc_table_data ap_adc_temper_table_battery[] = {
 	{  204,	 800 },
 	{  210,	 790 },
@@ -387,7 +387,7 @@ static int get_midas_siop_level(int temp)
 		if (level > prev_level)
 			level = prev_level;
 	}
-#elif defined(CONFIG_MACH_P4NOTE)
+#elif defined(CONFIG_MACH_P4NOTE) || defined(CONFIG_MACH_TAB3)
 	if (temp > prev_temp) {
 		if (temp >= 620)
 			level = 4;

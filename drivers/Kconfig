@@ -1,7 +1,5 @@
 menu "Device Drivers"
 
-source "drivers/gpu/mali400/Kconfig"
-
 source "drivers/base/Kconfig"
 
 source "drivers/connector/Kconfig"
@@ -142,10 +140,6 @@ source "drivers/sensorhub/Kconfig"
 
 source "drivers/devfreq/Kconfig"
 
-source "drivers/phone_svn/Kconfig"
-
-source "drivers/svnet/Kconfig"
-
 source "drivers/accessory/Kconfig"
 
 source "drivers/irda/Kconfig"
@@ -154,17 +148,16 @@ source "drivers/extcon/Kconfig"
 
 source "drivers/barcode_emul/Kconfig"
 
-source "drivers/dpram/Kconfig"
-
-# Secure OS Mobicore
-source "drivers/gud/Kconfig"
+# MUIC
+source "drivers/muic/Kconfig"
 
 source "drivers/iommu/Kconfig"
 
 # FELICA
 source "drivers/felica/Kconfig"
 
-# Authentec
-source "drivers/interceptor/Kconfig"
+#source "drivers/j4fs/Kconfig"
+
+source "drivers/ice4_fpga/Kconfig"
 
 endmenu

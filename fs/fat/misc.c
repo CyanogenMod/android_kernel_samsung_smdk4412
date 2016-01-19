@@ -25,21 +25,26 @@ void __fat_fs_error(struct super_block *sb, int report, const char *fmt, ...)
 	struct fat_mount_options *opts = &MSDOS_SB(sb)->options;
 	va_list args;
 	struct va_format vaf;
+	struct block_device *bdev = sb->s_bdev;
+	dev_t bd_dev = bdev ? bdev->bd_dev : 0;
 
 	if (report) {
 		va_start(args, fmt);
 		vaf.fmt = fmt;
 		vaf.va = &args;
-		printk(KERN_ERR "FAT-fs (%s): error, %pV\n", sb->s_id, &vaf);
+		printk(KERN_ERR "FAT-fs (%s[%d:%d]): error, %pV\n",
+				sb->s_id, MAJOR(bd_dev), MINOR(bd_dev), &vaf);
 		va_end(args);
 	}
 
 	if (opts->errors == FAT_ERRORS_PANIC)
-		panic("FAT-fs (%s): fs panic from previous error\n", sb->s_id);
+		panic("FAT-fs (%s[%d:%d]): fs panic from previous error\n",
+				sb->s_id, MAJOR(bd_dev), MINOR(bd_dev));
 	else if (opts->errors == FAT_ERRORS_RO && !(sb->s_flags & MS_RDONLY)) {
 		sb->s_flags |= MS_RDONLY;
-		printk(KERN_ERR "FAT-fs (%s): Filesystem has been "
-				"set read-only\n", sb->s_id);
+		printk(KERN_ERR "FAT-fs (%s[%d:%d]): Filesystem has been "
+				"set read-only\n",
+				sb->s_id, MAJOR(bd_dev), MINOR(bd_dev));
 	}
 }
 EXPORT_SYMBOL_GPL(__fat_fs_error);
@@ -52,11 +57,18 @@ void fat_msg(struct super_block *sb, const char *level, const char *fmt, ...)
 {
 	struct va_format vaf;
 	va_list args;
+	struct block_device *bdev = sb->s_bdev;
+	dev_t bd_dev = bdev ? bdev->bd_dev : 0;
 
 	va_start(args, fmt);
 	vaf.fmt = fmt;
 	vaf.va = &args;
-	printk("%sFAT-fs (%s): %pV\n", level, sb->s_id, &vaf);
+	if (!strncmp(level, KERN_ERR, sizeof(KERN_ERR)))
+		printk_ratelimited("%sFAT-fs (%s[%d:%d]): %pV\n", level,
+				sb->s_id, MAJOR(bd_dev), MINOR(bd_dev), &vaf);
+	else
+		printk("%sFAT-fs (%s[%d:%d]): %pV\n", level,
+				sb->s_id, MAJOR(bd_dev), MINOR(bd_dev), &vaf);
 	va_end(args);
 }
 

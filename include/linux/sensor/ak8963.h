@@ -40,7 +40,8 @@
 #define ECS_IOCTL_SET_YPR           _IOW(AKMIO, 0x05, int[YPR_DATA_SIZE])
 #define ECS_IOCTL_GET_OPEN_STATUS   _IOR(AKMIO, 0x06, int)
 #define ECS_IOCTL_GET_CLOSE_STATUS  _IOR(AKMIO, 0x07, int)
-#define ECS_IOCTL_GET_DELAY         _IOR(AKMIO, 0x08, long long int[AKM_NUM_SENSORS])
+#define ECS_IOCTL_GET_DELAY         _IOR(AKMIO, 0x08,\
+					long long int[AKM_NUM_SENSORS])
 #define ECS_IOCTL_GET_LAYOUT        _IOR(AKMIO, 0x09, char)
 #define ECS_IOCTL_GET_OUTBIT        _IOR(AKMIO, 0x0B, char)
 #define ECS_IOCTL_RESET             _IO(AKMIO, 0x0C)
@@ -65,14 +66,4 @@
 
 /* Get raw magnetic vector flag */
 #define ECS_IOCTL_APP_GET_MVFLAG	_IOR(AKMIO, 0x1A, short)
-
-#ifdef __KERNEL__
-struct akm8963_platform_data {
-	int gpio_data_ready_int;
-	char layout;
-	char outbit;
-	int gpio_RST;
-};
-#endif
-
 #endif

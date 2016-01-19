@@ -191,6 +191,7 @@
 #define S3C_VIDCON0_ENVID_F_DISABLE		(0 << 0)
 
 /* VIDCON1 */
+#define S3C_VIDCON1_LINECNT_MASK		(0x7ff << 16)
 #define S3C_VIDCON1_FIXVCLK_VCLK_HOLD		(0 << 9)
 #define S3C_VIDCON1_FIXVCLK_VCLK_RUN		(1 << 9)
 #define S3C_VIDCON1_FIXVCLK_VCLK_RUN_VDEN_DIS	(3 << 9)
@@ -247,7 +248,12 @@
 #define S3C_VIDTCON1_HSPW(x)			(((x) & 0xff) << 0)
 
 /* VIDTCON2 */
+#define S3C_VIDTCON2_LINEVAL_MASK			(0x7ff << 11)
+#define S3C_VIDTCON2_LINEVAL_SHIFT			(11)
 #define S3C_VIDTCON2_LINEVAL(x)			(((x) & 0x7ff) << 11)
+
+#define S3C_VIDTCON2_HOZVAL_MASK			(0x7ff << 0)
+#define S3C_VIDTCON2_HOZVAL_SHIFT			(0)
 #define S3C_VIDTCON2_HOZVAL(x)			(((x) & 0x7ff) << 0)
 
 /* Window 0~4 Control - WINCONx */
@@ -315,7 +321,7 @@
 #define S3C_WINCON1_LOCALSEL_MASK		(1 << 23)
 
 /* WINSHMAP */
-#define S3C_WINSHMAP_PROTECT(x)			(((x) & 0x1f) << 10)
+#define S3C_WINSHMAP_PROTECT(x)		(1 << (10 + (x)))
 #define S3C_WINSHMAP_CH_ENABLE(x)		(1 << (x))
 #define S3C_WINSHMAP_CH_DISABLE(x)		(1 << (x))
 #define S3C_WINSHMAP_LOCAL_ENABLE(x)		(0x20 << (x))
@@ -412,6 +418,18 @@
 
 /* WxKEYCON1 (1~4) */
 #define S3C_KEYCON1_COLVAL(x)			(((x) & 0xffffff) << 0)
+
+/* Window alpha control */
+#define S3C_VIDW_ALPHA0(_x)			(0x21C + ((_x) * 8))
+#define S3C_VIDW_ALPHA1(_x)			(0x220 + ((_x) * 8))
+
+/*  Window rgborder controls */
+
+#define WIN_RGB_ORDER(_win)			(0x2020 + ((_win) * 4))
+
+/* WIN_RGB_ORDERx */
+#define WIN_RGB_ORDER_FORWARD			(0 << 11)
+#define WIN_RGB_ORDER_REVERSE			(1 << 11)
 
 /* DUALRGB */
 #define S3C_DUALRGB_BYPASS_SINGLE	(0 << 0)

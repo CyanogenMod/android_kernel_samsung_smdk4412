@@ -38,12 +38,31 @@ struct sec_battery_platform_data {
 	int (*get_charging_current) (void);
 	int (*get_charger_is_full)(void);
 
+#if defined(CONFIG_SMB347_CHARGER)
+	int (*get_aicl_current)(void);
+	int (*get_input_current)(void);
+	void (*set_aicl_state)(int);
+#endif
+
 	void (*init_charger_gpio) (void);
+#if defined(CONFIG_MACH_P4NOTE) || defined(CONFIG_MACH_SP7160LTE) || defined(CONFIG_MACH_KONA) || defined(CONFIG_MACH_TAB3)
+	void (*inform_charger_connection) (int, int);
+#else
 	void (*inform_charger_connection) (int);
+#endif
 	int temp_high_threshold;
 	int temp_high_recovery;
 	int temp_low_recovery;
 	int temp_low_threshold;
+
+#if defined(CONFIG_TARGET_LOCALE_USA)
+	int temp_event_threshold;
+	int temp_lpm_high_threshold;
+	int temp_lpm_high_recovery;
+	int temp_lpm_low_recovery;
+	int temp_lpm_low_threshold;
+#endif /* CONFIG_TARGET_LOCALE_USA */
+
 	int charge_duration;
 	int recharge_duration;
 	int recharge_voltage;

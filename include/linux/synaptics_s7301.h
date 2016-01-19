@@ -116,9 +116,8 @@ struct finger_info {
 	int w_max;
 	int z;
 	int status;
-        int angle;
-        int width;
-
+    int angle;
+    int width;
 };
 
 struct finger_data {
@@ -281,7 +280,6 @@ struct synaptics_drv_data {
 	u16 refer_min;
 	u16 rx_to_rx[42][42];
 	unsigned long func_bit[BITS_TO_LONGS(MAX_FUNC+1)];
-	atomic_t keypad_enable;
 };
 
 extern struct class *sec_class;

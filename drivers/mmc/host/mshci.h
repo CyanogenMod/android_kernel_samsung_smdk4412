@@ -406,6 +406,10 @@ struct mshci_host {
 	u32			error_state;
 
 	unsigned long		sl_flags;
+
+	struct device		*bus_dev;
+	struct device		*host_dev;
+	
 	unsigned long		private[0] ____cacheline_aligned;
 };
 

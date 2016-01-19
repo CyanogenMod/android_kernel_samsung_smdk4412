@@ -32,6 +32,7 @@
 #define SET_ZLP_DATA		9
 #define GET_HIGH_FULL_SPEED	10
 #define SEND_FILE_WITH_HEADER 11
+#define MTP_VBUS_DISABLE 12
 #define SIG_SETUP		44
 
 /*PIMA15740-2000 spec*/

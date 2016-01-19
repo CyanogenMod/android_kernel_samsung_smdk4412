@@ -619,6 +619,13 @@ static int check_reset_complete (
 			return port_status;
 		}
 
+#ifdef CONFIG_EHCI_MODEM_PORTNUM
+		if ((index+1) == CONFIG_EHCI_MODEM_PORTNUM) {
+			/* modem connection port doesn't support handoff */
+			ehci_err(ehci, "port %d cannot handoff\n", index + 1);
+			return port_status;
+		}
+#endif
 		ehci_dbg (ehci, "port %d full speed --> companion\n",
 			index + 1);
 
@@ -1501,8 +1508,8 @@ static int ehci_hub_control (
 		 * or else system reboot).  See EHCI 2.3.9 and 4.14 for info
 		 * about the EHCI-specific stuff.
 		 */
-#ifdef CONFIG_HOST_COMPLIANT_TEST
 		case USB_PORT_FEAT_TEST:
+#ifdef CONFIG_HOST_COMPLIANT_TEST
 			ehci_info (ehci, "TEST MODE !!!!!!!!  selector == 0x%x \n",selector);
 
 			ehci_info (ehci, "running EHCI test %x on port %x\n",
@@ -1514,7 +1521,9 @@ static int ehci_hub_control (
 				goto error;
 			}
 			break;
-#endif
+#else
+			if (!selector || selector > 5)
+				goto error;
 			ehci_quiesce(ehci);
 
 			/* Put all enabled ports into suspend */
@@ -1532,7 +1541,7 @@ static int ehci_hub_control (
 			temp |= selector << 16;
 			ehci_writel(ehci, temp, status_reg);
 			break;
-
+#endif
 		default:
 			goto error;
 		}

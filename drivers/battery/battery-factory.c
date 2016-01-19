@@ -73,7 +73,8 @@ static struct device_attribute factory_attrs[] = {
 	FACTORY_ATTR(batt_temp_adc_cal),
 	FACTORY_ATTR(auth_battery),
 
-#if defined(CONFIG_TARGET_LOCALE_KOR) || defined(CONFIG_MACH_M0_CTC)
+#if defined(CONFIG_TARGET_LOCALE_KOR) || defined(CONFIG_MACH_M0_CTC)\
+	|| defined(CONFIG_MACH_T0_CHN_CTC)
 	FACTORY_ATTR(batt_temp_adc_spec),
 	FACTORY_ATTR(batt_sysrev),
 #endif
@@ -110,7 +111,8 @@ enum {
 	BATT_TEMP_ADC_CAL,
 	AUTH_BATTERY,
 
-#if defined(CONFIG_TARGET_LOCALE_KOR) || defined(CONFIG_MACH_M0_CTC)
+#if defined(CONFIG_TARGET_LOCALE_KOR) || defined(CONFIG_MACH_M0_CTC)\
+	|| defined(CONFIG_MACH_T0_CHN_CTC)
 	BATT_TEMP_ADC_SPEC,
 	BATT_SYSREV,
 #endif
@@ -123,9 +125,6 @@ static ssize_t factory_show_property(struct device *dev,
 	int i;
 	int cnt, dat, d_max, d_min, d_total;
 	int val;
-#if defined(CONFIG_MACH_KONA)
-	int comp1, comp3;
-#endif
 	const ptrdiff_t off = attr - factory_attrs;
 	pr_debug("%s: %s\n", __func__, factory_attrs[off].attr.name);
 
@@ -154,16 +153,10 @@ static ssize_t factory_show_property(struct device *dev,
 		val = 0;
 		for (cnt = 0; cnt < CNT_TEMPER_AVG; cnt++) {
 			msleep(100);
-#if defined(CONFIG_MACH_KONA)
-			info->battery_temper_adc = battery_get_info(info,
-							POWER_SUPPLY_PROP_TEMP);
-#else
 			battery_get_info(info, POWER_SUPPLY_PROP_TEMP);
-#endif
 			val += info->battery_temper_adc;
 			info->battery_temper_adc_avg = val / (cnt + 1);
 		}
-#if !defined(CONFIG_MACH_KONA)
 #ifdef CONFIG_S3C_ADC
 		info->battery_temper_avg = info->pdata->covert_adc(
 						info->battery_temper_adc_avg,
@@ -171,10 +164,6 @@ static ssize_t factory_show_property(struct device *dev,
 #else
 		info->battery_temper_avg = info->battery_temper;
 #endif
-#else
-		info->battery_temper_avg = info->battery_temper_adc_avg;
-#endif
-
 		val = info->battery_temper_avg;
 		pr_info("%s: temper avg(%d)\n", __func__, val);
 		i += scnprintf(buf + i, PAGE_SIZE - i, "%d\n", val);
@@ -200,9 +189,6 @@ static ssize_t factory_show_property(struct device *dev,
 			d_total += dat;
 		}
 		val = (d_total - d_max - d_min) / (CNT_VOLTAGE_AVG - 2);
-#if defined(CONFIG_MACH_KONA)
-		val /= 1000;
-#endif
 		pr_info("%s: voltage avg(%d)\n", __func__, val);
 		i += scnprintf(buf + i, PAGE_SIZE - i, "%d\n", val);
 		break;
@@ -267,33 +253,14 @@ static ssize_t factory_show_property(struct device *dev,
 		i += scnprintf(buf + i, PAGE_SIZE - i, "%d\n", val);
 		break;
 	case BATT_VOL_ADC:
-		i += scnprintf(buf + i, PAGE_SIZE - i, "N/A\n");
-		break;
 	case BATT_VOL_ADC_CAL:
-#if defined(CONFIG_MACH_KONA)
-		/* For using compensation 1% value */
-		comp1 = info->is_comp_1;
-		i += scnprintf(buf + i, PAGE_SIZE - i, "%d\n", comp1);
-		break;
-#else
-		i += scnprintf(buf + i, PAGE_SIZE - i, "N/A\n");
-		break;
-#endif
 	case BATT_VOL_ADC_AVER:
-#if defined(CONFIG_MACH_KONA)
-		/* For using compensation 3% value */
-		comp3 = info->is_comp_3;
-		i += scnprintf(buf + i, PAGE_SIZE - i, "%d\n", comp3);
-		break;
-#else
-		i += scnprintf(buf + i, PAGE_SIZE - i, "N/A\n");
-		break;
-#endif
 	case BATT_TEMP_ADC_CAL:
 	case AUTH_BATTERY:
 		i += scnprintf(buf + i, PAGE_SIZE - i, "N/A\n");
 		break;
-#if defined(CONFIG_TARGET_LOCALE_KOR) || defined(CONFIG_MACH_M0_CTC)
+#if defined(CONFIG_TARGET_LOCALE_KOR) || defined(CONFIG_MACH_M0_CTC)\
+	|| defined(CONFIG_MACH_T0_CHN_CTC)
 	case BATT_SYSREV:
 		val = system_rev;
 		i += scnprintf(buf + i, PAGE_SIZE - i, "%d\n", val);
@@ -564,7 +531,7 @@ int battery_info_proc(char *buf, char **start,
 		info->charge_start_time);
 	return len;
 }
-#elif defined(CONFIG_MACH_M0_CTC)
+#elif defined(CONFIG_MACH_M0_CTC) || defined(CONFIG_MACH_T0_CHN_CTC)
 int battery_info_proc(char *buf, char **start,
 			off_t offset, int count, int *eof, void *data)
 {

@@ -39,6 +39,7 @@ enum cpufreq_lock_ID {
 	DVFS_LOCK_ID_MFC,	/* MFC */
 	DVFS_LOCK_ID_USB,	/* USB */
 	DVFS_LOCK_ID_USB_IF,	/* USB_IF */
+	DVFS_LOCK_ID_DPRAM_IF,	/* DPRAM_IF */
 	DVFS_LOCK_ID_CAM,	/* CAM */
 	DVFS_LOCK_ID_PM,	/* PM */
 	DVFS_LOCK_ID_USER,	/* USER */

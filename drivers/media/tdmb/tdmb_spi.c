@@ -17,6 +17,7 @@
 *
 */
 
+#include <linux/module.h>
 #include <linux/spi/spi.h>
 #include "tdmb.h"
 

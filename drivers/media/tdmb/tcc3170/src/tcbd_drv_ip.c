@@ -283,23 +283,33 @@ static inline void tcbd_sort_start_cu(struct tcbd_multi_service *_multi_svc,
 		tcbd_debug(DEBUG_DRV_COMP, "%02d: 0x%08X\n", i, _svc_info[i]);
 }
 
+#define DEINT_BIT_COMP_5TO3 (0<<18)
+#define DEINT_BIT_COMP_5TO4 (1<<18)
+#define DEINT_BIT_COMP_NONE (2<<18)
+
+#define DEINT_ADDR_ASSIGN_3BIT     (0<<16)
+#define DEINT_ADDR_ASSIGN_ALL_BIT  (1<<16)
 s32 tcbd_send_service_info(struct tcbd_device *_device)
 {
 	s32 ret = 0;
-	struct tcbd_multi_service *mult_service = &_device->mult_service;
-	u32 sorted_svc_info[TCBD_MAX_NUM_SERVICE * 2];
+	u32 mci_update;
+	u32 mci_param[TCBD_MAX_NUM_SERVICE * 2];
 	u8 num_svc = TCBD_MAX_NUM_SERVICE;
+	struct tcbd_multi_service *mult_service = &_device->mult_service;
 
-	tcbd_sort_start_cu(mult_service, sorted_svc_info);
+	tcbd_sort_start_cu(mult_service, mci_param);
+
+	mci_param[1] |= DEINT_BIT_COMP_5TO3;
+	mci_update = mult_service->service_count | DEINT_ADDR_ASSIGN_3BIT;
 
 	ret = tcbd_write_mail_box(_device, MBPARA_SEL_CH_INFO_PRAM,
-					num_svc, sorted_svc_info);
+					num_svc, mci_param);
 	ret |= tcbd_write_mail_box(_device, MBPARA_SEL_CH_INFO_PRAM + 1,
-					num_svc, sorted_svc_info + num_svc);
+					num_svc, mci_param + num_svc);
 	ret |= tcbd_write_mail_box(_device, MBPARA_SYS_DAB_MCI_UPDATE, 1,
-					&mult_service->service_count);
+							&mci_update);
 	tcbd_debug(DEBUG_DRV_COMP, "service count:%d\n",
-		mult_service->service_count);
+					mult_service->service_count);
 	return ret;
 }
 

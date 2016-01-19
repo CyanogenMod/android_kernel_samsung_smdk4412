@@ -21,9 +21,13 @@
 #include <linux/i2c.h>
 #include <linux/miscdevice.h>
 #include <linux/uaccess.h>
+#include <linux/delay.h>
 #include <linux/sensor/sensors_core.h>
 #include <linux/sensor/k3dh.h>
 #include "k3dh_reg.h"
+#ifdef CONFIG_SENSOR_K3DH_INPUTDEV
+#include <linux/input.h>
+#endif
 
 /* For Debugging */
 #if 1
@@ -42,6 +46,16 @@
 
 #define CALIBRATION_FILE_PATH	"/efs/calibration_data"
 #define CAL_DATA_AMOUNT	20
+#define Z_CAL_SIZE	1024
+
+#ifdef CONFIG_SENSOR_K3DH_INPUTDEV
+/* ABS axes parameter range [um/s^2] (for input event) */
+#define GRAVITY_EARTH		9806550
+#define ABSMAX_2G		(GRAVITY_EARTH * 2)
+#define ABSMIN_2G		(-GRAVITY_EARTH * 2)
+#define MIN_DELAY	5
+#define MAX_DELAY	200
+#endif
 
 static const struct odr_delay {
 	u8 odr; /* odr reg setting */
@@ -80,6 +94,12 @@ struct k3dh_data {
 	u8 ctrl_reg1_shadow;
 	atomic_t opened; /* opened implies enabled */
 	struct accel_platform_data *acc_pdata;
+#ifdef CONFIG_SENSOR_K3DH_INPUTDEV
+	struct input_dev *input;
+	struct delayed_work work;
+	atomic_t delay;
+	atomic_t enable;
+#endif
 };
 
 static struct k3dh_data *g_k3dh;
@@ -88,17 +108,30 @@ static struct k3dh_data *g_k3dh;
 static void k3dh_xyz_position_adjust(struct k3dh_acc *acc,
 		int position)
 {
-	const int position_map[][3][3] = {
-	{{ 0, -1,  0}, { 1,  0,  0}, { 0,  0,  1} }, /* 0 top/upper-left */
-	{{ 1,  0,  0}, { 0,  1,  0}, { 0,  0,  1} }, /* 1 top/upper-right */
-	{{ 0,  1,  0}, {-1,  0,  0}, { 0,  0,  1} }, /* 2 top/lower-right */
-	{{-1,  0,  0}, { 0, -1,  0}, { 0,  0,  1} }, /* 3 top/lower-left */
-	{{ 0,  1,  0}, { 1,  0,  0}, { 0,  0, -1} }, /* 4 bottom/upper-left */
-	{{-1,  0,  0}, { 0,  1,  0}, { 0,  0, -1} }, /* 5 bottom/upper-right */
-	{{ 0, -1,  0}, {-1,  0,  0}, { 0,  0, -1} }, /* 6 bottom/lower-right */
-	{{ 1,  0,  0}, { 0, -1,  0}, { 0,  0, -1} }, /* 7 bottom/lower-left*/
-	};
 
+#ifdef CONFIG_SENSORS_K2DH
+	const int position_map[][3][3] = {
+	{{ 0, 1,  0}, { -1,  0,  0}, { 0,  0,  1} }, /* 0 top/upper-left */
+	{{ -1,  0,  0}, { 0,  -1,  0}, { 0,  0,  1} }, /* 1 top/upper-right */
+	{{ 0,  -1,  0}, {1,  0,  0}, { 0,  0,  1} }, /* 2 top/lower-right */
+	{{1,  0,  0}, { 0, 1,  0}, { 0,  0,  1} }, /* 3 top/lower-left */
+	{{ 0,  -1,  0}, { -1,  0,  0}, { 0,  0, -1} }, /* 4 bottom/upper-left */
+	{{1,  0,  0}, { 0,  -1,  0}, { 0,  0, -1} }, /* 5 bottom/upper-right */
+	{{ 0, 1,  0}, {1,  0,  0}, { 0,  0, -1} }, /* 6 bottom/lower-right */
+	{{ -1,  0,  0}, { 0, 1,  0}, { 0,  0, -1} }, /* 7 bottom/lower-left*/
+	};
+#else /* K3DH */
+	const int position_map[][3][3] = {
+	{{ -1, 0,  0}, { 0, -1,  0}, { 0,  0,  1} }, /* 0 top/upper-left */
+	{{ 0, -1, 0}, { 1, 0,  0}, { 0,  0,  1} }, /* 1 top/upper-right */
+	{{ 1, 0, 0}, {0, 1, 0}, { 0, 0, 1} }, /* 2 top/lower-right */
+	{{0,  1,  0}, { -1, 0,  0}, { 0,  0,  1} }, /* 3 top/lower-left */
+	{{ 1, 0, 0}, { 0, -1, 0}, { 0, 0, -1} }, /* 4 bottom/upper-left */
+	{{0, 1,  0}, { 1, 0,  0}, { 0,  0, -1} }, /* 5 bottom/upper-right */
+	{{ -1, 0, 0}, {0, 1,  0}, { 0,  0, -1} }, /* 6 bottom/lower-right */
+	{{ 0, 1, 0}, { -1, 0,  0}, { 0,  0, -1} }, /* 7 bottom/lower-left*/
+	};
+#endif
 	struct k3dh_acc xyz_adjusted = {0,};
 	s16 raw[3] = {0,};
 	int j;
@@ -140,16 +173,15 @@ static int k3dh_read_accel_raw_xyz(struct k3dh_data *data,
 
 	acc->x = acc->x >> 4;
 	acc->y = acc->y >> 4;
-#if defined(CONFIG_MACH_U1_NA_SPR_REV05) \
-	|| defined(CONFIG_MACH_U1_NA_SPR_EPIC2_REV00) \
-	|| defined(CONFIG_MACH_U1_NA_USCC_REV05) \
-	|| defined(CONFIG_MACH_Q1_BD) \
-	|| defined(CONFIG_MACH_U1_NA_USCC) \
-	|| defined(CONFIG_MACH_U1_NA_SPR)
+	#if defined(CONFIG_MACH_U1_NA_SPR_REV05) \
+		|| defined(CONFIG_MACH_U1_NA_SPR_EPIC2_REV00) \
+		|| defined(CONFIG_MACH_U1_NA_USCC_REV05) \
+		|| defined(CONFIG_MACH_Q1_BD) \
+		|| defined(CONFIG_MACH_U1_NA_SPR)
 	acc->z = -acc->z >> 4;
-#else
+	#else
 	acc->z = acc->z >> 4;
-#endif
+	#endif
 
 	if (g_k3dh->acc_pdata &&
 		g_k3dh->acc_pdata->axis_adjust)
@@ -220,6 +252,7 @@ static int k3dh_do_calibrate(struct device *dev, bool do_calib)
 	int sum[3] = { 0, };
 	int err = 0;
 	int i;
+	s16 z_cal;
 	mm_segment_t old_fs;
 
 	if (do_calib) {
@@ -241,7 +274,13 @@ static int k3dh_do_calibrate(struct device *dev, bool do_calib)
 
 		acc_data->cal_data.x = sum[0] / CAL_DATA_AMOUNT;
 		acc_data->cal_data.y = sum[1] / CAL_DATA_AMOUNT;
-		acc_data->cal_data.z = (sum[2] / CAL_DATA_AMOUNT) - 1024;
+		z_cal = sum[2] / CAL_DATA_AMOUNT;
+
+		if (z_cal > 0)
+			acc_data->cal_data.z = z_cal - Z_CAL_SIZE;
+		else
+			acc_data->cal_data.z = z_cal + Z_CAL_SIZE;
+
 	} else {
 		acc_data->cal_data.x = 0;
 		acc_data->cal_data.y = 0;
@@ -291,8 +330,13 @@ static int k3dh_accel_enable(struct k3dh_data *data)
 		if (err)
 			pr_err("%s: i2c write ctrl_reg1 failed\n", __func__);
 
+#ifdef CONFIG_SENSORS_K2DH
 		err = i2c_smbus_write_byte_data(data->client, CTRL_REG4,
-						CTRL_REG4_HR);
+				CTRL_REG4_HR | CTRL_REG4_BDU);
+#else
+		err = i2c_smbus_write_byte_data(data->client, CTRL_REG4,
+				CTRL_REG4_HR);
+#endif
 		if (err)
 			pr_err("%s: i2c write ctrl_reg4 failed\n", __func__);
 	}
@@ -432,11 +476,13 @@ static int k3dh_suspend(struct device *dev)
 {
 	int res = 0;
 	struct k3dh_data *data = dev_get_drvdata(dev);
-
+#ifdef CONFIG_SENSOR_K3DH_INPUTDEV
+	if (atomic_read(&data->enable))
+		cancel_delayed_work_sync(&data->work);
+#endif
 	if (atomic_read(&data->opened) > 0)
 		res = i2c_smbus_write_byte_data(data->client,
 						CTRL_REG1, PM_OFF);
-
 	return res;
 }
 
@@ -448,7 +494,11 @@ static int k3dh_resume(struct device *dev)
 	if (atomic_read(&data->opened) > 0)
 		res = i2c_smbus_write_byte_data(data->client, CTRL_REG1,
 						data->ctrl_reg1_shadow);
-
+#ifdef CONFIG_SENSOR_K3DH_INPUTDEV
+		if (atomic_read(&data->enable))
+			schedule_delayed_work(&data->work,
+				msecs_to_jiffies(5));
+#endif
 	return res;
 }
 
@@ -464,12 +514,100 @@ static const struct file_operations k3dh_fops = {
 	.unlocked_ioctl = k3dh_ioctl,
 };
 
+#ifdef CONFIG_SENSOR_K3DH_INPUTDEV
+static ssize_t k3dh_enable_show(struct device *dev,
+				   struct device_attribute *attr, char *buf)
+{
+	struct input_dev *input = to_input_dev(dev);
+	struct k3dh_data *data = input_get_drvdata(input);
+
+	return sprintf(buf, "%d\n", atomic_read(&data->enable));
+}
+
+static ssize_t k3dh_enable_store(struct device *dev,
+				    struct device_attribute *attr,
+				    const char *buf, size_t count)
+{
+	struct input_dev *input = to_input_dev(dev);
+	struct k3dh_data *data = input_get_drvdata(input);
+	unsigned long enable = 0;
+	int err;
+
+	if (strict_strtoul(buf, 10, &enable))
+		return -EINVAL;
+	k3dh_open_calibration(data);
+
+	if (enable) {
+		err = k3dh_accel_enable(data);
+		if (err < 0)
+			goto done;
+		schedule_delayed_work(&data->work,
+			msecs_to_jiffies(5));
+	} else {
+		cancel_delayed_work_sync(&data->work);
+		err = k3dh_accel_disable(data);
+		if (err < 0)
+			goto done;
+	}
+	atomic_set(&data->enable, enable);
+	pr_info("%s, enable = %ld\n", __func__, enable);
+done:
+	return count;
+}
+static DEVICE_ATTR(enable,
+		   S_IRUGO | S_IWUSR | S_IWGRP,
+		   k3dh_enable_show, k3dh_enable_store);
+
+static ssize_t k3dh_delay_show(struct device *dev,
+				  struct device_attribute *attr, char *buf)
+{
+	struct input_dev *input = to_input_dev(dev);
+	struct k3dh_data *data = input_get_drvdata(input);
+
+	return sprintf(buf, "%d\n", atomic_read(&data->delay));
+}
+
+static ssize_t k3dh_delay_store(struct device *dev,
+				   struct device_attribute *attr,
+				   const char *buf, size_t count)
+{
+	struct input_dev *input = to_input_dev(dev);
+	struct k3dh_data *data = input_get_drvdata(input);
+	unsigned long delay = 0;
+	if (strict_strtoul(buf, 10, &delay))
+		return -EINVAL;
+
+	if (delay > MAX_DELAY)
+		delay = MAX_DELAY;
+	if (delay < MIN_DELAY)
+		delay = MIN_DELAY;
+	atomic_set(&data->delay, delay);
+	k3dh_set_delay(data, delay * 1000000);
+	pr_info("%s, delay = %ld\n", __func__, delay);
+	return count;
+}
+static DEVICE_ATTR(poll_delay,
+		   S_IRUGO | S_IWUSR | S_IWGRP,
+		   k3dh_delay_show, k3dh_delay_store);
+
+static struct attribute *k3dh_attributes[] = {
+	&dev_attr_enable.attr,
+	&dev_attr_poll_delay.attr,
+	NULL
+};
+
+static struct attribute_group k3dh_attribute_group = {
+	.attrs = k3dh_attributes
+};
+#endif
+
 static ssize_t k3dh_fs_read(struct device *dev,
 			struct device_attribute *attr, char *buf)
 {
 	struct k3dh_data *data = dev_get_drvdata(dev);
 
-#if defined(CONFIG_MACH_U1) || defined(CONFIG_MACH_TRATS)
+#if defined(CONFIG_MACH_U1) || defined(CONFIG_MACH_TRATS) \
+	|| defined(CONFIG_MACH_TAB3)
 	int err = 0;
 	int on;
 
@@ -485,7 +623,7 @@ static ssize_t k3dh_fs_read(struct device *dev,
 		pr_err("%s: i2c write ctrl_reg1 failed\n", __func__);
 		return err;
 	}
-
+	usleep_range(10000, 11000); /* need loading time */
 	err = k3dh_read_accel_xyz(data, &data->acc_xyz);
 	if (err < 0) {
 		pr_err("%s: k3dh_read_accel_xyz failed\n", __func__);
@@ -598,12 +736,58 @@ void k3dh_shutdown(struct i2c_client *client)
 
 	k3dh_infomsg("is called.\n");
 
+#ifdef CONFIG_SENSOR_K3DH_INPUTDEV
+	if (atomic_read(&data->enable))
+		cancel_delayed_work_sync(&data->work);
+#endif
 	res = i2c_smbus_write_byte_data(data->client,
 					CTRL_REG1, PM_OFF);
 	if (res < 0)
 		pr_err("%s: pm_off failed %d\n", __func__, res);
 }
 
+#ifdef CONFIG_SENSOR_K3DH_INPUTDEV
+static void k3dh_work_func(struct work_struct *work)
+{
+	k3dh_read_accel_xyz(g_k3dh, &g_k3dh->acc_xyz);
+	pr_debug("%s: x: %d, y: %d, z: %d\n", __func__,
+		g_k3dh->acc_xyz.x, g_k3dh->acc_xyz.y, g_k3dh->acc_xyz.z);
+	input_report_abs(g_k3dh->input, ABS_X, g_k3dh->acc_xyz.x);
+	input_report_abs(g_k3dh->input, ABS_Y, g_k3dh->acc_xyz.y);
+	input_report_abs(g_k3dh->input, ABS_Z, g_k3dh->acc_xyz.z);
+	input_sync(g_k3dh->input);
+	schedule_delayed_work(&g_k3dh->work, msecs_to_jiffies(
+		atomic_read(&g_k3dh->delay)));
+}
+
+/* ----------------- *
+   Input device interface
+ * ------------------ */
+static int k3dh_input_init(struct k3dh_data *data)
+{
+	struct input_dev *dev;
+	int err = 0;
+
+	dev = input_allocate_device();
+	if (!dev)
+		return -ENOMEM;
+	dev->name = "accelerometer";
+	dev->id.bustype = BUS_I2C;
+
+	input_set_capability(dev, EV_ABS, ABS_MISC);
+	input_set_abs_params(dev, ABS_X, ABSMIN_2G, ABSMAX_2G, 0, 0);
+	input_set_abs_params(dev, ABS_Y, ABSMIN_2G, ABSMAX_2G, 0, 0);
+	input_set_abs_params(dev, ABS_Z, ABSMIN_2G, ABSMAX_2G, 0, 0);
+	input_set_drvdata(dev, data);
+
+	err = input_register_device(dev);
+	if (err < 0)
+		goto done;
+	data->input = dev;
+done:
+	return 0;
+}
+#endif
 static int k3dh_probe(struct i2c_client *client,
 		       const struct i2c_device_id *id)
 {
@@ -670,7 +854,21 @@ static int k3dh_probe(struct i2c_client *client,
 		pr_info("successful, position = %d\n",
 			pdata->accel_get_position());
 	}
+#ifdef CONFIG_SENSOR_K3DH_INPUTDEV
+	atomic_set(&data->enable, 0);
+	atomic_set(&data->delay, 200);
+	k3dh_input_init(data);
 
+	/* Setup sysfs */
+	err =
+	    sysfs_create_group(&data->input->dev.kobj,
+			       &k3dh_attribute_group);
+	if (err < 0)
+		goto err_sysfs_create_group;
+
+	/* Setup driver interface */
+	INIT_DELAYED_WORK(&data->work, k3dh_work_func);
+#endif
 #if defined(CONFIG_MACH_U1) || defined(CONFIG_MACH_TRATS)
 	/* creating class/device for test */
 	data->acc_class = class_create(THIS_MODULE, "accelerometer");
@@ -766,7 +964,6 @@ err_acc_device_create_file:
 err_acc_device_create:
 	class_destroy(data->acc_class);
 err_class_create:
-	misc_deregister(&data->k3dh_device);
 #else
 err_name_device_create_file:
 	device_remove_file(data->dev, &dev_attr_vendor);
@@ -777,8 +974,12 @@ err_cal_device_create_file:
 err_acc_device_create_file:
 	sensors_classdev_unregister(data->dev);
 err_acc_device_create:
-	misc_deregister(&data->k3dh_device);
 #endif
+#ifdef CONFIG_SENSOR_K3DH_INPUTDEV
+	input_free_device(data->input);
+err_sysfs_create_group:
+#endif
+misc_deregister(&data->k3dh_device);
 err_misc_register:
 	mutex_destroy(&data->read_lock);
 	mutex_destroy(&data->write_lock);

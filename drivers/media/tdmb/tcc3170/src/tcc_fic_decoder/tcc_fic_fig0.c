@@ -156,7 +156,7 @@ s32 fig0_ext01(struct fic_parser_matadata *parser,
 				subch_start->tbl_index = *fig_buff++ & 0x3f;
 			else
 				/* Invalid Table index */
-				subch_start->tbl_index = *fig_buff++ | 0xff;
+				subch_start->tbl_index = *fig_buff++ & 0xff;
 
 			fig_len -= 1;
 		}

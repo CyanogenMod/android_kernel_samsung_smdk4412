@@ -708,8 +708,8 @@ static void nv10_graph_load_dma_vtxbuf(struct nouveau_channel *chan,
 		0x2c000000 | chan->id << 20 | subchan << 16 | 0x18c);
 	nv_wr32(dev, NV10_PGRAPH_FFINTFC_ST2_DL, inst);
 	nv_mask(dev, NV10_PGRAPH_CTX_CONTROL, 0, 0x10000);
-	nv_mask(dev, NV04_PGRAPH_FIFO, 0x00000001, 0x00000001);
-	nv_mask(dev, NV04_PGRAPH_FIFO, 0x00000001, 0x00000000);
+	nv04_graph_fifo_access(dev, true);
+	nv04_graph_fifo_access(dev, false);
 
 	/* Restore the FIFO state */
 	for (i = 0; i < ARRAY_SIZE(fifo); i++)
@@ -879,13 +879,13 @@ nv10_graph_context_del(struct nouveau_channel *chan, int engine)
 	unsigned long flags;
 
 	spin_lock_irqsave(&dev_priv->context_switch_lock, flags);
-	nv_mask(dev, NV04_PGRAPH_FIFO, 0x00000001, 0x00000000);
+	nv04_graph_fifo_access(dev, false);
 
 	/* Unload the context if it's the currently active one */
 	if (nv10_graph_channel(dev) == chan)
 		nv10_graph_unload_context(dev);
 
-	nv_mask(dev, NV04_PGRAPH_FIFO, 0x00000001, 0x00000001);
+	nv04_graph_fifo_access(dev, true);
 	spin_unlock_irqrestore(&dev_priv->context_switch_lock, flags);
 
 	/* Free the context resources */
@@ -957,13 +957,8 @@ nv10_graph_init(struct drm_device *dev, int engine)
 }
 
 static int
-nv10_graph_fini(struct drm_device *dev, int engine, bool suspend)
+nv10_graph_fini(struct drm_device *dev, int engine)
 {
-	nv_mask(dev, NV04_PGRAPH_FIFO, 0x00000001, 0x00000000);
-	if (!nv_wait(dev, NV04_PGRAPH_STATUS, ~0, 0) && suspend) {
-		nv_mask(dev, NV04_PGRAPH_FIFO, 0x00000001, 0x00000001);
-		return -EBUSY;
-	}
 	nv10_graph_unload_context(dev);
 	nv_wr32(dev, NV03_PGRAPH_INTR_EN, 0x00000000);
 	return 0;

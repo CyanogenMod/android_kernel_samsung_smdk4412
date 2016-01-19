@@ -61,7 +61,13 @@ static int mmc_queue_thread(void *d)
 
 		spin_lock_irq(q->queue_lock);
 		set_current_state(TASK_INTERRUPTIBLE);
-		req = blk_fetch_request(q);
+
+		/* sync operation in case of TLC prod. */
+		if ((mq->card->quirks & MMC_QUIRK_MOVINAND_TLC) && (mq->mqrq_prev->req))
+			req = NULL;
+		else
+			req = blk_fetch_request(q);
+
 		/* set nopacked_period if next request is RT class */
 		if (req && IS_RT_CLASS_REQ(req))
 			mmc_set_nopacked_period(mq, HZ);

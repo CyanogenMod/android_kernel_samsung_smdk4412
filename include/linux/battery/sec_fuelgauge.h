@@ -21,8 +21,11 @@
 
 #include <linux/battery/sec_charging_common.h>
 
-#if defined(CONFIG_FUELGAUGE_DUMMY)
+#if defined(CONFIG_FUELGAUGE_DUMMY) || \
+	defined(CONFIG_FUELGAUGE_PM8917)
 #include <linux/battery/fuelgauge/dummy_fuelgauge.h>
+#elif defined(CONFIG_FUELGAUGE_ADC)
+#include <linux/battery/fuelgauge/adc_fuelgauge.h>
 #elif defined(CONFIG_FUELGAUGE_MAX17042)
 #include <linux/battery/fuelgauge/max17042_fuelgauge.h>
 #elif defined(CONFIG_FUELGAUGE_MAX17048)
@@ -35,17 +38,6 @@ struct sec_fuelgauge_reg_data {
 	u8 reg_addr;
 	u8 reg_data1;
 	u8 reg_data2;
-};
-
-static enum power_supply_property sec_fuelgauge_props[] = {
-	POWER_SUPPLY_PROP_STATUS,
-	POWER_SUPPLY_PROP_VOLTAGE_NOW,
-	POWER_SUPPLY_PROP_VOLTAGE_AVG,
-	POWER_SUPPLY_PROP_CURRENT_NOW,
-	POWER_SUPPLY_PROP_CURRENT_AVG,
-	POWER_SUPPLY_PROP_CAPACITY,
-	POWER_SUPPLY_PROP_TEMP,
-	POWER_SUPPLY_PROP_TEMP_AMBIENT,
 };
 
 struct sec_fuelgauge_info {
@@ -67,6 +59,7 @@ struct sec_fuelgauge_info {
 	struct wake_lock fuel_alert_wake_lock;
 
 	unsigned int capacity_old;	/* only for atomic calculation */
+	unsigned int capacity_max;	/* only for dynamic calculation */
 
 	bool initial_update_of_soc;
 	struct mutex fg_lock;
@@ -107,16 +100,10 @@ ssize_t sec_fg_store_attrs(struct device *dev,
 
 #define SEC_FG_ATTR(_name)				\
 {							\
-	.attr = {.name = #_name, .mode = 0666},	\
+	.attr = {.name = #_name, .mode = 0664},	\
 	.show = sec_fg_show_attrs,			\
 	.store = sec_fg_store_attrs,			\
 }
-
-static struct device_attribute sec_fg_attrs[] = {
-	SEC_FG_ATTR(reg),
-	SEC_FG_ATTR(data),
-	SEC_FG_ATTR(regs),
-};
 
 enum {
 	FG_REG = 0,

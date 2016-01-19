@@ -22,6 +22,8 @@
 #define MAX_TX_SIZE		29
 #define NOISEMITIGATION	0xb1
 #define ABS_POS_BIT		(0x1 << 3)
+#define IGNORE_RX_42	41
+#define IGNORE_RX_43	42
 
 enum REPORT_TYPE {
 	REPORT_TYPE_RESERVED = 1,

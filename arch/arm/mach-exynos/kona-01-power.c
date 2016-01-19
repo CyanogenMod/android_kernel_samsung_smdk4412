@@ -35,6 +35,9 @@
 #include <linux/mfd/max77686.h>
 #include <linux/mfd/max77693.h>
 
+#if defined(CONFIG_SEC_GPIO_DVS)
+#include <linux/secgpio_dvs.h>
+#endif
 
 #ifdef CONFIG_MFD_MAX77693
 static struct regulator_consumer_supply safeout1_supply[] = {
@@ -429,6 +432,14 @@ void midas_power_init(void)
 {
 	/* do nothing */
 	printk(KERN_INFO "%s\n", __func__);
+#if defined(CONFIG_SEC_GPIO_DVS)
+ 	/************************ Caution !!! ****************************/
+	/* This function must be located in an appropriate position for INIT state
+ 	 * in accordance with the specification of each BB vendor.
+ 	 */
+ 	/************************ Caution !!! ****************************/
+ 	gpio_dvs_check_initgpio();
+#endif
 }
 #endif /* CONFIG_REGULATOR_MAX77686 */
 

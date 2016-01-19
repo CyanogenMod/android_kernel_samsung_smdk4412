@@ -15,7 +15,7 @@
 extern int mali_dvfs_bottom_lock_push(void);
 extern int mali_dvfs_bottom_lock_pop(void);
 
-static inline int exynos_gpufreq_lock(void)
+static inline int exynos_gpufreq_lock(int dummy_val)
 {
 	return mali_dvfs_bottom_lock_push();
 }
@@ -25,6 +25,18 @@ static inline int exynos_gpufreq_unlock(void)
 	return mali_dvfs_bottom_lock_pop();
 }
 
+#elif defined(CONFIG_CPU_EXYNOS4412)
+extern int mali_dvfs_bottom_lock_push(int lock_step);
+extern int mali_dvfs_bottom_lock_pop(void);
+
+static inline int exynos_gpufreq_lock(int lock_step)
+{
+	return mali_dvfs_bottom_lock_push(lock_step);
+}
+static inline int exynos_gpufreq_unlock(void)
+{
+	return mali_dvfs_bottom_lock_pop();
+}
 #else
 static inline int exynos_gpufreq_lock(void)
 {

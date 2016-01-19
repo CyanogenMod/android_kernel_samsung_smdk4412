@@ -3,6 +3,8 @@
 ccflags-$(CONFIG_DEBUG_GPIO)	+= -DDEBUG
 
 obj-$(CONFIG_GPIOLIB)		+= gpiolib.o
+obj-$(CONFIG_SEC_GPIO_DVS)	+= secgpio_dvs.o
+obj-$(CONFIG_SEC_GPIO_DVS) += gpio_dvs/
 
 obj-$(CONFIG_GPIO_ADP5520)	+= adp5520-gpio.o
 obj-$(CONFIG_GPIO_ADP5588)	+= adp5588-gpio.o

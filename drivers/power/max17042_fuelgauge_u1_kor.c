@@ -27,6 +27,10 @@
 #include <linux/irq.h>
 #include <linux/gpio.h>
 
+#define FULL_SOC_DEFAULT	9650
+#define FULL_SOC_LOW		9300
+#define FULL_SOC_HIGH		10000
+
 static ssize_t sec_fg_show_property(struct device *dev,
 				    struct device_attribute *attr, char *buf);
 
@@ -45,6 +49,7 @@ struct max17042_chip {
 	int vfocv;		/* calculated battery voltage */
 	int soc;			/* battery capacity */
 	int raw_soc;		/* fuel gauge raw data */
+	int full_soc;		/* fuel gauge fullsoc data */
 	int config;
 	int rcomp;
 	int status;
@@ -90,6 +95,9 @@ static int max17042_get_property(struct power_supply *psy,
 			break;
 		case 1: /*raw soc */
 			val->intval = chip->raw_soc;
+			break;
+		case 2: /*full soc  */
+			val->intval = chip->full_soc;
 			break;
 		}
 		break;
@@ -299,6 +307,56 @@ static void max17042_get_status(struct i2c_client *client)
 			 data[1], data[0], chip->status); */
 }
 
+static int max17042_get_rawsoc(struct i2c_client *client)
+{
+	struct max17042_chip *chip = i2c_get_clientdata(client);
+	u8 data[2];
+	int ret;
+	int rawsoc;
+	pr_debug("%s\n", __func__);
+
+	ret = max17042_read_reg(client, MAX17042_REG_SOC_VF, data);
+	if (ret < 0)
+		return ret;
+
+	rawsoc = chip->raw_soc = (data[1] * 100) + (data[0] * 100 / 256);
+
+	pr_debug("%s: RAWSOC(0x%02x%02x, %d)\n", __func__,
+		 data[1], data[0], rawsoc);
+	return rawsoc;
+}
+
+static void max17042_adjust_fullsoc(struct i2c_client *client)
+{
+	struct max17042_chip *chip = i2c_get_clientdata(client);
+	int prev_full_soc = chip->full_soc;
+	int temp_soc = max17042_get_rawsoc(client);
+	int keep_soc = 0;
+
+	if (temp_soc < 0) {
+		pr_err("%s : fg data error!(%d)\n", __func__, temp_soc);
+		chip->full_soc = FULL_SOC_DEFAULT;
+		return;
+	}
+
+	if (temp_soc < FULL_SOC_LOW)
+		chip->full_soc = FULL_SOC_LOW;
+	else if (temp_soc > FULL_SOC_HIGH) {
+		keep_soc = FULL_SOC_HIGH / 100;
+		chip->full_soc = (FULL_SOC_HIGH - keep_soc);
+	} else {
+		keep_soc = temp_soc / 100;
+		if (temp_soc > (FULL_SOC_LOW + keep_soc))
+			chip->full_soc = temp_soc - keep_soc;
+		else
+			chip->full_soc = FULL_SOC_LOW;
+	}
+
+	if (prev_full_soc != chip->full_soc)
+		pr_info("%s : full_soc = %d, keep_soc = %d\n", __func__,
+			chip->full_soc, keep_soc);
+}
+
 static void max17042_get_soc(struct i2c_client *client)
 {
 	struct max17042_chip *chip = i2c_get_clientdata(client);
@@ -314,7 +372,8 @@ static void max17042_get_soc(struct i2c_client *client)
 	chip->raw_soc = psoc;
 
 	if (psoc > 100) {
-		temp_soc = ((psoc-60)*10000)/9700;
+		/* temp_soc = ((psoc-60)*10000)/9700; */
+		temp_soc = ((psoc-60)*10000)/(chip->full_soc-60);
 		/* under 160(psoc), 0% */
 	} else
 		temp_soc = 0;
@@ -446,6 +505,13 @@ static int max17042_set_property(struct power_supply *psy,
 		} else
 			return -EINVAL;
 		break;
+	case POWER_SUPPLY_PROP_STATUS:
+		pr_info("%s: charger full state!\n", __func__);
+		if (val->intval != POWER_SUPPLY_STATUS_FULL)
+			return -EINVAL;
+		/* adjust full soc */
+		max17042_adjust_fullsoc(chip->client);
+		break;
 	default:
 		return -EINVAL;
 	}
@@ -512,11 +578,13 @@ static enum power_supply_property max17042_battery_props[] = {
 static struct device_attribute sec_fg_attrs[] = {
 	SEC_FG_ATTR(fg_reset_soc),
 	SEC_FG_ATTR(fg_read_soc),
+	SEC_FG_ATTR(fg_read_fsoc),
 };
 
 enum {
 	FG_RESET_SOC = 0,
 	FG_READ_SOC,
+	FG_READ_FSOC,
 };
 
 static ssize_t sec_fg_show_property(struct device *dev,
@@ -535,6 +603,10 @@ static ssize_t sec_fg_show_property(struct device *dev,
 		max17042_get_soc(chip->client);
 		i += scnprintf(buf + i, PAGE_SIZE - i, "%d\n",
 			chip->soc);
+		break;
+	case FG_READ_FSOC:
+		i += scnprintf(buf + i, PAGE_SIZE - i, "%d\n",
+			chip->full_soc);
 		break;
 	default:
 		i = -EINVAL;
@@ -714,6 +786,7 @@ static int __devinit max17042_probe(struct i2c_client *client,
 	struct i2c_adapter *adapter = to_i2c_adapter(client->dev.parent);
 	struct max17042_chip *chip;
 	int ret;
+	int rawsoc;
 
 	if (!i2c_check_functionality(adapter, I2C_FUNC_SMBUS_BYTE))
 		return -EIO;
@@ -724,6 +797,9 @@ static int __devinit max17042_probe(struct i2c_client *client,
 
 	chip->client = client;
 	chip->pdata = client->dev.platform_data;
+
+	/* Initialize full_soc, set this before fisrt SOC reading */
+	chip->full_soc = FULL_SOC_DEFAULT;
 
 	i2c_set_clientdata(client, chip);
 
@@ -755,6 +831,14 @@ static int __devinit max17042_probe(struct i2c_client *client,
 		max17042_get_rcomp(client);
 		pr_info("new rcomp = 0x%04x\n", chip->rcomp);
 	}
+
+	/* first full_soc update */
+	rawsoc = max17042_get_rawsoc(client);
+	if (rawsoc > FULL_SOC_DEFAULT)
+		max17042_adjust_fullsoc(client);
+	max17042_get_soc(client);
+	pr_info("%s: rsoc=%d, fsoc=%d, soc=%d\n", __func__,
+			rawsoc, chip->full_soc, chip->soc);
 
 	/* register low batt intr */
 	ret = max17042_irq_init(chip);

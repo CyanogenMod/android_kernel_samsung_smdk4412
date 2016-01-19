@@ -371,6 +371,77 @@ config CLEANCACHE
 
 	  If unsure, say Y to enable cleancache
 
+config FRONTSWAP
+	bool "Enable frontswap to cache swap pages if tmem is present"
+	depends on SWAP
+	default n
+	help
+	  Frontswap is so named because it can be thought of as the opposite
+	  of a "backing" store for a swap device.  The data is stored into
+	  "transcendent memory", memory that is not directly accessible or
+	  addressable by the kernel and is of unknown and possibly
+	  time-varying size.  When space in transcendent memory is available,
+	  a significant swap I/O reduction may be achieved.  When none is
+	  available, all frontswap calls are reduced to a single pointer-
+	  compare-against-NULL resulting in a negligible performance hit
+	  and swap data is stored as normal on the matching swap device.
+
+	  If unsure, say Y to enable frontswap.
+
+config ZSMALLOC_NEW
+	tristate "Memory allocator for compressed pages"
+	default n
+	help
+	  zsmalloc is a slab-based memory allocator designed to store
+	  compressed RAM pages.  zsmalloc uses virtual memory mapping
+	  in order to reduce fragmentation.  However, this results in a
+	  non-standard allocator interface where a handle, not a pointer, is
+	  returned by an alloc().  This handle must be mapped in order to
+	  access the allocated space.
+
+config PGTABLE_MAPPING
+	bool "Use page table mapping to access object in zsmalloc"
+	depends on ZSMALLOC_NEW
+	help
+	  By default, zsmalloc uses a copy-based object mapping method to
+	  access allocations that span two pages. However, if a particular
+	  architecture (ex, ARM) performs VM mapping faster than copying,
+	  then you should select this. This causes zsmalloc to use page table
+	  mapping rather than copying for object mapping.
+
+	  You can check speed with zsmalloc benchmark[1].
+	  [1] https://github.com/spartacus06/zsmalloc
+
+config ZSWAP
+	bool "In-kernel swap page compression"
+	depends on FRONTSWAP && CRYPTO
+	select CRYPTO_LZO
+	select ZSMALLOC_NEW
+	default n
+	help
+	  Zswap is a backend for the frontswap mechanism in the VMM.
+	  It receives pages from frontswap and attempts to store them
+	  in a compressed memory pool, resulting in an effective
+	  partial memory reclaim.  In addition, pages and be retrieved
+	  from this compressed store much faster than most tradition
+	  swap devices resulting in reduced I/O and faster performance
+	  for many workloads.
+
+config DISABLE_LUMPY_RECLAIM
+	bool "Disable lumpy reclaim"
+	default y
+	depends on ZSWAP
+
+config DIRECT_RECLAIM_FILE_PAGES_ONLY
+	bool "Reclaim file pages only"
+	default n
+	depends on ZSWAP
+
+config TIGHT_PGDAT_BALANCE
+	bool "Increase balance condition"
+	default n
+	depends on ZSWAP
+
 config CMA
 	bool "Contiguous Memory Allocator framework"
 	# Currently there is only one allocator so force it on
@@ -430,3 +501,10 @@ config DEBUG_VMALLOC
 	  are the PID and the name of the task requesting vmalloc.
 
 	  Disabling these can result in savings in code size.
+
+config LOWMEM_CHECK
+	bool "Process's file and anon lowmem allocating status"
+
+config FADV_NOACTIVE
+	bool "fadvise noactive option support"
+	default n

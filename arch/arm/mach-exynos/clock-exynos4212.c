@@ -455,7 +455,7 @@ static struct clk exynos4212_init_clocks_off[] = {
 		.name		= "qec2c",
 		.enable		= exynos4_clk_ip_dmc_ctrl,
 		.ctrlbit	= (1 << 30),
-#ifndef CONFIG_SAMSUNG_C2C
+#ifndef CONFIG_EXYNOS_C2C
 	}, {
 		.name		= "c2c",
 		.devname	= "samsung-c2c",

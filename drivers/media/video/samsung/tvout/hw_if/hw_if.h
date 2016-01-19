@@ -385,6 +385,9 @@ struct s5p_hdmi_v_format {
 
 extern int s5p_hdmi_phy_set_tx_strength(u8 ch, u8 *value);
 #endif
+extern int s5p_hdmi_phy_disable_mode_set_done(void);
+extern int s5p_hdmi_phy_pad_disable(void);
+extern int s5p_hdmi_phy_enable_control(bool enable);
 extern int s5p_hdmi_phy_power(bool on);
 extern s32 s5p_hdmi_phy_config(
 		enum phy_freq freq, enum s5p_hdmi_color_depth cd);
@@ -421,6 +424,7 @@ extern void s5p_hdmi_reg_sw_hpd_enable(bool enable);
 extern void s5p_hdmi_reg_set_hpd_onoff(bool on_off);
 extern u8 s5p_hdmi_reg_get_hpd_status(void);
 extern void s5p_hdmi_reg_hpd_gen(void);
+extern void s5p_hdmi_reg_hpd_deglitch(bool on, u32 threshold);
 extern int s5p_hdmi_reg_intc_set_isr(irqreturn_t (*isr)(int, void *), u8 num);
 extern void s5p_hdmi_reg_intc_enable(enum s5p_hdmi_interrrupt intr, u8 en);
 #ifdef CONFIG_HDMI_EARJACK_MUTE
@@ -904,8 +908,12 @@ enum s5p_hdmi_v_mode {
 	v1920x1080i_59Hz,
 	v1920x1080p_59Hz,
 #ifdef CONFIG_HDMI_14A_3D
+	v1920x1080p_60Hz_SBS_HALF,
 	v1280x720p_60Hz_SBS_HALF,
 	v1280x720p_59Hz_SBS_HALF,
+	v1920x1080p_24Hz_SBS_HALF,
+	v1920x1080p_60Hz_TB,
+	v1280x720p_60Hz_TB,
 	v1280x720p_50Hz_TB,
 	v1920x1080p_24Hz_TB,
 	v1920x1080p_23Hz_TB,

@@ -439,15 +439,8 @@ static void bh1721fvc_work_func_light(struct work_struct *work)
 		result = (result * 10) / 12;
 		result = result * 139 / 13;
 		bh1721fvc_dbmsg("lux 0x%0X (%d)\n", result, result);
-#if 0
-		input_report_abs(bh1721fvc->input_dev, ABS_MISC, result);
-#else
-		if (result == 0) /* EV_REL does not send 0. */
-			input_report_rel(bh1721fvc->input_dev, REL_MISC, -1);
-		else
-			input_report_rel(bh1721fvc->input_dev, REL_MISC,
-				result);
-#endif
+		input_report_rel(bh1721fvc->input_dev, REL_MISC,
+			result + 1);
 		input_sync(bh1721fvc->input_dev);
 	} else {
 		pr_err("%s: read word failed! (errno=%d)\n", __func__,

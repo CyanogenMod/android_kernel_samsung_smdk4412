@@ -106,8 +106,6 @@ int tuner_type(HANDLE hDevice, u32 *type)
 int tuner_set_freq(HANDLE hDevice, u32 freq)
 {
 	int res = BBM_NOK;
-	u8  tmp;
-
 	if (tuner.init == NULL) {
 		print_log(hDevice, "TUNER NULL ERROR\n");
 		return BBM_NOK;
@@ -121,6 +119,7 @@ int tuner_set_freq(HANDLE hDevice, u32 freq)
 
 #if (FC8050_FREQ_XTAL == 19200) || (FC8050_FREQ_XTAL == 27000) \
 	|| (FC8050_FREQ_XTAL == 27120) || (FC8050_FREQ_XTAL == 38400)
+	u8  tmp;
 	tmp = (u8)(33554432/freq);
 	bbm_write(hDevice, 0xf1, tmp);
 #endif

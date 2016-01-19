@@ -27,8 +27,7 @@
 #include "ak8963-reg.h"
 #include <linux/sensor/sensors_core.h>
 
-#if defined(CONFIG_SLP) || defined(CONFIG_MACH_GC1)\
-	|| defined(CONFIG_MACH_M3_USA_TMO)
+#if defined(CONFIG_SLP) || defined(CONFIG_SENSORS_AK8963C_FACTORY)
 #define FACTORY_TEST
 #else
 #undef FACTORY_TEST
@@ -37,7 +36,6 @@
 
 #define VENDOR		"AKM"
 #define CHIP_ID		"AK8963C"
-
 
 struct akm8963_data {
 	struct i2c_client *this_client;
@@ -49,8 +47,10 @@ struct akm8963_data {
 	wait_queue_head_t state_wq;
 	u8 asa[3];
 	int irq;
+	u8 position;
+	axes_func_s16 convert_axes;
+	axes_func_s16 (*select_func) (u8);
 };
-
 
 static s32 akm8963_ecs_set_mode_power_down(struct akm8963_data *akm)
 {
@@ -213,6 +213,8 @@ static ssize_t akmd_read(struct file *file, char __user *buf,
 		pr_err("%s: invalid raw data(st1 = %d)\n",
 					__func__, data[0] & 0x01);
 
+	if (akm->convert_axes)
+		akm->convert_axes(&x, &y, &z);
 done:
 	return sprintf(buf, "%d,%d,%d\n", x, y, z);
 }
@@ -224,9 +226,7 @@ static long akmd_ioctl(struct file *file, unsigned int cmd,
 	struct akm8963_data *akm = container_of(file->private_data,
 			struct akm8963_data, akmd_device);
 	int ret;
-	#ifdef MAGNETIC_LOGGING
 	short x, y, z;
-	#endif
 	union {
 		char raw[RWBUF_SIZE];
 		int status;
@@ -282,17 +282,33 @@ static long akmd_ioctl(struct file *file, unsigned int cmd,
 						    AK8963_REG_ST1,
 						    sizeof(rwbuf.data),
 						    rwbuf.data);
+		mutex_unlock(&akm->lock);
 
+		if (akm->convert_axes) {
+			x = (rwbuf.data[2] << 8) + rwbuf.data[1];
+			y = (rwbuf.data[4] << 8) + rwbuf.data[3];
+			z = (rwbuf.data[6] << 8) + rwbuf.data[5];
+
+			akm->convert_axes(&x, &y, &z);
+
+			rwbuf.data[1] = x & 0xff;
+			rwbuf.data[2] = (x >> 8) & 0xff;
+			rwbuf.data[3] = y & 0xff;
+			rwbuf.data[4] = (y >> 8) & 0xff;
+			rwbuf.data[5] = z & 0xff;
+			rwbuf.data[6] = (z >> 8) & 0xff;
+		} else {
 		#ifdef MAGNETIC_LOGGING
-		x = (rwbuf.data[2] << 8) + rwbuf.data[1];
-		y = (rwbuf.data[4] << 8) + rwbuf.data[3];
-		z = (rwbuf.data[6] << 8) + rwbuf.data[5];
-
+			x = (rwbuf.data[2] << 8) + rwbuf.data[1];
+			y = (rwbuf.data[4] << 8) + rwbuf.data[3];
+			z = (rwbuf.data[6] << 8) + rwbuf.data[5];
+		#endif
+		}
+		#ifdef MAGNETIC_LOGGING
 		pr_info("%s:ST1=%d, x=%d, y=%d, z=%d, ST2=%d\n",
 			__func__, rwbuf.data[0], x, y, z, rwbuf.data[7]);
 		#endif
 
-		mutex_unlock(&akm->lock);
 		if (ret != sizeof(rwbuf.data)) {
 			pr_err("%s : failed to read %d bytes of mag data\n",
 			       __func__, sizeof(rwbuf.data));
@@ -371,8 +387,15 @@ static int ak8963c_selftest(struct akm8963_data *ak_data, int *sf)
 	u8 buf[6];
 	s16 x, y, z;
 	int retry_count = 0;
+	int ready_count = 0;
 
 retry:
+	mutex_lock(&ak_data->lock);
+	/* power down */
+	i2c_smbus_write_byte_data(ak_data->this_client,
+					AK8963_REG_CNTL1,
+					AK8963_CNTL1_POWER_DOWN);
+
 	/* read device info */
 	i2c_smbus_read_i2c_block_data(ak_data->this_client,
 					AK8963_REG_WIA, 2, buf);
@@ -389,12 +412,13 @@ retry:
 					AK8963_CNTL1_SELF_TEST);
 
 	/* wait for data ready */
-	while (1) {
+	while (ready_count < 10) {
 		msleep(20);
 		if (i2c_smbus_read_byte_data(ak_data->this_client,
 						AK8963_REG_ST1) == 1) {
 			break;
 		}
+		ready_count++;
 	}
 
 	i2c_smbus_read_i2c_block_data(ak_data->this_client,
@@ -403,6 +427,7 @@ retry:
 	/* set ATSC self test bit to 0 */
 	i2c_smbus_write_byte_data(ak_data->this_client,
 					AK8963_REG_ASTC, 0x00);
+	mutex_unlock(&ak_data->lock);
 
 	x = buf[0] | (buf[1] << 8);
 	y = buf[2] | (buf[3] << 8);
@@ -482,6 +507,7 @@ static ssize_t ak8963c_check_registers(struct device *dev,
 	struct akm8963_data *ak_data  = dev_get_drvdata(dev);
 	u8 buf[13];
 
+	mutex_lock(&ak_data->lock);
 	/* power down */
 	i2c_smbus_write_byte_data(ak_data->this_client,
 		AK8963_REG_CNTL1, AK8963_CNTL1_POWER_DOWN);
@@ -494,7 +520,7 @@ static ssize_t ak8963c_check_registers(struct device *dev,
 					AK8963_REG_ASTC);
 	buf[12] = i2c_smbus_read_byte_data(ak_data->this_client,
 					AK8963_REG_I2CDIS);
-
+	mutex_unlock(&ak_data->lock);
 
 	return sprintf(strbuf, "%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d\n",
 			buf[0], buf[1], buf[2], buf[3], buf[4], buf[5],
@@ -509,12 +535,14 @@ static ssize_t ak8963c_check_cntl(struct device *dev,
 	u8 buf;
 	int err;
 
+	mutex_lock(&ak_data->lock);
 	/* power down */
 	err = i2c_smbus_write_byte_data(ak_data->this_client,
 		AK8963_REG_CNTL1, AK8963_CNTL1_POWER_DOWN);
 
 	buf = i2c_smbus_read_byte_data(ak_data->this_client,
 					AK8963_REG_CNTL1);
+	mutex_unlock(&ak_data->lock);
 
 	return sprintf(strbuf, "%s\n",
 		((buf == AK8963_CNTL1_POWER_DOWN) ? "OK" : "NG"));
@@ -544,6 +572,7 @@ static ssize_t ak8963_adc(struct device *dev,
 	s16 x, y, z;
 	int err, success;
 
+	mutex_lock(&ak_data->lock);
 	/* start ADC conversion */
 	err = i2c_smbus_write_byte_data(ak_data->this_client,
 			AK8963_REG_CNTL1, AK8963_CNTL1_SNG_MEASURE);
@@ -552,6 +581,7 @@ static ssize_t ak8963_adc(struct device *dev,
 	err = akm8963_wait_for_data_ready(ak_data);
 	if (err) {
 		pr_err("%s: wait for data ready failed\n", __func__);
+		mutex_unlock(&ak_data->lock);
 		return err;
 	}
 	msleep(20);
@@ -560,8 +590,10 @@ static ssize_t ak8963_adc(struct device *dev,
 					AK8963_REG_ST1, sizeof(buf), buf);
 	if (err != sizeof(buf)) {
 		pr_err("%s: read data over i2c failed\n", __func__);
+		mutex_unlock(&ak_data->lock);
 		return err;
 	}
+	mutex_unlock(&ak_data->lock);
 
 	/* buf[0] is status1, buf[7] is status2 */
 	if ((buf[0] == 0) | (buf[7] == 1))
@@ -573,6 +605,9 @@ static ssize_t ak8963_adc(struct device *dev,
 	y = buf[3] | (buf[4] << 8);
 	z = buf[5] | (buf[6] << 8);
 
+	if (ak_data->convert_axes)
+		ak_data->convert_axes(&x, &y, &z);
+
 	pr_info("raw x = %d, y = %d, z = %d\n", x, y, z);
 	return sprintf(strbuf,
 		"%s, %d, %d, %d\n", (success ? "OK" : "NG"), x, y, z);
@@ -583,7 +618,7 @@ static ssize_t ak8963_show_raw_data(struct device *dev,
 		struct device_attribute *attr, char *buf)
 {
 	struct akm8963_data *akm = dev_get_drvdata(dev);
-	short x = 0, y = 0, z = 0;
+	static short x, y, z;
 	int ret;
 	u8 data[8] = {0,};
 
@@ -612,9 +647,14 @@ static ssize_t ak8963_show_raw_data(struct device *dev,
 		x = (data[2] << 8) + data[1];
 		y = (data[4] << 8) + data[3];
 		z = (data[6] << 8) + data[5];
-	} else
+		if (akm->convert_axes)
+			akm->convert_axes(&x, &y, &z);
+	} else {
 		pr_err("%s: invalid raw data(st1 = %d)\n",
 					__func__, data[0] & 0x01);
+		pr_info("%s:ST1=%d, x=%d, y=%d, z=%d, ST2=%d\n",
+			__func__, data[0], x, y, z, data[7]);
+	}
 
 done:
 	return sprintf(buf, "%d,%d,%d\n", x, y, z);
@@ -632,25 +672,56 @@ static ssize_t ak8963_show_name(struct device *dev,
 	return sprintf(buf, "%s\n", CHIP_ID);
 }
 
-static DEVICE_ATTR(raw_data, 0664,
+static ssize_t
+ak8963c_position_show(struct device *dev,
+		struct device_attribute *attr,
+		char *buf)
+{
+	struct akm8963_data *data = dev_get_drvdata(dev);
+
+	return sprintf(buf, "%u\n", data->position);
+}
+
+static ssize_t
+ak8963c_position_store(struct device *dev,
+		struct device_attribute *attr,
+		const char *buf,
+		size_t count)
+{
+	struct akm8963_data *data = dev_get_drvdata(dev);
+	int err;
+
+	err = kstrtou8(buf, 10, &data->position);
+	if (err < 0)
+		pr_err("%s, kstrtoint failed.", __func__);
+
+	if (data->select_func)
+		data->convert_axes = data->select_func(data->position);
+
+	return count;
+}
+
+static DEVICE_ATTR(raw_data, S_IRUGO,
 		ak8963_show_raw_data, NULL);
-static DEVICE_ATTR(vendor, 0664,
+static DEVICE_ATTR(vendor, S_IRUGO,
 		ak8963_show_vendor, NULL);
-static DEVICE_ATTR(name, 0664,
+static DEVICE_ATTR(name, S_IRUGO,
 		ak8963_show_name, NULL);
+static DEVICE_ATTR(position, S_IRUGO | S_IRWXU | S_IRWXG,
+	ak8963c_position_show, ak8963c_position_store);
 
 #ifdef FACTORY_TEST
-static DEVICE_ATTR(asa, 0664,
+static DEVICE_ATTR(asa, S_IRUGO,
 		ak8963c_get_asa, NULL);
-static DEVICE_ATTR(selftest, 0664,
+static DEVICE_ATTR(selftest, S_IRUGO,
 		ak8963c_get_selftest, NULL);
-static DEVICE_ATTR(chk_registers, 0664,
+static DEVICE_ATTR(chk_registers, S_IRUGO,
 		ak8963c_check_registers, NULL);
-static DEVICE_ATTR(dac, 0664,
+static DEVICE_ATTR(dac, S_IRUGO,
 		ak8963c_check_cntl, NULL);
-static DEVICE_ATTR(status, 0664,
+static DEVICE_ATTR(status, S_IRUGO,
 		ak8963c_get_status, NULL);
-static DEVICE_ATTR(adc, 0664,
+static DEVICE_ATTR(adc, S_IRUGO,
 		ak8963_adc, NULL);
 #endif
 
@@ -682,6 +753,14 @@ int akm8963_probe(struct i2c_client *client,
 	}
 
 	akm->pdata = client->dev.platform_data;
+	if (akm->pdata && akm->pdata->select_func) {
+		akm->select_func = akm->pdata->select_func;
+		if (akm->pdata->mag_get_position)
+			akm->position = akm->pdata->mag_get_position();
+		akm->convert_axes = akm->pdata->select_func(akm->position);
+		pr_info("%s, position = %d\n", __func__, akm->position);
+	}
+
 	mutex_init(&akm->lock);
 	init_completion(&akm->data_ready);
 
@@ -752,14 +831,20 @@ int akm8963_probe(struct i2c_client *client,
 
 	if (device_create_file(akm->dev, &dev_attr_vendor) < 0) {
 		pr_err("Failed to create device file(%s)!\n",
-			dev_attr_name.attr.name);
+			dev_attr_vendor.attr.name);
 		goto exit_device_create_vendor;
 	}
 
 	if (device_create_file(akm->dev, &dev_attr_name) < 0) {
 		pr_err("Failed to create device file(%s)!\n",
-			dev_attr_raw_data.attr.name);
+			dev_attr_name.attr.name);
 		goto exit_device_create_name;
+	}
+
+	if (device_create_file(akm->dev, &dev_attr_position) < 0) {
+		pr_err("Failed to create device file(%s)!\n",
+			dev_attr_position.attr.name);
+		goto exit_device_create_position;
 	}
 
 #ifdef FACTORY_TEST
@@ -814,8 +899,10 @@ exit_device_create_file3:
 exit_device_create_file2:
 	device_remove_file(akm->dev, &dev_attr_adc);
 exit_device_create_file1:
-	device_remove_file(akm->dev, &dev_attr_name);
+	device_remove_file(akm->dev, &dev_attr_position);
 #endif
+exit_device_create_position:
+	device_remove_file(akm->dev, &dev_attr_name);
 exit_device_create_name:
 	device_remove_file(akm->dev, &dev_attr_vendor);
 exit_device_create_vendor:
@@ -850,6 +937,7 @@ static int __devexit akm8963_remove(struct i2c_client *client)
 	device_remove_file(akm->dev, &dev_attr_chk_registers);
 	device_remove_file(akm->dev, &dev_attr_dac);
 	#endif
+	device_remove_file(akm->dev, &dev_attr_position);
 	device_remove_file(akm->dev, &dev_attr_name);
 	device_remove_file(akm->dev, &dev_attr_vendor);
 	device_remove_file(akm->dev, &dev_attr_raw_data);

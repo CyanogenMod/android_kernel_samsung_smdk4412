@@ -84,10 +84,6 @@
 #include <linux/battery/samsung_battery.h>
 #endif
 
-#ifdef CONFIG_BT_BCM4334
-#include <mach/board-bluetooth-bcm.h>
-#endif
-
 #ifdef CONFIG_EXYNOS4_SETUP_THERMAL
 #include <plat/s5p-tmu.h>
 #include <mach/regs-tmu.h>
@@ -128,7 +124,7 @@ struct s3cfb_extdsp_lcd {
 #include <mach/midas-tsp.h>
 #include <mach/regs-clock.h>
 
-#include <mach/midas-lcd.h>
+#include <mach/board-lcd.h>
 #include <mach/midas-sound.h>
 #ifdef CONFIG_USB_HOST_NOTIFY
 #include <linux/host_notify.h>
@@ -155,6 +151,11 @@ struct s3cfb_extdsp_lcd {
 #include <mach/kona-sensor.h>
 #endif
 
+#include <mach/board-bluetooth-bcm.h>
+
+/* cable state */
+bool is_cable_attached;
+
 /* Following are default values for UCON, ULCON and UFCON UART registers */
 #define SMDK4212_UCON_DEFAULT	(S3C2410_UCON_TXILEVEL |	\
 				 S3C2410_UCON_RXILEVEL |	\
@@ -180,9 +181,7 @@ static struct s3c2410_uartcfg smdk4212_uartcfgs[] __initdata = {
 		.ucon		= SMDK4212_UCON_DEFAULT,
 		.ulcon		= SMDK4212_ULCON_DEFAULT,
 		.ufcon		= SMDK4212_UFCON_DEFAULT,
-#ifdef CONFIG_BT_BCM4334
-                .wake_peer      = bcm_bt_lpm_exit_lpm_locked,
-#endif
+		.wake_peer	= bcm_bt_lpm_exit_lpm_locked,
 	},
 	[1] = {
 		.hwport		= 1,
@@ -790,7 +789,7 @@ static struct samsung_battery_platform_data samsung_battery_pdata = {
 
 	/* charging current */
 	.chg_curr_ta = 1800,
-	.chg_curr_dock = 1700,
+	.chg_curr_dock = 1800,
 	.chg_curr_siop_lv1 = 1500,
 	.chg_curr_siop_lv2 = 1000,
 	.chg_curr_siop_lv3 = 500,
@@ -798,6 +797,9 @@ static struct samsung_battery_platform_data samsung_battery_pdata = {
 	.chg_curr_cdp = 1000,
 	.chg_curr_wpc = 475,
 	.chg_curr_etc = 475,
+#if defined(CONFIG_MACH_KONA)
+	.chg_curr_mhl = 900,
+#endif
 
 	/* charging param */
 	.chng_interval = 30,
@@ -817,11 +819,25 @@ static struct samsung_battery_platform_data samsung_battery_pdata = {
 
 	.cb_det_src = CABLE_DET_CHARGER,
 
+#if defined(CONFIG_MACH_KONA_KOR_WIFI)
+	/* temperature param */
+	.overheat_stop_temp = 585,
+	.overheat_recovery_temp = 430,
+	.freeze_stop_temp = -40,
+	.freeze_recovery_temp = -10,
+#elif defined(CONFIG_MACH_KONALTE_USA_ATT)
+	/* temperature param */
+	.overheat_stop_temp = 500,
+	.overheat_recovery_temp = 450,
+	.freeze_stop_temp = -50,
+	.freeze_recovery_temp = 0,
+#else
 	/* temperature param */
 	.overheat_stop_temp = 500,
 	.overheat_recovery_temp = 420,
 	.freeze_stop_temp = -50,
 	.freeze_recovery_temp = 0,
+#endif
 
 	/* ctia */
 	.ctia_spec  = false,
@@ -1746,7 +1762,7 @@ static void __init exynos4_reserve_mem(void)
 #endif
 
 	static const char map[] __initconst =
-		"s3cfb.0=fimd;exynos4-fb.0=fimd;"
+		"s3cfb.0=fimd;exynos4-fb.0=fimd;samsung-pd.1=fimd;"
 		"s3c-fimc.0=fimc0;s3c-fimc.1=fimc1;s3c-fimc.2=fimc2;s3c-fimc.3=fimc3;"
 		"exynos4210-fimc.0=fimc0;exynos4210-fimc.1=fimc1;exynos4210-fimc.2=fimc2;exynos4210-fimc.3=fimc3;"
 #ifdef CONFIG_ION_EXYNOS

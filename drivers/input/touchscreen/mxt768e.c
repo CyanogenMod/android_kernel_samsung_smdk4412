@@ -91,7 +91,7 @@
 #define READ_FW_FROM_HEADER	0
 #define FOR_DEBUGGING_TEST_DOWNLOADFW_BIN 0
 #define ITDEV	0
-#define SHOW_COORDINATE	0
+#define SHOW_COORDINATE	1
 #define DEBUG_INFO	0
 #define USE_ADJUST_FRCCALRATIO	0
 /*#######################################*/

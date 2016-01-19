@@ -75,6 +75,9 @@ static const struct s5k5bafx_regs reg_datas = {
 #ifdef CONFIG_MACH_U1
 		S5K5BAFX_REGSET(CAM_VT_MODE_FD,
 				s5k5bafx_FD_common),
+#else
+		S5K5BAFX_REGSET(CAM_VT_MODE_FD,
+				s5k5bafx_common),
 #endif
 	},
 	.init_recording = {
@@ -82,8 +85,16 @@ static const struct s5k5bafx_regs reg_datas = {
 				s5k5bafx_recording_50Hz_common),
 		S5K5BAFX_REGSET(ANTI_BANDING_50HZ,
 				s5k5bafx_recording_50Hz_common),
+#if defined(CONFIG_MACH_U1) || defined(CONFIG_MACH_P8LTE) \
+	|| defined(CONFIG_TARGET_LOCALE_KOR) \
+	|| defined(CONFIG_TARGET_LOCALE_NAATT)
+		/* Support 60Hz recording */
 		S5K5BAFX_REGSET(ANTI_BANDING_60HZ,
 				s5k5bafx_recording_60Hz_common),
+#else
+		S5K5BAFX_REGSET(ANTI_BANDING_60HZ,
+				s5k5bafx_recording_50Hz_common),
+#endif
 	},
 	.stream_stop = S5K5BAFX_REGSET_TABLE(s5k5bafx_stream_stop),
 #ifdef SUPPORT_FACTORY_TEST
@@ -961,11 +972,9 @@ static int s5k5bafx_set_frame_rate(struct v4l2_subdev *sd, u32 fps)
 		return 0;
 	}
 
-	if (state->sensor_mode != SENSOR_MOVIE) {
-		err = s5k5bafx_set_from_table(sd, "fps", state->regs->fps,
-			ARRAY_SIZE(state->regs->fps), fps_index);
-		CHECK_ERR_MSG(err, "fail to set framerate\n")
-	}
+	err = s5k5bafx_set_from_table(sd, "fps", state->regs->fps,
+		ARRAY_SIZE(state->regs->fps), fps_index);
+	CHECK_ERR_MSG(err, "fail to set framerate\n")
 
 	return 0;
 }

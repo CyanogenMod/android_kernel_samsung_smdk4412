@@ -156,7 +156,7 @@ void fimg2d_clean_inner_pagetable_clone(unsigned long *pgd_clone,
 			(unsigned int)lv1end - (unsigned int)lv1, DMA_TO_DEVICE);
 }
 
-enum pt_status fimg2d_check_pagetable(struct mm_struct *mm, unsigned long vaddr,
+enum pt_status fimg2d_check_out_pagetable(struct mm_struct *mm, unsigned long vaddr,
 					size_t size)
 {
 	unsigned long *pgd;
@@ -193,8 +193,71 @@ enum pt_status fimg2d_check_pagetable(struct mm_struct *mm, unsigned long vaddr,
 		 *	lv2 desc[1:0] = 01 --> 64k pgae
 		 *	lv2 desc[1:0] = 1x --> 4k page
 		 */
-		if ((*lv2d & LV2_DESC_MASK) != 0x2) {
-			fimg2d_debug("invalid LV2 descriptor, "
+		if (((*lv2d & LV2_DESC_MASK) != 0x2)) {
+            fimg2d_debug("invalid LV2 descriptor, "
+					"pgd %p lv2d 0x%lx vaddr 0x%lx\n",
+					pgd, *lv2d, vaddr);
+			return PT_FAULT;
+		}
+
+		if (*lv2d & PTE_EXT_APX) {
+            fimg2d_debug("read only lv2 descriptor, pgd %p lv2d 0x%lx vaddr 0x%lx\n",
+					pgd, *lv2d, vaddr);
+			return PT_FAULT;
+		} else {
+			if ((*lv2d & (PTE_EXT_AP0 | PTE_EXT_AP1)) != 0x30) {
+                fimg2d_debug("No write Access only lv2 descriptor, pgd %p lv2d 0x%lx vaddr 0x%lx\n",
+						pgd, *lv2d, vaddr);
+				return PT_FAULT;
+			}
+		}
+
+		vaddr += PAGE_SIZE;
+		size -= PAGE_SIZE;
+	}
+
+	return PT_NORMAL;
+}
+
+enum pt_status fimg2d_check_in_pagetable(struct mm_struct *mm, unsigned long vaddr,
+					size_t size)
+{
+	unsigned long *pgd;
+	unsigned long *lv1d, *lv2d;
+
+	pgd = (unsigned long *)mm->pgd;
+
+	size += offset_in_page(vaddr);
+	size = PAGE_ALIGN(size);
+
+	while ((long)size > 0) {
+		lv1d = pgd + (vaddr >> LV1_SHIFT);
+
+		/*
+		 * check level 1 descriptor
+		 *	lv1 desc[1:0] = 00 --> fault
+		 *	lv1 desc[1:0] = 01 --> page table
+		 *	lv1 desc[1:0] = 10 --> section or supersection
+		 *	lv1 desc[1:0] = 11 --> reserved
+		 */
+		if ((*lv1d & LV1_DESC_MASK) != 0x1) {
+            fimg2d_debug("invalid LV1 descriptor, "
+					"pgd %p lv1d 0x%lx vaddr 0x%lx\n",
+					pgd, *lv1d, vaddr);
+			return PT_FAULT;
+		}
+
+		lv2d = (unsigned long *)phys_to_virt(*lv1d & ~LV2_BASE_MASK) +
+				((vaddr & LV2_PT_MASK) >> LV2_SHIFT);
+
+		/*
+		 * check level 2 descriptor
+		 *	lv2 desc[1:0] = 00 --> fault
+		 *	lv2 desc[1:0] = 01 --> 64k pgae
+		 *	lv2 desc[1:0] = 1x --> 4k page
+		 */
+		if (((*lv2d & LV2_DESC_MASK) != 0x2)) {
+            fimg2d_debug("invalid LV2 descriptor, "
 					"pgd %p lv2d 0x%lx vaddr 0x%lx\n",
 					pgd, *lv2d, vaddr);
 			return PT_FAULT;
@@ -248,7 +311,7 @@ void fimg2d_mmutable_value_replace(struct fimg2d_bltcmd *cmd,
 
 	*lv2d = l2d_value;
 
-	flush_all_cpu_caches();
+	fimg2d_dma_sync_inner((unsigned long)lv2d, 4, DMA_BIDIRECTIONAL);
 	fimg2d_clean_outer_pagetable(cmd->ctx->mm, fault_addr, 4);
 
 	printk(KERN_INFO "MMU Level2 value replaced [0x%lx]", l2d_value);

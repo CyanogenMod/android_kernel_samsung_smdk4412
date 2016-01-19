@@ -717,12 +717,12 @@ static ssize_t mtpg_write(struct file *fp, const char __user *buf,
 					 __func__, __LINE__, r);
 	return r;
 }
-
+/*
 static void interrupt_complete(struct usb_ep *ep, struct usb_request *req)
 {
 	printk(KERN_DEBUG "Finished Writing Interrupt Data\n");
 }
-
+*/
 static ssize_t interrupt_write(struct file *fd,
 			const char __user *buf, size_t count)
 {
@@ -769,7 +769,7 @@ static void read_send_work(struct work_struct *work)
 {
 	struct mtpg_dev	*dev = container_of(work, struct mtpg_dev,
 							read_send_work);
-	struct usb_composite_dev *cdev = dev->cdev;
+	//struct usb_composite_dev *cdev = dev->cdev;
 	struct usb_request *req = 0;
 	struct usb_container_header *hdr;
 	struct file *file;
@@ -814,10 +814,15 @@ static void read_send_work(struct work_struct *work)
 		ret = wait_event_interruptible(dev->write_wq,
 				((req = mtpg_req_get(dev, &dev->tx_idle))
 							|| dev->error));
-		if (ret < 0) {
+		if (ret < 0 || !req) {
 			r = ret;
 			printk(KERN_DEBUG "[%s]\t%d ret = %d\n",
 						__func__, __LINE__, r);
+			break;
+		}
+
+		if (!req) {
+			printk(KERN_ERR "[%s]Alloc has failed\n", __func__);
 			break;
 		}
 
@@ -836,7 +841,7 @@ static void read_send_work(struct work_struct *work)
 
 		ret = vfs_read(file, req->buf + hdr_length,
 					xfer - hdr_length, &file_pos);
-		if (ret < 0) {
+		if (ret < 0 || !req) {
 			r = ret;
 			break;
 		}
@@ -845,7 +850,7 @@ static void read_send_work(struct work_struct *work)
 
 		req->length = xfer;
 		ret = usb_ep_queue(dev->bulk_in, req, GFP_KERNEL);
-		if (ret < 0) {
+		if (ret < 0 || !req) {
 			dev->error = 1;
 			r = -EIO;
 			printk(KERN_DEBUG "[%s]\t%d ret = %d\n",
@@ -1062,6 +1067,14 @@ static long  mtpg_ioctl(struct file *fd, unsigned int code, unsigned long arg)
 		status = dev->read_send_result;
 		break;
 	}
+	case MTP_VBUS_DISABLE:
+		printk(KERN_DEBUG "[%s] line=[%d] \n",
+							__func__, __LINE__);
+		if (dev->cdev && dev->cdev->gadget) {
+			usb_gadget_vbus_disconnect(cdev->gadget);
+			printk(KERN_DEBUG "Restricted policy so disconnecting mtp gadget\n");
+		}
+		break;
 	default:
 		status = -ENOTTY;
 	}

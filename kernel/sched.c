@@ -86,6 +86,8 @@
 #define CREATE_TRACE_POINTS
 #include <trace/events/sched.h>
 
+#include <linux/cpufreq_slp.h>
+
 /*
  * Convert user-nice values [ -20 ... 0 ... 19 ]
  * to static priority [ MAX_RT_PRIO..MAX_PRIO-1 ],
@@ -3264,6 +3266,13 @@ unsigned long this_cpu_load(void)
 	return this->cpu_load[0];
 }
 
+#ifdef CONFIG_ZRAM_FOR_ANDROID
+unsigned long this_cpu_loadx(int i)
+{
+	struct rq *this = this_rq();
+	return this->cpu_load[i];
+}
+#endif /* CONFIG_ZRAM_FOR_ANDROID */
 
 /* Variables and functions for calc_load */
 static atomic_long_t calc_load_tasks;
@@ -4288,6 +4297,8 @@ need_resched:
 		rq->nr_switches++;
 		rq->curr = next;
 		++*switch_count;
+
+		slp_store_task_history(cpu, prev);
 
 		context_switch(rq, prev, next); /* unlocks the rq */
 		/*
@@ -5840,6 +5851,14 @@ void sched_show_task(struct task_struct *p)
 	printk(KERN_CONT "%5lu %5d %6d 0x%08lx\n", free,
 		task_pid_nr(p), task_pid_nr(p->real_parent),
 		(unsigned long)task_thread_info(p)->flags);
+#ifdef CONFIG_LOWMEM_CHECK
+	if (p->mm != NULL)
+		printk(KERN_INFO "file page total: %lu lowmem: %lu, anon page total: %lu lowmem: %lu \n",
+			get_mm_counter(p->mm, MM_FILEPAGES),
+			get_mm_counter(p->mm, MM_FILE_LOWPAGES),
+			get_mm_counter(p->mm, MM_ANONPAGES),
+			get_mm_counter(p->mm, MM_ANON_LOWPAGES));
+#endif
 
 	show_stack(p, NULL);
 }

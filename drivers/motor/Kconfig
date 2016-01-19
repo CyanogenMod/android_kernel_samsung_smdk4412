@@ -30,3 +30,16 @@ config MOTOR_DRV_ISA1200
 	help
 	  Say Y to enalbe the ISA1200 IC.
 
+config MOTOR_DRV_DRV2603
+	tristate "DRV2603"
+	default n
+	depends on ANDROID_TIMED_OUTPUT
+	help
+	  Say Y to enalbe the DRV2603 IC.
+
+config DC_MOTOR
+	tristate "DC motor"
+	default n
+	depends on ANDROID_TIMED_OUTPUT
+	help
+	  Say Y to enalbe the DC motor.

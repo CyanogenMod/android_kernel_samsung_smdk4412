@@ -38,6 +38,10 @@ config SND_SOC_CACHE_LZO
 config SND_SOC_AC97_BUS
 	bool
 
+config SND_SOC_ANDROID_SWITCH
+	tristate "SoC jack support for Android target"
+	depends on SND_SOC && SWITCH
+
 # All the supported SoCs
 source "sound/soc/atmel/Kconfig"
 source "sound/soc/au1x/Kconfig"

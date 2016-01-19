@@ -584,4 +584,3 @@ struct exynos_drm_fimc_pdata {
 };
 
 #endif
-

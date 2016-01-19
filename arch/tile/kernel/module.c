@@ -68,7 +68,7 @@ void *module_alloc(unsigned long size)
 	if (!area)
 		goto error;
 
-	if (map_vm_area(area, prot_rwx, &pages)) {
+	if (map_vm_area(area, prot_rwx, pages)) {
 		vunmap(area->addr);
 		goto error;
 	}

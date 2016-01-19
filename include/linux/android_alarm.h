@@ -78,6 +78,7 @@ int alarm_set_rtc(const struct timespec ts);
 int alarm_set_alarm_boot(char *alarm_data);
 #elif defined(CONFIG_RTC_POWER_OFF)
 int alarm_set_alarm_poweroff(char *alarm_data);
+int alarm_set_alarm_enable(int alarm_enable);
 #endif
 
 #endif
@@ -109,6 +110,7 @@ enum android_alarm_return_flags {
 #define ANDROID_ALARM_SET_ALARM_BOOT		_IOW('a', 7, struct timespec)
 #elif defined(CONFIG_RTC_POWER_OFF)
 #define ANDROID_ALARM_SET_ALARM_POWEROFF	_IOW('a', 8, struct timespec)
+#define ANDROID_ALARM_SET_ALARM_ENABLE		_IOW('a', 9, int)
 #endif
 #define ANDROID_ALARM_BASE_CMD(cmd)         (cmd & ~(_IOC(0, 0, 0xf0, 0)))
 #define ANDROID_ALARM_IOCTL_TO_TYPE(cmd)    (_IOC_NR(cmd) >> 4)

@@ -32,7 +32,9 @@
 #include <linux/mfd/max77686.h>
 #include <linux/mfd/max77686-private.h>
 
-//#define MAX77686_DEBUG
+#include <mach/sec_debug.h>
+
+#define MAX77686_DEBUG 0
 
 #define PMIC_DEBUG KERN_DEBUG
 #define PMIC_REG_DEBUG KERN_DEBUG
@@ -190,11 +192,23 @@ unsigned int max77686_opmode_reg[][3] = {
 	/* LDO1 ... LDO26 */
 	/* {NORMAL, LP, STANDBY} */
 	{0x3, 0x2, 0x0}, /* LDO1 */
+#ifdef CONFIG_SAMSUNG_C2C
+	{0x3, 0x3, 0x3}, /* VDDQ_M1/2 */
+#else
 	{0x3, 0x2, 0x1},
+#endif
+#ifdef CONFIG_SAMSUNG_C2C
+	{0x3, 0x3, 0x3}, /* VCC_1.8_AP */
+#else
+	{0x3, 0x2, 0x0},
+#endif
 	{0x3, 0x2, 0x0},
 	{0x3, 0x2, 0x0},
-	{0x3, 0x2, 0x0},
+#ifdef CONFIG_SAMSUNG_C2C
+	{0x3, 0x3, 0x3}, /* VMPLL_1.0_AP*/
+#else
 	{0x3, 0x2, 0x1},
+#endif
 	{0x3, 0x2, 0x1},
 	{0x3, 0x2, 0x1},
 	{0x3, 0x2, 0x0},
@@ -216,11 +230,19 @@ unsigned int max77686_opmode_reg[][3] = {
 	{0x3, 0x2, 0x0},
 	{0x3, 0x2, 0x0},
 	/* BUCK1 ... BUCK9 */
+#ifdef CONFIG_SAMSUNG_C2C
+	{0x3, 0x3, 0x3}, /* BUCK1 */
+#else
 	{0x3, 0x0, 0x1}, /* BUCK1 */
+#endif
 	{0x3, 0x2, 0x1},
 	{0x3, 0x2, 0x1},
 	{0x3, 0x2, 0x1},
+#ifdef CONFIG_SAMSUNG_C2C
+	{0x3, 0x3, 0x3}, /* VMEM 1.2V */
+#else
 	{0x3, 0x0, 0x0},
+#endif
 	{0x3, 0x0, 0x0},
 	{0x3, 0x0, 0x0},
 	{0x3, 0x0, 0x0},
@@ -318,7 +340,7 @@ static int max77686_reg_enable(struct regulator_dev *rdev)
 	if (ret)
 		return ret;
 
-#ifdef MAX77686_DEBUG
+#if MAX77686_DEBUG
 	printk(PMIC_DEBUG "%s: id=%d, pattern=%x\n",
 		__func__, rdev_get_id(rdev), pattern);
 #endif
@@ -336,7 +358,7 @@ static int max77686_reg_disable(struct regulator_dev *rdev)
 	if (ret)
 		return ret;
 
-#ifdef MAX77686_DEBUG
+#if MAX77686_DEBUG
 	printk(PMIC_DEBUG "%s: id=%d, pattern=%x\n",
 		__func__, rdev_get_id(rdev), pattern);
 #endif
@@ -407,7 +429,7 @@ static int max77686_get_voltage(struct regulator_dev *rdev)
 	val >>= shift;
 	val &= mask;
 
-#ifdef MAX77686_DEBUG
+#if MAX77686_DEBUG
 	printk(PMIC_REG_DEBUG "%s: id=%d, val=%x\n",
 		__func__, rid, val);
 #endif
@@ -474,11 +496,13 @@ static int max77686_set_voltage(struct regulator_dev *rdev,
 	max77686_read_reg(i2c, reg, &org);
 	org = (org & mask) >> shift;
 
+#if !defined(CONFIG_MACH_GD2)
 #if defined(CONFIG_MACH_M0) || defined(CONFIG_MACH_C1) || \
 	defined(CONFIG_MACH_M3) || \
-	defined(CONFIG_MACH_P4NOTE) || \
+	defined(CONFIG_MACH_P4NOTE) || defined(CONFIG_MACH_SP7160LTE) || \
 	defined(CONFIG_MACH_GC1) || defined(CONFIG_MACH_T0) || \
-	defined(CONFIG_MACH_GRANDE) || defined(CONFIG_MACH_IRON)
+	defined(CONFIG_MACH_GRANDE) || defined(CONFIG_MACH_IRON) || \
+	defined(CONFIG_MACH_TAB3)
 #if !defined(CONFIG_MACH_T0_CHN_CU_DUOS) || \
 	!defined(CONFIG_MACH_T0_CHN_CMCC) || \
 	!defined(CONFIG_MACH_T0_CHN_OPEN_DUOS) || \
@@ -487,7 +511,8 @@ static int max77686_set_voltage(struct regulator_dev *rdev,
 	if (!gpio_get_value(GPIO_HDMI_EN))
 #endif
 #endif
-#ifdef MAX77686_DEBUG
+#endif
+#if MAX77686_DEBUG
 		printk(PMIC_REG_DEBUG "max77686: id=%d, org=%x, val=%x",
 			rdev_get_id(rdev), org, i);
 #endif
@@ -495,12 +520,23 @@ static int max77686_set_voltage(struct regulator_dev *rdev,
 	*selector = i;
 
 	switch (rid) {
-	case MAX77686_BUCK2 ... MAX77686_BUCK4:
+	case MAX77686_BUCK2:
+                sec_debug_aux_log(SEC_DEBUG_AUXLOG_CPU_BUS_CLOCK_CHANGE,
+                        "%s:BUCK2:min_vol=%d, max_vol=%d(%ps)",
+                        __func__, min_uV, max_uV, __builtin_return_address(0));
+        case MAX77686_BUCK3:
+                sec_debug_aux_log(SEC_DEBUG_AUXLOG_CPU_BUS_CLOCK_CHANGE,
+                        "%s:BUCK3:min_vol=%d, max_vol=%d(%ps)",
+                        __func__, min_uV, max_uV, __builtin_return_address(0));
+        case MAX77686_BUCK4:
 		if (org < i)
 			udelay(DIV_ROUND_UP(desc->step * (i - org),
 						max77686->ramp_delay * 1000));
 		break;
 	case MAX77686_BUCK1:
+                sec_debug_aux_log(SEC_DEBUG_AUXLOG_CPU_BUS_CLOCK_CHANGE,
+                        "%s:BUCK1:min_vol=%d, max_vol=%d(%ps)",
+                        __func__, min_uV, max_uV, __builtin_return_address(0));
 	case MAX77686_BUCK5 ... MAX77686_BUCK9:
 		/* Unconditionally 100 mV/us */
 		if (org < i)
@@ -649,7 +685,7 @@ static int max77686_set_ramp_rate(struct i2c_client *i2c, int rate)
 		break;
 	}
 
-#ifdef MAX77686_DEBUG
+#if MAX77686_DEBUG
 	printk(PMIC_DEBUG "%s: ramp_delay=%d, data=0x%x\n", __func__, ramp_delay, data);
 #endif
 
@@ -802,7 +838,7 @@ static __devinit int max77686_pmic_probe(struct platform_device *pdev)
 			regulators[id].n_voltages =
 				(desc->max - desc->min) / desc->step + 1;
 
-#ifdef MAX77686_DEBUG
+#if MAX77686_DEBUG
 			printk(PMIC_DEBUG "%s: desc=%p, id=%d, n_vol=%d, max=%d, min=%d, step=%d\n",
 					__func__, desc, id, regulators[id].n_voltages,
 					desc->max, desc->min, desc->step);

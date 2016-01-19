@@ -17,6 +17,9 @@
  *  Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
  */
 
+#ifndef _LINUX_WACOM_I2C_TABLE_T03G_H
+#define _LINUX_WACOM_I2C_TABLE_T03G_H
+
 short TblX_CCW_LLeft_44[] = {
 #include "table/t03g/wacom_i2c_tblX_CCW_LLeft_T0.h"
 };
@@ -53,11 +56,7 @@ short tilt_offsetX[MAX_HAND][MAX_ROTATION] = \
 short tilt_offsetY[MAX_HAND][MAX_ROTATION] = \
 	{{40, 0, -40, 20, }, {20, 40, 0, -40, }};
 
-short tilt_offsetX_B713[MAX_HAND][MAX_ROTATION] = \
-	{{85, 100, -50, -85, }, {-85, 85, 100, -50, } };
-short tilt_offsetY_B713[MAX_HAND][MAX_ROTATION] = \
-	{{-90, 120, 100, -80, }, {-80, -90, 120, 100, } };
-
-char* tuning_version = "0910";
-char *tuning_version_B713 = "0730";
+char* tuning_version = "0912";
 char *tuning_model = "N7100";
+
+#endif /* _LINUX_WACOM_I2C_TABLE_T03G_H */

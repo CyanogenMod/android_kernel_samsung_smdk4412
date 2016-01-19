@@ -17,6 +17,20 @@
 #include <linux/pm_qos_params.h>
 #include <linux/pci.h>
 
+/*
+ * phys_addr_t was added as a generic arch typedef on 2.6.28,
+ * that backport is dealt with in compat-2.6.28.h
+ */
+#if defined(CONFIG_X86) || defined(CONFIG_X86_64)
+
+#if defined(CONFIG_64BIT) || defined(CONFIG_X86_PAE) || defined(CONFIG_PHYS_64BIT)
+typedef u64 phys_addr_t;
+#else
+typedef u32 phys_addr_t;
+#endif
+
+#endif /* x86 */
+
 /* The macro below uses a const upstream, this differs */
 
 /**

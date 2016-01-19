@@ -701,10 +701,10 @@ static int fsg_lun_open(struct fsg_lun *curlun, const char *filename)
 	num_sectors = size >> 9;	/* File size in 512-byte blocks */
 	min_sectors = 1;
 	if (curlun->cdrom) {
-		num_sectors >>= 2;  /* Reduce to a multiple of 2048 */
-		min_sectors = 300;  /* Smallest track is 300 frames */
-		if (num_sectors >= 256*60*75) {
-			num_sectors = (256*60*75 - 1);
+		num_sectors &= ~3;	/* Reduce to a multiple of 2048 */
+		min_sectors = 300*4;	/* Smallest track is 300 frames */
+		if (num_sectors >= 256*60*75*4) {
+			num_sectors = (256*60*75 - 1) * 4;
 			LINFO(curlun, "file too big: %s\n", filename);
 			LINFO(curlun, "using only first %d blocks\n",
 					(int) num_sectors);
@@ -759,6 +759,7 @@ static void store_cdrom_address(u8 *dest, int msf, u32 addr)
 {
 	if (msf) {
 		/* Convert to Minutes-Seconds-Frames */
+		addr >>= 2;		/* Convert to 2048-byte frames */
 		addr += 2*75;		/* Lead-in occupies 2 seconds */
 		dest[3] = addr % 75;	/* Frames */
 		addr /= 75;
@@ -911,41 +912,4 @@ static ssize_t fsg_store_file(struct device *dev, struct device_attribute *attr,
 	}
 	up_write(filesem);
 	return (rc < 0 ? rc : count);
-}
-
-static ssize_t fsg_show_cdrom (struct device *dev, struct device_attribute *attr,
-			   char *buf)
-{
-	struct fsg_lun  *curlun = fsg_lun_from_dev(dev);
-
-	return sprintf(buf, "%d\n", curlun->cdrom);
-}
-
-static ssize_t fsg_store_cdrom(struct device *dev, struct device_attribute *attr,
-				  const char *buf, size_t count)
-{
-	ssize_t    rc;
-	struct fsg_lun  *curlun = fsg_lun_from_dev(dev);
-	struct rw_semaphore  *filesem = dev_get_drvdata(dev);
-	unsigned  cdrom;
-
-	rc = kstrtouint(buf, 2, &cdrom);
-	if (rc)
-		return rc;
-
-	/*
-	 * Allow the cdrom status to change only while the
-	 * backing file is closed.
-	 */
-	down_read(filesem);
-	if (fsg_lun_is_open(curlun)) {
-		LDBG(curlun, "cdrom status change prevented\n");
-		rc = -EBUSY;
-	} else {
-		curlun->cdrom = cdrom;
-		LDBG(curlun, "cdrom status set to %d\n", curlun->cdrom);
-		rc = count;
-	}
-	up_read(filesem);
-	return rc;
 }

@@ -55,6 +55,7 @@ struct busfreq_control {
 	struct opp *opp_lock;
 	struct device *dev;
 	struct busfreq_data *data;
+	unsigned long min_freq;
 	bool init_done;
 };
 
@@ -108,8 +109,11 @@ struct opp *step_down(struct busfreq_data *data, int step)
 
 	return opp;
 }
-
+#ifdef CONFIG_CPU_EXYNOS4212
+static unsigned int _target(struct busfreq_data *data, struct opp *new, int margin)
+#else
 static unsigned int _target(struct busfreq_data *data, struct opp *new)
+#endif
 {
 	unsigned int index;
 	unsigned int voltage;
@@ -128,11 +132,15 @@ static unsigned int _target(struct busfreq_data *data, struct opp *new)
 	if (newfreq > currfreq) {
 		regulator_set_voltage(data->vdd_mif, voltage,
 				voltage + 25000);
+	#ifdef CONFIG_CPU_EXYNOS4212
+		voltage = data->get_int_volt(index) + margin;
+	#else
 		voltage = data->get_int_volt(index);
+	#endif
 		regulator_set_voltage(data->vdd_int, voltage,
 				voltage + 25000);
-		/*if (data->busfreq_prepare)
-			data->busfreq_prepare(index);*/
+		if (data->busfreq_prepare)
+			data->busfreq_prepare(index);
 	}
 	if (data->set_qos)
 		data->set_qos(index);
@@ -140,11 +148,15 @@ static unsigned int _target(struct busfreq_data *data, struct opp *new)
 	data->target(index);
 
 	if (newfreq < currfreq) {
-		/*if (data->busfreq_post)
-			data->busfreq_post(index);*/
+		if (data->busfreq_post)
+			data->busfreq_post(index);
 		regulator_set_voltage(data->vdd_mif, voltage,
 				voltage + 25000);
+		#ifdef CONFIG_CPU_EXYNOS4212
+		voltage = data->get_int_volt(index) + margin;
+		#else
 		voltage = data->get_int_volt(index);
+		#endif
 		regulator_set_voltage(data->vdd_int, voltage,
 				voltage + 25000);
 	}
@@ -159,6 +171,7 @@ static void exynos_busfreq_timer(struct work_struct *work)
 	struct busfreq_data *data = container_of(delayed_work, struct busfreq_data,
 			worker);
 	struct opp *opp;
+	unsigned long freq;
 	unsigned int index;
 
 	opp = data->monitor(data);
@@ -167,14 +180,29 @@ static void exynos_busfreq_timer(struct work_struct *work)
 
 	mutex_lock(&busfreq_lock);
 
-	if (bus_ctrl.opp_lock)
+	if (bus_ctrl.opp_lock) {
 		opp = bus_ctrl.opp_lock;
+	}
+	else if (bus_ctrl.min_freq)
+	{
+		freq = opp_get_freq(opp);
 
-	index = _target(data, opp);
+		if (freq < bus_ctrl.min_freq) {
+			freq = bus_ctrl.min_freq;
+			opp = opp_find_freq_ceil(bus_ctrl.dev, &freq);
+		}
+	}
+
+	#ifdef CONFIG_CPU_EXYNOS4212
+		index= _target(data, opp, 0);
+	#else
+		index = _target(data, opp);
+	#endif
 
 	update_busfreq_stat(data, index);
 	mutex_unlock(&busfreq_lock);
-	queue_delayed_work(system_freezable_wq, &data->worker, data->sampling_rate);
+	queue_delayed_work(system_freezable_wq, &data->worker,
+				(data->sampling_rate * data->rate_mult));
 }
 
 static int exynos_buspm_notifier_event(struct notifier_block *this,
@@ -186,7 +214,11 @@ static int exynos_buspm_notifier_event(struct notifier_block *this,
 	switch (event) {
 	case PM_SUSPEND_PREPARE:
 		mutex_lock(&busfreq_lock);
-		_target(data, data->max_opp);
+		#ifdef CONFIG_CPU_EXYNOS4212
+			_target(data, data->max_opp,50000);
+		#else
+			_target(data, data->max_opp);
+		#endif
 		data->use = false;
 		mutex_unlock(&busfreq_lock);
 		return NOTIFY_OK;
@@ -231,6 +263,46 @@ void exynos_busfreq_lock_free(unsigned int nId)
 {
 }
 
+static ssize_t show_min_freq(struct device *device,
+	struct device_attribute *attr, char *buf)
+{
+	int len = 0;
+
+	len = sprintf(buf, "%lu\n", bus_ctrl.min_freq);
+
+	return len;
+}
+
+static ssize_t store_min_freq(struct device *device, struct device_attribute *attr,
+	const char *buf, size_t count)
+{
+	struct platform_device *pdev = to_platform_device(bus_ctrl.dev);
+	struct busfreq_data *data = (struct busfreq_data *)platform_get_drvdata(pdev);
+	struct opp *opp;
+	unsigned long freq;
+	unsigned long minfreq = opp_get_freq(data->min_opp);
+	unsigned long maxfreq = opp_get_freq(data->max_opp);
+	int ret;
+
+	ret = sscanf(buf, "%lu", &freq);
+
+	if (freq < minfreq) {
+		dev_unlock(data->dev, data->dev);
+		bus_ctrl.min_freq = 0;
+		return count;
+	}
+
+	if (freq > maxfreq)
+		freq = maxfreq;
+
+	opp = opp_find_freq_ceil(bus_ctrl.dev, &freq);
+	freq = opp_get_freq(opp);
+	dev_lock(data->dev, data->dev, freq);
+	bus_ctrl.min_freq = freq;
+
+	return count;
+}
+
 static ssize_t show_level_lock(struct device *device,
 		struct device_attribute *attr, char *buf)
 {
@@ -270,6 +342,24 @@ static ssize_t store_level_lock(struct device *device, struct device_attribute *
 	opp = opp_find_freq_ceil(bus_ctrl.dev, &freq);
 	bus_ctrl.opp_lock = opp;
 	pr_info("Lock Freq : %lu\n", opp_get_freq(opp));
+	return count;
+}
+
+static ssize_t show_freq_table(struct device *device,
+		struct device_attribute *attr, char *buf)
+{
+	struct platform_device *pdev = to_platform_device(bus_ctrl.dev);
+	struct busfreq_data *data =
+			(struct busfreq_data *)platform_get_drvdata(pdev);
+	unsigned long maxfreq = opp_get_freq(data->max_opp);
+	int i, count = 0;
+
+	for (i = 0; i < data->table_size; i++) {
+		if(maxfreq >= data->table[i].mem_clk)
+			count += sprintf(&buf[count], "%u ",
+					data->table[i].mem_clk);
+	}
+	count += sprintf(&buf[count], "\n");
 	return count;
 }
 
@@ -444,7 +534,9 @@ static ssize_t store_load_history_size(struct device *device,
 	return count;
 }
 
+static DEVICE_ATTR(min_freq, 0664, show_min_freq, store_min_freq);
 static DEVICE_ATTR(curr_freq, 0664, show_level_lock, store_level_lock);
+static DEVICE_ATTR(freq_table, 0664, show_freq_table, NULL);
 static DEVICE_ATTR(lock_list, 0664, show_locklist, NULL);
 static DEVICE_ATTR(time_in_state, 0664, show_time_in_state, NULL);
 static DEVICE_ATTR(up_threshold, 0664, show_up_threshold, store_up_threshold);
@@ -464,7 +556,9 @@ static DEVICE_ATTR(load_history_size, 0664, show_load_history_size,
 					store_load_history_size);
 
 static struct attribute *busfreq_attributes[] = {
+	&dev_attr_min_freq.attr,
 	&dev_attr_curr_freq.attr,
+	&dev_attr_freq_table.attr,
 	&dev_attr_lock_list.attr,
 	&dev_attr_time_in_state.attr,
 	&dev_attr_up_threshold.attr,
@@ -499,13 +593,43 @@ void exynos_request_apply(unsigned long freq)
 	if (opp_get_freq(bus_ctrl.data->curr_opp) >= opp_get_freq(opp))
 		goto out;
 
-	index = _target(bus_ctrl.data, opp);
+	#ifdef CONFIG_CPU_EXYNOS4212
+		index = _target(bus_ctrl.data, opp, 0);
+	#else
+		index = _target(bus_ctrl.data, opp);
+	#endif
 
 	update_busfreq_stat(bus_ctrl.data, index);
 
 out:
 	mutex_unlock(&busfreq_lock);
 }
+
+#ifdef CONFIG_HAS_EARLYSUSPEND
+static void exynos4x12_busfreq_early_suspend(struct early_suspend *h)
+{
+	struct busfreq_data *data = container_of(h, struct busfreq_data,
+				busfreq_early_suspend_handler);
+
+	data->rate_mult = 8;
+#ifdef CONFIG_BUSFREQ_INTERLOCK_CPUFREQ
+	data->is_lcd_on = 0;
+#endif	
+}
+
+static void exynos4x12_busfreq_late_resume(struct early_suspend *h)
+{
+	struct busfreq_data *data = container_of(h, struct busfreq_data,
+				busfreq_early_suspend_handler);
+
+	data->rate_mult = 1;
+#ifdef CONFIG_BUSFREQ_INTERLOCK_CPUFREQ
+	data->is_lcd_on = 1;
+#endif	
+	cancel_delayed_work(&data->worker);
+	queue_work(system_freezable_wq, &data->worker.work);
+}
+#endif
 
 static __devinit int exynos_busfreq_probe(struct platform_device *pdev)
 {
@@ -553,11 +677,28 @@ static __devinit int exynos_busfreq_probe(struct platform_device *pdev)
 		goto err_busfreq;
 	}
 
+#ifdef CONFIG_HAS_EARLYSUSPEND
+	data->busfreq_early_suspend_handler.level =
+				EARLY_SUSPEND_LEVEL_DISABLE_FB;
+	data->busfreq_early_suspend_handler.suspend =
+				&exynos4x12_busfreq_early_suspend;
+	data->busfreq_early_suspend_handler.resume =
+				&exynos4x12_busfreq_late_resume;
+
+	register_early_suspend(&data->busfreq_early_suspend_handler);
+#endif
+
 	data->dev = &pdev->dev;
 	data->sampling_rate = usecs_to_jiffies(100000);
 	bus_ctrl.opp_lock =  NULL;
 	bus_ctrl.dev =  data->dev;
 	bus_ctrl.data =  data;
+	bus_ctrl.min_freq = 0;
+
+	data->rate_mult = 1;
+#ifdef CONFIG_BUSFREQ_INTERLOCK_CPUFREQ
+	data->is_lcd_on = 1;
+#endif	
 
 	INIT_DELAYED_WORK(&data->worker, exynos_busfreq_timer);
 
@@ -617,6 +758,9 @@ static __devexit int exynos_busfreq_remove(struct platform_device *pdev)
 {
 	struct busfreq_data *data = platform_get_drvdata(pdev);
 
+#ifdef CONFIG_HAS_EARLYSUSPEND
+	unregister_early_suspend(&data->busfreq_early_suspend_handler);
+#endif
 	unregister_pm_notifier(&data->exynos_buspm_notifier);
 	unregister_reboot_notifier(&data->exynos_reboot_notifier);
 	regulator_put(data->vdd_int);

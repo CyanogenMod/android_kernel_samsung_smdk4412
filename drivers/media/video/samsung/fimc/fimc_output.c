@@ -2726,7 +2726,7 @@ static int fimc_update_in_queue_addr(struct fimc_control *ctrl,
 
 int fimc_qbuf_output(void *fh, struct v4l2_buffer *b)
 {
-	struct fimc_buf *buf = (struct fimc_buf *)b->m.userptr;
+	struct fimc_buf buf;
 	struct fimc_ctx *ctx;
 	struct fimc_control *ctrl = ((struct fimc_prv_data *)fh)->ctrl;
 	int ctx_id = ((struct fimc_prv_data *)fh)->ctx_id;
@@ -2809,22 +2809,28 @@ int fimc_qbuf_output(void *fh, struct v4l2_buffer *b)
 		return -EINVAL;
 	}
 
-	if (buf->base[FIMC_ADDR_Y] != 0 && y_size != 0 &&
-			!cma_is_registered_region(buf->base[FIMC_ADDR_Y], y_size)) {
+	ret = copy_from_user(&buf, (struct fimc_buf *)b->m.userptr, sizeof(struct fimc_buf));
+	if (ret < 0) {
+		fimc_err("%s: failed to copy parameter\n", __func__);
+		return ret;
+	}
+
+	if (buf.base[FIMC_ADDR_Y] != 0 && y_size != 0 &&
+			!cma_is_registered_region(buf.base[FIMC_ADDR_Y], y_size)) {
 		fimc_err("%s: Y address is not CMA region 0x%x, %d \n",
-				__func__, buf->base[FIMC_ADDR_Y], y_size);
+				__func__, buf.base[FIMC_ADDR_Y], y_size);
 		return -EINVAL;
 	}
-	if (buf->base[FIMC_ADDR_CB] != 0 && cb_size != 0 &&
-			!cma_is_registered_region(buf->base[FIMC_ADDR_CB], cb_size)) {
+	if (buf.base[FIMC_ADDR_CB] != 0 && cb_size != 0 &&
+			!cma_is_registered_region(buf.base[FIMC_ADDR_CB], cb_size)) {
 		fimc_err("%s: CB address is not CMA region 0x%x, %d \n",
-				__func__, buf->base[FIMC_ADDR_CB], cb_size);
+				__func__, buf.base[FIMC_ADDR_CB], cb_size);
 		return -EINVAL;
 	}
-	if (buf->base[FIMC_ADDR_CR] != 0 && cr_size != 0 &&
-			!cma_is_registered_region(buf->base[FIMC_ADDR_CR], cr_size)) {
+	if (buf.base[FIMC_ADDR_CR] != 0 && cr_size != 0 &&
+			!cma_is_registered_region(buf.base[FIMC_ADDR_CR], cr_size)) {
 		fimc_err("%s: CR address is not CMA region 0x%x, %d \n",
-				__func__, buf->base[FIMC_ADDR_CR], cr_size);
+				__func__, buf.base[FIMC_ADDR_CR], cr_size);
 		return -EINVAL;
 	}
 	/* End check CMA region */
@@ -2833,8 +2839,7 @@ int fimc_qbuf_output(void *fh, struct v4l2_buffer *b)
 	    (ctrl->status == FIMC_STREAMON) ||
 	    (ctrl->status == FIMC_STREAMON_IDLE)) {
 		if (b->memory == V4L2_MEMORY_USERPTR) {
-			buf = (struct fimc_buf *)b->m.userptr;
-			ret = fimc_update_in_queue_addr(ctrl, ctx, b->index, buf->base);
+			ret = fimc_update_in_queue_addr(ctrl, ctx, b->index, buf.base);
 			if (ret < 0)
 				return ret;
 #ifdef CONFIG_SLP_DMABUF
@@ -2904,7 +2909,8 @@ int fimc_qbuf_output(void *fh, struct v4l2_buffer *b)
 		if (ctrl->regs == NULL) {
 			fimc_err("%s:FIMC%d power is off!!! (ctx=%d)\n",
 				 __func__, ctrl->id, ctx_id);
-			return -EINVAL;
+			ret = -EINVAL;
+			goto err_routine;
 		}
 
 		ctx = &ctrl->out->ctx[ctx_num];
@@ -2920,6 +2926,78 @@ int fimc_qbuf_output(void *fh, struct v4l2_buffer *b)
 				goto err_routine;
 			}
 		}
+
+		/* Check output buffer for CMA region */
+		width = ctx->fbuf.fmt.width;
+		height = ctx->fbuf.fmt.height;
+		format = ctx->fbuf.fmt.pixelformat;
+		y_size = width * height;
+		cb_size = 0;
+		cr_size = 0;
+
+		switch (format) {
+		case V4L2_PIX_FMT_RGB32:
+			y_size = y_size << 2;
+			size = PAGE_ALIGN(y_size);
+			break;
+		case V4L2_PIX_FMT_RGB565:	/* fall through */
+		case V4L2_PIX_FMT_UYVY:		/* fall through */
+		case V4L2_PIX_FMT_YUYV:
+		case V4L2_PIX_FMT_YVYU:
+		case V4L2_PIX_FMT_VYUY:
+			y_size = y_size << 1;
+			size = PAGE_ALIGN(y_size);
+			break;
+		case V4L2_PIX_FMT_YUV420:
+		case V4L2_PIX_FMT_YVU420:
+		case V4L2_PIX_FMT_YUV422P:
+		case V4L2_PIX_FMT_NV12M:
+			cb_size = y_size >> 2;
+			cr_size = y_size >> 2;
+			size = PAGE_ALIGN(y_size + cb_size + cr_size);
+			break;
+		case V4L2_PIX_FMT_NV12:
+		case V4L2_PIX_FMT_NV21:
+		case V4L2_PIX_FMT_NV16:
+		case V4L2_PIX_FMT_NV61:
+			cb_size = y_size >> 1;
+			size = PAGE_ALIGN(y_size + cb_size);
+			break;
+		case V4L2_PIX_FMT_NV12T:
+			fimc_get_nv12t_size(width, height, &y_size, &cb_size);
+			size = PAGE_ALIGN(y_size + cb_size);
+			break;
+		default:
+			fimc_err("%s: Invalid pixelformt : %d\n", __func__, format);
+			ret = -EINVAL;
+			goto err_routine;
+		}
+
+		if (ctx->dst[idx].base[FIMC_ADDR_Y] != 0 && y_size != 0 &&
+				!cma_is_registered_region((dma_addr_t)ctx->dst[idx].base[FIMC_ADDR_Y],
+					y_size)) {
+			fimc_err("%s: Y address is not CMA region 0x%x, %d \n",
+					__func__, ctx->dst[idx].base[FIMC_ADDR_Y], y_size);
+			ret = -EINVAL;
+			goto err_routine;
+		}
+		if (ctx->dst[idx].base[FIMC_ADDR_CB] != 0 && cb_size != 0 &&
+				!cma_is_registered_region((dma_addr_t)ctx->dst[idx].base[FIMC_ADDR_CB],
+					cb_size)) {
+			fimc_err("%s: CB address is not CMA region 0x%x, %d \n",
+					__func__, ctx->dst[idx].base[FIMC_ADDR_CB], cb_size);
+			ret = -EINVAL;
+			goto err_routine;
+		}
+		if (ctx->dst[idx].base[FIMC_ADDR_CR] != 0 && cr_size != 0 &&
+				!cma_is_registered_region((dma_addr_t)ctx->dst[idx].base[FIMC_ADDR_CR],
+					cr_size)) {
+			fimc_err("%s: CR address is not CMA region 0x%x, %d \n",
+					__func__, ctx->dst[idx].base[FIMC_ADDR_CR], cr_size);
+			ret = -EINVAL;
+			goto err_routine;
+		}
+		/* End check CMA region */
 
 		/* Check output buffer for CMA region */
 		width = ctx->fbuf.fmt.width;

@@ -32,6 +32,9 @@
 
 #include "mxt1664s_dev.h"
 
+static void mxt_start(struct mxt_data *data);
+static void mxt_stop(struct mxt_data *data);
+
 int mxt_read_mem(struct mxt_data *data, u16 reg, u8 len, u8 *buf)
 {
 	int ret = 0, i = 0;
@@ -161,21 +164,6 @@ static int mxt_backup(struct mxt_data *data)
 {
 	u8 buf = 0x55u;
 	return mxt_write_mem(data, data->cmd_proc + CMD_BACKUP_OFFSET, 1, &buf);
-}
-
-static void mxt_start(struct mxt_data *data)
-{
-	/* Touch report enable */
-	mxt_write_object(data,
-		TOUCH_MULTITOUCHSCREEN_T9,	0,
-		data->tsp_ctl);
-}
-
-static void mxt_stop(struct mxt_data *data)
-{
-	/* Touch report disable */
-	mxt_write_object(data,
-		TOUCH_MULTITOUCHSCREEN_T9, 0, 0);
 }
 
 static int mxt_check_instance(struct mxt_data *data, u8 object_type)
@@ -544,6 +532,11 @@ static void switch_acq_int_dwork(struct work_struct *work)
 		container_of(work, struct mxt_data,
 		acq_int_dwork.work);
 
+	if (!data->mxt_enabled) {
+		schedule_delayed_work(&data->acq_int_dwork, HZ / 5);
+		return ;
+	}
+
 	set_charger_config(data, 1);
 }
 
@@ -844,9 +837,10 @@ static void mxt_treat_T9_object(struct mxt_data *data, u8 *msg)
 		data->fingers[id].state = MXT_STATE_RELEASE;
 		data->finger_mask |= 1U << id;
 	} else {
-		/* ignore changed amplitude message */
+		/* ignore changed amplitude/vector message */
 		if (!((msg[1] & DETECT_MSG_MASK)
-				&& (msg[1] & AMPLITUDE_MSG_MASK)))
+				&& ((msg[1] & AMPLITUDE_MSG_MASK)
+				|| (msg[1] & VECTOR_MSG_MASK))))
 			dev_err(&data->client->dev, "Unknown state %#02x %#02x\n",
 				msg[0], msg[1]);
 	}
@@ -1061,6 +1055,64 @@ static int mxt_internal_resume(struct mxt_data *data)
 {
 	data->pdata->power_on();
 	return 0;
+}
+
+static void mxt_start(struct mxt_data *data)
+{
+#if 0
+	/* Touch report enable */
+	mxt_write_object(data,
+		TOUCH_MULTITOUCHSCREEN_T9,	0,
+		data->tsp_ctl);
+#else
+	mutex_lock(&data->lock);
+
+	if (data->mxt_enabled) {
+		dev_err(&data->client->dev,
+			"%s. but touch already on\n", __func__);
+	} else {
+		mxt_internal_resume(data);
+
+		msleep(100);
+
+		data->mxt_enabled = true;
+		enable_irq(data->client->irq);
+
+		schedule_delayed_work(&data->resume_dwork,
+			msecs_to_jiffies(MXT_1664S_RESUME_TIME));
+	}
+
+	mutex_unlock(&data->lock);
+#endif
+}
+
+static void mxt_stop(struct mxt_data *data)
+{
+#if 0
+	/* Touch report disable */
+	mxt_write_object(data,
+		TOUCH_MULTITOUCHSCREEN_T9, 0, 0);
+#else
+
+#if TSP_INFORM_CHARGER
+	cancel_delayed_work_sync(&data->noti_dwork);
+	cancel_delayed_work_sync(&data->acq_int_dwork);
+	cancel_delayed_work_sync(&data->resume_dwork);
+#endif
+
+	mutex_lock(&data->lock);
+
+	if (data->mxt_enabled) {
+		disable_irq(data->client->irq);
+		data->mxt_enabled = false;
+		mxt_internal_suspend(data);
+	} else {
+		dev_err(&data->client->dev,
+			"%s. but touch already off\n", __func__);
+	}
+
+	mutex_unlock(&data->lock);
+#endif
 }
 
 static int mxt_get_bootloader_version(struct i2c_client *client, u8 val)
@@ -1278,6 +1330,8 @@ static int mxt_input_open(struct input_dev *dev)
 {
 	struct mxt_data *data = input_get_drvdata(dev);
 
+	dev_info(&data->client->dev, "%s\n", __func__);
+
 	mxt_start(data);
 
 	return 0;
@@ -1286,6 +1340,8 @@ static int mxt_input_open(struct input_dev *dev)
 static void mxt_input_close(struct input_dev *dev)
 {
 	struct mxt_data *data = input_get_drvdata(dev);
+
+	dev_info(&data->client->dev, "%s\n", __func__);
 
 	mxt_stop(data);
 }
@@ -1300,8 +1356,6 @@ static void late_resume_dwork(struct work_struct *work)
 
 	if (!data->charging_mode)
 		schedule_delayed_work(&data->acq_int_dwork, HZ * 3);
-
-	enable_irq(data->client->irq);
 }
 
 #ifdef CONFIG_HAS_EARLYSUSPEND
@@ -1310,44 +1364,16 @@ static void late_resume_dwork(struct work_struct *work)
 
 static void mxt_early_suspend(struct early_suspend *h)
 {
-	struct mxt_data *data = container_of(h, struct mxt_data,
-								early_suspend);
-#if TSP_INFORM_CHARGER
-	cancel_delayed_work_sync(&data->noti_dwork);
-#endif
-
-	mutex_lock(&data->lock);
-
-	if (data->mxt_enabled) {
-		disable_irq(data->client->irq);
-		data->mxt_enabled = false;
-		mxt_internal_suspend(data);
-	} else {
-		dev_err(&data->client->dev,
-			"%s. but touch already off\n", __func__);
-	}
-
-	mutex_unlock(&data->lock);
+	struct mxt_data *data =
+		container_of(h, struct mxt_data, early_suspend);
+	mxt_stop(data);
 }
 
 static void mxt_late_resume(struct early_suspend *h)
 {
-	struct mxt_data *data = container_of(h, struct mxt_data,
-								early_suspend);
-
-	mutex_lock(&data->lock);
-
-	if (data->mxt_enabled) {
-		dev_err(&data->client->dev,
-			"%s. but touch already on\n", __func__);
-	} else {
-		mxt_internal_resume(data);
-		data->mxt_enabled = true;
-		schedule_delayed_work(&data->resume_dwork,
-			msecs_to_jiffies(MXT_1664S_HW_RESET_TIME));
-	}
-
-	mutex_unlock(&data->lock);
+	struct mxt_data *data =
+		container_of(h, struct mxt_data, early_suspend);
+	mxt_start(data);
 }
 #else
 static int mxt_suspend(struct device *dev)
@@ -1608,8 +1634,10 @@ static int __devinit mxt_probe(struct i2c_client *client,
 	data->input_dev = input_dev;
 	data->pdata = pdata;
 	data->num_fingers = pdata->max_finger_touches;
-	data->mxt_enabled = true;
 	data->config_version = pdata->config_version;
+#if TSP_DEBUG_INFO
+	data->debug_log = true;
+#endif
 	mutex_init(&data->lock);
 
 	input_dev->name = "sec_touchscreen";
@@ -1666,6 +1694,7 @@ static int __devinit mxt_probe(struct i2c_client *client,
 	INIT_DELAYED_WORK(&data->resume_dwork, late_resume_dwork);
 
 	data->pdata->power_on();
+	data->mxt_enabled = true;
 	msleep(MXT_1664S_HW_RESET_TIME);
 
 	/* init touch ic */
@@ -1680,10 +1709,13 @@ static int __devinit mxt_probe(struct i2c_client *client,
 	if (ret)
 		goto err_free_mem;
 
-	/* disabled report touch event to prevent unnecessary event.
-	* it will be enabled in open function
-	*/
-	mxt_stop(data);
+#if TSP_BOOSTER
+	ret = mxt_init_dvfs(data);
+	if (ret < 0) {
+		dev_err(&client->dev, "Fail get dvfs level for touch booster\n");
+		goto err_free_mem;
+	}
+#endif
 
 #if TSP_INFORM_CHARGER
 	/* Register callbacks */
@@ -1695,6 +1727,12 @@ static int __devinit mxt_probe(struct i2c_client *client,
 	}
 #endif
 
+	/* disabled report touch event to prevent unnecessary event.
+	* it will be enabled in open function
+	*/
+	mxt_write_object(data,
+		TOUCH_MULTITOUCHSCREEN_T9, 0, 0);
+
 	ret = request_threaded_irq(client->irq, NULL, mxt_irq_thread,
 		IRQF_TRIGGER_LOW | IRQF_ONESHOT, "mxt_ts", data);
 
@@ -1702,8 +1740,11 @@ static int __devinit mxt_probe(struct i2c_client *client,
 		dev_err(&client->dev, "Failed register irq\n");
 		goto err_free_mem;
 	}
+
+	mxt_stop(data);
+
 #ifdef CONFIG_HAS_EARLYSUSPEND
-	data->early_suspend.level = EARLY_SUSPEND_LEVEL_DISABLE_FB + 1;
+	data->early_suspend.level = EARLY_SUSPEND_LEVEL_STOP_DRAWING;
 	data->early_suspend.suspend = mxt_early_suspend;
 	data->early_suspend.resume = mxt_late_resume;
 	register_early_suspend(&data->early_suspend);
@@ -1715,13 +1756,6 @@ static int __devinit mxt_probe(struct i2c_client *client,
 		goto err_free_mem;
 	}
 
-#if TSP_BOOSTER
-	ret = mxt_init_dvfs(data);
-	if (ret < 0) {
-		dev_err(&client->dev, "Fail get dvfs level for touch booster\n");
-		goto err_free_mem;
-	}
-#endif
 	dev_info(&client->dev, "Mxt touch success initialization\n");
 
 	return 0;

@@ -94,7 +94,11 @@ static int s5p_ehci_configurate(struct usb_hcd *hcd)
 
 	/* DMA burst Enable, set utmi suspend_on_n */
 #ifdef CONFIG_USB_OHCI_S5P
+#ifdef CONFIG_CDMA_MODEM_MDM6600
+	writel(readl(INSNREG00(hcd->regs)) | ENA_DMA_INCR | OHCI_SUSP_LGCY,
+#else
 	writel(readl(INSNREG00(hcd->regs)) | ENA_DMA_INCR,
+#endif
 #else
 	writel(readl(INSNREG00(hcd->regs)) | ENA_DMA_INCR,
 #endif
@@ -127,8 +131,11 @@ int s5p_ehci_port_control(struct platform_device *pdev, int port, int enable)
 }
 #endif
 
-#if defined(CONFIG_LINK_DEVICE_HSIC) || defined(CONFIG_LINK_DEVICE_USB) \
-		|| defined(CONFIG_MDM_HSIC_PM)
+#if defined(CONFIG_SEC_MODEM_V2)
+static void s5p_wait_for_cp_resume(struct platform_device *pdev,
+	struct usb_hcd *hcd) { do { } while(0); }
+#elif defined(CONFIG_LINK_DEVICE_HSIC) || defined(CONFIG_LINK_DEVICE_USB) \
+				|| defined(CONFIG_MDM_HSIC_PM)
 static void s5p_wait_for_cp_resume(struct platform_device *pdev,
 	struct usb_hcd *hcd)
 {
@@ -148,21 +155,22 @@ static void s5p_wait_for_cp_resume(struct platform_device *pdev,
 	if (pdata && pdata->noti_host_states)
 		pdata->noti_host_states(pdev, S5P_HOST_ON);
 #endif
+#if defined(CONFIG_UMTS_MODEM_XMM6262)
+	if (pdata && pdata->get_cp_active_state &&
+		!pdata->get_cp_active_state()) {
+		s5p_ehci_port_control(pdev, CP_PORT, 0);
+		pr_err("mif: force port%d off by cp reset\n", CP_PORT);
+		return;
+	}
+#endif
 	do {
-		msleep(10);
+		usleep_range(10000, 11000);
 		val32 = ehci_readl(ehci, portsc);
 	} while (++retry_cnt < RETRY_CNT_LIMIT && !(val32 & PORT_CONNECT));
 
 	if (retry_cnt >= RETRY_CNT_LIMIT)
 		dev_info(&pdev->dev, "%s: retry_cnt = %d, portsc = 0x%x\n",
-				__func__, retry_cnt, val32);
-
-#if defined(CONFIG_UMTS_MODEM_XMM6262)
-	if (pdata->get_cp_active_state && !pdata->get_cp_active_state()) {
-		s5p_ehci_port_control(pdev, CP_PORT, 0);
-		pr_err("mif: force port%d off by cp reset\n", CP_PORT);
-	}
-#endif
+			__func__, retry_cnt, val32);
 }
 #endif
 
@@ -173,7 +181,7 @@ static void s5p_ehci_phy_init(struct platform_device *pdev)
 	struct usb_hcd *hcd = s5p_ehci->hcd;
 	u32 delay_count = 0;
 
-	if (pdata->phy_init) {
+	if (pdata && pdata->phy_init) {
 		pdata->phy_init(pdev, S5P_USB_PHY_HOST);
 
 		while (!readl(hcd->regs) && delay_count < 200) {
@@ -187,7 +195,6 @@ static void s5p_ehci_phy_init(struct platform_device *pdev)
 		dev_dbg(&pdev->dev, "%s : 0x%x\n", __func__,
 				readl(INSNREG00(hcd->regs)));
 	}
-
 }
 
 #ifdef CONFIG_PM
@@ -199,7 +206,7 @@ static int s5p_ehci_suspend(struct device *dev)
 	struct usb_hcd *hcd = s5p_ehci->hcd;
 	struct ehci_hcd *ehci = hcd_to_ehci(hcd);
 	unsigned long flags;
-	int rc = 0;
+	int rc;
 
 #ifdef CONFIG_MDM_HSIC_PM
 	/*
@@ -222,10 +229,18 @@ static int s5p_ehci_suspend(struct device *dev)
 		return -EBUSY;
 	}
 	rc = 0;
+#elif defined(CONFIG_SEC_MODEM_V2)
+	rc = get_hostwake_state();
+	if (rc) {
+		pr_info("%s: suspend fail by host wakeup irq\n", __func__);
+		pm_runtime_resume(&pdev->dev);
+		return -EBUSY;
+	}
+#else
+	rc = 0;
 #endif
-
 	if (time_before(jiffies, ehci->next_statechange))
-		msleep(10);
+		usleep_range(10000, 11000);
 
 	/* Root hub was already suspended. Disable irq emission and
 	 * mark HW unaccessible, bail out if RH has been resumed. Use
@@ -278,7 +293,7 @@ static int s5p_ehci_resume(struct device *dev)
 	}
 
 	if (time_before(jiffies, ehci->next_statechange))
-		msleep(10);
+		usleep_range(10000, 11000);
 
 	/* Mark hardware accessible again as we are out of D3 state by now */
 	set_bit(HCD_FLAG_HW_ACCESSIBLE, &hcd->flags);
@@ -318,15 +333,24 @@ static int s5p_ehci_resume(struct device *dev)
 	wait_dev_pwr_stat(hsic_pm_dev, POWER_ON);
 #endif
 #if defined(CONFIG_LINK_DEVICE_HSIC) || defined(CONFIG_LINK_DEVICE_USB) \
-		|| defined(CONFIG_MDM_HSIC_PM)
+	|| defined(CONFIG_MDM_HSIC_PM)
 	s5p_wait_for_cp_resume(pdev, hcd);
+	pm_runtime_mark_last_busy(&hcd->self.root_hub->dev);
 #endif
 	return 0;
 }
 
+int s5p_ehci_bus_resume(struct usb_hcd *hcd)
+{
+	/* When suspend is failed, re-enable clocks & PHY */
+	pm_runtime_resume(hcd->self.controller);
+
+	return ehci_bus_resume(hcd);
+}
 #else
 #define s5p_ehci_suspend	NULL
 #define s5p_ehci_resume		NULL
+#define s5p_ehci_bus_resume	NULL
 #endif
 
 #ifdef CONFIG_USB_SUSPEND
@@ -339,6 +363,12 @@ static int s5p_ehci_runtime_suspend(struct device *dev)
 		pdata->phy_suspend(pdev, S5P_USB_PHY_HOST);
 #ifdef CONFIG_MDM_HSIC_PM
 	request_active_lock_release(hsic_pm_dev);
+#endif
+
+#if defined(CONFIG_LINK_DEVICE_HSIC)
+	pr_info("%s: usage=%d, child=%d\n", __func__,
+					atomic_read(&dev->power.usage_count),
+					atomic_read(&dev->power.child_count));
 #endif
 	return 0;
 }
@@ -387,11 +417,15 @@ static int s5p_ehci_runtime_resume(struct device *dev)
 		wait_dev_pwr_stat(hsic_pm_dev, POWER_ON);
 #endif
 #if defined(CONFIG_LINK_DEVICE_HSIC) || defined(CONFIG_LINK_DEVICE_USB) \
-		|| defined(CONFIG_MDM_HSIC_PM)
+			|| defined(CONFIG_MDM_HSIC_PM)
 		s5p_wait_for_cp_resume(pdev, hcd);
 #endif
 	}
-
+#if defined(CONFIG_LINK_DEVICE_HSIC)
+	pr_info("%s: usage=%d, child=%d\n", __func__,
+					atomic_read(&dev->power.usage_count),
+					atomic_read(&dev->power.child_count));
+#endif
 	return 0;
 }
 #else
@@ -421,8 +455,8 @@ static const struct hc_driver s5p_ehci_hc_driver = {
 
 	.hub_status_data	= ehci_hub_status_data,
 	.hub_control		= ehci_hub_control,
+	.bus_resume		= s5p_ehci_bus_resume,
 	.bus_suspend		= ehci_bus_suspend,
-	.bus_resume		= ehci_bus_resume,
 
 	.relinquish_port	= ehci_relinquish_port,
 	.port_handed_over	= ehci_port_handed_over,
@@ -459,6 +493,10 @@ static ssize_t store_ehci_power(struct device *dev,
 
 	if (!power_on && s5p_ehci->power_on) {
 		printk(KERN_DEBUG "%s: EHCI turns off\n", __func__);
+#if defined(CONFIG_LINK_DEVICE_HSIC) || defined(CONFIG_LINK_DEVICE_USB)
+		if (hcd->self.root_hub)
+			pm_runtime_forbid(&hcd->self.root_hub->dev);
+#endif
 		pm_runtime_forbid(dev);
 		s5p_ehci->power_on = 0;
 		usb_remove_hcd(hcd);
@@ -504,8 +542,12 @@ static ssize_t store_ehci_power(struct device *dev,
 		/*HSIC IPC control the ACTIVE_STATE*/
 		if (pdata && pdata->noti_host_states)
 			pdata->noti_host_states(pdev, S5P_HOST_ON);
-#endif
+
+		/* mif allow the ehci runtime after enumeration */
+		pm_runtime_forbid(dev);
+#else
 		pm_runtime_allow(dev);
+#endif
 	}
 exit:
 	device_unlock(dev);
@@ -627,6 +669,7 @@ static int __devinit s5p_ehci_probe(struct platform_device *pdev)
 	s5p_ehci = kzalloc(sizeof(struct s5p_ehci_hcd), GFP_KERNEL);
 	if (!s5p_ehci)
 		return -ENOMEM;
+
 	s5p_ehci->dev = &pdev->dev;
 
 	hcd = usb_create_hcd(&s5p_ehci_hc_driver, &pdev->dev,

@@ -16,6 +16,32 @@
 
 #include <linux/skbuff.h>
 #include <linux/usb.h>
+#include <linux/types.h>
+
+#if \
+	defined(CONFIG_ALPHA) || defined(CONFIG_AVR32) || \
+	defined(CONFIG_BLACKFIN) || defined(CONFIG_CRIS) || \
+	defined(CONFIG_H8300) || defined(CONFIG_IA64) || \
+	defined(CONFIG_M68K) ||  defined(CONFIG_MIPS) || \
+	defined(CONFIG_PARISC) || defined(CONFIG_S390) || \
+	defined(CONFIG_PPC64) || defined(CONFIG_PPC32) || \
+	defined(CONFIG_SUPERH) || defined(CONFIG_SPARC) || \
+	defined(CONFIG_FRV) || defined(CONFIG_X86) || \
+	defined(CONFIG_M32R) || defined(CONFIG_M68K) || \
+	defined(CONFIG_MN10300) || defined(CONFIG_XTENSA)
+#include <asm/atomic.h>
+#else
+typedef struct {
+	volatile int counter;
+} atomic_t;
+
+#ifdef CONFIG_64BIT
+typedef struct {
+	volatile long counter;
+} atomic64_t;
+#endif /* CONFIG_64BIT */
+
+#endif
 
 #define  PCI_EXP_LNKCTL_ES     0x0080  /* Extended Synch */
 

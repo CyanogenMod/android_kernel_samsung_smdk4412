@@ -327,6 +327,10 @@ extern void midas_config_sleep_gpio_table(void);
 #define ESC_PHONE_ACTIVE_IRQ	IRQ_EINT(12)
 #define GPIO_ESC_DPRAM_INT		EXYNOS4_GPX3(5)
 #define ESC_DPRAM_INT_IRQ		IRQ_EINT(29)
+
+#if defined(CONFIG_SIM_SLOT_SWITCH)
+#define GPIO_UIM_SIM_SEL	EXYNOS4212_GPM0(7)
+#endif
 #endif
 
 #endif /* __MACH_GPIO_C1_H */

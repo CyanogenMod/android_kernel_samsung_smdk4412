@@ -556,7 +556,7 @@ int mmc_bus_test(struct mmc_card *card, u8 bus_width)
 }
 
 static int mmc_send_cmd(struct mmc_host *host,
-			u32 opcode, u32 arg, unsigned int flags, u32 *resp)
+		u32 opcode, u32 arg, unsigned int flags, u32 *resp)
 {
 	int err;
 	struct mmc_command cmd;
@@ -589,15 +589,15 @@ static int mmc_movi_cmd(struct mmc_host *host, u32 arg)
 	if (!err)
 		do {
 			err = mmc_send_cmd(host, MMC_SEND_STATUS,
-				host->card->rca << 16,
-				MMC_RSP_SPI_R2 | MMC_RSP_R1 | MMC_CMD_AC,
-				&resp);
+					host->card->rca << 16,
+					MMC_RSP_SPI_R2 | MMC_RSP_R1 | MMC_CMD_AC,
+					&resp);
 			if (err) {
 				printk(KERN_ERR "CMD13(VC) failed\n");
 				break;
-				}
+			}
 			/*wait until READY_FOR_DATA*/
-			} while (!(resp & 1<<8));
+		} while (!(resp & 1<<8));
 
 	return err;
 }
@@ -608,36 +608,36 @@ static int mmc_movi_erase_cmd(struct mmc_host *host, u32 arg1, u32 arg2)
 	u32 resp;
 
 	err = mmc_send_cmd(host, MMC_ERASE_GROUP_START, arg1,
-					MMC_RSP_R1 | MMC_CMD_AC, &resp);
+			MMC_RSP_R1 | MMC_CMD_AC, &resp);
 	if (err)
 		return err;
 
 	err = mmc_send_cmd(host, MMC_ERASE_GROUP_END, arg2,
-					MMC_RSP_R1 | MMC_CMD_AC, &resp);
+			MMC_RSP_R1 | MMC_CMD_AC, &resp);
 	if (err)
 		return err;
 
 	err = mmc_send_cmd(host, MMC_ERASE, 0,
-					MMC_RSP_R1B | MMC_CMD_AC, &resp);
+			MMC_RSP_R1B | MMC_CMD_AC, &resp);
 	if (!err)
 		do {
 			err = mmc_send_cmd(host, MMC_SEND_STATUS,
-				host->card->rca << 16,
-				MMC_RSP_SPI_R2 | MMC_RSP_R1 | MMC_CMD_AC,
-				&resp);
+					host->card->rca << 16,
+					MMC_RSP_SPI_R2 | MMC_RSP_R1 | MMC_CMD_AC,
+					&resp);
 			if (err) {
 				printk(KERN_ERR "CMD13(VC) failed\n");
 				break;
-				}
+			}
 			/*wait until READY_FOR_DATA*/
-			} while (!(resp & 1<<8));
+		} while (!(resp & 1<<8));
 
 	return err;
 }
 
 
 static int mmc_movi_read_req(struct mmc_card *card,
-					void *data_buf, u32 arg, u32 blocks)
+		void *data_buf, u32 arg, u32 blocks)
 {
 	struct mmc_request mrq = {0};
 	struct mmc_command cmd = {0};
@@ -652,6 +652,7 @@ static int mmc_movi_read_req(struct mmc_card *card,
 		cmd.opcode = MMC_READ_MULTIPLE_BLOCK;
 	else
 		cmd.opcode = MMC_READ_SINGLE_BLOCK;
+
 	cmd.arg = arg;
 
 	cmd.flags = MMC_RSP_SPI_R1 | MMC_RSP_R1 | MMC_CMD_ADTC;
@@ -677,8 +678,9 @@ static int mmc_movi_read_req(struct mmc_card *card,
 	return 0;
 }
 
-#define MOVI_CONT_VHX0	0x56485830
-#define MOVI_CONT_VMX0	0x564D5830
+#define MOVI_CONT_VHX0	0x56485830	// VHX0
+#define MOVI_CONT_VHX2	0x56483230	// VH20
+#define MOVI_CONT_VMX0	0x564D5830	// VMX0
 
 int mmc_start_movi_smart(struct mmc_card *card)
 {
@@ -710,15 +712,18 @@ int mmc_start_movi_smart(struct mmc_card *card)
 
 	movi_ver = ((data_buf[312] << 24) | (data_buf[313] << 16) |
 			(data_buf[314] << 8) | data_buf[315]);
+
 	if (movi_ver == MOVI_CONT_VMX0)
 		ret = MMC_MOVI_VER_VMX0;
 	else if (movi_ver == MOVI_CONT_VHX0)
 		ret = MMC_MOVI_VER_VHX0;
+	else if (movi_ver == MOVI_CONT_VHX2)
+		ret = MMC_MOVI_VER_VHX2;
 	else
 		ret = 0x0;
 
 	date = ((data_buf[327] << 24) | (data_buf[326] << 16) |
-				(data_buf[325] << 8) | data_buf[324]);
+			(data_buf[325] << 8) | data_buf[324]);
 
 	card->movi_fwver = data_buf[320];
 	card->movi_fwdate = date;
@@ -788,11 +793,7 @@ int mmc_send_hpi_cmd(struct mmc_card *card, u32 *status)
 
 	opcode = card->ext_csd.hpi_cmd;
 	if (opcode == MMC_STOP_TRANSMISSION)
-#ifdef CONFIG_WIMAX_CMC
-		cmd.flags = MMC_RSP_R1 | MMC_CMD_AC;
-#else
 		cmd.flags = MMC_RSP_R1B | MMC_CMD_AC;
-#endif
 	else if (opcode == MMC_SEND_STATUS)
 		cmd.flags = MMC_RSP_R1 | MMC_CMD_AC;
 

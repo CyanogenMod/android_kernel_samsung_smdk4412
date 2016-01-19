@@ -614,6 +614,8 @@ int fc8150_init(HANDLE hDevice)
 	bbm_write(hDevice, 0x1004, 0x4d);
 	bbm_write(hDevice, 0x1069, 0x09);
 	bbm_write(hDevice, 0x1075, 0x00);
+	bbm_write(hDevice, 0x1083, 0x14);
+	bbm_write(hDevice, 0x1084, 0x0f);
 
 	bbm_word_write(hDevice, 0x00b4, 0x0000);
 	/*bbm_write(hDevice, 0x00b6, 0x03);*/ /* Default 0x03, 0x00, 0x07*/
@@ -770,9 +772,9 @@ int fc8150_scan_status(HANDLE hDevice)
 		return BBM_NOK;
 
 	if (((0x70 & data) == 0x40) && ((0x1c & data1) == 0x18))
-		ts_err_free_timeout = 400;
+		ts_err_free_timeout = 40;
 	else
-		ts_err_free_timeout = 650;
+		ts_err_free_timeout = 65;
 
 	for (i = 0; i < ts_err_free_timeout; i++) {
 		bbm_read(hDevice, 0x5053, &data);

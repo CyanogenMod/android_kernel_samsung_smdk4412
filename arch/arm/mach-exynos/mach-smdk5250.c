@@ -227,24 +227,6 @@ static struct exynos5_fimc_is_sensor_info s5k6a3= {
 #endif
 #endif
 
-#ifdef CONFIG_EXYNOS_C2C
-struct exynos_c2c_platdata smdk5250_c2c_pdata = {
-	.setup_gpio	= NULL,
-	.shdmem_addr	= C2C_SHAREDMEM_BASE,
-	.shdmem_size	= C2C_MEMSIZE_64,
-	.ap_sscm_addr	= NULL,
-	.cp_sscm_addr	= NULL,
-	.rx_width	= C2C_BUSWIDTH_16,
-	.tx_width	= C2C_BUSWIDTH_16,
-	.clk_opp100	= 400,
-	.clk_opp50	= 200,
-	.clk_opp25	= 100,
-	.default_opp_mode	= C2C_OPP50,
-	.get_c2c_state	= NULL,
-	.c2c_sysreg	= S5P_VA_CMU + 0x6000,
-};
-#endif
-
 #ifdef CONFIG_VIDEO_FIMG2D
 static struct fimg2d_platdata fimg2d_data __initdata = {
 	.hw_ver		= 0x42,
@@ -716,9 +698,6 @@ static struct platform_device *smdk5250_devices[] __initdata = {
 #ifdef CONFIG_S5P_DEV_ACE
 	&s5p_device_ace,
 #endif
-#ifdef CONFIG_EXYNOS_C2C
-	&exynos_device_c2c,
-#endif
 	&exynos5_device_ahci,
 };
 
@@ -737,6 +716,16 @@ static void __init exynos_reserve_mem(void)
 			.size = 30 * SZ_1M,
 			.start = 0
 		},
+#ifdef CONFIG_EXYNOS_C2C
+		{
+			.name = "c2c_shdmem",
+			.size = C2C_SHAREDMEM_SIZE,
+			{
+				.alignment = C2C_SHAREDMEM_SIZE,
+			},
+			.start = 0
+		},
+#endif
 #ifdef CONFIG_VIDEO_SAMSUNG_MEMSIZE_GSC0
 		{
 			.name = "gsc0",
@@ -1249,9 +1238,6 @@ static void __init smdk5250_machine_init(void)
 	exynos5_gsc_set_parent_clock("aclk_300_gscl", "dout_aclk_300_gscl");
 	exynos5_gsc_set_clock_rate("dout_aclk_300_gscl", 310000000);
 #endif
-#ifdef CONFIG_EXYNOS_C2C
-	exynos_c2c_set_platdata(&smdk5250_c2c_pdata);
-#endif
 #ifdef CONFIG_VIDEO_JPEG_V2X
 	exynos5_jpeg_setup_clock(&s5p_device_jpeg.dev, 150000000);
 #endif
@@ -1286,31 +1272,10 @@ static void __init smdk5250_machine_init(void)
 	register_reboot_notifier(&exynos5_reboot_notifier);
 }
 
-#ifdef CONFIG_EXYNOS_C2C
-static void __init exynos_c2c_reserve(void)
-{
-	static struct cma_region regions[] = {
-		{
-			.name = "c2c_shdmem",
-			.size = 64 * SZ_1M,
-			{ .alignment	= 64 * SZ_1M },
-			.start = C2C_SHAREDMEM_BASE
-		}, {
-			.size = 0,
-		}
-	};
-
-	s5p_cma_region_reserve(regions, NULL, 0, NULL);
-}
-#endif
-
 MACHINE_START(SMDK5250, "SMDK5250")
 	.boot_params	= S5P_PA_SDRAM + 0x100,
 	.init_irq	= exynos5_init_irq,
 	.map_io		= smdk5250_map_io,
 	.init_machine	= smdk5250_machine_init,
 	.timer		= &exynos4_timer,
-#ifdef CONFIG_EXYNOS_C2C
-	.reserve	= &exynos_c2c_reserve,
-#endif
 MACHINE_END

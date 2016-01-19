@@ -330,7 +330,7 @@ static void mdm_modem_shutdown(struct platform_device *pdev)
 static void modem_complete(struct device *pdev)
 {
 	struct mdm_platform_data *pdata;
-
+       
 	if (!pdev) {
 		pr_err("pdev is null!!\n");
 		return;

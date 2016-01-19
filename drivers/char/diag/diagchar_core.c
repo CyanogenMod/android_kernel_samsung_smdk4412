@@ -224,6 +224,11 @@ static int diagchar_close(struct inode *inode, struct file *file)
 #ifdef CONFIG_DIAG_HSIC_PIPE
 	if (driver->logging_mode == MEMORY_DEVICE_MODE)
 		queue_work(driver->diag_hsic_wq, &driver->diag_disconnect_work);
+
+	if (driver->silent_log_pid) {
+		put_pid(driver->silent_log_pid);
+		driver->silent_log_pid = NULL;
+	}
 #endif
 
 #ifdef CONFIG_DIAG_OVER_USB
@@ -425,6 +430,10 @@ long diagchar_ioctl(struct file *filp,
 		} else
 			driver->sub_logging_mode = NO_LOGGING_MODE;
 		driver->logging_process_id = current->tgid;
+
+#ifdef CONFIG_DIAG_HSIC_PIPE
+		driver->silent_log_pid = get_pid(task_pid(current));
+#endif
 		mutex_unlock(&driver->diagchar_mutex);
 		if (temp == MEMORY_DEVICE_MODE && driver->logging_mode
 							== NO_LOGGING_MODE) {

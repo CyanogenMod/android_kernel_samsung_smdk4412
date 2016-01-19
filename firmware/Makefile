@@ -31,9 +31,15 @@ ifdef CONFIG_MACH_T0
 fw-shipped-$(CONFIG_VIDEO_S5C73M3) += SlimISP_ZK.bin \
 				      SlimISP_GK.bin
 else
-ifdef CONFIG_MACH_BAFFIN
+ifdef CONFIG_MACH_M3_USA_TMO
 fw-shipped-$(CONFIG_VIDEO_S5C73M3) += SlimISP_ZK.bin \
 				      SlimISP_GK.bin
+else
+ifdef CONFIG_MACH_BAFFIN
+fw-shipped-$(CONFIG_VIDEO_S5C73M3) += SlimISP_ZK.bin \
+				      SlimISP_GK.bin \
+				      SlimISP_BK.bin \
+				      SlimISP_GM.bin
 else
 ifdef CONFIG_MACH_GRANDE
 fw-shipped-$(CONFIG_VIDEO_S5C73M3) += SlimISP_GJ.bin
@@ -47,7 +53,9 @@ endif
 endif
 endif
 endif
+endif
 
+fw-shipped-$(CONFIG_RMI4_FWLIB) += rmi4/KONA-E036.img
 fw-shipped-$(CONFIG_3C359) += 3com/3C359.bin
 fw-shipped-$(CONFIG_ACENIC) += $(acenic-objs)
 fw-shipped-$(CONFIG_ADAPTEC_STARFIRE) += adaptec/starfire_rx.bin \
@@ -170,19 +178,26 @@ fw-shipped-$(CONFIG_EPEN_WACOM_G9PM) += epen/W9001_B746.bin epen/W9001_B713.bin 
 			epen/W9001_B746VZW.bin epen/W9001_B746USC.bin \
 			epen/W9001_0700.bin
 fw-shipped-$(CONFIG_EPEN_WACOM_G9PL) += epen/W9002_B781.bin
+fw-shipped-$(CONFIG_KEYBOARD_TC370L_TOUCHKEY) += coreriver/tc370.fw
 
 #for sensorhub
-fw-shipped-$(CONFIG_SENSORS_SSP) += ssp.fw
+fw-shipped-$(CONFIG_SENSORS_SSP_STM) += ssp_b.fw
+fw-shipped-$(CONFIG_SENSORS_SSP_ATMEL) += ssp.fw
 fw-shipped-$(CONFIG_SENSORS_SSP) += ssp_crashed.fw
 
 TSPFIRMWARE_DIRECTORY = $(srctree)/firmware/tsp_atmel
 ifeq ($(shell test -d $(TSPFIRMWARE_DIRECTORY) && echo yes),yes)
+fw-shipped-$(CONFIG_TOUCHSCREEN_ATMEL_MXT224E) += tsp_atmel/mXT224e.fw
 fw-shipped-$(CONFIG_TOUCHSCREEN_ATMEL_MXT540E) += tsp_atmel/mXT540E.fw
-fw-shipped-$(CONFIG_TOUCHSCREEN_ATMEL_MXT540S) += tsp_atmel/mXT540S.fw
+fw-shipped-$(CONFIG_TOUCHSCREEN_ATMEL_MXT540S) += tsp_atmel/mXT540Sg.fw tsp_atmel/mXT540Si.fw
 fw-shipped-$(CONFIG_TOUCHSCREEN_MXT768E) += tsp_atmel/mXT768E.fw
 fw-shipped-$(CONFIG_TOUCHSCREEN_ATMEL_MXT1664S) += tsp_atmel/mXT1664S.fw
+fw-shipped-$(CONFIG_TOUCHSCREEN_ATMEL_MXT1188S) += tsp_atmel/mXT1188S.fw
+fw-shipped-$(CONFIG_TOUCHSCREEN_ATMEL_MXT1188S) += tsp_atmel/mXT1188S_4G.fw
+fw-shipped-$(CONFIG_TOUCHSCREEN_ATMEL_MXT1188S) += tsp_atmel/mXT1188S_old.fw
+fw-shipped-$(CONFIG_TOUCHSCREEN_ATMEL_MXTS) += tsp_atmel/mXT336S.fw
 else
-$(warning '$(TSPFIRMWARE_DIRECTORY)' directory dose not exist)
+$(warning '$(TSPFIRMWARE_DIRECTORY)' directory does not exist)
 endif
 
 TSPFIRMWARE_DIRECTORY_MEL = $(srctree)/firmware/tsp_melfas
@@ -191,7 +206,7 @@ fw-shipped-$(CONFIG_TOUCHSCREEN_MELFAS) += tsp_melfas/CORE.fw
 fw-shipped-$(CONFIG_TOUCHSCREEN_MELFAS) += tsp_melfas/PRIV.fw
 fw-shipped-$(CONFIG_TOUCHSCREEN_MELFAS) += tsp_melfas/PUBL.fw
 else
-$(warning '$(TSPFIRMWARE_DIRECTORY)' directory dose not exist)
+$(warning '$(TSPFIRMWARE_DIRECTORY_MEL)' directory does not exist)
 endif
 
 TSPFIRMWARE_DIRECTORY_MEL_GC = $(srctree)/firmware/tsp_melfas/gc
@@ -206,19 +221,59 @@ fw-shipped-$(CONFIG_TOUCHSCREEN_MELFAS_GC) += tsp_melfas/gc/C_CORE.fw
 fw-shipped-$(CONFIG_TOUCHSCREEN_MELFAS_GC) += tsp_melfas/gc/C_PRIV.fw
 fw-shipped-$(CONFIG_TOUCHSCREEN_MELFAS_GC) += tsp_melfas/gc/C_PUBL.fw
 else
-$(warning '$(TSPFIRMWARE_DIRECTORY)' directory dose not exist)
+$(warning '$(TSPFIRMWARE_DIRECTORY_MEL_GC)' directory does not exist)
+endif
+
+TSPFIRMWARE_DIRECTORY_MEL_W = $(srctree)/firmware/tsp_melfas/w
+ifeq ($(shell test -d $(TSPFIRMWARE_DIRECTORY_MEL_W) && echo yes),yes)
+fw-shipped-$(CONFIG_TOUCHSCREEN_MELFAS_W) += tsp_melfas/w/CORE.fw
+fw-shipped-$(CONFIG_TOUCHSCREEN_MELFAS_W) += tsp_melfas/w/PRIV.fw
+fw-shipped-$(CONFIG_TOUCHSCREEN_MELFAS_W) += tsp_melfas/w/PUBL.fw
+fw-shipped-$(CONFIG_TOUCHSCREEN_MELFAS_W) += tsp_melfas/w/mms_ts_w.fw
+fw-shipped-$(CONFIG_TOUCHSCREEN_MELFAS_W) += tsp_melfas/w/mms_ts_w_config.fw
+else
+$(warning '$(TSPFIRMWARE_DIRECTORY_MEL_W)' directory does not exist)
 endif
 
 TSPFIRMWARE_DIRECTORY_MEL_NOTE = $(srctree)/firmware/tsp_melfas/note
 ifeq ($(shell test -d $(TSPFIRMWARE_DIRECTORY_MEL_NOTE) && echo yes),yes)
-fw-shipped-$(CONFIG_TOUCHSCREEN_MELFAS_NOTE) += tsp_melfas/note/melfasl.fw
-fw-shipped-$(CONFIG_TOUCHSCREEN_MELFAS_NOTE) += tsp_melfas/note/melfasm.fw
+fw-shipped-$(CONFIG_TOUCHSCREEN_MELFAS_NOTE) += tsp_melfas/note/melfas.fw
 fw-shipped-$(CONFIG_TOUCHSCREEN_MELFAS_NOTE) += tsp_melfas/note/BOOT.fw
 fw-shipped-$(CONFIG_TOUCHSCREEN_MELFAS_NOTE) += tsp_melfas/note/CORE.fw
-fw-shipped-$(CONFIG_TOUCHSCREEN_MELFAS_NOTE) += tsp_melfas/note/CONFL.fw
-fw-shipped-$(CONFIG_TOUCHSCREEN_MELFAS_NOTE) += tsp_melfas/note/CONFM.fw
+fw-shipped-$(CONFIG_TOUCHSCREEN_MELFAS_NOTE) += tsp_melfas/note/CONF.fw
+fw-shipped-$(CONFIG_TOUCHSCREEN_MELFAS_NOTE) += tsp_melfas/note/mms_boot.fw
 else
-$(warning '$(TSPFIRMWARE_DIRECTORY)' directory dose not exist)
+$(warning '$(TSPFIRMWARE_DIRECTORY_MEL_NOTE)' directory does not exist)
+endif
+
+TSPFIRMWARE_DIRECTORY_MEL_TAB3 = $(srctree)/firmware/tsp_melfas/tab3
+ifeq ($(shell test -d $(TSPFIRMWARE_DIRECTORY_MEL_TAB3) && echo yes),yes)
+fw-shipped-$(CONFIG_TOUCHSCREEN_MMS152_TAB3) += tsp_melfas/tab3/melfas.fw
+fw-shipped-$(CONFIG_TOUCHSCREEN_MMS152_TAB3) += tsp_melfas/tab3/BOOT.fw
+fw-shipped-$(CONFIG_TOUCHSCREEN_MMS152_TAB3) += tsp_melfas/tab3/CORE.fw
+fw-shipped-$(CONFIG_TOUCHSCREEN_MMS152_TAB3) += tsp_melfas/tab3/CONF.fw
+fw-shipped-$(CONFIG_TOUCHSCREEN_MMS152_TAB3) += tsp_melfas/tab3/mms_boot.fw
+else
+$(warning '$(TSPFIRMWARE_DIRECTORY_MEL_TAB3)' directory does not exist)
+endif
+
+TSPFIRMWARE_DIRECTORY_MEL_MMS252 = $(srctree)/firmware/tsp_melfas/lt
+ifeq ($(shell test -d $(TSPFIRMWARE_DIRECTORY_MEL_MMS252) && echo yes),yes)
+fw-shipped-$(CONFIG_TOUCHSCREEN_MMS252) += tsp_melfas/lt/melfas_yf.fw
+fw-shipped-$(CONFIG_TOUCHSCREEN_MMS252) += tsp_melfas/lt/melfas_wt.fw
+fw-shipped-$(CONFIG_TOUCHSCREEN_MMS252) += tsp_melfas/lt/melfas_ij.fw
+else
+$(warning '$(TSPFIRMWARE_DIRECTORY_MEL_MMS252)' directory does not exist)
+endif
+
+TSPFIRMWARE_DIRECTORY_MEL_GD2 = $(srctree)/firmware/tsp_melfas/gd2
+ifeq ($(shell test -d $(TSPFIRMWARE_DIRECTORY_MEL_GD2) && echo yes),yes)
+fw-shipped-$(CONFIG_TOUCHSCREEN_MELFAS_GD2) += tsp_melfas/gd2/melfas.fw
+fw-shipped-$(CONFIG_TOUCHSCREEN_MELFAS_GD2) += tsp_melfas/gd2/BOOT.fw
+fw-shipped-$(CONFIG_TOUCHSCREEN_MELFAS_GD2) += tsp_melfas/gd2/CORE.fw
+fw-shipped-$(CONFIG_TOUCHSCREEN_MELFAS_GD2) += tsp_melfas/gd2/CONF.fw
+else
+$(warning '$(TSPFIRMWARE_DIRECTORY_MEL_GD2)' directory does not exist)
 endif
 
 fw-shipped-$(CONFIG_AUDIENCE_ES305) += audience/es305_fw.bin

@@ -392,8 +392,14 @@ unsigned int iChecksumTarget;
 #elif defined(CONFIG_MACH_M0) || defined(CONFIG_MACH_C1) || \
 	defined(CONFIG_MACH_M3)
 #include "touchkey_fw_M0.h"
-#elif defined(CONFIG_MACH_T0)
+#elif defined(CONFIG_MACH_T0) || defined(CONFIG_MACH_GD2)
 #include "touchkey_fw_T0.h"
+#elif defined(CONFIG_MACH_SUPERIOR_KOR_SKT)
+#include "touchkey_fw_SUPERIOR.h"
+#elif defined(CONFIG_MACH_U1_KOR_LGT)
+#include "touchkey_fw_U1-LGT.h"
+#elif defined(CONFIG_MACH_ZEST)
+#include "touchkey_fw_ZEST.h"
 #else
 #include "touchkey_fw_U1.h"
 #endif

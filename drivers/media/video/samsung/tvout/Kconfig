@@ -128,6 +128,17 @@ config USER_ALLOC_TVOUT
 	  TV Driver doesn't allocate memory for frame buffer.
 	  So, before enabling TV out, the frame buffer should be allocated.
 
+config USE_TVOUT_CMA
+	bool "Allocate vp buffer memory on CMA heap. (EXPERIMENTAL)"
+	depends on VIDEO_TVOUT && DMA_CMA
+	default n
+	---help---
+	  TV Driver doesn't reserve memory for vp buffer.
+	  Depending on the connection status of HDMI/MHL cable,
+	  vp buffer will be allocated or deallocated on CMA heap.
+	  This means that vp memory can be utilized for normal usage
+	  while TVOUT driver is not working.
+
 config TV_FB_NUM
 	int "Index of TVOUT frame buffer"
 	depends on VIDEO_TVOUT && TV_FB && !USER_ALLOC_TVOUT

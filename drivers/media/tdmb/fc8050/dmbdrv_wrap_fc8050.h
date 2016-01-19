@@ -47,6 +47,8 @@ struct sub_channel_info_type {
 	unsigned char user_appl_length[USER_APPL_NUM_MAX];
 	unsigned char user_appl_data
 		[USER_APPL_NUM_MAX][USER_APPL_DATA_SIZE_MAX];
+	unsigned char scids;
+	unsigned char ecc;
 };
 
 void dmb_drv_isr(void);
@@ -61,6 +63,10 @@ char *dmb_drv_get_sub_ch_dab_label(int subchannel_count);
 struct sub_channel_info_type *dmb_drv_get_fic_dmb(int subchannel_count);
 struct sub_channel_info_type *dmb_drv_get_fic_dab(int subchannel_count);
 unsigned char dmb_drv_set_ch(
+	unsigned long frequency
+	, unsigned char subchannel
+	, unsigned char sevice_type);
+unsigned char dmb_drv_set_ch_factory(
 	unsigned long frequency
 	, unsigned char subchannel
 	, unsigned char sevice_type);

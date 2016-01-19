@@ -2217,7 +2217,9 @@ struct usb_hcd *usb_create_shared_hcd(const struct hc_driver *driver,
 			return NULL;
 		}
 		mutex_init(hcd->bandwidth_mutex);
+#if !defined(CONFIG_USB_EHCI_S5P) && !defined(USB_OHCI_S5P)		
 		dev_set_drvdata(dev, hcd);
+#endif		
 	} else {
 		hcd->bandwidth_mutex = primary_hcd->bandwidth_mutex;
 		hcd->primary_hcd = primary_hcd;

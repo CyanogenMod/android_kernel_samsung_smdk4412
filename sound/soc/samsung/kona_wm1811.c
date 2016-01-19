@@ -203,6 +203,17 @@ static void kona_gpio_init(void)
 	gpio_set_value(GPIO_LINEOUT_EN, 0);
 	gpio_free(GPIO_LINEOUT_EN);
 #endif
+
+#if defined(CONFIG_SND_USE_EXTERNAL_LDO_FOR_EARMICBIAS)
+	err = gpio_request(GPIO_EAR_SND_SEL, "EAR_SND_SEL");
+	if (err) {
+		pr_err(KERN_ERR "EAR_SND_SEL GPIO set error!\n");
+		return;
+	}
+	gpio_direction_output(GPIO_EAR_SND_SEL, 0);
+	gpio_set_value(GPIO_EAR_SND_SEL, 0);
+	gpio_free(GPIO_EAR_SND_SEL);
+#endif
 }
 
 static const struct soc_enum lineout_mode_enum[] = {
@@ -436,6 +447,28 @@ static int set_ext_submicbias(struct snd_soc_dapm_widget *w,
 	return 0;
 }
 
+#if defined(CONFIG_SND_USE_EXTERNAL_LDO_FOR_EARMICBIAS)
+static int set_ext_earmicbias(struct snd_soc_dapm_widget *w,
+				struct snd_kcontrol *kcontrol, int event)
+{
+	struct snd_soc_codec *codec = w->codec;
+
+	dev_info(codec->dev, "%s event is %02X", w->name, event);
+
+	switch (event) {
+	case SND_SOC_DAPM_PRE_PMU:
+		gpio_set_value(GPIO_EAR_SND_SEL, 1);
+		msleep(100);
+		break;
+	case SND_SOC_DAPM_POST_PMD:
+		gpio_set_value(GPIO_EAR_SND_SEL, 0);
+		break;
+	}
+
+	return 0;
+}
+#endif
+
 static int set_lineout_switch(struct snd_soc_dapm_widget *w,
 			     struct snd_kcontrol *kcontrol, int event)
 {
@@ -634,8 +667,13 @@ static void jack_set_type(struct wm1811_machine_priv *wm1811, int jack_type)
 
 			if (wm8994->pdata->jd_ext_cap) {
 				mutex_lock(&wm1811->codec->mutex);
+#if defined(CONFIG_SND_USE_EXTERNAL_LDO_FOR_EARMICBIAS)
+				snd_soc_dapm_disable_pin(&wm1811->codec->dapm,
+							"Headset ext Mic");
+#else
 				snd_soc_dapm_disable_pin(&wm1811->codec->dapm,
 							 "MICBIAS2");
+#endif							 
 				snd_soc_dapm_sync(&wm1811->codec->dapm);
 				mutex_unlock(&wm1811->codec->mutex);
 			}
@@ -904,6 +942,9 @@ static const struct snd_kcontrol_new kona_controls[] = {
 	SOC_DAPM_PIN_SWITCH("Main Mic"),
 	SOC_DAPM_PIN_SWITCH("Sub Mic"),
 	SOC_DAPM_PIN_SWITCH("Headset Mic"),
+#if defined(CONFIG_SND_USE_EXTERNAL_LDO_FOR_EARMICBIAS)
+	SOC_DAPM_PIN_SWITCH("Headset ext Mic"),
+#endif
 
 	SOC_ENUM_EXT("AIF2 Mode", aif2_mode_enum[0],
 		get_aif2_mode, set_aif2_mode),
@@ -932,6 +973,9 @@ const struct snd_soc_dapm_widget kona_dapm_widgets[] = {
 	SND_SOC_DAPM_LINE("LINE", set_lineout_switch),
 	SND_SOC_DAPM_LINE("HDMI", NULL),
 
+#if defined(CONFIG_SND_USE_EXTERNAL_LDO_FOR_EARMICBIAS)
+	SND_SOC_DAPM_MIC("Headset ext Mic", set_ext_earmicbias),
+#endif
 	SND_SOC_DAPM_MIC("Headset Mic", NULL),
 	SND_SOC_DAPM_MIC("Main Mic", set_ext_micbias),
 	SND_SOC_DAPM_MIC("Sub Mic", set_ext_submicbias),
@@ -964,6 +1008,9 @@ const struct snd_soc_dapm_route kona_dapm_routes[] = {
 	{ "IN1RP", NULL, "MICBIAS2" },
 	{ "IN1RN", NULL, "MICBIAS2" },
 	{ "MICBIAS2", NULL, "Headset Mic" },
+#if defined(CONFIG_SND_USE_EXTERNAL_LDO_FOR_EARMICBIAS)
+	{ "MICBIAS2", NULL, "Headset ext Mic" },
+#endif
 };
 
 static struct snd_soc_dai_driver kona_ext_dai[] = {
@@ -1152,6 +1199,9 @@ static int kona_wm1811_init_paiftx(struct snd_soc_pcm_runtime *rtd)
 	snd_soc_dapm_ignore_suspend(&codec->dapm, "SPK");
 	snd_soc_dapm_ignore_suspend(&codec->dapm, "HP");
 	snd_soc_dapm_ignore_suspend(&codec->dapm, "Headset Mic");
+#if defined(CONFIG_SND_USE_EXTERNAL_LDO_FOR_EARMICBIAS)
+	snd_soc_dapm_ignore_suspend(&codec->dapm, "Headset ext Mic");
+#endif
 	snd_soc_dapm_ignore_suspend(&codec->dapm, "Sub Mic");
 	snd_soc_dapm_ignore_suspend(&codec->dapm, "Main Mic");
 	snd_soc_dapm_ignore_suspend(&codec->dapm, "AIF1DACDAT");

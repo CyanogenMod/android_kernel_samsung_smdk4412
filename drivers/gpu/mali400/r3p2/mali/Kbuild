@@ -22,9 +22,6 @@ MALI_PP_SCHEDULER_FORCE_NO_JOB_OVERLAP_BETWEEN_APPS ?= 0
 MALI_UPPER_HALF_SCHEDULING ?= 1
 # MALI_SEC
 # Include the mapping between TARGET_PLATFORM and KDIR + MALI_PLATFORM
-ifeq ($(CONFIG_CPU_EXYNOS4210),y)
-    TARGET_PLATFORM=pegasus-m400
-endif
 ifeq ($(CONFIG_CPU_EXYNOS4212),y)
     TARGET_PLATFORM=pegasus-m400
 endif
@@ -44,7 +41,6 @@ MALI_PLATFORM_FILES = $(subst $(srctree)/$(src)/,,$(wildcard $(srctree)/$(src)/p
 # For customer releases the Linux Device Drivers will be provided as ARM proprietary and GPL releases:
 # The ARM proprietary product will only include the license/proprietary directory
 # The GPL product will only include the license/gpl directory
-$(warning Current directory is $(srctree)/$(src) from $(shell pwd))
 ifeq ($(wildcard $(srctree)/$(src)/linux/license/gpl/*),)
     ccflags-y += -I$(srctree)/$(src)/linux/license/proprietary
     ifeq ($(CONFIG_MALI400_PROFILING),y)

@@ -1015,7 +1015,7 @@ geomagnetic_raw_threshold_store(struct device *dev,
 
 	geomagnetic_multi_lock();
 
-	if (0 <= value && value <= 2) {
+	if (value <= 2) {
 #ifdef YAS_SENSOR_KERNEL_DEVFILE_INTERFACE
 		struct input_event ev[1];
 		make_event(ev, EV_ABS, ABS_RAW_THRESHOLD, value);
@@ -1448,12 +1448,12 @@ geomagnetic_raw_self_test_show(struct device *dev,
 		"Test6 - err = %d, sensitivity = %d,%d\n"
 		"Test7 - err = %d, offset = %d,%d,%d\n"
 		"Test2 - err = %d\n", __func__,
-		err1, id, err3, err4, x, y1, y2, err5, dir, err6, sx, sy,
+		err1, id, err3, err4, x, y1, y2, err5, 0, err6, sx, sy,
 		err7, ohx, ohy, ohz, err2);
 
 	return sprintf(buf,
 			"%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d\n",
-			err1, id, err3, err4, x, y1, y2, err5, dir, err6, sx,
+			err1, id, err3, err4, x, y1, y2, err5, 0, err6, sx,
 			sy, err7, ohx, ohy, ohz, err2);
 }
 
@@ -1464,19 +1464,11 @@ geomagnetic_raw_self_test_noise_show(struct device *dev,
 	struct geomagnetic_data *data = i2c_get_clientdata(this_client);
 	int id, x, y1, y2, dir, hx0, hy0, hz0;
 	int err8;
-#if CONFIG_MACH_KONA_SENSOR
-		pcbtest.power_on_and_device_check(&id);
-		pcbtest.initialization();
-		pcbtest.offset_control_measurement_and_set_offset_register(
-			&x, &y1, &y2);
-#else
-	if (!data->noise_test_init) {
-		pcbtest.power_on_and_device_check(&id);
-		pcbtest.initialization();
-		pcbtest.offset_control_measurement_and_set_offset_register(
-			&x, &y1, &y2);
-	}
-#endif
+
+	pcbtest.power_on_and_device_check(&id);
+	pcbtest.initialization();
+	pcbtest.offset_control_measurement_and_set_offset_register(
+		&x, &y1, &y2);
 	pcbtest.direction_measurement(&dir);
 	err8 = pcbtest.noise_level_check(&hx0, &hy0, &hz0);
 	if (err8 < 0) {
@@ -1488,6 +1480,22 @@ geomagnetic_raw_self_test_noise_show(struct device *dev,
 	usleep_range(3000, 3100);
 	data->noise_test_init = 1;
 	pr_debug("%s: %d, %d, %d\n", __func__, hx0, hy0, hz0);
+
+	if (hx0 > YAS_NOISE_MAX)
+		hx0 = YAS_NOISE_MAX;
+	else if (hx0 < YAS_NOISE_MIN)
+		hx0 = YAS_NOISE_MIN;
+
+	if (hy0 > YAS_NOISE_MAX)
+		hy0 = YAS_NOISE_MAX;
+	else if (hy0 < YAS_NOISE_MIN)
+		hy0 = YAS_NOISE_MIN;
+
+	if (hz0 > YAS_NOISE_MAX)
+		hz0 = YAS_NOISE_MAX;
+	else if (hz0 < YAS_NOISE_MIN)
+		hz0 = YAS_NOISE_MIN;
+
 	return snprintf(buf, PAGE_SIZE, "%d,%d,%d\n", hx0, hy0, hz0);
 }
 
@@ -1544,11 +1552,11 @@ static struct attribute_group geomagnetic_raw_attribute_group = {
 	.attrs = geomagnetic_raw_attributes
 };
 static struct device_attribute dev_attr_magnetic_sensor_selftest =
-	__ATTR(selftest, S_IRUSR | S_IRGRP,
+	__ATTR(selftest, S_IRUGO | S_IWUSR | S_IWGRP,
 	geomagnetic_raw_self_test_show, NULL);
 
 static struct device_attribute dev_attr_magnetic_sensor_raw_data =
-	__ATTR(raw_data, S_IRUSR | S_IRGRP,
+	__ATTR(raw_data, S_IRUGO | S_IWUSR | S_IWGRP,
 	geomagnetic_raw_self_test_noise_show, NULL);
 
 static ssize_t magnetic_vendor_show(struct device *dev,

@@ -264,7 +264,9 @@ static __init int sel_netport_init(void)
 {
 	int iter;
 	int ret;
-
+#ifdef CONFIG_ALWAYS_ENFORCE
+	selinux_enabled = 1;
+#endif
 	if (!selinux_enabled)
 		return 0;
 

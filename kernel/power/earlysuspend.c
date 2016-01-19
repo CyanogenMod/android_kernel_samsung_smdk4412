@@ -20,9 +20,9 @@
 #include <linux/syscalls.h> /* sys_sync */
 #include <linux/wakelock.h>
 #include <linux/workqueue.h>
-#ifdef CONFIG_ZRAM_FOR_ANDROID
-#include <asm/atomic.h>
-#endif /* CONFIG_ZRAM_FOR_ANDROID */
+#ifdef CONFIG_FAST_BOOT
+#include <linux/fake_shut_down.h>
+#endif
 
 #include "power.h"
 
@@ -32,10 +32,6 @@ enum {
 	DEBUG_VERBOSE = 1U << 3,
 };
 static int debug_mask = DEBUG_USER_STATE;
-#ifdef CONFIG_ZRAM_FOR_ANDROID
-atomic_t optimize_comp_on = ATOMIC_INIT(0);
-EXPORT_SYMBOL(optimize_comp_on);
-#endif /* CONFIG_ZRAM_FOR_ANDROID */
 
 module_param_named(debug_mask, debug_mask, int, S_IRUGO | S_IWUSR | S_IWGRP);
 
@@ -102,9 +98,7 @@ static void early_suspend(struct work_struct *work)
 
 	mutex_lock(&early_suspend_lock);
 	spin_lock_irqsave(&state_lock, irqflags);
-#ifdef CONFIG_ZRAM_FOR_ANDROID
-	atomic_set(&optimize_comp_on, 1);
-#endif /* CONFIG_ZRAM_FOR_ANDROID */
+
 	if (state == SUSPEND_REQUESTED)
 		state |= SUSPENDED;
 	else
@@ -156,9 +150,7 @@ static void late_resume(struct work_struct *work)
 
 	mutex_lock(&early_suspend_lock);
 	spin_lock_irqsave(&state_lock, irqflags);
-#ifdef CONFIG_ZRAM_FOR_ANDROID
-	atomic_set(&optimize_comp_on, 0);
-#endif /* CONFIG_ZRAM_FOR_ANDROID */
+
 	if (state == SUSPENDED)
 		state &= ~SUSPENDED;
 	else
@@ -188,9 +180,6 @@ abort:
 	pm_wd_del_timer(&timer);
 }
 
-#ifdef CONFIG_FAST_BOOT
-extern bool fake_shut_down;
-#endif
 void request_suspend_state(suspend_state_t new_state)
 {
 	unsigned long irqflags;
@@ -216,8 +205,12 @@ void request_suspend_state(suspend_state_t new_state)
 		queue_work(suspend_work_queue, &early_suspend_work);
 	} else if (old_sleep && new_state == PM_SUSPEND_ON) {
 #ifdef CONFIG_FAST_BOOT
-		if (fake_shut_down)
+		if (fake_shut_down) {
+			pr_info("%s : end of fake shut down\n", __func__);
 			fake_shut_down = false;
+			raw_notifier_call_chain(&fsd_notifier_list,
+					FAKE_SHUT_DOWN_CMD_OFF, NULL);
+		}
 #endif
 		state &= ~SUSPEND_REQUESTED;
 		wake_lock(&main_wake_lock);

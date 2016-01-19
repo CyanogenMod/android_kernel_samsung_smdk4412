@@ -65,6 +65,8 @@
 #define MAC_REQUEST	0
 #define OTHER_REQUEST	1
 
+#define MAX_MULTI_CONFIG_NUM 2
+
 /* Description  : Set configuration number
  * Parameter    : unsigned num (host request)
  * Return value : always return 0 (It's virtual multiconfiguration)

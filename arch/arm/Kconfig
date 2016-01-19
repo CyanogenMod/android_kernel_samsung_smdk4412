@@ -29,6 +29,7 @@ config ARM
 	select HAVE_C_RECORDMCOUNT
 	select HAVE_GENERIC_HARDIRQS
 	select HAVE_SPARSE_IRQ
+	select HAVE_EFFICIENT_UNALIGNED_ACCESS
 	select GENERIC_IRQ_SHOW
 	select CPU_PM if (SUSPEND || CPU_IDLE)
 	help
@@ -1259,30 +1260,6 @@ config ARM_ERRATA_754327
 	  This workaround defines cpu_relax() as smp_mb(), preventing correctly
 	  written polling loops from denying visibility of updates to memory.
 
-config ARM_ERRATA_761320
-	bool "ARM errata: no direct eviction"
-	depends on CPU_V7 && SMP
-	help
-	  This option enables the workaround for the 761320 Cortex-A9 erratum.
-
-config ARM_ERRATA_761171
-	bool "ARM errata: disable store streaming of mode 3"
-	depends on CPU_V7 && SMP
-	help
-	  This option enables the workaround for the 761171 Cortex-A15 erratum.
-
-config ARM_ERRATA_762974
-	bool "ARM errata: disable l2 prefetch"
-	depends on CPU_V7 && SMP
-	help
-	  This option enables the workaround for the 762964 Cortex-A15 erratum.
-
-config ARM_ERRATA_763722
-	bool "ARM errata: disable store streaming of mode 2 and mode 3"
-	depends on CPU_V7 && SMP
-	help
-	  This option enables the workaround for the 763722 Cortex-A15 erratum.
-
 config ARM_ERRATA_764369
 	bool "ARM errata: Data cache line maintenance operation by MVA may not succeed"
 	depends on CPU_V7 && SMP
@@ -1319,6 +1296,29 @@ config ARM_ERRATA_775420
 	 to deadlock. This workaround puts DSB before executing ISB if
 	 an abort may occur on cache maintenance.
 
+config ARM_ERRATA_761320
+	bool "ARM errata: no direct eviction"
+	depends on CPU_V7 && SMP
+	help
+	  This option enables the workaround for the 761320 Cortex-A9 erratum.
+
+config ARM_ERRATA_761171
+	bool "ARM errata: disable store streaming of mode 3"
+	depends on CPU_V7 && SMP
+	help
+	  This option enables the workaround for the 761171 Cortex-A15 erratum.
+
+config ARM_ERRATA_762974
+	bool "ARM errata: disable l2 prefetch"
+	depends on CPU_V7 && SMP
+	help
+	  This option enables the workaround for the 762964 Cortex-A15 erratum.
+
+config ARM_ERRATA_763722
+	bool "ARM errata: disable store streaming of mode 2 and mode 3"
+	depends on CPU_V7 && SMP
+	help
+	  This option enables the workaround for the 763722 Cortex-A15 erratum.
 endmenu
 
 source "arch/arm/common/Kconfig"
@@ -1639,7 +1639,6 @@ config FORCE_MAX_ZONEORDER
 	int "Maximum zone order" if ARCH_SHMOBILE
 	range 11 64 if ARCH_SHMOBILE
 	default "9" if SA1111
-	default "12" if ARCH_EXYNOS
 	default "11"
 	help
 	  The kernel memory allocator divides physically contiguous memory
@@ -1777,7 +1776,7 @@ config ARM_FLUSH_CONSOLE_ON_RESTART
 	  released if it failed to be acquired, which will cause all the
 	  pending messages to be flushed.
 
-source "arch/arm/mvp/Kconfig"
+
 
 endmenu
 

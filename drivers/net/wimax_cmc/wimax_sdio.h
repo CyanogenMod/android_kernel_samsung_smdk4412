@@ -246,8 +246,8 @@ struct net_adapter {
 	struct task_struct		*wtm_task;
 #endif
 	struct sk_buff  *rx_skb;
-	u8 			*receive_buffer;
-	u32			buff_len;
+	u8	*receive_buffer;
+	u32	buff_len;
 	u32					image_offset;
 	u32			msg_enable;
 	s32			wake_irq;

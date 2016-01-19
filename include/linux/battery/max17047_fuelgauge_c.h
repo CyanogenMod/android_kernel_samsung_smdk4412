@@ -20,7 +20,7 @@
 #ifndef __MAX17047_BATTERY_H_
 #define __MAX17047_BATTERY_H_
 
-//#if defined (CONFIG_FUELGAUGE_MAX17047_COULOMB_COUNTING)
+/*#if defined (CONFIG_FUELGAUGE_MAX17047_COULOMB_COUNTING)*/
 /* jig state */
 extern bool is_jig_attached;
 
@@ -75,7 +75,7 @@ enum {
 /* FullCap learning setting */
 #define VFFULLCAP_CHECK_INTERVAL	300 /* sec */
 /* soc should be 0.1% unit */
-#define VFSOC_FOR_FULLCAP_LEARNING	950
+#define VFSOC_FOR_FULLCAP_LEARNING	95
 #define LOW_CURRENT_FOR_FULLCAP_LEARNING	20
 #define HIGH_CURRENT_FOR_FULLCAP_LEARNING	120
 #define LOW_AVGCURRENT_FOR_FULLCAP_LEARNING 20
@@ -83,18 +83,34 @@ enum {
 
 /* power off margin */
 /* soc should be 0.1% unit */
-#define POWER_OFF_SOC_HIGH_MARGIN	20
+#define POWER_OFF_SOC_HIGH_MARGIN	2
 #define POWER_OFF_VOLTAGE_HIGH_MARGIN	3500
 #define POWER_OFF_VOLTAGE_LOW_MARGIN	3400
 
 /* FG recovery handler */
-/* soc should be 0.1% unit */
-#define STABLE_LOW_BATTERY_DIFF 30
-#define STABLE_LOW_BATTERY_DIFF_LOWBATT 10
-#define LOW_BATTERY_SOC_REDUCE_UNIT 10
+/* soc should be 1% unit */
+#define STABLE_LOW_BATTERY_DIFF 3
+#define STABLE_LOW_BATTERY_DIFF_LOWBATT 1
+#define LOW_BATTERY_SOC_REDUCE_UNIT 1
 
+/*#endif*/
 
-//#endif
+enum {
+		SDI_BATTERY_TYPE = 0,
+		BYD_BATTERY_TYPE,
+		LIS_BATTERY_TYPE,
+		UNKNOWN_TYPE
+};
+
+#define ADC_SDI_BATTERY_MIN 0 /* adc value : 70 */
+#define ADC_SDI_BATTERY_MAX 19 /* adc value : 70 */
+
+#define ADC_BYD_BATTERY_MIN 51 /* adc value : 32 */
+#define ADC_BYD_BATTERY_MAX 90 /* adc value : 32 */
+
+#define ADC_LIS_BATTERY_MIN 20 /* adc value : 42 */
+#define ADC_LIS_BATTERY_MAX 50 /* adc value : 42 */
+
 
 struct max17047_platform_data {
 	int irq_gpio;

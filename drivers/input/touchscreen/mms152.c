@@ -75,8 +75,8 @@
 
 #define MELFAS_MAX_TOUCH	10
 
-#define TS_MAX_X_COORD		1023
-#define TS_MAX_Y_COORD		599
+#define TS_MAX_X_COORD		600
+#define TS_MAX_Y_COORD		1024
 #define TS_MAX_Z_TOUCH		255
 #define TS_MAX_W_TOUCH		30
 
@@ -106,7 +106,7 @@
 #define PRESS_KEY		1
 #define RELEASE_KEY		0
 
-#define SHOW_COORD		0
+#define SHOW_COORD		1
 #define DEBUG_PRINT		0
 #define DEBUG_MODE
 
@@ -1004,8 +1004,9 @@ static void melfas_ts_read_input(struct melfas_ts_data *ts)
 
 	for (i = 0; i < read_num; i = i+6) {
 		id = (buf[i] & 0x0F)-1;
-		posX = (u16)(buf[i+1] & 0x0F) << 8 | buf[i+2];
-		posY = (u16)(buf[i+1] & 0xF0) << 4 | buf[i+3];
+		posX = TS_MAX_X_COORD -
+				((u16)(buf[i+1] & 0xF0) << 4 | buf[i+3]);
+		posY = (u16)(buf[i+1] & 0x0F) << 8 | buf[i+2];
 		str = buf[i + 4];
 		width = buf[i+5];
 

@@ -20,8 +20,8 @@
 /*
  * File     yas_pcb_test.c
  * Brief    pcb test program for yas530/yas532
- * Date     2013/1/22
- * Revision 1.4.3
+ * Date     2012/10/05
+ * Revision 1.4.1
  */
 #include "yas_pcb_test.h"
 
@@ -220,6 +220,8 @@ static int Ms3AxesLibDir8(int ss, int cc, unsigned short *ans)
 	int uss = ss;
 	int ret = 0;
 
+	*ans = 0;
+
 	if (cc < -2147483647)
 		cc++;
 	if (ss < -2147483647)
@@ -347,6 +349,7 @@ static int yas_pcb_reset_coil(void)
 {
 	int ret;
 	uint8_t u08Data;
+
 	u08Data = YAS_PCB_COIL_DEFAULT;
 	ret = g_callback.i2c_write(YAS_PCB_ADDR_SLAVE, YAS_PCB_ADDR_COIL,
 			&u08Data, 1);
@@ -355,6 +358,7 @@ static int yas_pcb_reset_coil(void)
 
 	return YAS_PCB_NO_ERROR;
 }
+
 static int yas530_read_cal(uint8_t *pu08Buf)
 {
 	int i;
@@ -602,7 +606,7 @@ static int yas_pcb_measure(struct yas_pcb_vector *pstXy1y2, int *temperature,
 }
 
 static int yas_pcb_is_flow_occued(struct yas_pcb_vector *pstXy1y2,
-	int32_t underflow, int32_t overflow)
+					int32_t underflow, int32_t overflow)
 {
 	int result = YAS_PCB_NO_ERROR;
 	int32_t s32Tmp;
@@ -677,8 +681,7 @@ static void yas530_calc_magnetic_field(struct yas_pcb_vector *pstXy1y2,
 	s32Oz  = -pstXy1y2->v[1] - pstXy1y2->v[2];
 
 	pstXyz->v[0] = (gstCorrect.s32K
-		* ((100 * pstXy1y2->v[0])
-		+ (gstCorrect.s32A2 * s32Oy)
+		* ((100 * pstXy1y2->v[0]) + (gstCorrect.s32A2 * s32Oy)
 		+ (gstCorrect.s32A3 * s32Oz))) / 10;
 	pstXyz->v[1] = (gstCorrect.s32K
 		* ((gstCorrect.s32A4 * pstXy1y2->v[0])
@@ -710,8 +713,7 @@ static void yas532_calc_magnetic_field(struct yas_pcb_vector *pstXy1y2,
 	s32Oz  = -pstXy1y2->v[1] - pstXy1y2->v[2];
 
 	pstXyz->v[0] = (gstCorrect.s32K
-		* ((100 * pstXy1y2->v[0])
-		+ (gstCorrect.s32A2 * s32Oy)
+		* ((100 * pstXy1y2->v[0]) + (gstCorrect.s32A2 * s32Oy)
 		+ (gstCorrect.s32A3 * s32Oz))) / 10;
 	pstXyz->v[1] = (gstCorrect.s32K
 		* ((gstCorrect.s32A4 * pstXy1y2->v[0])
@@ -842,6 +844,7 @@ static int yas_pcb_test3(void)
 	ret = yas_pcb_reset_coil();
 	if (YAS_PCB_NO_ERROR != ret)
 		return ret;
+
 	return YAS_PCB_NO_ERROR;
 }
 
@@ -949,22 +952,22 @@ static int yas_pcb_test6(int *sx, int *sy)
 		result = yas_pcb_measure(pN, &temperature, u08Command,
 				YAS_PCB_INT_NOTCHECK);
 
-			if (YAS_PCB_NO_ERROR == result) {
-				if (YAS532_DEVICE_ID == gu08DevId) {
-					*sx = (int)(pC->s32K * 100
-						 * (pP->v[0] - pN->v[0]));
-					*sx /= 1000;
-					*sx /= YAS_VCORE;
-					*sy = (int)(pC->s32K * pC->s32A5
-						 * ((pP->v[1] - pN->v[1])
-						  - (pP->v[2] - pN->v[2])));
-					*sy /= 1000;
-					*sy /= YAS_VCORE;
-				} else {
-					*sx = (int)(pN->v[0] - pP->v[0]);
-					*sy = (int)((pN->v[1] - pP->v[1])
-						  - (pN->v[2] - pP->v[2]));
-				}
+		if (YAS_PCB_NO_ERROR == result) {
+			if (YAS532_DEVICE_ID == gu08DevId) {
+				*sx = (int)(pC->s32K * 100
+					 * (pP->v[0] - pN->v[0]));
+				*sx /= 1000;
+				*sx /= YAS_VCORE;
+				*sy = (int)(pC->s32K * pC->s32A5
+					 * ((pP->v[1] - pN->v[1])
+					  - (pP->v[2] - pN->v[2])));
+				*sy /= 1000;
+				*sy /= YAS_VCORE;
+			} else {
+				*sx = (int)(pN->v[0] - pP->v[0]);
+				*sy = (int)((pN->v[1] - pP->v[1])
+					  - (pN->v[2] - pP->v[2]));
+			}
 
 			result = yas_pcb_is_flow_occued(pP, 0, gs32Overflow);
 			if (YAS_PCB_NO_ERROR == result)
@@ -1029,7 +1032,7 @@ static int yas_pcb_test8(int *hx0, int *hy0, int *hz0)
 			YAS_PCB_INT_NOTCHECK);
 		if (YAS_PCB_NO_ERROR == nRet) {
 			nRet = yas_pcb_calc_magnetic_field(&stOhxy1y2,
-					&stOhxyz);
+				&stOhxyz);
 			if (YAS_PCB_NO_ERROR == nRet) {
 				*hx0 = stOhxy1y2.v[0];
 				*hy0 = stOhxy1y2.v[1] - stOhxy1y2.v[2];
@@ -1274,6 +1277,7 @@ int yas_pcb_test_init(struct yas_pcb_test *func)
 		gu08Recalc = 0;
 		gs32RecalcWait = 0;
 #endif
+
 		result = YAS_PCB_NO_ERROR;
 	}
 

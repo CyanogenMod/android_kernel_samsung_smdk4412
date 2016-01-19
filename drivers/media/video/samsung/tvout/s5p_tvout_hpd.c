@@ -21,7 +21,10 @@
 #ifdef CONFIG_HDMI_SWITCH_HPD
 #include <linux/switch.h>
 #endif
-
+#ifdef CONFIG_MACH_GD2
+#include <linux/power_supply.h>
+#define PSY_BAT_NAME "battery"
+#endif
 #include "s5p_tvout_common_lib.h"
 #include "hw_if/hw_if.h"
 
@@ -80,6 +83,9 @@ static int last_uevent_state;
 atomic_t hdmi_status;
 atomic_t poll_state;
 
+#ifdef CONFIG_MACH_GD2
+static void hdmi_set_charger(bool on);
+#endif
 static int s5p_hpd_open(struct inode *inode, struct file *file);
 static int s5p_hpd_release(struct inode *inode, struct file *file);
 static ssize_t s5p_hpd_read(struct file *file, char __user *buffer,
@@ -87,10 +93,6 @@ static ssize_t s5p_hpd_read(struct file *file, char __user *buffer,
 static unsigned int s5p_hpd_poll(struct file *file, poll_table *wait);
 static long s5p_hpd_ioctl(struct file *file,
 			  unsigned int cmd, unsigned long arg);
-#ifdef CONFIG_SAMSUNG_WORKAROUND_HPD_GLANCE
-void mhl_hpd_handler(bool onoff);
-bool (*is_mhl_power_state_on)(void);
-#endif
 
 static const struct file_operations hpd_fops = {
 	.owner = THIS_MODULE,
@@ -108,7 +110,7 @@ static struct miscdevice hpd_misc_device = {
 };
 
 #ifdef CONFIG_LSI_HDMI_AUDIO_CH_EVENT
-	static struct switch_dev g_audio_ch_switch;
+static struct switch_dev g_audio_ch_switch;
 #endif
 
 static void s5p_hpd_kobject_uevent(void)
@@ -156,6 +158,9 @@ static void s5p_hpd_kobject_uevent(void)
 #ifdef CONFIG_HDMI_SWITCH_HPD
 			hpd_struct.hpd_switch.state = 0;
 			switch_set_state(&hpd_struct.hpd_switch, 1);
+#ifdef CONFIG_MACH_GD2
+			hdmi_set_charger(true);
+#endif
 #else
 			sprintf(env_buf, "HDMI_STATE=online");
 			envp[env_offset++] = env_buf;
@@ -182,6 +187,9 @@ static void s5p_hpd_kobject_uevent(void)
 #ifdef CONFIG_HDMI_SWITCH_HPD
 			hpd_struct.hpd_switch.state = 1;
 			switch_set_state(&hpd_struct.hpd_switch, 0);
+#ifdef CONFIG_MACH_GD2
+			hdmi_set_charger(false);
+#endif
 #else
 			sprintf(env_buf, "HDMI_STATE=offline");
 			envp[env_offset++] = env_buf;
@@ -384,6 +392,11 @@ static int s5p_hpd_irq_eint(int irq)
 		wake_up_interruptible(&hpd_struct.waitq);
 	} else {
 		HPDIFPRINTK("gpio is low\n");
+#if defined(CONFIG_SAMSUNG_WORKAROUND_HPD_GLANCE) &&\
+	!defined(CONFIG_SAMSUNG_MHL_9290) &&\
+	!defined(CONFIG_MHL_SII9234)
+		call_sched_mhl_hpd_handler();
+#endif
 		irq_set_irq_type(hpd_struct.irq_n, IRQ_TYPE_LEVEL_HIGH);
 		if (atomic_read(&hpd_struct.state) == HPD_LO)
 			return IRQ_HANDLED;
@@ -392,11 +405,6 @@ static int s5p_hpd_irq_eint(int irq)
 		atomic_set(&poll_state, 1);
 
 		last_hpd_state = HPD_LO;
-#ifdef	CONFIG_SAMSUNG_WORKAROUND_HPD_GLANCE
-		if (is_mhl_power_state_on != NULL)
-			if (!is_mhl_power_state_on())
-				mhl_hpd_handler(false);
-#endif
 
 #ifdef CONFIG_HDMI_CONTROLLED_BY_EXT_IC
 		schedule_delayed_work(&ext_ic_control_dwork ,
@@ -462,6 +470,11 @@ static int s5p_hpd_irq_hdmi(int irq)
 
 	} else if (flag & (1 << HDMI_IRQ_HPD_UNPLUG)) {
 		HPDIFPRINTK("HPD_LO\n");
+#if defined(CONFIG_SAMSUNG_WORKAROUND_HPD_GLANCE) &&\
+	!defined(CONFIG_SAMSUNG_MHL_9290) &&\
+	!defined(CONFIG_MHL_SII9234)
+		call_sched_mhl_hpd_handler();
+#endif
 
 		s5p_hdcp_stop();
 
@@ -473,11 +486,6 @@ static int s5p_hpd_irq_hdmi(int irq)
 		atomic_set(&poll_state, 1);
 
 		last_hpd_state = HPD_LO;
-#ifdef	CONFIG_SAMSUNG_WORKAROUND_HPD_GLANCE
-		if (is_mhl_power_state_on != NULL)
-			if (!is_mhl_power_state_on())
-				mhl_hpd_handler(false);
-#endif
 #ifdef CONFIG_HDMI_CONTROLLED_BY_EXT_IC
 		schedule_delayed_work(&ext_ic_control_dwork ,
 				msecs_to_jiffies(1000));
@@ -531,6 +539,25 @@ static work_func_t  ext_ic_control_func(void)
 }
 #endif
 
+#ifdef CONFIG_MACH_GD2
+static void hdmi_set_charger(bool on)
+{
+	struct power_supply *psy = power_supply_get_by_name(PSY_BAT_NAME);
+	union power_supply_propval power_value;
+
+	if (!psy) {
+		pr_err("%s: fail to get %s psy\n", __func__, PSY_BAT_NAME);
+		return;
+	}
+
+	power_value.intval = on;
+
+	pr_info("%s: on/off %d \n", __func__, on);
+	psy->set_property(psy, POWER_SUPPLY_PROP_HDMI, &power_value);
+
+	return;
+}
+#endif
 
 #ifdef	CONFIG_SAMSUNG_WORKAROUND_HPD_GLANCE
 static irqreturn_t s5p_hpd_irq_default_handler(int irq, void *dev_id)
@@ -632,6 +659,11 @@ static int __devinit s5p_hpd_probe(struct platform_device *pdev)
 		last_hpd_state = HPD_LO;
 	}
 
+#ifdef CONFIG_LSI_HDMI_AUDIO_CH_EVENT
+	g_audio_ch_switch.name = "ch_hdmi_audio";
+	switch_dev_register(&g_audio_ch_switch);
+#endif
+
 #ifdef CONFIG_HDMI_SWITCH_HPD
 	hpd_struct.hpd_switch.name = "hdmi";
 	switch_dev_register(&hpd_struct.hpd_switch);
@@ -649,6 +681,10 @@ static int __devinit s5p_hpd_probe(struct platform_device *pdev)
 	}
 #ifdef	CONFIG_SAMSUNG_WORKAROUND_HPD_GLANCE
 	disable_irq(hpd_struct.irq_n);
+#	if !defined(CONFIG_SAMSUNG_MHL_9290) &&\
+		!defined(CONFIG_MHL_SII9234)
+		hpd_intr_state = s5p_hpd_get_status;
+#	endif
 #endif
 
 	s5p_hdmi_reg_intc_set_isr(s5p_hpd_irq_handler, (u8) HDMI_IRQ_HPD_PLUG);
@@ -657,10 +693,6 @@ static int __devinit s5p_hpd_probe(struct platform_device *pdev)
 
 	last_uevent_state = -1;
 
-#ifdef CONFIG_LSI_HDMI_AUDIO_CH_EVENT
-	g_audio_ch_switch.name = "ch_hdmi_audio";
-	switch_dev_register(&g_audio_ch_switch);
-#endif
 	return 0;
 }
 

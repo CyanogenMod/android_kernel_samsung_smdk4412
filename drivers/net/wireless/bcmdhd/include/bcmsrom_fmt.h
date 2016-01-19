@@ -1,7 +1,7 @@
 /*
  * SROM format definition.
  *
- * Copyright (C) 1999-2012, Broadcom Corporation
+ * Copyright (C) 1999-2014, Broadcom Corporation
  * 
  *      Unless you and Broadcom execute a separate written software license
  * agreement governing use of this software, this software is licensed to you
@@ -21,7 +21,7 @@
  * software in any way with any other Broadcom software provided under a license
  * other than the GPL, without Broadcom's express prior written consent.
  *
- * $Id: bcmsrom_fmt.h 361510 2012-10-09 00:15:04Z $
+ * $Id: bcmsrom_fmt.h 427005 2013-10-02 00:15:10Z $
  */
 
 #ifndef	_bcmsrom_fmt_h_
@@ -389,6 +389,7 @@
 #define SROM8_NOISELVL_5GM	215
 #define SROM8_NOISELVL_5GH	216
 #define SROM8_NOISELVL_5GU	217
+#define SROM8_NOISECALOFFSET	218
 
 #define SROM9_REV_CRC		219
 
@@ -454,8 +455,15 @@
 #define SROM11_MPWR_RAWTS		88
 #define SROM11_TS_SLP_OPT_CORRX		89
 #define SROM11_XTAL_FREQ		90
+#define SROM11_5GB0_4080_W0_A1          91
 #define SROM11_PHYCAL_TEMPDELTA  	92
 #define SROM11_MPWR_1_AND_2 		93
+#define SROM11_5GB0_4080_W1_A1          94
+#define SROM11_TSSIFLOOR_2G 		95
+#define SROM11_TSSIFLOOR_5GL 		96
+#define SROM11_TSSIFLOOR_5GM 		97
+#define SROM11_TSSIFLOOR_5GH 		98
+#define SROM11_TSSIFLOOR_5GU 		99
 
 /* Masks and offsets for Terrmal parameters */
 #define SROM11_TEMPS_PERIOD_MASK	0xf0
@@ -476,13 +484,15 @@
 #define SROM11_PDOFF_2G_40M_VALID_MASK  0x8000
 #define SROM11_PDOFF_2G_40M_VALID_SHIFT 15
 
-#define SROM11_PDOFF_2G_40M     100
+#define SROM11_PDOFF_2G_40M     	100
 #define SROM11_PDOFF_40M_A0		101
 #define SROM11_PDOFF_40M_A1		102
 #define SROM11_PDOFF_40M_A2		103
+#define SROM11_5GB0_4080_W2_A1          103
 #define SROM11_PDOFF_80M_A0		104
 #define SROM11_PDOFF_80M_A1		105
 #define SROM11_PDOFF_80M_A2		106
+#define SROM11_5GB1_4080_W0_A1          106
 
 #define SROM11_SUBBAND5GVER 		107
 
@@ -493,9 +503,12 @@
 #define SROM11_PATH2			148
 
 #define	SROM11_2G_MAXP			0
+#define SROM11_5GB1_4080_PA             0
 #define	SROM11_2G_PA			1
+#define SROM11_5GB2_4080_PA             2
 #define	SROM11_RXGAINS1			4
 #define	SROM11_RXGAINS			5
+#define SROM11_5GB3_4080_PA             5
 #define	SROM11_5GB1B0_MAXP		6
 #define	SROM11_5GB3B2_MAXP		7
 #define	SROM11_5GB0_PA			8
@@ -562,6 +575,7 @@
 #define SROM11_MCSBW805GHPO 		196
 #define SROM11_MCSBW805GHPO_1		197
 #define SROM11_RPCAL_5GU		198
+#define SROM11_PDOFF_2G_CCK	        199
 #define SROM11_MCSLR5GLPO		200
 #define SROM11_MCSLR5GMPO		201
 #define SROM11_MCSLR5GHPO		202
@@ -576,8 +590,10 @@
 #define SROM11_SB20IN40LRPO 		210
 #define SROM11_SB20IN80AND160LR5GLPO	211
 #define SROM11_SB40AND80LR5GLPO		212
+#define SROM11_TXIDXCAP2G               212
 #define SROM11_SB20IN80AND160LR5GMPO	213
 #define SROM11_SB40AND80LR5GMPO		214
+#define SROM11_TXIDXCAP5G               214
 #define SROM11_SB20IN80AND160LR5GHPO	215
 #define SROM11_SB40AND80LR5GHPO		216
 

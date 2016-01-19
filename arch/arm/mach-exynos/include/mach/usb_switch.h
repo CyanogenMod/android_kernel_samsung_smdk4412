@@ -8,7 +8,7 @@ enum usb_path_t {
 	USB_PATH_ADCCHECK = (1 << 28),
 	USB_PATH_TA = (1 << 24),
 	USB_PATH_CP = (1 << 20),
-#if defined(CONFIG_MACH_P4NOTE) || defined(CONFIG_MACH_KONA)
+#if defined(CONFIG_MACH_P4NOTE) || defined(CONFIG_MACH_SP7160LTE) || defined(CONFIG_MACH_KONA) || defined(CONFIG_MACH_TAB3)
 	USB_PATH_AP = (1 << 16),
 #else
 	USB_PATH_OTG = (1 << 16),

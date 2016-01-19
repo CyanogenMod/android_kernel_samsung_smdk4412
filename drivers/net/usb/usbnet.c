@@ -1036,7 +1036,9 @@ skip_reset:
 }
 
 /*-------------------------------------------------------------------------*/
-
+#ifdef CONFIG_MDM_HSIC_PM
+#define TX_ERR_CRASH_THRS 100
+#endif
 static void tx_complete (struct urb *urb)
 {
 	struct sk_buff		*skb = (struct sk_buff *) urb->context;
@@ -1052,14 +1054,19 @@ static void tx_complete (struct urb *urb)
 				dev->udev->descriptor.idProduct == 0x904C) {
 			pr_debug("set tx wakelock for fd\n");
 			fast_dormancy_wakelock(rmnet_pm_dev);
+			dev->net->stats.tx_errors = 0;
 		}
 #endif
 	} else {
 		dev->net->stats.tx_errors++;
+
+#ifdef CONFIG_MDM_HSIC_PM
 		if (dev->udev->descriptor.idProduct == 0x9048 ||
-				dev->udev->descriptor.idProduct == 0x904C)
+				dev->udev->descriptor.idProduct == 0x904C) {
 			netdev_err(dev->net, "tx err %d, %d\n",
 					urb->status, entry->urb->status);
+		}
+#endif
 
 		switch (urb->status) {
 		case -EPIPE:
@@ -1541,13 +1548,14 @@ int usbnet_suspend (struct usb_interface *intf, pm_message_t message)
 {
 	struct usbnet		*dev = usb_get_intfdata(intf);
 
-	if (!dev->suspend_count++) {
+	if (!dev->suspend_count) {
 		spin_lock_irq(&dev->txq.lock);
 		/* don't autosuspend while transmitting */
 		if (dev->txq.qlen && (message.event & PM_EVENT_AUTO)) {
 			spin_unlock_irq(&dev->txq.lock);
 			return -EBUSY;
 		} else {
+			dev->suspend_count++;
 			set_bit(EVENT_DEV_ASLEEP, &dev->flags);
 			spin_unlock_irq(&dev->txq.lock);
 		}

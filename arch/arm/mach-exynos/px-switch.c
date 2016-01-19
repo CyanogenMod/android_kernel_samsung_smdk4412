@@ -86,12 +86,24 @@ static ssize_t show_uart_sel(struct device *dev,
 #if (CONFIG_SAMSUNG_ANALOG_UART_SWITCH == 2)
 		if (val_sel2 == 0) {
 #endif /* (CONFIG_SAMSUNG_ANALOG_UART_SWITCH == 2) */
-			/* AP */
-			mode = "AP";
+
+#if defined(CONFIG_MACH_KONA)
+			if (system_rev == 0) /* Keyboard DOCK */
+				mode = "DOCK";
+			else
+#endif /* CONFIG_MACH_KONA */
+				/* AP */
+				mode = "AP";
+
 #if (CONFIG_SAMSUNG_ANALOG_UART_SWITCH == 2)
 		} else {
-			/* Keyboard DOCK */
-			mode = "DOCK";
+#if defined(CONFIG_MACH_KONA)
+			if (system_rev == 0) /* AP */
+				mode = "AP";
+			else
+#endif /* CONFIG_MACH_KONA */
+				/* Keyboard DOCK */
+				mode = "DOCK";
 		}
 #endif /* (CONFIG_SAMSUNG_ANALOG_UART_SWITCH == 2) */
 	}
@@ -133,11 +145,16 @@ static ssize_t store_uart_sel(struct device *dev,
 	uart_sel = gpio_get_value(GPIO_UART_SEL);
 #if (CONFIG_SAMSUNG_ANALOG_UART_SWITCH == 2)
 	uart_sel2 = gpio_get_value(GPIO_UART_SEL2);
-#endif
+#endif /* (CONFIG_SAMSUNG_ANALOG_UART_SWITCH == 2) */
 	if (!strncasecmp(buf, "AP", 2)) {
 		uart_sel = 1;
 #if (CONFIG_SAMSUNG_ANALOG_UART_SWITCH == 2)
-		uart_sel2 = 0;
+#if defined(CONFIG_MACH_KONA)
+		if (system_rev == 0)
+			uart_sel2 = 1;
+		else
+#endif /* CONFIG_MACH_KONA */
+			uart_sel2 = 0;
 #endif /* (CONFIG_SAMSUNG_ANALOG_UART_SWITCH == 2) */
 	} else if (!strncasecmp(buf, "CP", 2)) {
 		uart_sel = 0;
@@ -145,7 +162,12 @@ static ssize_t store_uart_sel(struct device *dev,
 #if (CONFIG_SAMSUNG_ANALOG_UART_SWITCH == 2)
 		if (!strncasecmp(buf, "DOCK", 4)) {
 			uart_sel = 1;
-			uart_sel2 = 1;
+#if defined(CONFIG_MACH_KONA)
+			if (system_rev == 0)
+				uart_sel2 = 0;
+			else
+#endif /* CONFIG_MACH_KONA */
+				uart_sel2 = 1;
 		} else {
 #endif /* (CONFIG_SAMSUNG_ANALOG_UART_SWITCH == 2) */
 		pr_err("%s: wrong uart_sel value(%s)!!\n", __func__, buf);
@@ -159,7 +181,8 @@ static ssize_t store_uart_sel(struct device *dev,
 	gpio_set_value(GPIO_UART_SEL, uart_sel);
 	pr_info("%s: uart_sel(%d)\n", __func__, uart_sel);
 #if (CONFIG_SAMSUNG_ANALOG_UART_SWITCH == 2)
-	/* 1 for (AP)DOCK, 0 for (AP)FAC */
+	/* 1 for (AP)DOCK, 0 for (AP)FAC
+	 * KONA rev 0 is 1 for (AP)FAC, 0 for (AP)DOCK */
 	gpio_set_value(GPIO_UART_SEL2, uart_sel2);
 	pr_info("%s: uart_sel2(%d)\n", __func__, uart_sel2);
 #endif /* (CONFIG_SAMSUNG_ANALOG_UART_SWITCH == 2) */
@@ -212,34 +235,7 @@ void set_usb_connection_state(bool connected)
 
 static void pmic_safeout2(int onoff)
 {
-#if !defined(CONFIG_MACH_P4NOTE) && !defined(CONFIG_MACH_KONA)
-	struct regulator *regulator;
-
-	regulator = regulator_get(NULL, "safeout2");
-	BUG_ON(IS_ERR_OR_NULL(regulator));
-
-	if (onoff) {
-		if (!regulator_is_enabled(regulator)) {
-			regulator_enable(regulator);
-		} else {
-			pr_info("%s: onoff:%d No change in safeout2\n",
-			       __func__, onoff);
-		}
-	} else {
-		if (regulator_is_enabled(regulator)) {
-			regulator_force_disable(regulator);
-		} else {
-			pr_info("%s: onoff:%d No change in safeout2\n",
-			       __func__, onoff);
-		}
-	}
-#if defined(CONFIG_MACH_KONA)
-	/* kona have switching charger instead of analog USB_VBUS switch
-	 * So, just return */
-	return;
-#endif
-	regulator_put(regulator);
-#else
+#if defined(CONFIG_MACH_P4NOTE) || defined(CONFIG_MACH_TAB3)
 	if (onoff) {
 		if (!gpio_get_value(GPIO_USB_SEL_CP)) {
 			gpio_set_value(GPIO_USB_SEL_CP, onoff);
@@ -255,30 +251,56 @@ static void pmic_safeout2(int onoff)
 			       __func__, onoff);
 		}
 	}
+#elif defined(CONFIG_MACH_KONA)
+	/* kona have switching charger instead of analog USB_VBUS switch
+	 * So, just return */
+	return;
+#else
+	struct regulator *regulator;
+
+	regulator = regulator_get(NULL, "safeout2");
+	BUG_ON(IS_ERR_OR_NULL(regulator));
+
+	if (onoff) {
+		if (!regulator_is_enabled(regulator)) {
+			regulator_enable(regulator);
+		} else {
+			pr_info("%s: onoff:%d No change in safeout2\n",
+				__func__, onoff);
+		}
+	} else {
+		if (regulator_is_enabled(regulator)) {
+			regulator_force_disable(regulator);
+		} else {
+			pr_info("%s: onoff:%d No change in safeout2\n",
+				__func__, onoff);
+		}
+	}
+
+	regulator_put(regulator);
 #endif
 }
 
 static void usb_apply_path(enum usb_path_t path)
 {
-#if defined(CONFIG_MACH_P4NOTE)
+#if defined(CONFIG_MACH_P4NOTE) || defined(CONFIG_MACH_TAB3)
 	pr_info("%s: current gpio before changing : sel0:%d sel1:%d sel_cp:%d\n",
-	       __func__, gpio_get_value(GPIO_USB_SEL0),
-	       gpio_get_value(GPIO_USB_SEL1), gpio_get_value(GPIO_USB_SEL_CP));
-	pr_info("%s: target path %x\n", __func__, path);
+		__func__, gpio_get_value(GPIO_USB_SEL0),
+		gpio_get_value(GPIO_USB_SEL1), gpio_get_value(GPIO_USB_SEL_CP));
 #elif defined(CONFIG_MACH_KONA)
 	pr_info("%s: current gpio before changing : sel0:%d sel1:%d\n",
 		__func__, gpio_get_value(GPIO_USB_SEL0),
 		gpio_get_value(GPIO_USB_SEL1));
 #else
 	pr_info("%s: current gpio before changing : sel1:%d sel2:%d sel3:%d\n",
-	       __func__, gpio_get_value(GPIO_USB_SEL1),
-	       gpio_get_value(GPIO_USB_SEL2), gpio_get_value(GPIO_USB_SEL3));
-	pr_info("%s: target path %x\n", __func__, path);
+		__func__, gpio_get_value(GPIO_USB_SEL1),
+		gpio_get_value(GPIO_USB_SEL2), gpio_get_value(GPIO_USB_SEL3));
 #endif
+	pr_info("%s: target path %x\n", __func__, path);
 
 	/* following checks are ordered according to priority */
 	if (path & USB_PATH_ADCCHECK) {
-#if defined(CONFIG_MACH_P4NOTE) || defined(CONFIG_MACH_KONA)
+#if defined(CONFIG_MACH_P4NOTE) || defined(CONFIG_MACH_KONA) || defined(CONFIG_MACH_TAB3)
 		gpio_set_value(GPIO_USB_SEL0, 1);
 		gpio_set_value(GPIO_USB_SEL1, 0);
 #else
@@ -292,7 +314,7 @@ static void usb_apply_path(enum usb_path_t path)
 		goto out_nochange;
 	}
 
-#if defined(CONFIG_MACH_P4NOTE) || defined(CONFIG_MACH_KONA)
+#if defined(CONFIG_MACH_P4NOTE) || defined(CONFIG_MACH_KONA) || defined(CONFIG_MACH_TAB3)
 	if (path & USB_PATH_TA) {
 		gpio_set_value(GPIO_USB_SEL0, 0);
 		gpio_set_value(GPIO_USB_SEL1, 0);
@@ -302,7 +324,7 @@ static void usb_apply_path(enum usb_path_t path)
 
 	if (path & USB_PATH_CP) {
 		pr_info("DEBUG: set USB path to CP\n");
-#if defined(CONFIG_MACH_P4NOTE) || defined(CONFIG_MACH_KONA)
+#if defined(CONFIG_MACH_P4NOTE) || defined(CONFIG_MACH_KONA) || defined(CONFIG_MACH_TAB3)
 		gpio_set_value(GPIO_USB_SEL0, 0);
 		gpio_set_value(GPIO_USB_SEL1, 1);
 #else
@@ -316,7 +338,7 @@ static void usb_apply_path(enum usb_path_t path)
 		mdelay(3);
 		goto out_cp;
 	}
-#if defined(CONFIG_MACH_P4NOTE) || defined(CONFIG_MACH_KONA)
+#if defined(CONFIG_MACH_P4NOTE) || defined(CONFIG_MACH_KONA) || defined(CONFIG_MACH_TAB3)
 	if (path & USB_PATH_AP) {
 		gpio_set_value(GPIO_USB_SEL0, 1);
 		gpio_set_value(GPIO_USB_SEL1, 1);
@@ -340,7 +362,7 @@ static void usb_apply_path(enum usb_path_t path)
 #endif /* CONFIG_MACH_P4NOTE */
 
 	/* default */
-#if defined(CONFIG_MACH_P4NOTE) || defined(CONFIG_MACH_KONA)
+#if defined(CONFIG_MACH_P4NOTE) || defined(CONFIG_MACH_KONA) || defined(CONFIG_MACH_TAB3)
 	gpio_set_value(GPIO_USB_SEL0, 1);
 	gpio_set_value(GPIO_USB_SEL1, 1);
 #else
@@ -425,7 +447,7 @@ void usb_switch_unlock(void)
 	up(&usb_switch_sem);
 }
 
-#if defined(CONFIG_MACH_P4NOTE) || defined(CONFIG_MACH_KONA)
+#if defined(CONFIG_MACH_P4NOTE) || defined(CONFIG_MACH_KONA) || defined(CONFIG_MACH_TAB3)
 static void init_gpio(void)
 {
 	int uart_sel = -1;
@@ -523,7 +545,7 @@ static int __init usb_switch_init(void)
 	int ret;
 
 /* USB_SEL gpio_request */
-#if defined(CONFIG_MACH_P4NOTE) || defined(CONFIG_MACH_KONA)
+#if defined(CONFIG_MACH_P4NOTE) || defined(CONFIG_MACH_KONA) || defined(CONFIG_MACH_TAB3)
 	gpio_request(GPIO_USB_SEL0, "GPIO_USB_SEL0");
 	gpio_request(GPIO_USB_SEL1, "GPIO_USB_SEL1");
 #if defined(GPIO_USB_SEL_CP)
@@ -547,7 +569,7 @@ static int __init usb_switch_init(void)
 #endif /* CONFIG_MACH_P8LTE */
 
 /* USB_SEL gpio_export */
-#if defined(CONFIG_MACH_P4NOTE) || defined(CONFIG_MACH_KONA)
+#if defined(CONFIG_MACH_P4NOTE) || defined(CONFIG_MACH_KONA) || defined(CONFIG_MACH_TAB3)
 	gpio_export(GPIO_USB_SEL0, 1);
 	gpio_export(GPIO_USB_SEL1, 1);
 #if defined(GPIO_USB_SEL_CP)
@@ -576,7 +598,7 @@ static int __init usb_switch_init(void)
 	BUG_ON(!sec_switch_dev);
 
 /* USB_SEL gpio_export_link */
-#if defined(CONFIG_MACH_P4NOTE) || defined(CONFIG_MACH_KONA)
+#if defined(CONFIG_MACH_P4NOTE) || defined(CONFIG_MACH_KONA) || defined(CONFIG_MACH_TAB3)
 	gpio_export_link(sec_switch_dev, "GPIO_USB_SEL0", GPIO_USB_SEL0);
 	gpio_export_link(sec_switch_dev, "GPIO_USB_SEL1", GPIO_USB_SEL1);
 #if defined(GPIO_USB_SEL_CP)
@@ -613,11 +635,11 @@ static int __init usb_switch_init(void)
 	/*init_MUTEX(&usb_switch_sem);*/
 	sema_init(&usb_switch_sem, 1);
 
-#if defined(CONFIG_MACH_P4NOTE) || defined(CONFIG_MACH_KONA)
+#if defined(CONFIG_MACH_P4NOTE) || defined(CONFIG_MACH_KONA) || defined(CONFIG_MACH_TAB3)
 	init_gpio();
 #endif
 
-#if defined(CONFIG_MACH_P4NOTE) || defined(CONFIG_MACH_KONA)
+#if defined(CONFIG_MACH_P4NOTE) || defined(CONFIG_MACH_KONA) || defined(CONFIG_MACH_TAB3)
 	if ((!gpio_get_value(GPIO_USB_SEL0)) && (gpio_get_value(GPIO_USB_SEL1))) {
 #else
 	if (!gpio_get_value(GPIO_USB_SEL1)) {

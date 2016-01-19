@@ -83,6 +83,8 @@ void bt_config_gpio_table(int array_size, unsigned int (*gpio_table)[4])
 
 void bt_uart_rts_ctrl(int flag)
 {
+	pr_info("[BT] bt_uart_rts_ctrl.BT_EN:%d, flag:%d\n",gpio_get_value(GPIO_BT_EN),flag);
+
 	if (!gpio_get_value(GPIO_BT_EN))
 		return;
 	if (flag) {
@@ -115,7 +117,7 @@ static int bcm4330_bt_rfkill_set_power(void *data, bool blocked)
 		gpio_set_value(GPIO_BT_EN, 1);
 		msleep(20);
 		gpio_set_value(GPIO_BT_nRST, 1);
-		msleep(50);
+		msleep(100);
 	} else {
 		pr_info("[BT] Bluetooth Power Off.\n");
 		bt_is_running = 0;
@@ -243,6 +245,8 @@ static int bcm4330_bluetooth_probe(struct platform_device *pdev)
 	int rc = 0;
 	int ret;
 
+	pr_info("[BT] bcm4330_bluetooth_probe.\n");
+  
 	rc = gpio_request(GPIO_BT_EN, "bcm4330_bten_gpio");
 	if (unlikely(rc)) {
 		pr_err("[BT] GPIO_BT_EN request failed.\n");
@@ -315,6 +319,7 @@ static int bcm4330_bluetooth_probe(struct platform_device *pdev)
 		gpio_free(GPIO_BT_EN);
 	}
 #endif
+	pr_info("[BT] bcm4330_bluetooth_probe End \n");
 	return rc;
 }
 

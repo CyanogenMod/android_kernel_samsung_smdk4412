@@ -17,6 +17,11 @@
 #include <mach/map.h>
 #include <plat/tvout.h>
 
+#ifdef CONFIG_USE_TVOUT_CMA
+#include <linux/dma-mapping.h>
+static u64 s5p_tvout_dmamask = DMA_BIT_MASK(32);
+#endif
+
 /* TVOUT interface */
 static struct resource s5p_tvout_resources[] = {
 	[0] = {
@@ -74,6 +79,12 @@ struct platform_device s5p_device_tvout = {
 	.id             = -1,
 	.num_resources  = ARRAY_SIZE(s5p_tvout_resources),
 	.resource       = s5p_tvout_resources,
+#ifdef CONFIG_USE_TVOUT_CMA
+	.dev		= {
+		.dma_mask		= &s5p_tvout_dmamask,
+		.coherent_dma_mask	= DMA_BIT_MASK(32),
+	},
+#endif
 };
 EXPORT_SYMBOL(s5p_device_tvout);
 

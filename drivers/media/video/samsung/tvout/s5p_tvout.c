@@ -279,16 +279,115 @@ static CLASS_ATTR(dbg_msg, S_IRUGO | S_IWUSR,
 		sysfs_dbg_msg_show, sysfs_dbg_msg_store);
 #endif
 
+#if !defined(CONFIG_CPU_EXYNOS4212) && !defined(CONFIG_CPU_EXYNOS4412)
+#if defined(CONFIG_USE_TVOUT_CMA)
+static inline int alloc_vp_buff(struct platform_device *pdev)
+{
+	/* in this case, buff will be allocated later
+	   when HDMI/MHL cable is connected */
+	return 1;
+}
+#elif defined(CONFIG_S5P_MEM_CMA)
+static inline int alloc_vp_buff(struct platform_device *pdev)
+{
+	int i, ret;
+	struct cma_info mem_info;
+	unsigned int vp_buff_vir_addr;
+	unsigned int vp_buff_phy_addr;
+
+	ret = cma_info(&mem_info, &pdev->dev, 0);
+	tvout_dbg("[cma_info] start_addr : 0x%x, end_addr : 0x%x, "
+		  "total_size : 0x%x, free_size : 0x%x\n",
+		  mem_info.lower_bound, mem_info.upper_bound,
+		  mem_info.total_size, mem_info.free_size);
+	if (ret) {
+		tvout_err("get cma info failed\n");
+		return 0;
+	}
+	s5ptv_vp_buff.size = mem_info.total_size;
+	if (s5ptv_vp_buff.size < S5PTV_VP_BUFF_CNT * S5PTV_VP_BUFF_SIZE) {
+		tvout_err("insufficient vp buffer size\n");
+		return 0;
+	}
+	vp_buff_phy_addr = (unsigned int)cma_alloc
+	    (&pdev->dev, (char *)"tvout", (size_t) s5ptv_vp_buff.size,
+	     (dma_addr_t) 0);
+
+	tvout_dbg("s5ptv_vp_buff.size = 0x%x\n", s5ptv_vp_buff.size);
+	tvout_dbg("s5ptv_vp_buff phy_base = 0x%x\n", vp_buff_phy_addr);
+
+	vp_buff_vir_addr = (unsigned int)phys_to_virt(vp_buff_phy_addr);
+	tvout_dbg("s5ptv_vp_buff vir_base = 0x%x\n", vp_buff_vir_addr);
+
+	if (!vp_buff_vir_addr) {
+		tvout_err("phys_to_virt failed\n");
+		cma_free(vp_buff_phy_addr);
+		return 0;
+	}
+
+	for (i = 0; i < S5PTV_VP_BUFF_CNT; i++) {
+		s5ptv_vp_buff.vp_buffs[i].phy_base =
+		    vp_buff_phy_addr + (i * S5PTV_VP_BUFF_SIZE);
+		s5ptv_vp_buff.vp_buffs[i].vir_base =
+		    vp_buff_vir_addr + (i * S5PTV_VP_BUFF_SIZE);
+	}
+
+	return 1;
+}
+#elif defined(CONFIG_S5P_MEM_BOOTMEM)
+static inline int alloc_vp_buff(struct platform_device *pdev)
+{
+	int i;
+	int mdev_id;
+	unsigned int vp_buff_vir_addr;
+	unsigned int vp_buff_phy_addr;
+
+	mdev_id = S5P_MDEV_TVOUT;
+	/* alloc from bank1 as default */
+	vp_buff_phy_addr = s5p_get_media_memory_bank(mdev_id, 1);
+	s5ptv_vp_buff.size = s5p_get_media_memsize_bank(mdev_id, 1);
+	if (s5ptv_vp_buff.size < S5PTV_VP_BUFF_CNT * S5PTV_VP_BUFF_SIZE) {
+		tvout_err("insufficient vp buffer size\n");
+		return 0;
+	}
+
+	tvout_dbg("s5ptv_vp_buff.size = 0x%x\n", s5ptv_vp_buff.size);
+	tvout_dbg("s5ptv_vp_buff phy_base = 0x%x\n", vp_buff_phy_addr);
+
+	vp_buff_vir_addr = (unsigned int)phys_to_virt(vp_buff_phy_addr);
+	tvout_dbg("s5ptv_vp_buff vir_base = 0x%x\n", vp_buff_vir_addr);
+
+	if (!vp_buff_vir_addr) {
+		tvout_err("phys_to_virt failed\n");
+		return 0;
+	}
+
+	for (i = 0; i < S5PTV_VP_BUFF_CNT; i++) {
+		s5ptv_vp_buff.vp_buffs[i].phy_base =
+		    vp_buff_phy_addr + (i * S5PTV_VP_BUFF_SIZE);
+		s5ptv_vp_buff.vp_buffs[i].vir_base =
+		    vp_buff_vir_addr + (i * S5PTV_VP_BUFF_SIZE);
+	}
+
+	return 1;
+}
+#endif
+#else
+static inline int alloc_vp_buff(struct platform_device *pdev)
+{
+	int i;
+
+	for (i = 0; i < S5PTV_VP_BUFF_CNT; i++) {
+		s5ptv_vp_buff.vp_buffs[i].phy_base = 0;
+		s5ptv_vp_buff.vp_buffs[i].vir_base = 0;
+	}
+
+	return 1;
+}
+#endif
+
 static int __devinit s5p_tvout_probe(struct platform_device *pdev)
 {
-#if defined(CONFIG_S5P_MEM_CMA)
-	struct cma_info mem_info;
-	int ret;
-#elif defined(CONFIG_S5P_MEM_BOOTMEM)
-	int mdev_id;
-#endif
-	unsigned int vp_buff_vir_addr;
-	unsigned int vp_buff_phy_addr = 0;
 	int i;
 
 #ifdef CONFIG_HDMI_EARJACK_MUTE
@@ -370,61 +469,9 @@ static int __devinit s5p_tvout_probe(struct platform_device *pdev)
 #endif
 	on_stop_process = false;
 	on_start_process = false;
-#if !defined(CONFIG_CPU_EXYNOS4212) && !defined(CONFIG_CPU_EXYNOS4412)
-#if defined(CONFIG_S5P_MEM_CMA)
-	/* CMA */
-	ret = cma_info(&mem_info, &pdev->dev, 0);
-	tvout_dbg("[cma_info] start_addr : 0x%x, end_addr : 0x%x, "
-		  "total_size : 0x%x, free_size : 0x%x\n",
-		  mem_info.lower_bound, mem_info.upper_bound,
-		  mem_info.total_size, mem_info.free_size);
-	if (ret) {
-		tvout_err("get cma info failed\n");
+
+	if (!alloc_vp_buff(pdev))
 		goto err_tvif_start;
-	}
-	s5ptv_vp_buff.size = mem_info.total_size;
-	if (s5ptv_vp_buff.size < S5PTV_VP_BUFF_CNT * S5PTV_VP_BUFF_SIZE) {
-		tvout_err("insufficient vp buffer size\n");
-		goto err_tvif_start;
-	}
-	vp_buff_phy_addr = (unsigned int)cma_alloc
-	    (&pdev->dev, (char *)"tvout", (size_t) s5ptv_vp_buff.size,
-	     (dma_addr_t) 0);
-
-#elif defined(CONFIG_S5P_MEM_BOOTMEM)
-	mdev_id = S5P_MDEV_TVOUT;
-	/* alloc from bank1 as default */
-	vp_buff_phy_addr = s5p_get_media_memory_bank(mdev_id, 1);
-	s5ptv_vp_buff.size = s5p_get_media_memsize_bank(mdev_id, 1);
-	if (s5ptv_vp_buff.size < S5PTV_VP_BUFF_CNT * S5PTV_VP_BUFF_SIZE) {
-		tvout_err("insufficient vp buffer size\n");
-		goto err_tvif_start;
-	}
-#endif
-
-	tvout_dbg("s5ptv_vp_buff.size = 0x%x\n", s5ptv_vp_buff.size);
-	tvout_dbg("s5ptv_vp_buff phy_base = 0x%x\n", vp_buff_phy_addr);
-
-	vp_buff_vir_addr = (unsigned int)phys_to_virt(vp_buff_phy_addr);
-	tvout_dbg("s5ptv_vp_buff vir_base = 0x%x\n", vp_buff_vir_addr);
-
-	if (!vp_buff_vir_addr) {
-		tvout_err("phys_to_virt failed\n");
-		goto err_ioremap;
-	}
-
-	for (i = 0; i < S5PTV_VP_BUFF_CNT; i++) {
-		s5ptv_vp_buff.vp_buffs[i].phy_base =
-		    vp_buff_phy_addr + (i * S5PTV_VP_BUFF_SIZE);
-		s5ptv_vp_buff.vp_buffs[i].vir_base =
-		    vp_buff_vir_addr + (i * S5PTV_VP_BUFF_SIZE);
-	}
-#else
-	for (i = 0; i < S5PTV_VP_BUFF_CNT; i++) {
-		s5ptv_vp_buff.vp_buffs[i].phy_base = 0;
-		s5ptv_vp_buff.vp_buffs[i].vir_base = 0;
-	}
-#endif
 
 	for (i = 0; i < S5PTV_VP_BUFF_CNT - 1; i++)
 		s5ptv_vp_buff.copy_buff_idxs[i] = i;
@@ -470,10 +517,6 @@ static int __devinit s5p_tvout_probe(struct platform_device *pdev)
 err_sysfs:
 	class_destroy(sec_tvout);
 err_class:
-err_ioremap:
-#if defined(CONFIG_S5P_MEM_CMA)
-	cma_free(vp_buff_phy_addr);
-#endif
 err_tvif_start:
 	s5p_tvout_v4l2_destructor();
 err_v4l2:

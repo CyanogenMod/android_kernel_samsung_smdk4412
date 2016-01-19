@@ -1,7 +1,7 @@
 /*
  * Linux cfg80211 driver - Android related functions
  *
- * Copyright (C) 1999-2012, Broadcom Corporation
+ * Copyright (C) 1999-2014, Broadcom Corporation
  * 
  *      Unless you and Broadcom execute a separate written software license
  * agreement governing use of this software, this software is licensed to you
@@ -21,7 +21,7 @@
  * software in any way with any other Broadcom software provided under a license
  * other than the GPL, without Broadcom's express prior written consent.
  *
- * $Id: wl_android.h 367305 2012-11-07 13:49:55Z $
+ * $Id: wl_android.h 454971 2014-02-12 14:56:41Z $
  */
 
 #include <linux/module.h>
@@ -53,17 +53,6 @@ void wl_android_post_init(void);
 int wl_android_wifi_on(struct net_device *dev);
 int wl_android_wifi_off(struct net_device *dev);
 int wl_android_priv_cmd(struct net_device *net, struct ifreq *ifr, int cmd);
-
-#if defined(CONFIG_WIFI_CONTROL_FUNC)
-int wl_android_wifictrl_func_add(void);
-void wl_android_wifictrl_func_del(void);
-void* wl_android_prealloc(int section, unsigned long size);
-
-int wifi_get_irq_number(unsigned long *irq_flags_ptr);
-int wifi_set_power(int on, unsigned long msec);
-int wifi_get_mac_addr(unsigned char *buf);
-void *wifi_get_country_code(char *ccode);
-#endif /* CONFIG_WIFI_CONTROL_FUNC */
 
 #ifdef WL_GENL
 typedef struct bcm_event_hdr {
@@ -105,3 +94,6 @@ enum {
 s32 wl_genl_send_msg(struct net_device *ndev, u32 event_type,
 	u8 *string, u16 len, u8 *hdr, u16 hdrlen);
 #endif /* WL_GENL */
+#ifdef WLAIBSS
+s32 wl_netlink_send_msg(int pid, int seq, void *data, size_t size);
+#endif /* WLAIBSS */

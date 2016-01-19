@@ -43,7 +43,11 @@ void s5p_int_src_hdmi_hpd(struct platform_device *pdev)
 #else
 	s3c_gpio_cfgpin(GPIO_HDMI_HPD, S3C_GPIO_SFN(0x3));
 #endif
+#ifdef CONFIG_SAMSUNG_MHL
+	s3c_gpio_setpull(GPIO_HDMI_HPD, S3C_GPIO_PULL_NONE);
+#else
 	s3c_gpio_setpull(GPIO_HDMI_HPD, S3C_GPIO_PULL_DOWN);
+#endif
 }
 
 void s5p_int_src_ext_hpd(struct platform_device *pdev)
@@ -81,7 +85,11 @@ int s5p_v4l2_hpd_read_gpio(void)
 void s5p_v4l2_int_src_hdmi_hpd(void)
 {
 	s3c_gpio_cfgpin(HDMI_GPX(7), S3C_GPIO_SFN(0x3));
+#ifdef CONFIG_SAMSUNG_MHL
+	s3c_gpio_setpull(HDMI_GPX(7), S3C_GPIO_PULL_NONE);
+#else
 	s3c_gpio_setpull(HDMI_GPX(7), S3C_GPIO_PULL_DOWN);
+#endif
 }
 
 void s5p_v4l2_int_src_ext_hpd(void)

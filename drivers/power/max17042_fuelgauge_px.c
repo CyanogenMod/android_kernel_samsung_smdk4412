@@ -932,27 +932,6 @@ void fg_check_vf_fullcap_range(void)
 			fg_read_register(DPACC_REG));
 }
 
-int fg_check_cap_corruption_p4(void)
-{
-
-	struct i2c_client *client = fg_i2c_client;
-	struct max17042_chip *chip = i2c_get_clientdata(client);
-
-	int designcap;
-
-	/* If usgin Jig or low batt compensation flag is set,
-	   then skip checking. */
-	if (chip->pdata->check_jig_status()) {
-		fg_write_register(DESIGNCAP_REG, chip->info.vfcapacity - 1);
-		designcap = fg_read_register(DESIGNCAP_REG);
-		pr_info("%s: return by jig, vfcap(0x%04x), designcap(0x%04x)\n",
-				__func__, chip->info.vfcapacity, designcap);
-		return 0;
-	} else
-		return 1;
-}
-
-
 int fg_check_cap_corruption(void)
 {
 	struct i2c_client *client = fg_i2c_client;
@@ -1229,8 +1208,8 @@ static int get_low_batt_threshold(int range, int level, int nCurrent)
 	if (fg_get_battery_type() == SDI_BATTERY_TYPE) {
 		switch (range) {
 /* P4 & P8 needs one more level */
-#if defined(CONFIG_MACH_P4NOTE) \
-	|| defined(CONFIG_MACH_P8) || defined(CONFIG_MACH_P8LTE)
+#if defined(CONFIG_MACH_P4NOTE) || defined(CONFIG_MACH_SP7160LTE) \
+	|| defined(CONFIG_MACH_P8) || defined(CONFIG_MACH_P8LTE) || defined(CONFIG_MACH_TAB3)
 		case 5:
 			if (level == 1)
 				ret = SDI_Range5_1_Offset + \
@@ -1321,7 +1300,7 @@ static int get_low_batt_threshold(int range, int level, int nCurrent)
 			break;
 		}
 	}
-#if defined(CONFIG_MACH_P4NOTE)
+#if defined(CONFIG_MACH_P4NOTE) || defined(CONFIG_MACH_SP7160LTE) || defined(CONFIG_MACH_TAB3)
 	else if (fg_get_battery_type() == BYD_BATTERY_TYPE) {
 		switch (range) {
 		case 5:
@@ -1433,8 +1412,8 @@ int low_batt_compensation(int fg_soc, int fg_vcell, int fg_current)
 				bCntReset = 1;
 		}
 /* P4 & P8 needs more level */
-#if defined(CONFIG_MACH_P4NOTE) \
-	|| defined(CONFIG_MACH_P8) || defined(CONFIG_MACH_P8LTE)
+#if defined(CONFIG_MACH_P4NOTE) || defined(CONFIG_MACH_SP7160LTE) \
+	|| defined(CONFIG_MACH_P8) || defined(CONFIG_MACH_P8LTE) || defined(CONFIG_MACH_TAB3)
 		else if (fg_min_current >= CURRENT_RANGE5 && \
 				fg_min_current < CURRENT_RANGE4) {
 			if (fg_soc >= 2 && fg_vcell < \
@@ -1488,8 +1467,8 @@ int low_batt_compensation(int fg_soc, int fg_vcell, int fg_current)
 
 
 		if (check_low_batt_comp_condtion(&new_level)) {
-#if defined(CONFIG_MACH_P4NOTE) || \
-	defined(CONFIG_MACH_P8) || defined(CONFIG_MACH_P8LTE)
+#if defined(CONFIG_MACH_P4NOTE) || defined(CONFIG_MACH_SP7160LTE) || \
+	defined(CONFIG_MACH_P8) || defined(CONFIG_MACH_P8LTE) || defined(CONFIG_MACH_TAB3)
 			/*
 			 * Disable 3% low battery compensation
 			 * duplicated action with 1% low battery compensation
@@ -1521,7 +1500,7 @@ int low_batt_compensation(int fg_soc, int fg_vcell, int fg_current)
 		}
 	}
 
-#if defined(CONFIG_MACH_P4NOTE) || defined(CONFIG_MACH_P2)
+#if defined(CONFIG_MACH_P4NOTE) || defined(CONFIG_MACH_SP7160LTE) || defined(CONFIG_MACH_P2) || defined(CONFIG_MACH_TAB3)
 	/* Prevent power off over 3500mV */
 	/* Force power off under 3400mV */
 	prevent_early_late_poweroff(fg_vcell, &fg_soc);

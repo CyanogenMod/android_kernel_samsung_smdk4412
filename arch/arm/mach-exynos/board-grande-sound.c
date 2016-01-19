@@ -188,7 +188,7 @@ static struct wm8994_drc_cfg drc_value[] = {
 		.regs[4] = 0x0000,
 	},
 #endif
-#if defined(CONFIG_MACH_P4NOTE)
+#if defined(CONFIG_MACH_P4NOTE) || defined(CONFIG_MACH_TAB3)
 {
 		.name = "cam rec DRC",
 		.regs[0] = 0x019B,
@@ -253,7 +253,7 @@ static struct wm8994_pdata wm1811_pdata = {
 #if defined(CONFIG_MACH_M0) || defined(CONFIG_MACH_C1_KOR_SKT) || \
 	defined(CONFIG_MACH_C1_KOR_KT) || defined(CONFIG_MACH_C1_KOR_LGT) || \
 	defined(CONFIG_MACH_P4NOTE) || defined(CONFIG_MACH_GC1) \
-	|| defined(CONFIG_MACH_GRANDE) || defined(CONFIG_MACH_IRON)
+	|| defined(CONFIG_MACH_GRANDE) || defined(CONFIG_MACH_IRON) || defined(CONFIG_MACH_TAB3)
 	.lineout2fb = 0,
 #else
 	.lineout2fb = 1,

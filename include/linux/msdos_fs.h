@@ -102,7 +102,9 @@ struct __fat_dirent {
 #define FAT_IOCTL_GET_ATTRIBUTES	_IOR('r', 0x10, __u32)
 #define FAT_IOCTL_SET_ATTRIBUTES	_IOW('r', 0x11, __u32)
 #define VFAT_IOCTL_GET_VOLUME_ID	_IOR('r', 0x12, __u32)
+#if defined(CONFIG_VMWARE_MVP)
 #define FAT_IOCTL_VMW_EXTEND		_IO('r', 0x42)
+#endif
 
 struct fat_boot_sector {
 	__u8	ignored[3];	/* Boot strap short or near jump */

@@ -40,6 +40,7 @@
 #include <linux/firmware.h>
 #include <linux/dma-mapping.h>
 #include <linux/vmalloc.h>
+#include <linux/syscalls.h>
 
 #include "fimc-is-core.h"
 #include "fimc-is-regs.h"
@@ -48,6 +49,40 @@
 #include "fimc-is-err.h"
 
 /* Binary load functions */
+#if 0
+ void dump_region(struct fimc_is_dev *dev)
+{
+	int i, j;
+	struct file *file;
+	loff_t pos = 0;
+	int fd;
+	mm_segment_t old_fs;
+	char filename[] = "/data/fimcis/fimc_is.raw";
+
+	printk(KERN_INFO "---- start FW dump ----\n");
+
+	old_fs = get_fs();
+	set_fs(KERNEL_DS);
+
+	fd = sys_open(filename, O_WRONLY|O_CREAT, 0644);
+	if (fd >= 0) {
+		//sys_write(fd, (u8 *)phys_to_virt(dev->mem.base), 10*1024*1024);
+		sys_write(fd, (u8 *)phys_to_virt(dev->mem.base + FIMC_IS_DEBUG_REGION_ADDR), 512*1024);
+		file = fget(fd);
+		if (file) {
+			//vfs_write(file, (u8 *)phys_to_virt(dev->mem.base), 10*1024*1024, &pos);
+			vfs_write(file, (u8 *)phys_to_virt(dev->mem.base + FIMC_IS_DEBUG_REGION_ADDR), 512*1024, &pos);
+			fput(file);
+		}
+		sys_close(fd);
+	} 
+	else
+		printk(KERN_ERR "Dump FW error !! \n");
+
+	set_fs(old_fs);
+}
+#endif
+
 static int fimc_is_request_firmware(struct fimc_is_dev *dev)
 {
 	int ret;
@@ -407,7 +442,7 @@ int fimc_is_s_power(struct v4l2_subdev *sd, int on)
 			printk(KERN_INFO "%s Wait Sub ip power off\n", __func__);
 			ret = wait_event_timeout(is_dev->irq_queue1,
 				test_bit(IS_PWR_SUB_IP_POWER_OFF,
-				&is_dev->power), FIMC_IS_SHUTDOWN_TIMEOUT);
+				&is_dev->power), FIMC_IS_POWEROFF_TIMEOUT);
 			if (!ret) {
 				err("%s wait timeout\n", __func__);
 				fimc_is_hw_set_low_poweroff(is_dev, true);
@@ -986,6 +1021,9 @@ static int fimc_is_v4l2_digital_zoom(struct fimc_is_dev *dev, int zoom_factor)
 static int fimc_is_v4l2_isp_scene_mode(struct fimc_is_dev *dev, int mode)
 {
 	int ret = 0;
+#ifdef USE_NIGHT_SHOT
+	dev->sensor.frametime_max_LLS = 0;
+#endif
 	switch (mode) {
 	case SCENE_MODE_NONE:
 		/* ISO */
@@ -1531,7 +1569,7 @@ static int fimc_is_v4l2_isp_scene_mode(struct fimc_is_dev *dev, int mode)
 		IS_INC_PARAM_NUM(dev);
 		/* Metering */
 		IS_ISP_SET_PARAM_METERING_CMD(dev,
-				ISP_METERING_COMMAND_AVERAGE);
+				ISP_METERING_COMMAND_CENTER);
 		IS_ISP_SET_PARAM_METERING_WIN_POS_X(dev, 0);
 		IS_ISP_SET_PARAM_METERING_WIN_POS_Y(dev, 0);
 		IS_ISP_SET_PARAM_METERING_WIN_WIDTH(dev, 0);
@@ -1548,7 +1586,11 @@ static int fimc_is_v4l2_isp_scene_mode(struct fimc_is_dev *dev, int mode)
 		IS_SET_PARAM_BIT(dev, PARAM_ISP_AWB);
 		IS_INC_PARAM_NUM(dev);
 		/* Adjust */
+#ifdef USE_NIGHT_SHOT
+		IS_ISP_SET_PARAM_ADJUST_CMD(dev, 0xFF);//for test
+#else		
 		IS_ISP_SET_PARAM_ADJUST_CMD(dev, ISP_ADJUST_COMMAND_MANUAL_ALL);
+#endif
 		IS_ISP_SET_PARAM_ADJUST_CONTRAST(dev, 0);
 		IS_ISP_SET_PARAM_ADJUST_SATURATION(dev, 0);
 		IS_ISP_SET_PARAM_ADJUST_SHARPNESS(dev, 0);
@@ -1577,7 +1619,26 @@ static int fimc_is_v4l2_isp_scene_mode(struct fimc_is_dev *dev, int mode)
 		IS_ISP_SET_PARAM_AA_MANUAL_AF(dev, 0);
 		IS_ISP_SET_PARAM_AA_ERR(dev, ISP_AF_ERROR_NO);
 		IS_SET_PARAM_BIT(dev, PARAM_ISP_AA);
+		IS_INC_PARAM_NUM(dev);				
+#ifdef USE_NIGHT_SHOT
+		/* ISP stop */
+		IS_ISP_SET_PARAM_CONTROL_CMD(dev, CONTROL_COMMAND_STOP);
+		IS_SET_PARAM_BIT(dev, PARAM_ISP_CONTROL);
 		IS_INC_PARAM_NUM(dev);
+		fimc_is_mem_cache_clean((void *)dev->is_p_region,
+			IS_PARAM_SIZE);
+		fimc_is_hw_set_param(dev);
+		/* Frame rate setting */
+		dev->sensor.frametime_max_LLS = 125000;
+		IS_ISP_SET_PARAM_OTF_INPUT_FRAMETIME_MIN(dev,0);
+		IS_ISP_SET_PARAM_OTF_INPUT_FRAMETIME_MAX(dev,125000);
+		IS_SET_PARAM_BIT(dev, PARAM_ISP_OTF_INPUT);
+		IS_INC_PARAM_NUM(dev);
+		/* ISP start */
+		IS_ISP_SET_PARAM_CONTROL_CMD(dev, CONTROL_COMMAND_START);
+		IS_SET_PARAM_BIT(dev, PARAM_ISP_CONTROL);
+		IS_INC_PARAM_NUM(dev);
+#endif
 		fimc_is_mem_cache_clean((void *)dev->is_p_region,
 							IS_PARAM_SIZE);
 		fimc_is_hw_set_param(dev);
@@ -4354,6 +4415,12 @@ static int fimc_is_s_mbus_fmt(struct v4l2_subdev *sd,
 		return ret;
 	}
 
+#ifdef USE_NIGHT_SHOT
+       if(dev->sensor.frametime_max_LLS != 0){
+           frametime_max = dev->sensor.frametime_max_LLS;
+       }
+#endif
+
 	format = fimc_is_hw_get_sensor_format(dev);
 	/* 1. ISP input / output*/
 	IS_ISP_SET_PARAM_OTF_INPUT_WIDTH(dev, mf->width);
@@ -4431,7 +4498,7 @@ static int fimc_is_s_stream(struct v4l2_subdev *sd, int enable)
 		fimc_is_hw_set_stream(dev, enable);
 		ret = wait_event_timeout(dev->irq_queue1,
 				test_bit(IS_ST_STREAM_ON, &dev->state),
-				FIMC_IS_SHUTDOWN_TIMEOUT);
+				 FIMC_IS_STREAMON_TIMEOUT);
 		if (!ret) {
 			err("wait timeout : Stream on\n");
 			fimc_is_hw_set_low_poweroff(dev, true);
@@ -4447,7 +4514,7 @@ static int fimc_is_s_stream(struct v4l2_subdev *sd, int enable)
 		fimc_is_hw_set_stream(dev, enable);
 		ret = wait_event_timeout(dev->irq_queue1,
 				test_bit(IS_ST_STREAM_OFF, &dev->state),
-						FIMC_IS_SHUTDOWN_TIMEOUT);
+						FIMC_IS_STREAMOFF_TIMEOUT);
 		if (!ret) {
 			err("wait timeout : Stream off\n");
 			printk(KERN_ERR "Low power off\n");
@@ -4465,6 +4532,9 @@ static int fimc_is_s_parm(struct v4l2_subdev *sd, struct v4l2_streamparm *a)
 	u32 fps = 0;
 	int width, height, format;
 	int i, ret = 0;
+#ifdef USE_NIGHT_SHOT
+       u32 frametime_max;
+#endif
 
 	if (a->parm.capture.timeperframe.numerator == 0)
 		fps = 0; /* prevent divide-by-0 error case */
@@ -4590,6 +4660,14 @@ static int fimc_is_s_parm(struct v4l2_subdev *sd, struct v4l2_streamparm *a)
 				return -EINVAL;
 			}
 		}
+		
+#ifdef USE_NIGHT_SHOT
+              if(dev->sensor.frametime_max_LLS == 0){
+                  frametime_max = 66666;
+              }else{
+                  frametime_max = dev->sensor.frametime_max_LLS;
+              }
+#endif
 		IS_ISP_SET_PARAM_OTF_INPUT_CMD(dev, OTF_INPUT_COMMAND_ENABLE);
 		IS_ISP_SET_PARAM_OTF_INPUT_WIDTH(dev, width);
 		IS_ISP_SET_PARAM_OTF_INPUT_HEIGHT(dev, height);
@@ -4603,7 +4681,11 @@ static int fimc_is_s_parm(struct v4l2_subdev *sd, struct v4l2_streamparm *a)
 		IS_ISP_SET_PARAM_OTF_INPUT_CROP_WIDTH(dev, 0);
 		IS_ISP_SET_PARAM_OTF_INPUT_CROP_HEIGHT(dev, 0);
 		IS_ISP_SET_PARAM_OTF_INPUT_FRAMETIME_MIN(dev, 0);
+#ifdef USE_NIGHT_SHOT
+		IS_ISP_SET_PARAM_OTF_INPUT_FRAMETIME_MAX(dev, frametime_max);
+#else
 		IS_ISP_SET_PARAM_OTF_INPUT_FRAMETIME_MAX(dev, 66666);
+#endif
 		IS_SET_PARAM_BIT(dev, PARAM_ISP_OTF_INPUT);
 		IS_INC_PARAM_NUM(dev);
 		fimc_is_mem_cache_clean((void *)dev->is_p_region,

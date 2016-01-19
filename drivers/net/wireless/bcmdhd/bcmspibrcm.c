@@ -1,7 +1,7 @@
 /*
  * Broadcom BCMSDH to gSPI Protocol Conversion Layer
  *
- * Copyright (C) 1999-2012, Broadcom Corporation
+ * Copyright (C) 1999-2014, Broadcom Corporation
  * 
  *      Unless you and Broadcom execute a separate written software license
  * agreement governing use of this software, this software is licensed to you
@@ -21,7 +21,7 @@
  * software in any way with any other Broadcom software provided under a license
  * other than the GPL, without Broadcom's express prior written consent.
  *
- * $Id: bcmspibrcm.c 359460 2012-09-28 01:51:23Z $
+ * $Id: bcmspibrcm.c 373331 2012-12-07 04:46:22Z $
  */
 
 #define HSMODE
@@ -94,6 +94,9 @@ uint8	spi_inbuf[SPI_MAX_PKT_LEN];
 #define BUF2_PKT_LEN	128
 uint8	spi_outbuf2[BUF2_PKT_LEN];
 uint8	spi_inbuf2[BUF2_PKT_LEN];
+#ifdef BCMSPI_ANDROID
+uint *dhd_spi_lockcount = NULL;
+#endif /* BCMSPI_ANDROID */
 
 #if !(defined(SPI_PIO_RW_BIGENDIAN) && defined(SPI_PIO_32BIT_RW))
 #define SPISWAP_WD4(x) bcmswap32(x);
@@ -164,6 +167,10 @@ sdioh_attach(osl_t *osh, void *bar0, uint irq)
 	 */
 	sd->wordlen = 2;
 
+#ifdef BCMSPI_ANDROID
+	dhd_spi_lockcount = &sd->lockcount;
+#endif /* BCMSPI_ANDROID */
+
 #ifndef BCMSPI_ANDROID
 	if (!spi_hw_attach(sd)) {
 		sd_err(("%s: spi_hw_attach() failed\n", __FUNCTION__));
@@ -209,6 +216,9 @@ sdioh_detach(osl_t *osh, sdioh_info_t *sd)
 		spi_hw_detach(sd);
 #endif /* !BCMSPI_ANDROID */
 		spi_osfree(sd);
+#ifdef BCMSPI_ANDROID
+		dhd_spi_lockcount = NULL;
+#endif /* !BCMSPI_ANDROID */
 		MFREE(sd->osh, sd, sizeof(sdioh_info_t));
 	}
 	return SDIOH_API_RC_SUCCESS;
@@ -218,24 +228,24 @@ sdioh_detach(osl_t *osh, sdioh_info_t *sd)
 extern SDIOH_API_RC
 sdioh_interrupt_register(sdioh_info_t *sd, sdioh_cb_fn_t fn, void *argh)
 {
-#ifndef BCMSPI_ANDROID
 	sd_trace(("%s: Entering\n", __FUNCTION__));
+#if !defined(OOB_INTR_ONLY)
 	sd->intr_handler = fn;
 	sd->intr_handler_arg = argh;
 	sd->intr_handler_valid = TRUE;
-#endif /* !BCMSPI_ANDROID */
+#endif /* !defined(OOB_INTR_ONLY) */
 	return SDIOH_API_RC_SUCCESS;
 }
 
 extern SDIOH_API_RC
 sdioh_interrupt_deregister(sdioh_info_t *sd)
 {
-#ifndef BCMSPI_ANDROID
 	sd_trace(("%s: Entering\n", __FUNCTION__));
+#if !defined(OOB_INTR_ONLY)
 	sd->intr_handler_valid = FALSE;
 	sd->intr_handler = NULL;
 	sd->intr_handler_arg = NULL;
-#endif /* !BCMSPI_ANDROID */
+#endif /* !defined(OOB_INTR_ONLY) */
 	return SDIOH_API_RC_SUCCESS;
 }
 

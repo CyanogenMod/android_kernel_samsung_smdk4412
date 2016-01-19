@@ -34,7 +34,8 @@ extern void battery_control_info(struct battery_info *info,
 extern void battery_event_control(struct battery_info *info);
 #endif /* CONFIG_SYSFS */
 
-#if defined(CONFIG_TARGET_LOCALE_KOR) || defined(CONFIG_MACH_M0_CTC)
+#if defined(CONFIG_TARGET_LOCALE_KOR) || defined(CONFIG_MACH_M0_CTC)\
+	|| defined(CONFIG_MACH_T0_CHN_CTC)
 extern int battery_info_proc(char *buf, char **start,
 			off_t offset, int count, int *eof, void *data);
 #endif

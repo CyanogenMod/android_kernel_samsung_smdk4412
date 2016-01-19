@@ -89,7 +89,7 @@ static void ir_remocon_send(struct ir_remocon_data *data)
 			if (data->signal[0] < 50000)
 				period += 1;
 #endif
-#ifdef CONFIG_MACH_P4NOTE
+#if defined(CONFIG_MACH_P4NOTE) || defined(CONFIG_MACH_SP7160LTE) || defined(CONFIG_MACH_TAB3)
 				period += 1;
 #endif
 		} else
@@ -106,7 +106,7 @@ static void ir_remocon_send(struct ir_remocon_data *data)
 	else
 		off = (period - duty) - 2;
 
-#ifdef CONFIG_MACH_P4NOTE
+#if defined(CONFIG_MACH_P4NOTE) || defined(CONFIG_MACH_SP7160LTE) || defined(CONFIG_MACH_TAB3)
 	 off = (period - duty) - 3;
 #endif
 
@@ -131,7 +131,7 @@ static void ir_remocon_send(struct ir_remocon_data *data)
 				off_period = data->signal[i+1]*(period+1);
 		}
 
-#ifdef CONFIG_MACH_P4NOTE
+#if defined(CONFIG_MACH_P4NOTE) || defined(CONFIG_MACH_SP7160LTE) || defined(CONFIG_MACH_TAB3)
 		off_period = data->signal[i+1]*(period+1);
 #endif
 
@@ -316,7 +316,7 @@ static int __devinit ir_remocon_probe(struct platform_device *pdev)
 		error = -ENOMEM;
 		goto err_free_mem;
 	}
-#if defined(CONFIG_MACH_P2) || defined(CONFIG_MACH_P4NOTE)
+#if defined(CONFIG_MACH_P2) || defined(CONFIG_MACH_P4NOTE) || defined(CONFIG_MACH_TAB3)
 	data->gpio = GPIO_IRDA_CONTROL;
 	data->pwr_en = -1;
 #endif

@@ -91,7 +91,7 @@ static void __exit felica_exit(void);
 #define FELICA_NL_REQ_SYNC				0x06
 #define FELICA_NL_RESPONCE				0xFE
 #define FELICA_NL_CONNECT_MSG			0xFF
-#define FELICA_NL_MSG_DATA_SIZE			4096
+#define FELICA_NL_MSG_DATA_SIZE			4096*4
 #define FELICA_NL_MSG_SIZE			(FELICA_NL_MSG_DATA_SIZE+4)
 
 #define MSG_READ1_FLAGS_OFFSET			1

@@ -96,11 +96,13 @@ void save_stack_trace_tsk(struct task_struct *tsk, struct stack_trace *trace)
 		/*
 		 * What guarantees do we have here that 'tsk'
 		 * is not running on another CPU?
-		 *
-		 * We guarantee that this function will be used for
-		 * latencytop only :-)
+		 * What guarantees do we have here that 'tsk' is not
+		 * running on another CPU?  For now, ignore it as we
+		 * can't guarantee we won't explode.
 		 */
-		/* BUG(); */
+		if (trace->nr_entries < trace->max_entries)
+			        trace->entries[trace->nr_entries++] = ULONG_MAX;
+		return;
 #endif
 		data.no_sched_functions = 1;
 		frame.fp = thread_saved_fp(tsk);

@@ -48,8 +48,8 @@ extern void midas_config_sleep_gpio_table(void);
 
 /* Sensors & NFC*/
 #define GPIO_PS_ALS_EN		EXYNOS4212_GPJ0(5)
-#define GPIO_PS_ALS_SDA_28V	EXYNOS4_GPK1(1)
-#define GPIO_PS_ALS_SCL_28V	EXYNOS4_GPK2(2)
+#define GPIO_PS_ALS_SDA_28V	EXYNOS4_GPF0(0)
+#define GPIO_PS_ALS_SCL_28V	EXYNOS4_GPF0(1)
 #define GPIO_PS_ALS_INT		EXYNOS4_GPX0(2)
 
 #define GPIO_ACC_INT		EXYNOS4_GPX0(0)
@@ -326,6 +326,7 @@ extern void midas_config_sleep_gpio_table(void);
 
 #if defined(CONFIG_TDMB) || defined(CONFIG_TDMB_MODULE)
 #define GPIO_TDMB_EN		EXYNOS4_GPC0(0)
+#define GPIO_TDMB_RST_N		EXYNOS4_GPF0(7)
 #define GPIO_TDMB_INT		EXYNOS4_GPC0(4)
 #define GPIO_TDMB_IRQ		gpio_to_irq(GPIO_TDMB_INT)
 #define GPIO_TDMB_INT_AF	0xf
@@ -335,4 +336,9 @@ extern void midas_config_sleep_gpio_table(void);
 #define GPIO_TDMB_SPI_MOSI	EXYNOS4_GPC1(4)
 #endif
 
+#define GPIO_LED_VDD_EN		EXYNOS4212_GPM0(0)
+#define GPIO_KEY_LED_CTRL	EXYNOS4_GPF2(6)
+#define GPIO_MSENSE_RST_N	EXYNOS4_GPY2(1)
+
+#define GPIO_LINEOUT_EN		EXYNOS4_GPL0(3)
 #endif /* __MACH_GPIO_BAFFIN_H */

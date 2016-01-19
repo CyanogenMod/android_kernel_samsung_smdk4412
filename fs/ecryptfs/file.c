@@ -36,7 +36,8 @@
 #ifdef CONFIG_WTL_ENCRYPTION_FILTER
 #include <linux/ctype.h>
 #define ECRYPTFS_IOCTL_GET_ATTRIBUTES	_IOR('l', 0x10, __u32)
-#define ECRYPTFS_WAS_ENCRYPTED 128
+#define ECRYPTFS_WAS_ENCRYPTED 0x0080
+#define ECRYPTFS_WAS_ENCRYPTED_OTHER_DEVICE 0x0100
 #endif
 
 
@@ -245,6 +246,14 @@ static int ecryptfs_open(struct inode *inode, struct file *file)
 		goto out;
 	}
 #ifdef CONFIG_WTL_ENCRYPTION_FILTER
+	if (crypt_stat->flags & ECRYPTFS_STRUCT_INITIALIZED
+		&& crypt_stat->flags & ECRYPTFS_POLICY_APPLIED
+		&& crypt_stat->flags & ECRYPTFS_ENCRYPTED
+		&& !(crypt_stat->flags & ECRYPTFS_KEY_VALID)
+		&& !(crypt_stat->flags & ECRYPTFS_KEY_SET)
+		&& crypt_stat->flags & ECRYPTFS_I_SIZE_INITIALIZED) {
+		crypt_stat->flags |= ECRYPTFS_ENCRYPTED_OTHER_DEVICE;
+	}
 	mutex_lock(&crypt_stat->cs_mutex);
 	if ((mount_crypt_stat->flags & ECRYPTFS_ENABLE_NEW_PASSTHROUGH)
 			&& (crypt_stat->flags & ECRYPTFS_ENCRYPTED)) {
@@ -377,11 +386,19 @@ ecryptfs_unlocked_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 					fp_dentry->d_name.len + 1);
 
 		mutex_lock(&crypt_stat->cs_mutex);
-		if ((crypt_stat->flags & ECRYPTFS_ENCRYPTED) ||
-			((mount_crypt_stat->flags & ECRYPTFS_ENABLE_FILTERING)
-			&& (is_file_name_match(mount_crypt_stat, fp_dentry)
-			|| is_file_ext_match(mount_crypt_stat, filename))))
-			attr = ECRYPTFS_WAS_ENCRYPTED;
+		if ((crypt_stat->flags & ECRYPTFS_ENCRYPTED
+			|| crypt_stat->flags & ECRYPTFS_ENCRYPTED_OTHER_DEVICE)
+			|| ((mount_crypt_stat->flags
+					& ECRYPTFS_ENABLE_FILTERING)
+				&& (is_file_name_match
+					(mount_crypt_stat, fp_dentry)
+				|| is_file_ext_match
+					(mount_crypt_stat, filename)))) {
+			if (crypt_stat->flags & ECRYPTFS_KEY_VALID)
+				attr = ECRYPTFS_WAS_ENCRYPTED;
+			else
+				attr = ECRYPTFS_WAS_ENCRYPTED_OTHER_DEVICE;
+		}
 		mutex_unlock(&crypt_stat->cs_mutex);
 		put_user(attr, user_attr);
 		return 0;

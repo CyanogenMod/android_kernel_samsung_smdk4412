@@ -510,7 +510,12 @@ static void get_fw_ver_bin(void *device_data)
 	char buff[40] = {0};
 
 	set_default_result(sysfs_data);
+
+#if defined(CONFIG_TARGET_LOCALE_USA)
+	snprintf(buff, sizeof(buff), "AT00%04x", MXT_FIRM_VERSION);
+#else
 	snprintf(buff, sizeof(buff), "%02x", MXT_FIRM_VERSION);
+#endif
 
 	set_cmd_result(sysfs_data, buff, strnlen(buff, sizeof(buff)));
 	sysfs_data->cmd_state = CMD_STATUS_OK;
@@ -528,7 +533,11 @@ static void get_fw_ver_ic(void *device_data)
 	int ver = data->info.version;
 
 	set_default_result(sysfs_data);
+#if defined(CONFIG_TARGET_LOCALE_USA)
+	snprintf(buff, sizeof(buff), "AT00%04x", ver);
+#else
 	snprintf(buff, sizeof(buff), "%02x", ver);
+#endif
 
 	set_cmd_result(sysfs_data, buff, strnlen(buff, sizeof(buff)));
 	sysfs_data->cmd_state = CMD_STATUS_OK;

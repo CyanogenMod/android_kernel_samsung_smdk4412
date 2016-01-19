@@ -386,7 +386,7 @@ int rtc_set_alarm_boot(struct rtc_device *rtc, struct rtc_wkalrm *alarm)
 
 	if (!rtc->ops)
 		err = -ENODEV;
-	else if (!rtc->ops->set_alarm)
+	else if (!rtc->ops->set_alarm_boot)
 		err = -EINVAL;
 	else
 		err = rtc->ops->set_alarm_boot(rtc->dev.parent, alarm);
@@ -395,6 +395,22 @@ int rtc_set_alarm_boot(struct rtc_device *rtc, struct rtc_wkalrm *alarm)
 	return err;
 }
 EXPORT_SYMBOL_GPL(rtc_set_alarm_boot);
+
+int rtc_get_alarm_boot(struct rtc_device *rtc, struct rtc_wkalrm *alarm)
+{
+	int err;
+
+	err = mutex_lock_interruptible(&rtc->ops_lock);
+	if (err)
+		return err;
+
+	if (rtc->ops->get_alarm_boot)
+		err = rtc->ops->get_alarm_boot(rtc->dev.parent, alarm);
+
+	mutex_unlock(&rtc->ops_lock);
+	return err;
+}
+EXPORT_SYMBOL_GPL(rtc_get_alarm_boot);
 #endif
 
 #if defined(CONFIG_RTC_POWER_OFF)
@@ -417,6 +433,27 @@ int rtc_set_alarm_poweroff(struct rtc_device *rtc, struct rtc_wkalrm *alarm)
 	return err;
 }
 EXPORT_SYMBOL_GPL(rtc_set_alarm_poweroff);
+
+int rtc_set_alarm_enable(struct rtc_device *rtc, int enable)
+{
+	int err;
+
+	err = mutex_lock_interruptible(&rtc->ops_lock);
+	if (err)
+		return err;
+
+	if (!rtc->ops)
+		err = -ENODEV;
+	else if (!rtc->ops->set_alarm)
+		err = -EINVAL;
+	else
+		err = rtc->ops->set_alarm_enable(rtc->dev.parent, enable);
+
+	mutex_unlock(&rtc->ops_lock);
+	return err;
+
+}
+EXPORT_SYMBOL_GPL(rtc_set_alarm_enable);
 #endif
 
 

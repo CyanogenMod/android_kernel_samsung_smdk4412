@@ -31,13 +31,8 @@
 #include <plat/gpio-cfg.h>
 #include <plat/cpu.h>
 #include <plat/clock-clksrc.h>
-#if defined(CONFIG_S5P_DSIM_SWITCHABLE_DUAL_LCD)
-#include <../../../drivers/video/samsung_duallcd/s3cfb.h>
-#else
-#include <../../../drivers/video/samsung/s3cfb.h>	/* should be fixed */
-#endif
+#include <plat/fb-s5p.h>
 
-struct platform_device; /* don't need the contents */
 
 #ifdef CONFIG_FB_S5P
 
@@ -59,7 +54,6 @@ void s3cfb_set_display_path(void)
 #endif
 }
 
-#if !defined(CONFIG_FB_S5P_MIPI_DSIM)
 static void s3cfb_gpio_setup_24bpp(unsigned int start, unsigned int size,
 		unsigned int cfg, s5p_gpio_drvstr_t drvstr)
 {
@@ -68,7 +62,6 @@ static void s3cfb_gpio_setup_24bpp(unsigned int start, unsigned int size,
 	for (; size > 0; size--, start++)
 		s5p_gpio_set_drvstr(start, drvstr);
 }
-#endif
 
 #if defined(CONFIG_FB_S5P_WA101S) || defined(CONFIG_FB_S5P_LTE480WV)
 void s3cfb_cfg_gpio(struct platform_device *pdev)
@@ -659,7 +652,7 @@ int s3cfb_mdnie_pwm_clk_on(void)
 		printk(KERN_ERR "failed to get sclk for mdnie_pwm_pre\n");
 		goto err_clk2;
 	}
-#if defined(CONFIG_FB_S5P_S6C1372)
+#if defined(CONFIG_FB_S5P_S6C1372) || defined(CONFIG_FB_S5P_HX8369B)
 	mout_mpll = clk_get(NULL, "xusbxti");
 	if (IS_ERR(mout_mpll)) {
 		printk(KERN_ERR "failed to get mout_mpll\n");
@@ -730,7 +723,7 @@ err_clk1:
 	return -EINVAL;
 }
 
-unsigned int get_clk_rate(struct platform_device *pdev, struct clk *sclk)
+static unsigned int get_clk_rate(struct platform_device *pdev, struct clk *sclk)
 {
 	struct s3c_platform_fb *pdata = pdev->dev.platform_data;
 	struct s3cfb_lcd *lcd = (struct s3cfb_lcd *)pdata->lcd;
@@ -758,22 +751,22 @@ unsigned int get_clk_rate(struct platform_device *pdev, struct clk *sclk)
 
 		fimd_div = gcd(div, div_limit);
 
-		div /= fimd_div;
+		if (div/fimd_div <= 16)
+			div /= fimd_div;
 	}
 
 	if (!div) {
 		dev_err(&pdev->dev, "div(%d) should be non-zero\n", div);
 		div = 1;
 	} else if (div > 16) {
-		dev_err(&pdev->dev, "div(%d) max should be 16\n", div);
-		for (fimd_div = 2; fimd_div < div; div++) {
-			if (div%fimd_div == 0)
+		for (fimd_div = 2; fimd_div <= div; fimd_div++) {
+			if ((div%fimd_div == 0) && (div/fimd_div <= 16))
 				break;
 		}
 		div /= fimd_div;
-		div = (div > 16) ? 16 : div;
 	}
 
+	div = (div > 16) ? 16 : div;
 	rate = src_clk / div;
 
 	if ((src_clk % rate) && (div != 1)) {
@@ -783,8 +776,8 @@ unsigned int get_clk_rate(struct platform_device *pdev, struct clk *sclk)
 			rate--;
 	}
 
-	dev_info(&pdev->dev, "vclk=%d, div=%d(%d), rate=%d\n",
-		vclk, DIV_ROUND_CLOSEST(src_clk, vclk), div, rate);
+	dev_info(&pdev->dev, "src_clk=%d, vclk=%d, div=%d(%d), rate=%d\n",
+		src_clk, vclk, DIV_ROUND_CLOSEST(src_clk, vclk), div, rate);
 
 	return rate;
 }
@@ -795,11 +788,10 @@ int s3cfb_clk_on(struct platform_device *pdev, struct clk **s3cfb_clk)
 	struct clk *mout_mpll = NULL;
 	struct clk *lcd_clk = NULL;
 	struct clksrc_clk *src_clk = NULL;
-	u32 clkdiv = 0;
 	struct s3c_platform_fb *pdata = pdev->dev.platform_data;
 	struct s3cfb_lcd *lcd = (struct s3cfb_lcd *)pdata->lcd;
 
-	u32 rate = 0;
+	u32 rate = 0, clkdiv = 0;
 	int ret = 0;
 
 	lcd_clk = clk_get(&pdev->dev, "lcd");

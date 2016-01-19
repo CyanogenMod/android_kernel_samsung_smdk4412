@@ -236,7 +236,7 @@ static struct idpram_gpio_data idpram_gpio_init_control[] = {
 
 static void idpram_gpio_cfg(struct idpram_gpio_data *gpio)
 {
-	printk(KERN_DEBUG "idpram set gpio num=%d, cfg=0x%x, pud=%d, val=%d\n",
+	pr_info("MIF: idpram set gpio num=%d, cfg=0x%x, pud=%d, val=%d\n",
 		gpio->num, gpio->cfg, gpio->pud, gpio->val);
 
 	s3c_gpio_cfgpin(gpio->num, gpio->cfg);
@@ -287,7 +287,7 @@ static void idpram_init(void)
 		s5pv310_dpram_sfr_va = (struct idpram_sfr_reg __iomem *)
 		ioremap_nocache(IDPRAM_SFR_PHYSICAL_ADDR, IDPRAM_SFR_SIZE);
 		if (!s5pv310_dpram_sfr_va) {
-			printk(KERN_ERR "MIF: idpram_sfr_base io-remap fail\n");
+			pr_err("MIF: idpram_sfr_base io-remap fail\n");
 			/*iounmap(idpram_base);*/
 		}
 	}
@@ -426,8 +426,9 @@ static struct modem_data cdma_modem_data = {
 	.gpio_cp_reset     = GPIO_QSC_PHONE_RST,
 	.gpio_pda_active   = GPIO_PDA_ACTIVE,
 	.gpio_phone_active = GPIO_QSC_PHONE_ACTIVE,
-	.gpio_ap_wakeup = GPIO_C210_DPRAM_INT_N,
-	.gpio_cp_dump_int = GPIO_CP_DUMP_INT,
+	.gpio_ap_wakeup    = GPIO_C210_DPRAM_INT_N,
+	.gpio_cp_dump_int  = GPIO_CP_DUMP_INT,
+	.gpio_mbx_intr     = GPIO_DPRAM_INT_CP_N,
 
 	.modem_net  = CDMA_NETWORK,
 	.modem_type = QC_QSC6085,
@@ -481,7 +482,7 @@ static void config_cdma_modem_gpio(void)
 	if (gpio_cp_on) {
 		err = gpio_request(gpio_cp_on, "QSC_ON");
 		if (err) {
-			pr_err("fail to request gpio %s\n", "QSC_ON");
+			pr_err("MIF: fail to request gpio %s\n", "QSC_ON");
 		} else {
 			gpio_direction_output(gpio_cp_on, 0);
 			s3c_gpio_setpull(gpio_cp_on, S3C_GPIO_PULL_NONE);
@@ -491,7 +492,7 @@ static void config_cdma_modem_gpio(void)
 	if (gpio_cp_rst) {
 		err = gpio_request(gpio_cp_rst, "QSC_RST");
 		if (err) {
-			pr_err("fail to request gpio %s\n", "QSC_RST");
+			pr_err("MIF: fail to request gpio %s\n", "QSC_RST");
 		} else {
 			gpio_direction_output(gpio_cp_rst, 0);
 			s3c_gpio_setpull(gpio_cp_rst, S3C_GPIO_PULL_NONE);
@@ -502,9 +503,9 @@ static void config_cdma_modem_gpio(void)
 	if (gpio_pda_active) {
 		err = gpio_request(gpio_pda_active, "PDA_ACTIVE");
 		if (err) {
-			pr_err("fail to request gpio %s\n", "PDA_ACTIVE");
+			pr_err("MIF: fail to request gpio %s\n", "PDA_ACTIVE");
 		} else {
-			gpio_direction_output(gpio_pda_active, 0);
+			gpio_direction_output(gpio_pda_active, 1);
 			s3c_gpio_setpull(gpio_pda_active, S3C_GPIO_PULL_NONE);
 		}
 	}
@@ -512,17 +513,20 @@ static void config_cdma_modem_gpio(void)
 	if (gpio_phone_active) {
 		err = gpio_request(gpio_phone_active, "PHONE_ACTIVE");
 		if (err) {
-			pr_err("fail to request gpio %s\n", "PHONE_ACTIVE");
+			pr_err("MIF: fail to request gpio %s\n",
+				"PHONE_ACTIVE");
 		} else {
 			s3c_gpio_cfgpin(gpio_phone_active, S3C_GPIO_SFN(0xF));
-			s3c_gpio_setpull(gpio_phone_active, S3C_GPIO_PULL_NONE);
+			s3c_gpio_setpull(gpio_phone_active,
+				S3C_GPIO_PULL_NONE);
 		}
 	}
 
 	if (gpio_ap_wakeup) {
 		err = gpio_request(gpio_ap_wakeup, "HOST_WAKEUP");
 		if (err) {
-			pr_err("fail to request gpio %s\n", "HOST_WAKEUP");
+			pr_err("MIF: fail to request gpio %s\n",
+				"HOST_WAKEUP");
 		} else {
 			s3c_gpio_cfgpin(gpio_ap_wakeup, S3C_GPIO_SFN(0xF));
 			s3c_gpio_setpull(gpio_ap_wakeup, S3C_GPIO_PULL_NONE);
@@ -532,26 +536,59 @@ static void config_cdma_modem_gpio(void)
 	if (gpio_cp_dump_int) {
 		err = gpio_request(gpio_cp_dump_int, "CP_DUMP_INT");
 		if (err) {
-			pr_err("fail to request gpio %s\n", "CP_DUMP_INT");
+			pr_err("MIF: fail to request gpio %s\n",
+				"CP_DUMP_INT");
 		} else {
-			s3c_gpio_cfgpin(gpio_cp_dump_int, S3C_GPIO_SFN(0xF));
+			s3c_gpio_cfgpin(gpio_cp_dump_int, S3C_GPIO_SFN(0xFF));
 			s3c_gpio_setpull(gpio_cp_dump_int, S3C_GPIO_PULL_DOWN);
 		}
 	}
 }
 
-static int __init init_modem(void)
+static int c1_is_bootmode_recovery;
+
+static int __init setup_bootmode(char *str)
 {
-	pr_info("MIF : <%s>\n", __func__);
+	printk(KERN_INFO "%s : %s\n", __func__, str);
 
-	/* interanl dpram gpio configure */
-	idpram_gpio_init();
-	idpram_init();
+	c1_is_bootmode_recovery = 0;
 
-	config_cdma_modem_gpio();
+	if (str)
+		if ((*str == '2') || (*str == '4'))
+			c1_is_bootmode_recovery = 1;
 
-	platform_device_register(&cdma_modem);
+	printk(KERN_INFO "%s. c1_is_bootmode_recovery = %d\n",
+		__func__, c1_is_bootmode_recovery);
+
 	return 0;
 }
+
+__setup("bootmode=", setup_bootmode);
+
+struct platform_device sec_device_dpram_recovery = {
+	.name = "dpram-recovery",
+	.id = -1,
+};
+
+static int __init init_modem(void)
+{
+	pr_info("MIF: <%s+\n", __func__);
+
+	if (c1_is_bootmode_recovery)
+		platform_device_register(&sec_device_dpram_recovery);
+	else {
+		/* internal dpram gpio configure */
+		idpram_gpio_init();
+		idpram_init();
+
+		config_cdma_modem_gpio();
+
+		platform_device_register(&cdma_modem);
+	}
+
+	pr_info("MIF: <%s-\n", __func__);
+
+	return 0;
+}
+
 late_initcall(init_modem);
-/*device_initcall(init_modem);*/

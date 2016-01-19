@@ -102,7 +102,6 @@ struct sromc_access_cfg {
 
 #define MAX_MSM_EDPRAM_IPC_DEV	2	/* FMT, RAW */
 
-
 struct msm_edpram_ipc_cfg {
 	u16 magic;
 	u16 access;
@@ -663,13 +662,9 @@ static struct sromc_access_cfg gsm_edpram_access_cfg[] = {
 	},
 };
 
-static struct modemlink_dpram_control gsm_edpram_ctrl = {
-	.dp_type = EXT_DPRAM,
+static struct modemlink_dpram_data gsm_edpram = {
+	.type = EXT_DPRAM,
 
-	.dpram_irq        = ESC_DPRAM_INT_IRQ,
-	.dpram_irq_flags  = IRQF_TRIGGER_FALLING,
-
-	.max_ipc_dev = IPC_RFS,
 	.ipc_map = &gsm_ipc_map,
 
 	.boot_size_offset = DP_BOOT_SIZE_OFFSET,
@@ -769,10 +764,15 @@ static struct modem_data gsm_modem_data = {
 	.gpio_reset_req_n  = 0,	/* GPIO_CP_MSM_PMU_RST, */
 	.gpio_cp_reset     = GPIO_CP2_MSM_RST,
 	.gpio_pda_active   = 0,
+
 	.gpio_phone_active = GPIO_ESC_PHONE_ACTIVE,
+	.irq_phone_active = ESC_PHONE_ACTIVE_IRQ,
+
 	.gpio_flm_uart_sel = GPIO_BOOT_SW_SEL_CP2,
 
-	.gpio_dpram_int = GPIO_ESC_DPRAM_INT,
+	.gpio_ipc_int2ap = GPIO_ESC_DPRAM_INT,
+	.irq_ipc_int2ap = ESC_DPRAM_INT_IRQ,
+	.irqf_ipc_int2ap = IRQF_TRIGGER_FALLING,
 
 	.gpio_cp_dump_int   = 0,
 	.gpio_cp_warm_reset = 0,
@@ -783,34 +783,20 @@ static struct modem_data gsm_modem_data = {
 	.modem_type = QC_ESC6270,
 	.link_types = LINKTYPE(LINKDEV_DPRAM),
 	.link_name  = "esc6270_edpram",
-	.dpram_ctl  = &gsm_edpram_ctrl,
+	.dpram = &gsm_edpram,
 
-	.ipc_version	= SIPC_VER_41,
+	.ipc_version = SIPC_VER_41,
+	.max_ipc_dev = (IPC_RAW + 1),
 
 	.num_iodevs = ARRAY_SIZE(gsm_io_devices),
 	.iodevs     = gsm_io_devices,
 };
 
-static struct resource gsm_modem_res[] = {
-	[0] = {
-		.name  = "cp_active_irq",
-		.start = ESC_PHONE_ACTIVE_IRQ,
-		.end   = ESC_PHONE_ACTIVE_IRQ,
-		.flags = IORESOURCE_IRQ,
-	},
-	[1] = {
-		.name = "dpram_irq",
-		.start = ESC_DPRAM_INT_IRQ,
-		.end = ESC_DPRAM_INT_IRQ,
-		.flags = IORESOURCE_IRQ,
-	},
-};
-
 static struct platform_device gsm_modem = {
 	.name = "modem_if",
 	.id = 1,
-	.num_resources = ARRAY_SIZE(gsm_modem_res),
-	.resource = gsm_modem_res,
+	.num_resources = 0,
+	.resource = NULL,
 	.dev = {
 		.platform_data = &gsm_modem_data,
 	},
@@ -935,7 +921,7 @@ void config_gsm_modem_gpio(void)
 	unsigned gpio_pda_active = gsm_modem_data.gpio_pda_active;
 	unsigned gpio_phone_active = gsm_modem_data.gpio_phone_active;
 	unsigned gpio_flm_uart_sel = gsm_modem_data.gpio_flm_uart_sel;
-	unsigned gpio_dpram_int = gsm_modem_data.gpio_dpram_int;
+	unsigned gpio_ipc_int2ap = gsm_modem_data.gpio_ipc_int2ap;
 
 	pr_err("[MODEMS] <%s>\n", __func__);
 
@@ -1025,15 +1011,15 @@ void config_gsm_modem_gpio(void)
 		gpio_set_value(gpio_cp_rst, 0);
 	}
 
-	if (gpio_dpram_int) {
-		err = gpio_request(gpio_dpram_int, "ESC_DPRAM_INT");
+	if (gpio_ipc_int2ap) {
+		err = gpio_request(gpio_ipc_int2ap, "ESC_DPRAM_INT");
 		if (err) {
 			pr_err("fail to request gpio %s, gpio %d, errno %d\n",
-					"ESC_DPRAM_INT", gpio_dpram_int, err);
+					"ESC_DPRAM_INT", gpio_ipc_int2ap, err);
 		} else {
 			/* Configure as a wake-up source */
-			s3c_gpio_cfgpin(gpio_dpram_int, S3C_GPIO_SFN(0xF));
-			s3c_gpio_setpull(gpio_dpram_int, S3C_GPIO_PULL_NONE);
+			s3c_gpio_cfgpin(gpio_ipc_int2ap, S3C_GPIO_SFN(0xF));
+			s3c_gpio_setpull(gpio_ipc_int2ap, S3C_GPIO_PULL_NONE);
 		}
 	}
 
@@ -1058,10 +1044,10 @@ void config_gsm_modem_gpio(void)
 
 static u8 *gsm_edpram_remap_mem_region(struct sromc_cfg *cfg)
 {
-	int			      dp_addr = 0;
-	int			      dp_size = 0;
-	u8 __iomem                   *dp_base = NULL;
-	struct msm_edpram_ipc_cfg    *ipc_map = NULL;
+	int dp_addr = 0;
+	int dp_size = 0;
+	u8 __iomem *dp_base = NULL;
+	struct msm_edpram_ipc_cfg *ipc_map = NULL;
 	struct dpram_ipc_device *dev = NULL;
 
 	dp_addr = cfg->addr;
@@ -1073,8 +1059,8 @@ static u8 *gsm_edpram_remap_mem_region(struct sromc_cfg *cfg)
 	}
 	pr_info("[MDM] <%s> DPRAM VA=0x%08X\n", __func__, (int)dp_base);
 
-	gsm_edpram_ctrl.dp_base = (u8 __iomem *)dp_base;
-	gsm_edpram_ctrl.dp_size = dp_size;
+	gsm_edpram.base = (u8 __iomem *)dp_base;
+	gsm_edpram.size = dp_size;
 
 	/* Map for IPC */
 	ipc_map = (struct msm_edpram_ipc_cfg *)dp_base;

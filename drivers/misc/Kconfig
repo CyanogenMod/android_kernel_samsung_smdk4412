@@ -420,6 +420,14 @@ config SENSORS_AK8975
 	  If you say yes here you get support for Asahi Kasei's
 	  orientation sensor AK8975.
 
+config SENSORS_AK8963
+	tristate "AK8963 compass support"
+	default n
+	depends on I2C
+	help
+	  If you say yes here you get support for Asahi Kasei's
+	  orientation sensor AK8963.
+
 config EP93XX_PWM
 	tristate "EP93xx PWM support"
 	depends on ARCH_EP93XX
@@ -567,6 +575,12 @@ config SWITCH_DUAL_MODEM
 	 Need to change UI at *#7284# also to have effect on this.
 	 Use a combination of MAX77693 switch function and GPIO control.
 
+config SWITCH_USB_PATH_AUTO
+	bool "Switch USB path automatically"
+	default n
+	help
+	 This feature can be switch the path of USB automatically when switching the USB path by using the sysfs node
+
 config WIMAX_CMC
         bool "SUB PMIC FOR WIMAX CMC"
         depends on I2C
@@ -613,53 +627,6 @@ config AUDIENCE_ES305
 
 source "drivers/misc/2mic/Kconfig"
 
-config MUIC_MAX8997
-	tristate "MAX8997 MUIC"
-	depends on MFD_MAX8997
-	help
-	  If you say yes here you will get support for the MUIC of
-	  Maxim MAX8997 PMIC.
-	  The MAX8997 MUIC is a USB port accessory detector and switch.
-
-config MUIC_MAX8997_OVPUI
-	tristate "MAX8997 MUIC"
-	depends on MFD_MAX8997
-	default n
-	help
-	  If you say yes here you will get support for the MUIC OVP UI
-	  concept of Maxim MAX8997 PMIC. The MAX8997 MUIC OVP UI concept
-	  is used in Chinese models. When OVP is occurred, the battery UI
-	  must be changed to uncharging status.
-
-config MUIC_MAX77693_SEPARATE_MHL_PORT
-	bool "MUIC_MAX77693_SEPARATE_MHL_PORT"
-	depends on MFD_MAX77693
-	default n
-	help
-	  If you say yes here you will get support for the separated
-	  MHL port.
-
-config MUIC_MAX77693_SUPPORT_OTG_AUDIO_DOCK
-	bool "MUIC_MAX77693_SUPPORT_OTG_AUDIO_DOCK"
-	depends on MFD_MAX77693
-	default n
-	help
-	  If you say yes here you will get support for the OTG audio dock.
-
-config MUIC_MAX77693_SUPPORT_SMART_DOCK
-	bool "MUIC_MAX77693_SUPPORT_SMART_DOCK"
-	depends on MFD_MAX77693
-	default n
-	help
-	  If you say yes here you will get support for the smart dock.
-
-config MUIC_MAX77693_SUPPORT_CAR_DOCK
-	bool "MUIC_MAX77693_SUPPORT_CAR_DOCK"
-	depends on MFD_MAX77693
-	default n
-	help
-	  If you say yes here you will get support for the car dock.
-
 config USBHUB_USB3503
 	bool "USB3503 USB HUB Driver"
 	depends on I2C
@@ -694,6 +661,12 @@ config STMPE811_ADC
 	---help---
 	  Say yes here to build support for STMPE811 8 channel ADC driver
 
+config TIMA_LOG
+	tristate "Support for dumping TIMA log"
+	default y
+	help
+	  This option enables support for dumping TIMA log
+
 config MPU_SENSORS_MPU3050
     tristate "MPU3050"
     depends on I2C
@@ -722,12 +695,10 @@ source "drivers/misc/ti-st/Kconfig"
 source "drivers/misc/lis3lv02d/Kconfig"
 source "drivers/misc/carma/Kconfig"
 source "drivers/misc/c2c/Kconfig"
-
 source "drivers/misc/modem_if/Kconfig"
 source "drivers/misc/modem_if_na/Kconfig"
-if MACH_U1
-source "drivers/misc/modem_if_u1/Kconfig"
-endif
+source "drivers/misc/modem_if_na_spr/Kconfig"
+source "drivers/misc/modem_v2/Kconfig"
 
 config SLP_LOWMEM_NOTIFY
 	bool "Driver for SLP Low Memory Notification"

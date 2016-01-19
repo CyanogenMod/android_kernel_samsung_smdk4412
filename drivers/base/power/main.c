@@ -32,6 +32,10 @@
 #include "../base.h"
 #include "power.h"
 
+#ifdef CONFIG_FAST_BOOT
+#include <linux/fake_shut_down.h>
+#endif
+
 /*
  * The entries in the dpm_list list are in a depth first order, simply
  * because children are guaranteed to be discovered after parents, and
@@ -1019,9 +1023,7 @@ static int device_suspend(struct device *dev)
  * dpm_suspend - Execute "suspend" callbacks for all non-sysdev devices.
  * @state: PM transition of the system being carried out.
  */
-#ifdef CONFIG_FAST_BOOT
-extern bool fake_shut_down;
-#endif
+
 int dpm_suspend(pm_message_t state)
 {
 	ktime_t starttime = ktime_get();

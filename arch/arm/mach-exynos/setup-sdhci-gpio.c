@@ -22,9 +22,7 @@
 #include <plat/gpio-cfg.h>
 #include <plat/regs-sdhci.h>
 #include <plat/sdhci.h>
-
-extern int s3c_gpio_slp_cfgpin(unsigned int pin, unsigned int config);
-extern int s3c_gpio_slp_setpull_updown(unsigned int pin, unsigned int config);
+#include "u1.h"
 
 #if defined(CONFIG_ARCH_EXYNOS4)
 void exynos4_setup_sdhci0_cfg_gpio(struct platform_device *dev, int width)
@@ -158,7 +156,8 @@ void exynos4_setup_sdhci3_cfg_gpio(struct platform_device *dev, int width)
 	struct s3c_sdhci_platdata *pdata = dev->dev.platform_data;
 	unsigned int gpio;
 
-#if defined(CONFIG_WIMAX_CMC)
+#if defined(CONFIG_WIMAX_CMC) /* && defined(CONFIG_TARGET_LOCALE_NA) */
+
 	if (gpio_get_value(GPIO_WIMAX_EN)) {
 		for (gpio = EXYNOS4_GPK3(0); gpio < EXYNOS4_GPK3(2); gpio++) {
 			s3c_gpio_cfgpin(gpio, S3C_GPIO_SFN(2));
@@ -197,14 +196,16 @@ void exynos4_setup_sdhci3_cfg_gpio(struct platform_device *dev, int width)
 		}
 	}
 #else
+
 	/* Set all the necessary GPK3[0:1] pins to special-function 2 */
 	for (gpio = EXYNOS4_GPK3(0); gpio < EXYNOS4_GPK3(2); gpio++) {
 		s3c_gpio_cfgpin(gpio, S3C_GPIO_SFN(2));
 #if defined(CONFIG_MACH_U1) || defined(CONFIG_MACH_TRATS)
 		s3c_gpio_setpull(gpio, S3C_GPIO_PULL_NONE);
 		s5p_gpio_set_drvstr(gpio, S5P_GPIO_DRVSTR_LV2);
-#elif defined(CONFIG_MACH_M0) || defined(CONFIG_MACH_C1_USA_ATT) || \
-	defined(CONFIG_MACH_T0) || defined(CONFIG_MACH_M3)
+#elif defined(CONFIG_MACH_M0) || defined(CONFIG_MACH_C1) || \
+	defined(CONFIG_MACH_T0) || defined(CONFIG_MACH_M3) || \
+	defined(CONFIG_MACH_GD2)
 		s3c_gpio_setpull(gpio, S3C_GPIO_PULL_NONE);
 		s5p_gpio_set_drvstr(gpio, S5P_GPIO_DRVSTR_LV2);
 #elif defined(CONFIG_MACH_MIDAS)
@@ -229,8 +230,9 @@ void exynos4_setup_sdhci3_cfg_gpio(struct platform_device *dev, int width)
 #if defined(CONFIG_MACH_U1) || defined(CONFIG_MACH_TRATS)
 		s3c_gpio_setpull(gpio, S3C_GPIO_PULL_NONE);
 		s5p_gpio_set_drvstr(gpio, S5P_GPIO_DRVSTR_LV2);
-#elif defined(CONFIG_MACH_M0) || defined(CONFIG_MACH_C1_USA_ATT) || \
-	defined(CONFIG_MACH_T0) || defined(CONFIG_MACH_M3)
+#elif defined(CONFIG_MACH_M0) || defined(CONFIG_MACH_C1) || \
+	defined(CONFIG_MACH_T0) || defined(CONFIG_MACH_M3) || \
+	defined(CONFIG_MACH_GD2)
 		s3c_gpio_setpull(gpio, S3C_GPIO_PULL_NONE);
 		s5p_gpio_set_drvstr(gpio, S5P_GPIO_DRVSTR_LV2);
 #elif defined(CONFIG_MACH_MIDAS)

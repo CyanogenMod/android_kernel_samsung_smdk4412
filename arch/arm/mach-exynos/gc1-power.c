@@ -418,7 +418,7 @@ static struct regulator_init_data safeout2_init_data = {
 		.always_on	= 0,
 		.boot_on	= 0,
 		.state_mem	= {
-			.disabled = 1,
+			.enabled = 1,
 		},
 	},
 	.num_consumer_supplies	= ARRAY_SIZE(safeout2_supply),
@@ -464,7 +464,11 @@ static struct regulator_consumer_supply s5m_ldo3_supply[] = {};
 static struct regulator_consumer_supply s5m_ldo4_supply[] = {
 	REGULATOR_SUPPLY("vddq_pre_1.8v", NULL),
 };
-
+#if defined(CONFIG_MACH_GC1_USA_ATT) || defined(CONFIG_MACH_GC1_USA_VZW)
+static struct regulator_consumer_supply s5m_ldo5_supply[] = {
+	REGULATOR_SUPPLY("vcc_adc_1.8v", NULL),
+};
+#endif
 static struct regulator_consumer_supply s5m_ldo8_supply[] = {
 	REGULATOR_SUPPLY("vmipi_1.0v", NULL),
 	REGULATOR_SUPPLY("VDD10", "s5p-mipi-dsim.0"),
@@ -583,38 +587,42 @@ static struct regulator_consumer_supply s5m8767_enp32khz[] = {
 	};
 
 S5M_REGULATOR_INIT(s5m_ldo3, "VCC_1.8V_AP", 1800000, 1800000, 1, 0, 0);
+#if defined(CONFIG_MACH_GC1_USA_ATT) || defined(CONFIG_MACH_GC1_USA_VZW)
+S5M_REGULATOR_INIT(s5m_ldo5, "VCC_ADC_1.8V", 1800000, 1800000, 0,
+		REGULATOR_CHANGE_STATUS, 1);
+#endif
 S5M_REGULATOR_INIT(s5m_ldo8, "VMIPI_1.0V", 1000000, 1000000, 1,
-	       REGULATOR_CHANGE_STATUS, 0);
+		REGULATOR_CHANGE_STATUS, 0);
 S5M_REGULATOR_INIT(s5m_ldo9, "CAM_ISP_1.8V", 1800000, 1800000, 0,
-	       REGULATOR_CHANGE_STATUS, 1);
+		REGULATOR_CHANGE_STATUS, 1);
 S5M_REGULATOR_INIT(s5m_ldo10, "VMIPI_1.8V", 1800000, 1800000, 1,
-	       REGULATOR_CHANGE_STATUS, 0);
+		REGULATOR_CHANGE_STATUS, 0);
 S5M_REGULATOR_INIT(s5m_ldo11, "VABB1_1.95V", 1950000, 1950000, 1,
-	       REGULATOR_CHANGE_STATUS, 1);
+		REGULATOR_CHANGE_STATUS, 1);
 S5M_REGULATOR_INIT(s5m_ldo12, "VUOTG_3.0V", 3000000, 3000000, 1,
-	       REGULATOR_CHANGE_STATUS, 0);
+		REGULATOR_CHANGE_STATUS, 0);
 S5M_REGULATOR_INIT(s5m_ldo14, "VABB2_1.95V", 1950000, 1950000, 1,
-	       REGULATOR_CHANGE_STATUS, 1);
+		REGULATOR_CHANGE_STATUS, 1);
 S5M_REGULATOR_INIT(s5m_ldo19, "LCD_IO_1.8V", 1800000, 1800000, 0,
-	       REGULATOR_CHANGE_STATUS, 1);
+		REGULATOR_CHANGE_STATUS, 1);
 S5M_REGULATOR_INIT(s5m_ldo20, "TSP_AVDD_3.3V", 3300000, 3300000, 0,
-	       REGULATOR_CHANGE_STATUS, 1);
+		REGULATOR_CHANGE_STATUS, 1);
 S5M_REGULATOR_INIT(s5m_ldo21, "MOT_3.3V", 3300000, 3300000, 0,
-	       REGULATOR_CHANGE_STATUS, 1);
+		REGULATOR_CHANGE_STATUS, 1);
 S5M_REGULATOR_INIT(s5m_ldo22, "CAM_SENSOR_2.8V", 2800000, 2800000, 0,
-	       REGULATOR_CHANGE_STATUS, 1);
+		REGULATOR_CHANGE_STATUS, 1);
 S5M_REGULATOR_INIT(s5m_ldo23, "VTF_2.8V", 2800000, 2800000, 0,
-	       REGULATOR_CHANGE_STATUS, 1);
+		REGULATOR_CHANGE_STATUS, 1);
 S5M_REGULATOR_INIT(s5m_ldo24, "LED_3.3V", 3000000, 3000000, 0,
-	       REGULATOR_CHANGE_STATUS, 1);
+		REGULATOR_CHANGE_STATUS, 1);
 S5M_REGULATOR_INIT(s5m_ldo25, "CAM_SENSOR_CORE_1.2V", 1200000, 1200000, 0,
-	       REGULATOR_CHANGE_STATUS, 1);
+		REGULATOR_CHANGE_STATUS, 1);
 S5M_REGULATOR_INIT(s5m_ldo26, "CAM_SENSOR_1.8V", 1800000, 1800000, 0,
-	       REGULATOR_CHANGE_STATUS, 1);
+		REGULATOR_CHANGE_STATUS, 1);
 S5M_REGULATOR_INIT(s5m_ldo27, "OIS_1.5V", 1500000, 1500000, 0,
-	       REGULATOR_CHANGE_STATUS, 1);
+		REGULATOR_CHANGE_STATUS, 1);
 S5M_REGULATOR_INIT(s5m_ldo28, "TSP_VDD_1.8V", 1800000, 1800000, 0,
-	       REGULATOR_CHANGE_STATUS, 1);
+		REGULATOR_CHANGE_STATUS, 1);
 
 
 static struct regulator_init_data s5m8767_buck1_data = {
@@ -706,6 +714,9 @@ static struct s5m_regulator_data s5m8767_regulators[] = {
 	{S5M8767_BUCK4, &s5m8767_buck4_data,},
 	{S5M8767_BUCK6, &s5m8767_buck6_data,},
 	{S5M8767_LDO3, &s5m_ldo3_init_data,},
+#if defined(CONFIG_MACH_GC1_USA_ATT) || defined(CONFIG_MACH_GC1_USA_VZW)
+	{S5M8767_LDO5, &s5m_ldo5_init_data,},
+#endif
 	{S5M8767_LDO8, &s5m_ldo8_init_data,},
 	{S5M8767_LDO9, &s5m_ldo9_init_data,},
 	{S5M8767_LDO10, &s5m_ldo10_init_data,},
@@ -738,6 +749,19 @@ struct s5m_opmode_data s5m8767_opmode_data[S5M8767_REG_MAX] = {
 	[S5M8767_LDO19] = {S5M8767_LDO19, S5M_OPMODE_STANDBY},
 };
 
+#if defined(CONFIG_MACH_GC1_USA_VZW) || defined(CONFIG_MACH_GC1_KOR_SKT) || \
+	defined(CONFIG_MACH_GC1_KOR_KT) || defined(CONFIG_MACH_GC1_KOR_LGT)
+struct s5m_wtsr_smpl wtsr_smpl_data = {
+	.wtsr_en = true,
+	.smpl_en = false,
+};
+#else
+struct s5m_wtsr_smpl wtsr_smpl_data = {
+	.wtsr_en = true,
+	.smpl_en = true,
+};
+#endif
+
 struct s5m_platform_data exynos4_s5m8767_info = {
 	.device_type	= S5M8767X,
 	.num_regulators = ARRAY_SIZE(s5m8767_regulators),
@@ -750,7 +774,7 @@ struct s5m_platform_data exynos4_s5m8767_info = {
 	.wakeup		= 1,
 
 	.opmode_data = s5m8767_opmode_data,
-	.wtsr_smpl		= 1,
+	.wtsr_smpl	= &wtsr_smpl_data,
 
 	.buck2_voltage[0] = 1100000,	/* 1.1V */
 	.buck2_voltage[1] = 1100000,	/* 1.1V */

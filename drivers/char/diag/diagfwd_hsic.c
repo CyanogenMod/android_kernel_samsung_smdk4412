@@ -148,9 +148,10 @@ static void diag_hsic_read_complete_callback(void *ctxt, char *buf,
 static void diag_zero_cfg_hsic_work_fn(struct work_struct *work)
 {
 	int index = driver->zero_cfg_packet_lens_index;
-	if (index >= ZERO_CFG_SUBPACKET_MAX)
+	if (index >= ZERO_CFG_SUBPACKET_MAX) {
+		diag_bridge_close();
 		return;
-
+	}
 	if (!driver->in_busy_hsic_write && !driver->in_busy_hsic_read) {
 		driver->in_busy_hsic_write = 1;
 		diag_bridge_write(&zero_cfg_buf[driver->zero_cfg_index],

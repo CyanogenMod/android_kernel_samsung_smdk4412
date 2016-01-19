@@ -256,7 +256,7 @@ struct ieee80211_supported_band {
  * @use_4addr: use 4-address frames
  */
 struct vif_params {
-       int use_4addr;
+	int use_4addr;
 };
 
 /**
@@ -382,6 +382,8 @@ struct cfg80211_crypto_settings {
  * @hidden_ssid: whether to hide the SSID in Beacon/Probe Response frames
  * @crypto: crypto settings
  * @privacy: the BSS uses privacy
+ * @acl_mac: Enable or disable mac address based acl in driver,
+ *	valid only for the drivers which have this support implemented.
  * @auth_type: Authentication type (algorithm)
  * @beacon_ies: extra information element(s) to add into Beacon frames or %NULL
  * @beacon_ies_len: length of beacon_ies in octets
@@ -403,6 +405,7 @@ struct beacon_parameters {
 	enum nl80211_hidden_ssid hidden_ssid;
 	struct cfg80211_crypto_settings crypto;
 	bool privacy;
+	bool acl_mac;
 	enum nl80211_auth_type auth_type;
 	const u8 *beacon_ies;
 	size_t beacon_ies_len;
@@ -412,6 +415,8 @@ struct beacon_parameters {
 	size_t assocresp_ies_len;
 	int probe_resp_len;
 	u8 *probe_resp;
+	enum nl80211_sta_capab_req_options sta_cap_req;
+	u8 auto_channel_select;
 };
 
 /**
@@ -930,6 +935,7 @@ struct cfg80211_match_set {
  * @wiphy: the wiphy this was for
  * @dev: the interface
  * @channels: channels to scan
+ * @rssi_thold: don't report scan results below this threshold (in s32 dBm)
  */
 struct cfg80211_sched_scan_request {
 	struct cfg80211_ssid *ssids;
@@ -940,6 +946,7 @@ struct cfg80211_sched_scan_request {
 	size_t ie_len;
 	struct cfg80211_match_set *match_sets;
 	int n_match_sets;
+	s32 rssi_thold;
 
 	/* internal */
 	struct wiphy *wiphy;
@@ -1159,6 +1166,8 @@ struct cfg80211_ibss_params {
  * @key_len: length of WEP key for shared key authentication
  * @key_idx: index of WEP key for shared key authentication
  * @key: WEP key for shared key authentication
+ * @bg_scan_period:  Background scan period in seconds
+ *   or -1 to indicate that default value is to be used.
  */
 struct cfg80211_connect_params {
 	struct ieee80211_channel *channel;
@@ -1172,6 +1181,7 @@ struct cfg80211_connect_params {
 	struct cfg80211_crypto_settings crypto;
 	const u8 *key;
 	u8 key_len, key_idx;
+	int bg_scan_period;
 };
 
 /**
@@ -1196,8 +1206,7 @@ enum wiphy_params_flags {
 struct cfg80211_bitrate_mask {
 	struct {
 		u32 legacy;
-		/* TODO: add support for masking MCS rates; e.g.: */
-		/* u8 mcs[IEEE80211_HT_MCS_MASK_LEN]; */
+		u8 mcs[IEEE80211_HT_MCS_MASK_LEN];
 	} control[IEEE80211_NUM_BANDS];
 };
 /**
@@ -1262,6 +1271,24 @@ struct cfg80211_gtk_rekey_data {
 	u8 kek[NL80211_KEK_LEN];
 	u8 kck[NL80211_KCK_LEN];
 	u8 replay_ctr[NL80211_REPLAY_CTR_LEN];
+};
+
+struct mac_address {
+	u8 addr[ETH_ALEN];
+};
+
+/**
+ * struct cfg80211_acl_params - Access control parameters
+ * @mac_addrs: List of mac addresses of stations to be used for acl
+ * @acl_policy: Access control policy to be applied on the station's
+ *	entry specified by mac_addr
+ */
+struct cfg80211_acl_params {
+	enum nl80211_acl_policy_attr acl_policy;
+	int n_acl_entries;
+
+	/* Keep it last */
+	struct mac_address mac_addrs[0];
 };
 
 /**
@@ -1417,6 +1444,8 @@ struct cfg80211_gtk_rekey_data {
  * @set_power_mgmt: Configure WLAN power management. A timeout value of -1
  *	allows the driver to adjust the dynamic ps timeout value.
  * @set_cqm_rssi_config: Configure connection quality monitor RSSI threshold.
+ * @set_cqm_txe_config: Configure connection quality monitor TX error
+ *	thresholds.
  * @sched_scan_start: Tell the driver to start a scheduled scan.
  * @sched_scan_stop: Tell the driver to stop an ongoing scheduled
  *	scan.  The driver_initiated flag specifies whether the driver
@@ -1443,23 +1472,17 @@ struct cfg80211_gtk_rekey_data {
  * @probe_client: probe an associated client, must return a cookie that it
  *	later passes to cfg80211_probe_status().
  *
- * @notify_btcoex_inq_status: Notify the Bluetooth inquiry status in
- *	case of a Bleutooth co-ex device.
+ * @notify_btcoex: Send BT coex WMI command.
  *
- * @notify_btcoex_sco_status: Notify the Bluetooth SCO connection status in
- *	case of a Bluetooth co-ex device.
+ * @set_mac_acl: Set stations' mac address to driver's access control list in
+ *	AP and P2P GO mode. Parameters are mac address of list of stations,
+ *	number of entries and acl policy to be used with this list. If there
+ *	is already a list in driver for this acl policy, this new list may
+ *	replace the existing one. When no entry is passed in the list of mac
+ *	address, driver has to clear it's acl list for that acl policy. Drivers
+ *	which advertises the support for mac address based access control can
+ *	implement this callback.
  *
- * @notify_btcoex_a2dp_status: Notify the Bluetooth A2DP connection status in
- *	case of a Bluetooth co-ex device.
- *
- * @notify_btcoex_acl_info: Notify the Bluetooth chip's ACL connction
- *	information
- *
- * @notify_btcoex_antenna_config: Notify the Bluetooth WiFi chip antenna
- *	configuration
- *
- * @notify_btcoex_bt_vendor: Notify the Bluetooth chip vendor in case of using
- *	different Bluetooth chip vendor
  */
 
 struct cfg80211_ops {
@@ -1626,6 +1649,10 @@ struct cfg80211_ops {
 				       struct net_device *dev,
 				       s32 rssi_thold, u32 rssi_hyst);
 
+	int	(*set_cqm_txe_config)(struct wiphy *wiphy,
+				      struct net_device *dev,
+				      u32 rate, u32 pkts, u32 intvl);
+
 	void	(*mgmt_frame_register)(struct wiphy *wiphy,
 				       struct net_device *dev,
 				       u16 frame_type, bool reg);
@@ -1656,23 +1683,16 @@ struct cfg80211_ops {
 
 	struct ieee80211_channel *(*get_channel)(struct wiphy *wiphy);
 
-	int	(*notify_btcoex_inq_status)(struct wiphy *wiphy, bool status);
-	int	(*notify_btcoex_sco_status)(struct wiphy *wiphy,  bool status,
-					    bool esco, u32 tx_interval,
-					    u32 tx_pkt_len);
-	int	(*notify_btcoex_a2dp_status)(struct wiphy *wiphy, bool status);
-	int	(*notify_btcoex_acl_info)(struct wiphy *wiphy,
-					  enum nl80211_btcoex_acl_role role,
-					  u32 remote_lmp_ver);
-	int	(*notify_btcoex_antenna_config)(struct wiphy *wiphy,
-					  enum nl80211_btcoex_antenna_config);
-	int	(*notify_btcoex_bt_vendor)(struct wiphy *wiphy,
-					   enum nl80211_btcoex_vendor_list);
 	int	(*notify_btcoex)(struct wiphy *wiphy,
 					   u8 *buf, int len);
-	int	(*priv_cmd)(struct wiphy *wiphy, struct net_device *dev,
-			       char *priv_cmd);
-	int	(*notify_p2p_flush)(struct wiphy *wiphy);
+
+	int	(*set_mac_acl)(struct wiphy *wiphy, struct net_device *dev,
+			       struct cfg80211_acl_params *params);
+
+	int     (*set_wow_mode)(struct wiphy *wiphy,
+				struct cfg80211_wowlan *wow);
+
+	int     (*clr_wow_mode)(struct wiphy *wiphy);
 };
 
 /*
@@ -1758,6 +1778,7 @@ enum wiphy_flags {
 	WIPHY_FLAG_HAVE_AP_SME			= BIT(17),
 	WIPHY_FLAG_REPORTS_OBSS			= BIT(18),
 	WIPHY_FLAG_AP_PROBE_RESP_OFFLOAD	= BIT(19),
+	WIPHY_FLAG_SUPPORTS_ACS                 = BIT(20),
 };
 
 /**
@@ -1832,10 +1853,6 @@ struct ieee80211_iface_combination {
 	u16 max_interfaces;
 	u8 n_limits;
 	bool beacon_int_infra_match;
-};
-
-struct mac_address {
-	u8 addr[ETH_ALEN];
 };
 
 struct ieee80211_txrx_stypes {
@@ -1971,6 +1988,11 @@ struct wiphy_wowlan_support {
  * @wowlan: WoWLAN support information
  *
  * @ap_sme_capa: AP SME capabilities, flags from &enum nl80211_ap_sme_features.
+ *
+ * @max_acl_mac_addrs: Maximum number of mac addresses that the device
+ *	supports for ACL. Driver having ACL based on MAC address support
+ *	has to fill this. This limit is common for both (white and black)
+ *	the acl policies.
  */
 struct wiphy {
 	/* assign these fields before you register the wiphy */
@@ -2071,6 +2093,12 @@ struct wiphy {
 #ifdef CONFIG_CFG80211_WEXT
 	const struct iw_handler_def *wext;
 #endif
+
+	/*
+	 * Maximum number of mac address entries that device can
+	 * support for access control based on mac address.
+	 */
+	u8 max_acl_mac_addrs;
 
 	char priv[0] __attribute__((__aligned__(NETDEV_ALIGN)));
 };
@@ -2782,9 +2810,6 @@ void cfg80211_put_bss(struct cfg80211_bss *bss);
  */
 void cfg80211_unlink_bss(struct wiphy *wiphy, struct cfg80211_bss *bss);
 
-void cfg80211_unlink_allbss(struct wiphy *wiphy);
-
-
 /**
  * cfg80211_send_rx_auth - notification of processed authentication
  * @dev: network device
@@ -3219,6 +3244,25 @@ void cfg80211_new_sta(struct net_device *dev, const u8 *mac_addr,
 void cfg80211_del_sta(struct net_device *dev, const u8 *mac_addr, gfp_t gfp);
 
 /**
+ * cfg80211_conn_failed - connection request failed notification
+ *
+ * @dev: the netdev
+ * @mac_addr: the station's address
+ * @reason: the reason for connection failure
+ * @gfp: allocation flags
+ *
+ * Whenever a station tries to connect to an AP and if the station
+ * could not connect to the AP as the AP has rejected the connection
+ * for some reasons, this function is called.
+ *
+ * The reason for connection failure can be any of the value from
+ * nl80211_connect_failed_reason enum
+ */
+void cfg80211_conn_failed(struct net_device *dev, const u8 *mac_addr,
+			  enum nl80211_connect_failed_reason reason,
+			  gfp_t gfp);
+
+/**
  * cfg80211_rx_mgmt - notification of received, unprocessed management frame
  * @dev: network device
  * @freq: Frequency on which the frame was received in MHz
@@ -3278,6 +3322,21 @@ void cfg80211_cqm_rssi_notify(struct net_device *dev,
  */
 void cfg80211_cqm_pktloss_notify(struct net_device *dev,
 				 const u8 *peer, u32 num_packets, gfp_t gfp);
+
+/**
+ * cfg80211_cqm_txe_notify - TX error rate event
+ * @dev: network device
+ * @peer: peer's MAC address
+ * @num_packets: how many packets were lost
+ * @rate: % of packets which failed transmission
+ * @intvl: interval (in s) over which the TX failure threshold was breached.
+ * @gfp: context flags
+ *
+ * Notify userspace when configured % TX failures over number of packets in a
+ * given interval is exceeded.
+ */
+void cfg80211_cqm_txe_notify(struct net_device *dev, const u8 *peer,
+			     u32 num_packets, u32 rate, u32 intvl, gfp_t gfp);
 
 /**
  * cfg80211_gtk_rekey_notify - notify userspace about driver rekeying
@@ -3358,15 +3417,16 @@ void cfg80211_report_obss_beacon(struct wiphy *wiphy,
 				 const u8 *frame, size_t len,
 				 int freq, gfp_t gfp);
 
-/**
- * cfg80211_priv_event - notify userspace about priv event
- * @dev: the device the priv event was sent on
- * @priv_event: event string
- * @gfp: allocation flags
+/*
+ * cfg80211_ch_switch_notify - update wdev channel and notify userspace
+ * @dev: the device which switched channels
+ * @freq: new channel frequency (in MHz)
+ * @type: channel type
+ *
+ * Acquires wdev_lock, so must only be called from sleepable driver context!
  */
-void cfg80211_priv_event(struct net_device *dev, const char *priv_event,
-			   gfp_t gfp);
-
+void cfg80211_ch_switch_notify(struct net_device *dev, int freq,
+			       enum nl80211_channel_type type);
 
 /* Logging, debugging and troubleshooting/diagnostic helpers. */
 

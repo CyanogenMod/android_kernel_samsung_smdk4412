@@ -68,6 +68,18 @@ config S5PV310_HI_ARMCLK_THAN_1_2GHZ
 	  If you are using the chip to work at the high clock than 1.2GHz,
 	  activate this option.
 
+config EXYNOS_MARK_PAGE_HOLES
+	bool "Mark page holes from the offset 1GiB of DRAM"
+	default n
+	help
+	  Select if the sizes of DRAM installed in the both channels are not
+	  balanced and interleaving size is 4KiB.
+
+config EXYNOS_MARK_PAGE_HOLES_DEBUG
+	bool "Panic on try of mapping page holes"
+	default n
+	depends on EXYNOS_MARK_PAGE_HOLES
+
 choice
 	prompt "EXYNOS5210 core type"
 	depends on CPU_EXYNOS5210
@@ -504,6 +516,18 @@ config EXYNOS4X12_1000MHZ_SUPPORT
 	help
 	  Max 1.0Ghz support
 
+config EXYNOS4X12_800MHZ_SUPPORT
+	bool "Max 800MHz CPUFREQ LEVEL"
+	depends on EXYNOS4_CPUFREQ && (CPU_EXYNOS4212 || CPU_EXYNOS4412)
+	help
+	Max 800Mhz support
+
+config EXYNOS4X12_400MHZ_SUPPORT
+	bool "Max 400MHz CPUFREQ LEVEL"
+	depends on EXYNOS4_CPUFREQ && (CPU_EXYNOS4212 || CPU_EXYNOS4412)
+	help
+	Max 400Mhz support
+
 endchoice
 
 config MIDAS_COMMON
@@ -603,6 +627,10 @@ endchoice
 
 endmenu
 
+config MOTOR_IR_FILTER
+	bool "IR FILTER MOTOR for IPCAMERA)"
+	default n
+
 config BUSFREQ_DEBUG
 	bool "BUSFREQ sysfs support"
 	default n
@@ -614,6 +642,18 @@ config GPIO_MIDAS_01_BD
 config GPIO_MIDAS_02_BD
 	bool "GPIO configuration for Midas 02 BD"
 	depends on MACH_SLP_MIDAS
+
+config BUSFREQ_INTERLOCK_CPUFREQ
+	bool "Busfreq interlock with CPU freq"
+	default n
+	help
+	Busfreq is rapidly linked with Cpufreq.
+
+config BUSFREQ_ELEVATION
+	bool "Elevation of the busfreq lock"
+	default n
+	help
+	Busfreq lock is raised, which is used in IP blocks.
 
 config BUSFREQ_L2_160M
 	bool "Busfreq L2 level use 160MHz"
@@ -632,6 +672,15 @@ config SEC_THERMISTOR
 	 Use thermistor driver for U1 & U1 Premium.
 	 U1 has two thermistors. this device driver use one of those
 	 to check system temperature.
+
+config SEC_SUBTHERMISTOR
+	bool "Use sub thermistor"
+	depends on SAMSUNG_DEV_ADC
+	default n
+	help
+	  Use sub thermistor driver.
+	  This device driver use only Japan model.
+	  Japan model has sub thermistors.
 
 config EXYNOS_SYSREG_PM
 	bool "PM Support for System Registers"
@@ -670,6 +719,10 @@ config COMPACTION_RETRY_DEBUG
 	  This shows us the buddy information
 	  before and after compation retrial.
 	  This should be turned off later.
+
+config SEC_DUAL_MODEM_MODE
+	bool "sec dual modem mode"
+	default n
 
 # machine support
 
@@ -871,10 +924,6 @@ config MACH_Q1_BD
 	bool "Q1 Board"
 
 endchoice
-config TARGET_LOCALE_NAATT_TEMP
-    bool "Support North America GSM ATT Board"
-	depends on MACH_U1
-    default n
 
 config MACH_PX
 	bool "PX board"
@@ -956,9 +1005,7 @@ config PANEL_U1_NA_SPR
 
 endchoice
 
-if MACH_U1 || MACH_C1 || MACH_M3 || MACH_M0 || MACH_P4 || MACH_P2 || MACH_P4NOTE || MACH_T0 || MACH_TRATS || MACH_GRANDE || MACH_GC1 || MACH_BAFFIN || MACH_KONA
 source "arch/arm/mach-exynos/Kconfig.local"
-endif
 
 config MACH_SMDK4X12
 	bool "SMDK4X12 board"
@@ -1077,10 +1124,14 @@ config MACH_P4NOTE
 	select S3C_DEV_I2C5
 	select P4NOTE_00_BD
 
+config MACH_TAB3
+	bool "TAB3 board"
+	select S3C_DEV_I2C4
+	select S3C_DEV_I2C5
+
 config MACH_GC1
 	bool "Galuxy Camera board"
 	select S3C_DEV_I2C4
-	select S3C_DEV_I2C5
 	select GC1_00_BD
 
 config MACH_T0
@@ -1091,9 +1142,9 @@ config MACH_T0
 	select S3C_DEV_I2C5
 
 config MACH_KONA
-        bool "KONA Note8 board"
-        select S3C_DEV_I2C4
-        select S3C_DEV_I2C5
+	bool "KONA Note8 board"
+	select S3C_DEV_I2C4
+	select S3C_DEV_I2C5
 
 config MACH_IRON
 	bool "Iron board"
@@ -1115,6 +1166,46 @@ config MACH_BAFFIN
 	bool "BAFFIN board"
 	select S3C_DEV_I2C4
 	select S3C_DEV_I2C5
+
+config MACH_HD
+	bool "HD Board"
+	select S3C_DEV_I2C4
+	select S3C_DEV_I2C5
+
+config MACH_GD2
+	bool "GD2 board"
+	select EXYNOS4_SETUP_I2C2
+	select S3C_DEV_I2C2
+	select S3C_DEV_I2C4
+	select S3C_DEV_I2C5
+
+config MACH_ZEST
+	bool "ZEST board"
+	select S3C_DEV_I2C4
+	select S3C_DEV_I2C5
+	select ZEST_00_BD	
+
+config MACH_SP7160LTE
+	bool "SP7160 LTE board"
+	select S3C_DEV_I2C4
+	select S3C_DEV_I2C5
+	select SP7160LTE_00_BD
+
+config MACH_IPCAM
+	bool "IPCAM board"
+	select S3C_DEV_I2C0
+	select S3C_DEV_I2C1
+	select S3C_DEV_I2C4
+	select S3C_DEV_I2C5
+
+config MACH_GC2PD
+	bool "Galuxy Camera board"
+	select S3C_DEV_I2C4
+	select GC2PD_00_BD
+
+config MACH_WATCH
+	bool "WATCH board"
+
 endchoice
 
 config MIDAS_COMMON_BD
@@ -1123,30 +1214,121 @@ config MIDAS_COMMON_BD
 config P4NOTE_00_BD
 	bool "P4 Note PQ common Board"
 
+config TAB3_00_BD
+	bool "TAB3 rev00 common Board"
+	default n
+
+config TAB3_01_BD
+	bool "TAB3 rev01 common Board"
+	default n
+
+config TARGET_TAB3_WIFI7
+	bool "TAB3 wifi 7inch common Board"
+	default n
+
+config TARGET_TAB3_LTE7
+	bool "TAB3 lte 7inch common Board"
+	default n
+
+config TARGET_TAB3_3G10
+	bool "TAB3 3G 10inch common Board"
+	default n
+
+config TARGET_TAB3_WIFI10
+	bool "TAB3 wifi 10inch common Board"
+	default n
+
+config TARGET_TAB3_LTE10
+	bool "TAB3 lte 10inch common Board"
+	default n
+	
+config TARGET_TAB3_3G8
+	bool "TAB3 3G 8inch common Board"
+	default n
+
+config TARGET_TAB3_WIFI8
+	bool "TAB3 wifi 8inch common Board"
+	default n
+
+config TARGET_TAB3_LTE8
+	bool "TAB3 lte 8inch common Board"
+	default n
+
 config GC1_00_BD
 	bool "Galaxy Camera common Board"
 
-config T0_00_BD
-	bool "T0 Revison 00 board"
+config KONA_00_BD
+	bool "KONA note8 rev00 common Board"
+	default n
+
+config KONA_01_BD
+	bool "KONA note8 rev01 common Board"
 	default n
 
 config T0_04_BD
 	bool "T0 Revison 04 board"
 	default n
 
-config KONA_00_BD
-        bool "KONA note8 rev00 common Board"
-        default n
+config MACH_T0_GODIVA_LTE
+	bool "Godiva LTE"
+	default n
 
-config KONA_01_BD
-        bool "KONA note8 rev01 common Board"
-        default n
+config MACH_T0_VOLTE_Q
+	bool "Volte Qualcomm"
+	default n
 
 config IRON_BD
 	bool "Iron common Board"
 
 config GRANDE_BD
 	bool "Grande common Board"
+
+config HD_00_BD
+	bool "HD revision 00 Board"
+	default n
+
+config GD2_00_BD
+	bool "GD revision 00 Board"
+	default n
+
+config GD2_01_BD
+	bool "GD revision 01 Board"
+	default n
+
+config ZEST_00_BD
+	bool "ZEST 00 Board"
+	default n
+
+config WATCH_00_BD
+	bool "WATCH 00 Board"
+	default n
+
+config WATCH_01_BD
+	bool "WATCH 01 Board"
+	default n
+
+config WATCH_02_BD
+	bool "WATCH 02 Board"
+	default n
+
+config SP7160LTE_00_BD
+	bool "SP7160 LTE 00 Board"
+
+config IPCAM_00_BD
+	bool "IPCAM 00 Board"
+	default n
+
+config IPCAM_01_BD
+	bool "IPCAM 01 Board"
+	default n
+
+config GC2PD_00_BD
+	bool "Galaxy Camera 2 common Board"
+
+config MACH_SF2
+        bool "SF2 Camera Board"
+
+source "arch/arm/mach-exynos/Kconfig.slp"
 
 config WRITEBACK_ENABLED
 	bool "Samsung Writeback Enable"
@@ -1162,11 +1344,11 @@ config EXYNOS_SOUND_PLATFORM_DATA
 config JACK_FET
 	bool "Ear Micbias dischage Enable"
 
+config USE_ADC_DET
+	bool "Jack Detection with ADC IC"
+
 config JACK_GROUND_DET
 	bool "Ear Ground Detection Enable"
-
-config USE_ADC_DET
-        bool "Jack Detection with ADC IC"
 
 config SAMSUNG_ANALOG_UART_SWITCH
 	int "SAMSUNG analog switch for UART"
@@ -1611,18 +1793,32 @@ config SEC_LOG_LAST_KMSG
 	help
 	  This option enables /proc/last_kmsg support.
 
+config SEC_AVC_LOG
+	default n
+	bool "Enable avc audit log support" if EMBEDDED
+	depends on SEC_DEBUG
+	help
+	  This option enables additional log buffer for audit log.
+
+config SEC_DEBUG_TIMA_LOG
+	default n
+	bool "Enable tima log support" if EMBEDDED
+	depends on SEC_DEBUG
+	help
+	  This option enables additional log buffer for tsp log.
+
 config EHCI_IRQ_DISTRIBUTION
 	bool "ehci irq distribution"
 	default n
 
 if (LINK_DEVICE_USB || LINK_DEVICE_HSIC)
 config EHCI_MODEM_PORTNUM
-        int "EHCI port number of modem connection"
-        default 2
+	int "EHCI port number of modem connection"
+	default 2
 config CMC_MODEM_HSIC_SYSREV
-        int "System revision number which CMC modem support HSIC i/f"
-        depends on LTE_MODEM_CMC221
-        default 9
+	int "System revision number which CMC modem support HSIC i/f"
+	depends on LTE_MODEM_CMC221
+	default 9
 endif
 
 if SEC_MODEM
@@ -1632,14 +1828,30 @@ config LTE_VIA_SWITCH
 	bool
 	default n
 
-config SEC_DUAL_MODEM_MODE
-	bool "sec dual modem mode"
-	default n
+choice
+	prompt "SVNET2 version"
+	default SEC_MODEM_PRIMITIVE
+
+config SEC_MODEM_PRIMITIVE
+	bool "the first SVENT2"
+
+config SEC_MODEM_V2
+	bool "Modem IF ver. 2 for HSIC"
+
+config SEC_MODEM_IF
+	bool "Modem IF"
+endchoice
 
 choice
 	prompt "SEC MODEM CONFIG"
 	depends on SEC_MODEM
-	default SEC_MODEM_M0_C2C
+	default SEC_MODEM_M0
+
+config SEC_MODEM_SP7160LTE
+	bool "XMM7160 feature"
+	select UMTS_MODEM_XMM6262
+	select LINK_DEVICE_HSIC
+	select EHCI_IRQ_DISTRIBUTION
 
 config SEC_MODEM_M0_C2C
 	bool "M0 with xmm6262 c2c"
@@ -1710,6 +1922,11 @@ config SEC_MODEM_U1
 	select LINK_DEVICE_HSIC
 	select EHCI_IRQ_DISTRIBUTION
 
+config SEC_MODEM_Q1_TD
+        bool "Q1 with sprd8803"
+        select TDSCDMA_MODEM_SPRD8803
+        select LINK_DEVICE_SPI
+
 config SEC_MODEM_U1_LGT
 	bool "U1 with mdm6600"
 	select CDMA_MODEM_MDM6600
@@ -1748,16 +1965,60 @@ config SEC_MODEM_U1_SPR
         select LINK_DEVICE_DPRAM
         select INTERNAL_MODEM_IF
 
+config SEC_MODEM_GODIVA2
+	bool "T0 with SS222 and CBP8.2"
+	select LTE_VIA_SWITCH
+	select UMTS_MODEM_SS222
+	select BOOT_DEVICE_SPI
+	select LINK_DEVICE_C2C
+	select CDMA_MODEM_CBP82
+	select LINK_DEVICE_DPRAM
+
+config SEC_MODEM_ZEST
+	bool "ZEST with SS222"
+	select UMTS_MODEM_SS222
+	select BOOT_DEVICE_SPI
+	select LINK_DEVICE_C2C
+
+config SEC_MODEM_GC2_ATT
+	bool "Galaxy Camera II with SS222"
+	select UMTS_MODEM_SS222
+	select BOOT_DEVICE_SPI
+	select LINK_DEVICE_C2C
+
 endchoice
 
 endif
 
 comment "Connectivity Feature"
-config GPS_BRCM_475X
-	bool "BRCM_475X_CHIPSET"
+config GPS_BCMxxxxx
+	bool "BROADCOM_GPS_CHIPSET_COMMON"
 	default n
 
-if BT
+config GPS_BCM47511
+	bool "BROADCOM_GPS_CHIPSET_47511"
+	default n
+
+config GPS_BCM4752
+	bool "BROADCOM_GPS_CHIPSET_4752"
+	default n
+
+config GPS_BCM47521
+	bool "BROADCOM_GPS_CHIPSET_47521"
+	default n
+
+config GPS_CSRxT
+	bool "CSR_GPS_CHIPSET_COMMON"
+	default n
+
+config GPS_GSD4T
+	bool "CSR_GPS_CHIPSET_4T"
+	default n
+
+config GPS_GSD5T
+	bool "CSR_GPS_CHIPSET_5T"
+	default n
+
 config BT_CSR8811
 	bool "Enable CSR8811 driver"
 	default n
@@ -1778,12 +2039,18 @@ config BT_BCM43241
 	help
 	  Adds BCM43241 RFKILL driver for Broadcom BCM4334 chipset
 
-config BT_MGMT
-	bool "Bluetooth Mgmt"
+config BT_BCM4335
+	bool "Enable BCM4335 driver"
 	default n
 	help
-	  This is for bluetooth mgmt
-endif
+	  Adds BCM4335 RFKILL driver for Broadcom BCM4335 chipset
+
+config BT_BLUEDROID
+	bool "Bluetooth bluedroid"
+	default n
+	help
+	  This is for bluedroid stack
+	  default is n.
 
 comment "Qualcomm Modem Feature"
 config QC_MODEM
@@ -1805,9 +2072,10 @@ config MDM_HSIC_PM
 config EMI_ERROR_RECOVERY
 	bool "unsuspected emi error recovery on HUB"
 	default n
+
 config SIM_DETECT
 	bool "support sim detect"
-        default n
+	default n
 
 if QC_MODEM
 choice
@@ -1829,6 +2097,10 @@ config QC_MODEM_M3
 endchoice
 endif
 
+config SAMSUNG_PRODUCT_SHIP
+	bool "set up for product shipping"
+	default n
+
 config USB_CDFS_SUPPORT
 	bool "Auto install for cdfs"
 	default y
@@ -1849,12 +2121,54 @@ config CORESIGHT_ETM_DEFAULT_ENABLE
 	  Turns on ETM tracing by default. Otherwise, tracing is
 	  disabled by default but can be enabled by other means.
 
+config CPU_FREQ_TETHERING
+	bool "Lock cpu freq & bus clock when tethering mode turn on"
+	depends on QC_MODEM
+	default n
+
+config USBIRQ_BALANCING_LTE_HIGHTP
+	bool "USBIRQ_BALANCING_LTE_HIGHTP"
+	depends on QC_MODEM
+	default n
 
 config MACH_KONA_SENSOR
-        bool "KONA Sensor Enable"
-        help
-          Support sensors of KONA boards
+	bool "KONA Sensor Enable"
+	help
+	  Support sensors of KONA boards
 
-          BMA254 / BOSCH
-          YAS532 / YAMAHA
-          GP2A030A / SHARP
+	  BMA254 / BOSCH
+	  YAS532 / YAMAHA
+	  GP2A030A / SHARP
+
+config MACH_GD2_SENSOR
+	bool "GD2 Sensor Enable"
+	help
+	  Support sensors of GD2 boards
+
+	  K330 / STM
+	  AK8963 / AKM
+	  CM36651 / CAPELLA
+
+config GC2PD_LTE
+	bool "GC2PD LTE model"
+	help
+	  Support GC2PD LTE
+
+config GC2PD_LTE_EUR_OPEN
+	bool "GC2PD LTE EUR model"
+	help
+	  Support GC2PD LTE for EUR
+
+config USER_RESET_DEBUG
+	bool "KOR reset reason debug feature in user version"
+	default n
+	help
+	  This option enables debugging log for B10 project.
+	  This option provides reset history log in user version.
+	  This option enable proc/reset_reason support
+	  It's only support KOR Model
+
+config PM_DEBUG_WAKEUP_RESET
+	bool "Log the Power Management debug information"
+	help
+	  This configuratoin is only for debugging the PM interrupt issue.

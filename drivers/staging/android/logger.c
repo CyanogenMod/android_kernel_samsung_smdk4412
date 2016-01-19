@@ -719,7 +719,11 @@ static struct logger_log VAR = { \
 
 DEFINE_LOGGER_DEVICE(log_main, LOGGER_LOG_MAIN, 2048*1024)
 DEFINE_LOGGER_DEVICE(log_events, LOGGER_LOG_EVENTS, 256*1024)
+#if defined(CONFIG_MACH_T0)
+DEFINE_LOGGER_DEVICE(log_radio, LOGGER_LOG_RADIO, 2048*1024)
+#else
 DEFINE_LOGGER_DEVICE(log_radio, LOGGER_LOG_RADIO, 1024*1024)
+#endif
 DEFINE_LOGGER_DEVICE(log_system, LOGGER_LOG_SYSTEM, 256*1024)
 DEFINE_LOGGER_DEVICE(log_sf, LOGGER_LOG_SF, 256*1024)
 
@@ -775,9 +779,11 @@ static int __init logger_init(void)
 	if (unlikely(ret))
 		goto out;
 
+#if !defined(CONFIG_SAMSUNG_PRODUCT_SHIP)
 	ret = init_log(&log_sf);
 	if (unlikely(ret))
 		goto out;
+#endif
 
 	sec_getlog_supply_loggerinfo(_buf_log_main, _buf_log_radio,
 				     _buf_log_events, _buf_log_system);

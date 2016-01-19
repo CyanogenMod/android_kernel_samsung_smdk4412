@@ -78,7 +78,6 @@ static int synaptics_ts_load_fw(struct synaptics_drv_data *data)
 		printk(KERN_DEBUG "[TSP] start, file path %s, size %u Bytes\n",
 		       SYNAPTICS_FW, fw_size);
 #endif
-
 		if (nread != fw_size) {
 			printk(KERN_ERR
 			       "[TSP] failed to read firmware file, nread %u Bytes\n",
@@ -458,6 +457,7 @@ static void check_delta_cap(struct synaptics_drv_data *data)
 }
 #endif
 
+
 static void check_diagnostics_mode(struct synaptics_drv_data *data)
 {
 	/* Set report mode */
@@ -479,19 +479,17 @@ static void check_diagnostics_mode(struct synaptics_drv_data *data)
 		/* check the result */
 		check_rx_to_rx(data);
 		break;
-
 #if defined(CONFIG_TOUCHSCREEN_SYNAPTICS_S7301_KEYS)
 	case REPORT_TYPE_DELTA_CAP:
 		check_delta_cap(data);
 		break;
 #endif
-		
 	default:
 		break;
 	}
 
-	/* Reset */
-	soft_reset(data);
+	if (data->cmd_report_type != REPORT_TYPE_DELTA_CAP)
+		soft_reset(data);
 }
 
 static u16 synaptics_get_threshold(struct synaptics_drv_data *data)
@@ -507,10 +505,8 @@ static u16 synaptics_get_threshold(struct synaptics_drv_data *data)
 static void synaptics_fw_phone(struct synaptics_drv_data *data,
 	u8 *buf)
 {
-	strncpy(buf, data->firm_version,
-		sizeof(data->firm_version));
-	printk(KERN_DEBUG "[TSP] firm phone : %s\n",
-		data->firm_version);
+	sprintf(buf, "%c%c%.2d%.2d00", data->firm_version[0], data->firm_version[1], data->firm_version[2], data->firm_version[3]);
+	printk(KERN_DEBUG "[TSP] firm phone : %s\n", buf);
 }
 
 static void synaptics_fw_panel(struct synaptics_drv_data *data,
@@ -520,6 +516,8 @@ static void synaptics_fw_panel(struct synaptics_drv_data *data,
 	synaptics_ts_read_block(data,
 		data->f34.control_base_addr,
 		buf, 4);
+
+	sprintf(buf, "%c%c%.2d%.2d00", buf[0], buf[1], buf[2], buf[3]);
 
 	printk(KERN_DEBUG "[TSP] firm panel : %s\n", buf);
 }
@@ -1182,7 +1180,7 @@ static ssize_t sec_brightness_store(struct device *dev,
 	int on_off;
 
 	if (sscanf(buf, "%d\n", &on_off) == 1) {
-		//printk(KERN_DEBUG "[TSPLED] touch_led_on [%d]\n", on_off);
+		printk(KERN_DEBUG "[TSPLED] touch_led_on [%d]\n", on_off);
 		data->pdata->led_control(on_off);
 	} else {
 		printk(KERN_DEBUG "[TSPLED] buffer read failed\n");
@@ -1202,37 +1200,6 @@ static ssize_t sec_extra_button_store(struct device *dev,
 		printk(KERN_DEBUG "[TSP] buffer read failed\n");
 	}
 	return size;
-}
-
-static ssize_t sec_keypad_enable_show(struct device *dev,
-		struct device_attribute *attr, char *buf)
-{
-	struct synaptics_drv_data *data = dev_get_drvdata(dev);
-
-	return sprintf(buf, "%d\n", atomic_read(&data->keypad_enable));
-}
-
-static ssize_t sec_keypad_enable_store(struct device *dev,
-		struct device_attribute *attr, const char *buf, size_t count)
-{
-	struct synaptics_drv_data *data = dev_get_drvdata(dev);
-
-	unsigned int val = 0;
-	sscanf(buf, "%d", &val);
-	val = (val == 0 ? 0 : 1);
-	atomic_set(&data->keypad_enable, val);
-	if (val) {
-		set_bit(KEY_BACK, data->input->keybit);
-		set_bit(KEY_MENU, data->input->keybit);
-		set_bit(KEY_HOME, data->input->keybit);
-	} else {
-		clear_bit(KEY_BACK, data->input->keybit);
-		clear_bit(KEY_MENU, data->input->keybit);
-		clear_bit(KEY_HOME, data->input->keybit);
-	}
-	input_sync(data->input);
-
-	return count;
 }
 
 static DEVICE_ATTR(touch_sensitivity, S_IRUGO | S_IWUSR,
@@ -1257,8 +1224,6 @@ static DEVICE_ATTR(extra_button_event, S_IRUGO | S_IWUSR,
 	NULL, sec_extra_button_store);
 static DEVICE_ATTR(touchkey_button_status, S_IRUGO | S_IWUSR,
 	sec_touchkey_button_status_show, NULL);
-static DEVICE_ATTR(keypad_enable, S_IRUGO|S_IWUSR,
-	sec_keypad_enable_show, sec_keypad_enable_store);
 
 static struct attribute *sec_touchkey_sysfs_attributes[] = {
 	&dev_attr_touch_sensitivity.attr,
@@ -1272,7 +1237,6 @@ static struct attribute *sec_touchkey_sysfs_attributes[] = {
 	&dev_attr_brightness.attr,
 	&dev_attr_extra_button_event.attr,
 	&dev_attr_touchkey_button_status.attr,
-	&dev_attr_keypad_enable.attr,
 	NULL,
 };
 
@@ -1297,6 +1261,7 @@ int set_tsp_sysfs(struct synaptics_drv_data *data)
 		pr_err("[TSP] failed to create sysfs group\n");
 		goto err_device_create;
 	}
+
 #if defined(CONFIG_TOUCHSCREEN_SYNAPTICS_S7301_KEYLED)
 	synaptics_with_gpio_led_device = device_create(sec_class,
 				NULL, 0, data, "sec_touchkey");
@@ -1313,7 +1278,6 @@ int set_tsp_sysfs(struct synaptics_drv_data *data)
 		goto err_device_create;
 	}
 #endif
-
 	return 0;
 
 err_device_create:

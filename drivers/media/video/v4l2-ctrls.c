@@ -1649,6 +1649,21 @@ s32 v4l2_ctrl_g_ctrl(struct v4l2_ctrl *ctrl)
 }
 EXPORT_SYMBOL(v4l2_ctrl_g_ctrl);
 
+int v4l2_noti_ctrl(struct v4l2_ctrl_handler *hdl, struct v4l2_noti_control *control)
+{
+	struct v4l2_ctrl *ctrl = v4l2_ctrl_find(hdl, control->id);
+
+	if (ctrl == NULL || !type_is_int(ctrl))
+		return -EINVAL;
+	return get_ctrl(ctrl, &control->value);
+}
+EXPORT_SYMBOL(v4l2_noti_ctrl);
+
+int v4l2_subdev_noti_ctrl(struct v4l2_subdev *sd, struct v4l2_noti_control *control)
+{
+	return v4l2_noti_ctrl(sd->ctrl_handler, control);
+}
+EXPORT_SYMBOL(v4l2_subdev_noti_ctrl);
 
 /* Core function that calls try/s_ctrl and ensures that the new value is
    copied to the current value on a set.

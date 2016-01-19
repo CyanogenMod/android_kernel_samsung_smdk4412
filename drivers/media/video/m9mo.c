@@ -22,6 +22,13 @@
 #include <linux/vmalloc.h>
 #include <linux/firmware.h>
 #include <linux/videodev2.h>
+#include <linux/gpio.h>
+#include <plat/gpio-cfg.h>
+#include <mach/regs-gpio.h>
+
+
+#include <mach/dev.h>
+#include <plat/cpu.h>
 
 #ifdef CONFIG_VIDEO_SAMSUNG_V4L2
 #include <linux/videodev2_exynos_camera.h>
@@ -33,26 +40,54 @@
 #include <media/m9mo_platform.h>
 #include "m9mo.h"
 
+/* #define M9MO_ISP_DEBUG  //ISP Debug */
+
 #define M9MO_DRIVER_NAME	"M9MO"
+#if 1
+#define M9MO_BUS_FREQ_LOCK
+#endif
+#if 0
+#define HOLD_LENS_SUPPORT
+#endif
+#if 0
+#define M9MO_LOAD_FW_4MB
+#endif
 
 extern struct class *camera_class;
 struct device *m9mo_dev;
+#ifdef HOLD_LENS_SUPPORT
 static bool leave_power;
+#endif
+#ifdef M9MO_BUS_FREQ_LOCK
+struct device *bus_dev;
+#endif
+
+static int m9mo_Lens_close_hold;
+static int m9mo_Lens_Off_Needed;
 
 #if 0
 #define M9MO_FW_PATH		"/data/RS_M9MO.bin"
 #define FW_INFO_PATH		"/data/FW_INFO.bin"
 #endif
 
+int mmc_fw;
 #define M9MO_FW_PATH		"/sdcard/RS_M9MO.bin"
+#define M9MO_FW_MMC_PATH		"/dev/block/mmcblk0p17"
+#ifdef M9MO_LOAD_FW_4MB
+#define FW_BIN_SIZE		4194304
+#else
+#define FW_BIN_SIZE		2097152
+#endif
 
 #define M9MO_FW_REQ_PATH	"RS_M9MO.bin"
+#define M9MO_FW_REQ_PATH2	"/system/vendor/firmware/RS_M9MO.bin"
 #define M9MO_EVT31_FW_REQ_PATH	"RS_M9MO_EVT3.1.bin"
 
 #define FW_INFO_PATH		"/sdcard/FW_INFO.bin"
 
 
 #define M9MO_FW_DUMP_PATH	"/sdcard/M9MO_dump.bin"
+#define M9MO_SIO_LOADER_PATH_M9MO       "/system/vendor/firmware/M9MO_SFW.bin"
 
 #if 0
 #define M9MO_FACTORY_CSV_PATH	"/data/FACTORY_CSV_RAW.bin"
@@ -74,16 +109,19 @@ static bool leave_power;
 #define M9MOOO_FW_PATH "RS_M9LS_OO.bin" /* FIBEROPTICS - SONY */
 #endif
 
-#if 0
-#define M9MO_FW_VER_LEN		22
-#define M9MO_FW_VER_FILE_CUR	0x16FF00
-#define M9MO_FW_VER_NUM		0x000018
-#else
-#define M9MO_FW_VER_LEN	20
-#define M9MO_SEN_FW_VER_LEN	30
-#define M9MO_FW_VER_FILE_CUR	0x1FF080
-#define M9MO_FW_VER_NUM		0x1FF080
-#endif
+#define FW_WRITE_SIZE 524288 /*2097152*/
+
+#define M9MO_SHD_DATA_PATH		"/storage/extSdCard/C101_shading_data.bin"
+#define FACTORY_RESOL_WIDE 106
+#define FACTORY_RESOL_TELE 107
+#define FACTORY_RESOL_WIDE_INSIDE 131
+#define FACTORY_RESOL_TELE_INSIDE 132
+#define FACTORY_TILT_TEST_INSIDE 133
+#define FACTORY_DUST_TEST_INSIDE 136
+#define FACTORY_LENS_SHADING_TEST_INSIDE 137
+#define FACTORY_NOISE_TEST_INSIDE 138
+#define FACTORY_REDIMAGE_TEST_INSIDE 165
+#define FACTORY_TILT_DIVISION 168
 
 #define M9MO_FLASH_BASE_ADDR	0x00000000
 
@@ -98,6 +136,7 @@ u32 M9MO_FLASH_FACTORY_TELE_RESOL[] = {0x27E03298, 0x27E0329F};
 u32 M9MO_FLASH_FACTORY_WIDE_RESOL[] = {0x27E032A0, 0x27E032A7};
 u32 M9MO_FLASH_FACTORY_AF_FCS[] = {0x27E0323A, 0x27E03275};
 u32 M9MO_FLASH_FACTORY_PUNT[] = {0x27E031D8, 0x27E03239};
+u32 M9MO_FLASH_FACTORY_DECENTER[] = {0x27E032EC, 0x27E03303};
 
 u32 M9MO_FLASH_FACTORY_BACKLASH[] = {0x27E03276, 0x27E03279};
 
@@ -107,13 +146,25 @@ u32 M9MO_FLASH_FACTORY_LIVEVIEW[] = {0x27E03108, 0x27E0310F};
 u32 M9MO_FLASH_FACTORY_GAIN_CAPTURE[] = {0x27E03110, 0x27E03117};
 u32 M9MO_FLASH_FACTORY_SH_CLOSE[] = {0x27E0327A, 0x27E03297};
 u32 M9MO_FLASH_FACTORY_FLASH_CHECK[] = {0x27E032AE, 0x27E032B0};
-u32 M9MO_FLASH_FACTORY_WB_ADJ[] = {0x27E03000, 0x27E0304F};
+u32 M9MO_FLASH_FACTORY_WB_ADJ[] = {0x27E03000, 0x27E03059};
 u32 M9MO_FLASH_FACTORY_FLASH_WB[] = {0x27E032B4, 0x27E032C3};
 u32 M9MO_FLASH_FACTORY_ADJ_FLASH_WB[] = {0x27E032D0, 0x27E032EB};
-
 u32 M9MO_FLASH_FACTORY_IR_CHECK[] = {0x27E032C4, 0x27E032CD};
+u32 M9MO_FLASH_FACTORY_BEFORE_SHD_CHECK[] = {0x27E033DD, 0x27E033E1};
+
+u32 M9MO_FLASH_FACTORY_RESOLUTION[] = {0x27E03334, 0x27E033D3};
 
 u32 M9MO_FLASH_FACTORY_RESULT = 0x27E03128;
+static struct i2c_client *tempclient;
+
+#ifdef CONFIG_VIDEO_M9MO_SPI
+static char *Fbuf; /*static QCTK*/
+#ifdef M9MO_LOAD_FW_4MB
+static char FW_buf[4394304] = {0}; /*static QCTK 4MB*/
+#else
+static char FW_buf[2197152] = {0}; /*static QCTK 2MB*/
+#endif
+#endif
 
 #define M9MO_INT_RAM_BASE_ADDR	0x01100000
 
@@ -134,7 +185,13 @@ u32 M9MO_FLASH_FACTORY_RESULT = 0x27E03128;
 #define M9MO_POST_MAXSIZE	0x0
 
 #define M9MO_DEF_APEX_DEN	100
-
+#define EXIF_ONE_THIRD_STOP_STEP
+/*
+#define EXIF_ONE_HALF_STOP_STEP
+*/
+/*
+#define ISP_LOGWRITE
+*/
 #define m9mo_readb(sd, g, b, v) m9mo_read(__LINE__, sd, 1, g, b, v, true)
 #define m9mo_readw(sd, g, b, v) m9mo_read(__LINE__, sd, 2, g, b, v, true)
 #define m9mo_readl(sd, g, b, v) m9mo_read(__LINE__, sd, 4, g, b, v, true)
@@ -151,56 +208,77 @@ u32 M9MO_FLASH_FACTORY_RESULT = 0x27E03128;
 #define m9mo_writew2(sd, g, b, v) m9mo_write(__LINE__, sd, 2, g, b, v, false)
 #define m9mo_writel2(sd, g, b, v) m9mo_write(__LINE__, sd, 4, g, b, v, false)
 
-#define CHECK_ERR(x)	if ((x) < 0) { \
+#define CHECK_ERR(x)	if ((x) <= 0) { \
 				cam_err("i2c failed, err %d\n", x); \
 				return x; \
 			}
 
 #define NELEMS(array) (sizeof(array) / sizeof(array[0]))
 
-#if 0
+#if 1
 #define FAST_CAPTURE
 #endif
 
+/* DZ : Digital ZOOM is enabled in FCGD08     */
+/* Monitor Sizes are changed to support DZoom */
+/* From FCGD07(1056x704) to FCGD09~(960x640)  */
+/* From FCGD07(1280x720) to FCGD09~(960x540)  */
+
+/* CAUTION!!! : Postview Size must be set to the value same as Monitor Size */
 static const struct m9mo_frmsizeenum preview_frmsizes[] = {
-	{ M9MO_PREVIEW_QCIF,	176,	144,	0x05 },	/* 176 x 144 */
-	{ M9MO_PREVIEW_QVGA,	320,	240,	0x09 },
-	{ M9MO_PREVIEW_VGA,	640,	480,	0x17 },
-	{ M9MO_PREVIEW_D1,	768,	512,	0x33 }, /* High speed */
-	{ M9MO_PREVIEW_960_720,	960,	720,	0x34 },
-	{ M9MO_PREVIEW_1080_720,	1056,	704,	0x35 },
-	{ M9MO_PREVIEW_720P,	1280,	720,	0x21 },
-	{ M9MO_PREVIEW_1080P,	1920,	1080,	0x28 },
-	{ M9MO_PREVIEW_HDR,	3264,	2448,	0x27 },
-	{ M9MO_PREVIEW_720P_60FPS,	1280, 720,	   0x25 },
-	{ M9MO_PREVIEW_VGA_60FPS,	640, 480,	   0x2F },
-	{ M9MO_PREVIEW_1080P_DUAL,	1920,	1080,	0x2C },
-	{ M9MO_PREVIEW_720P_DUAL,	1280,	720,	0x2D },
-	{ M9MO_PREVIEW_VGA_DUAL,	640,	480,	0x2E },
-	{ M9MO_PREVIEW_QVGA_DUAL,	320,	240,	0x36 },
+	{ M9MO_PREVIEW_QCIF,		176,	144,	176,	144,	0x05 },
+	{ M9MO_PREVIEW_QVGA,		320,	240,	320,	240,	0x09 },
+	{ M9MO_PREVIEW_CIF,		352,	288,	704,	576,	0x3A },
+	{ M9MO_PREVIEW_VGA,			640,	480,	640,	480,	0x17 },
+	{ M9MO_PREVIEW_640_524,		640,	524,	704,	576,	0x3A },
+	{ M9MO_PREVIEW_800_450,		800,	450,	1280,   720,    0x21 },
+	{ M9MO_PREVIEW_D1_DZ,		768,	512,	960,	640,	0x3D },
+	{ M9MO_PREVIEW_704_528_DZ,	704,	528,	960,	720,	0x34 },
+	{ M9MO_PREVIEW_960_540_DZ,	960,	540,	960,	540,	0x3C },
+	{ M9MO_PREVIEW_960_720,		960,	720,	960,	720,	0x34 },
+	{ M9MO_PREVIEW_1056_704,	1056,	704,	1056,	704,	0x35 },
+	{ M9MO_PREVIEW_720P,		1280,	720,	1280,	720,	0x21 },
+	{ M9MO_PREVIEW_1080P,		1920,	1080,	1920,	1080,	0x28 },
+	{ M9MO_PREVIEW_HDR,			3264,	2448,	3264,	2448,	0x27 },
+	{ M9MO_PREVIEW_720P_60FPS,	1280,   720,    1280,   720,    0x25 },
+	{ M9MO_PREVIEW_VGA_60FPS,	640,	480,	640,	480,    0x2F },
+	{ M9MO_PREVIEW_1080P_DUAL,	1920,	1080,	1920,	1080,	0x2C },
+	{ M9MO_PREVIEW_720P_DUAL,	1280,	720,	1280,	720,	0x2D },
+	{ M9MO_PREVIEW_VGA_DUAL,	640,	480,	640,	480,	0x2E },
+	{ M9MO_PREVIEW_QVGA_DUAL,	320,	240,	320,	240,	0x36 },
+	{ M9MO_PREVIEW_1440_1080,	1440,	1080,	1440,	1080,	0x37 },
+	{ M9MO_PREVIEW_D1_120FPS,	768,	512,	768,	512,	0x33 },
+	{ M9MO_PREVIEW_FACTORY_TILT,	960,	540,	1920,	1080,	0x3F },
 };
 
 static const struct m9mo_frmsizeenum capture_frmsizes[] = {
-	{ M9MO_CAPTURE_HD,	960,	720,	0x34 },
-	{ M9MO_CAPTURE_1MP,	1024,	768,	0x0F },
-	{ M9MO_CAPTURE_2MPW,	1920,	1080,	0x19 },
-	{ M9MO_CAPTURE_3MP,	1984,	1488,	0x2F },
-	{ M9MO_CAPTURE_4MP,	2304,	1728,	0x1E },
-	{ M9MO_CAPTURE_5MP,	2592,	1944,	0x20 },
-	{ M9MO_CAPTURE_8MP,	3264,	2448,	0x25 },
-	{ M9MO_CAPTURE_10MP,	3648,	2736,	0x30 },
-	{ M9MO_CAPTURE_12MPW,	4608,	2592,	0x31 },
-	{ M9MO_CAPTURE_14MP,	4608,	3072,	0x32 },
-	{ M9MO_CAPTURE_16MP,	4608,	3456,	0x33 },
+	{ M9MO_CAPTURE_VGA,			640,	480,	640,	480,	0x09 },
+	{ M9MO_CAPTURE_HD,			960,	720,	960,	720,	0x34 },
+	{ M9MO_CAPTURE_1MP,			1024,	768,	1024,	768,	0x0F },
+	{ M9MO_CAPTURE_2MPW,		1920,	1080,	1920,	1080,	0x19 },
+	{ M9MO_CAPTURE_3MP,			1984,	1488,	1984,	1488,	0x2F },
+	{ M9MO_CAPTURE_4MP,			2304,	1728,	2304,	1728,	0x1E },
+	{ M9MO_CAPTURE_5MP,			2592,	1944,	2592,	1944,	0x20 },
+	{ M9MO_CAPTURE_8MP,			3264,	2448,	3264,	2448,	0x25 },
+	{ M9MO_CAPTURE_9MPW,		4096,	2304,	4096,	2304,	0x37 },
+	{ M9MO_CAPTURE_10MP,		3648,	2736,	3648,	2736,	0x30 },
+	{ M9MO_CAPTURE_11MP,		3960,	2640,	3960,	2640,	0x38 },
+	{ M9MO_CAPTURE_12MPW,		4608,	2592,	4608,	2592,	0x31 },
+	{ M9MO_CAPTURE_14MP,		4608,	3072,	4608,	3072,	0x32 },
+	{ M9MO_CAPTURE_16MP,		4608,	3456,	4608,	3456,	0x33 },
 };
 
+/* CAUTION!!! : Postview Size must be set to the value same as Monitor Size */
 static const struct m9mo_frmsizeenum postview_frmsizes[] = {
-	{ M9MO_CAPTURE_POSTQVGA,	320,	240,	0x01 },
-	{ M9MO_CAPTURE_POSTVGA,		640,	480,	0x08 },
-	{ M9MO_CAPTURE_POSTWVGA,	800,	480,	0x09 },
-	{ M9MO_CAPTURE_POSTHD,		960,	720,	0x13 },
-	{ M9MO_CAPTURE_POSTP,		1056,	704,	0x14 },
-	{ M9MO_CAPTURE_POSTWHD,		1280,	720,	0x0F },
+	{ M9MO_CAPTURE_POSTQVGA,		320,	240,	320,	240,	0x01 },
+	{ M9MO_CAPTURE_POSTVGA,			640,	480,	640,	480,	0x08 },
+	{ M9MO_CAPTURE_POSTWVGA,		800,	480,	800,	480,	0x09 },
+	{ M9MO_CAPTURE_POST_704_528,	704,	528,	960,	720,	0x13 },
+	{ M9MO_CAPTURE_POSTHD,			960,	720,	960,	720,	0x13 },
+	{ M9MO_CAPTURE_POST_768_512,	768,	512,	960,	640,	0x16 },
+	{ M9MO_CAPTURE_POSTP,			1056,	704,	1056,	704,	0x14 },
+	{ M9MO_CAPTURE_POST_960_540,	960,	540,	960,	540,	0x15 },
+	{ M9MO_CAPTURE_POSTWHD,			1280,	720,	1280,	720,	0x0F },
 };
 
 static struct m9mo_control m9mo_ctrls[] = {
@@ -242,7 +320,11 @@ static struct m9mo_control m9mo_ctrls[] = {
 	}, {
 		.id = V4L2_CID_CAMERA_ZOOM,
 		.minimum = ZOOM_LEVEL_0,
+#if defined(CONFIG_MACH_GC2PD)
+		.maximum = ZOOM_LEVEL_10,
+#else
 		.maximum = ZOOM_LEVEL_MAX - 1,
+#endif
 		.step = 1,
 		.value = ZOOM_LEVEL_0,
 		.default_value = ZOOM_LEVEL_0,
@@ -263,9 +345,13 @@ static struct m9mo_control m9mo_ctrls[] = {
 	},
 };
 
-static u8 sysfs_sensor_fw[7] = {0,};
-static u8 sysfs_phone_fw[7] = {0,};
-static u8 sysfs_sensor_type[25] = {0,};
+static u8 sysfs_sensor_fw[M9MO_FW_VER_TOKEN + 1] = {0,};
+static u8 sysfs_phone_fw[M9MO_FW_VER_TOKEN + 1] = {0,};
+static u8 sysfs_sensor_type[M9MO_SENSOR_TYPE_LEN + 1] = {0,};
+static int sysfs_check_app = -1;
+static int s_zoom_speed = 1;
+static int m9mo_init(struct v4l2_subdev *sd, u32 val);
+static int m9mo_post_init(struct v4l2_subdev *sd, u32 val);
 
 static inline struct m9mo_state *to_state(struct v4l2_subdev *sd)
 {
@@ -280,6 +366,7 @@ static int m9mo_read(int _line, struct v4l2_subdev *sd,
 	unsigned char data[5];
 	unsigned char recv_data[len + 1];
 	int i, err = 0;
+	int retry = 3;
 
 	if (!client->adapter)
 		return -ENODEV;
@@ -287,6 +374,7 @@ static int m9mo_read(int _line, struct v4l2_subdev *sd,
 	if (len != 0x01 && len != 0x02 && len != 0x04)
 		return -EINVAL;
 
+i2c_retry:
 	msg.addr = client->addr;
 	msg.flags = 0;
 	msg.len = sizeof(data);
@@ -328,9 +416,20 @@ static int m9mo_read(int _line, struct v4l2_subdev *sd,
 		return err;
 	}
 
-	if (recv_data[0] != sizeof(recv_data))
+	if (recv_data[0] != sizeof(recv_data)) {
+#if 1
 		cam_i2c_dbg("expected length %d, but return length %d\n",
 				 sizeof(recv_data), recv_data[0]);
+#endif
+		if (retry > 0) {
+			retry--;
+			msleep(20);
+			goto i2c_retry;
+		} else {
+			cam_err("Retry all failed for expected length error.");
+			return -1;
+		}
+	}
 
 	if (len == 0x01)
 		*val = recv_data[1];
@@ -516,7 +615,7 @@ static int m9mo_mem_read(struct v4l2_subdev *sd, u16 len, u32 addr, u8 *val)
 
 	memcpy(val, recv_data + 3, len);
 
-	cam_i2c_dbg("address %#x, length %d\n", addr, len);
+	//cam_i2c_dbg("address %#x, length %d\n", addr, len);
 	return err;
 }
 
@@ -564,26 +663,151 @@ static irqreturn_t m9mo_isp_isr(int irq, void *dev_id)
 	struct v4l2_subdev *sd = (struct v4l2_subdev *)dev_id;
 	struct m9mo_state *state = to_state(sd);
 
-	cam_dbg("**************** interrupt ****************\n");
+	cam_trace("**************** interrupt ****************\n");
 	state->isp.issued = 1;
-	wake_up_interruptible(&state->isp.wait);
+	wake_up(&state->isp.wait);
 
 	return IRQ_HANDLED;
+}
+
+static int m9mo_makeLog(struct v4l2_subdev *sd, char *filename, bool dumpLogPath)
+{
+	struct m9mo_state *state = to_state(sd);
+	int addr = 0, len = 0xff; /* init */
+	int err = 0;
+	int i = 0, no = 0;
+	char buf[256];
+
+	struct file *fp;
+	mm_segment_t old_fs;
+	char filepath[256];
+	state->log_num +=1;
+
+	old_fs = get_fs();
+	set_fs(KERNEL_DS);
+
+#ifdef ISP_LOGWRITE
+	if(dumpLogPath ||!strncmp("_SEC_", filename, 5)) {
+		sprintf(filepath, "/sdcard/log/%s%c", filename, 0);
+	} else
+#endif
+	{
+		sprintf(filepath, "/sdcard/ISPD/%s%c", filename, 0);
+	}
+	cam_trace(" FilePath = %s\n", filepath);
+
+	fp = filp_open(filepath,
+		O_WRONLY|O_CREAT|O_TRUNC, S_IRUGO|S_IWUGO|S_IXUSR);
+	if (IS_ERR(fp)) {
+		cam_err("failed to open %s, err %ld\n",
+			filepath, PTR_ERR(fp));
+		return  -1;
+	}
+
+#ifdef M9MO_ISP_DEBUG
+	cam_dbg("%s\n", filepath);
+#endif
+	err = m9mo_writeb2(sd, 0x0d, 0x06, 0x0);
+	CHECK_ERR(err);
+
+	err = m9mo_readl2(sd, 0x0d, 0x08, &addr);
+	CHECK_ERR(err);
+
+	err = m9mo_writeb2(sd, 0x0d, 0x0e, 0x2);
+	CHECK_ERR(err);
+
+	while (no < 10000) { /* max log count : 10000 */
+		err = m9mo_writew2(sd, 0x0d, 0x0c, no);
+		CHECK_ERR(err);
+
+		err = m9mo_writeb2(sd, 0x0d, 0x0e, 0x3);
+		CHECK_ERR(err);
+
+		while (len == 0xff) {
+			err = m9mo_readb2(sd, 0x0d, 0x07, &len);
+			CHECK_ERR(err);
+
+			if (i++ > 3000)  /* only delay code */
+				break;
+		}
+
+		if (len == 0 || len == 0xff) {
+			err = m9mo_writeb2(sd, 0x0d, 0x0e, 0x1);
+			CHECK_ERR(err);
+			break;
+		}
+
+		i = 0;
+		len += 1;
+		if (len > sizeof(buf))
+			len = sizeof(buf);
+		err = m9mo_mem_read(sd,  len, addr, buf);
+		if (err < 0)
+			cam_err("ISPD i2c falied, err %d\n", err);
+
+		buf[len-1] = '\n';
+
+		vfs_write(fp, buf, len,  &fp->f_pos);
+#if 0
+		cam_dbg("ISPD Log : %x[%d], %d, %32s)\n",
+					addr, no, len, buf);
+#endif
+		len = 0xff; /* init */
+		no++;
+	}
+
+	if (!IS_ERR(fp) && fp != NULL)
+		filp_close(fp, current->files);
+
+	set_fs(old_fs);
+
+	return 0;
 }
 
 static u32 m9mo_wait_interrupt(struct v4l2_subdev *sd,
 	unsigned int timeout)
 {
 	struct m9mo_state *state = to_state(sd);
-	int try_cnt = 30;
+	int try_cnt = 60;
+#ifdef ISP_LOGWRITE
+	char filepath[256];
+
+	sprintf(filepath, "ISP_interrupt_error_%d.log", state->log_num);
+#endif
 	cam_trace("E\n");
 
+#if 0
 	if (wait_event_interruptible_timeout(state->isp.wait,
 		state->isp.issued == 1,
 		msecs_to_jiffies(timeout)) == 0) {
 		cam_err("timeout ~~~~~~~~~~~~~~~~~~~~~\n");
 		return 0;
 	}
+#else
+	if (wait_event_timeout(state->isp.wait,
+				state->isp.issued == 1,
+				msecs_to_jiffies(timeout)) == 0) {
+		int err = 0;
+		u32 int_en = 0, int_factor = 0, mode = 0, sys_status = 0;
+#ifdef ISP_LOGWRITE
+		m9mo_makeLog(sd, filepath, true);
+#endif
+		cam_err("timeout ~~~~~~~~~~~~~~~~~~~~~~~\n");
+		err = m9mo_readw(sd, M9MO_CATEGORY_SYS, M9MO_SYS_INT_EN, &int_en);
+		CHECK_ERR(err);
+		err = m9mo_readw(sd, M9MO_CATEGORY_SYS,
+			M9MO_SYS_INT_FACTOR, &int_factor);
+		CHECK_ERR(err);
+		err = m9mo_readb(sd, M9MO_CATEGORY_SYS, M9MO_SYS_MODE, &mode);
+		CHECK_ERR(err);
+		err = m9mo_readb(sd, M9MO_CATEGORY_SYS,
+			0x0c, &sys_status);
+		CHECK_ERR(err);
+		cam_err("int_en=%d, int_factor=%d, mode_status=%d, sys_status=%d\n",
+			int_en, int_factor, mode, sys_status);
+		return 0;
+	}
+#endif
 
 	state->isp.issued = 0;
 
@@ -594,7 +818,7 @@ static u32 m9mo_wait_interrupt(struct v4l2_subdev *sd,
 					state->isp.int_factor);
 		if (state->isp.int_factor == 0xFFFF) {
 			try_cnt--;
-			msleep(20);
+			msleep(10);
 		} else
 			try_cnt = 0;
 	} while (try_cnt);
@@ -641,28 +865,95 @@ static int m9mo_wait_framesync(struct v4l2_subdev *sd)
 	return 0;
 }
 
+static int m9mo_set_smart_auto_default_value(struct v4l2_subdev *sd, int val)
+{
+	struct m9mo_state *state = to_state(sd);
+	int err, value;
+
+	cam_trace("E %d\n", val);
+
+	if (val == 1) {
+		err = m9mo_writeb(sd, M9MO_CATEGORY_MON,
+			M9MO_MON_EDGE_CTRL, state->sharpness);
+		CHECK_ERR(err);
+
+		err = m9mo_writeb(sd, M9MO_CATEGORY_MON,
+			M9MO_MON_CHROMA_LVL, state->saturation);
+		CHECK_ERR(err);
+
+		err = m9mo_writeb(sd, M9MO_CATEGORY_MON,
+			M9MO_MON_COLOR_EFFECT, state->color_effect);
+		CHECK_ERR(err);
+	} else {
+		err = m9mo_writeb(sd, M9MO_CATEGORY_AE,
+			M9MO_AE_EP_MODE_CAP, 0x05);
+		CHECK_ERR(err);
+
+		err = m9mo_writeb(sd, M9MO_CATEGORY_AE,
+			M9MO_AE_EV_PRG_MODE_CAP, 0x10);
+		CHECK_ERR(err);
+
+		err = m9mo_writeb(sd, M9MO_CATEGORY_CAPPARM,
+			M9MO_CAPPARM_STROBE_EN, state->strobe_en);
+		CHECK_ERR(err);
+
+		err = m9mo_writeb(sd, M9MO_CATEGORY_AE,
+			M9MO_AE_INDEX, 0x1E);
+		CHECK_ERR(err);
+
+		err = m9mo_writeb(sd, M9MO_CATEGORY_CAPPARM,
+			M9MO_CAPPARM_WDR_EN, 0x0);
+		CHECK_ERR(err);
+
+		err = m9mo_writeb(sd, M9MO_CATEGORY_MON,
+			M9MO_MON_EDGE_CTRL, 0x03);
+		CHECK_ERR(err);
+
+		err = m9mo_writeb(sd, M9MO_CATEGORY_MON,
+			M9MO_MON_CHROMA_LVL, 0x03);
+		CHECK_ERR(err);
+
+		err = m9mo_readb(sd, M9MO_CATEGORY_MON,
+			M9MO_MON_COLOR_EFFECT, &value);
+		CHECK_ERR(err);
+
+		if (value == 0x11 || value == 0x21) {
+			err = m9mo_writeb(sd, M9MO_CATEGORY_MON,
+				M9MO_MON_COLOR_EFFECT, state->color_effect);
+			CHECK_ERR(err);
+		}
+
+		err = m9mo_writeb(sd, M9MO_CATEGORY_MON,
+			0xAE, 0x0);
+		CHECK_ERR(err);
+	}
+
+	cam_trace("X\n");
+	return 0;
+}
+
 static int m9mo_set_mode(struct v4l2_subdev *sd, u32 mode)
 {
 	int i, err;
 	u32 old_mode, val;
 	u32 int_factor, int_en;
+	int retry_mode_change = 1;
 	struct m9mo_state *state = to_state(sd);
 
 	cam_trace("E\n");
 
 	err = m9mo_readb(sd, M9MO_CATEGORY_SYS, M9MO_SYS_MODE, &old_mode);
+	CHECK_ERR(err);
 
-	if (err < 0)
-		return err;
+	if (state->samsung_app) {
+		/* don't change mode when cap -> param */
+		if (old_mode == M9MO_STILLCAP_MODE && mode == M9MO_PARMSET_MODE)
+			return 10;
+	}
 
-	/* don't change mode when cap -> param */
-	if (old_mode == M9MO_STILLCAP_MODE && mode == M9MO_PARMSET_MODE)
-		return 10;
-
-#if 1	/* Dual Capture */
+	/* Dual Capture */
 	if (state->dual_capture_start && mode == M9MO_STILLCAP_MODE)
 		mode = M9MO_PARMSET_MODE;
-#endif
 
 	if (old_mode == mode) {
 		cam_dbg("%#x -> %#x\n", old_mode, mode);
@@ -671,6 +962,7 @@ static int m9mo_set_mode(struct v4l2_subdev *sd, u32 mode)
 
 	cam_dbg("%#x -> %#x\n", old_mode, mode);
 
+retry_mode_set:
 	switch (old_mode) {
 	case M9MO_SYSINIT_MODE:
 		cam_warn("sensor is initializing\n");
@@ -681,7 +973,7 @@ static int m9mo_set_mode(struct v4l2_subdev *sd, u32 mode)
 		if (mode == M9MO_STILLCAP_MODE) {
 			err = m9mo_writeb(sd, M9MO_CATEGORY_SYS,
 				M9MO_SYS_MODE, M9MO_MONITOR_MODE);
-			if (err < 0)
+			if (err <= 0)
 				break;
 			for (i = M9MO_I2C_VERIFY; i; i--) {
 				err = m9mo_readb(sd, M9MO_CATEGORY_SYS,
@@ -698,15 +990,46 @@ static int m9mo_set_mode(struct v4l2_subdev *sd, u32 mode)
 
 	default:
 		cam_warn("current mode is unknown, %d\n", old_mode);
-		err = 0;/* -EINVAL; */
+		err = 1;/* -EINVAL; */
 	}
 
-	if (err < 0)
+	if (err <= 0)
 		return err;
+
+	for (i = M9MO_I2C_VERIFY; i; i--) {
+		err = m9mo_readb(sd, M9MO_CATEGORY_SYS, M9MO_SYS_MODE, &val);
+		if (val == mode)
+			break;
+		msleep(20);
+	}
+
+	if (val != mode) {
+		if (retry_mode_change) {
+			retry_mode_change = 0;
+			goto retry_mode_set;
+		} else {
+			cam_warn("ISP mode not change, %d -> %d\n", val, mode);
+			return -ETIMEDOUT;
+		}
+	}
+
+	if ((mode == M9MO_PARMSET_MODE) && (state->mode == MODE_ERASER)) {
+		err = m9mo_writeb(sd, M9MO_CATEGORY_PARM,
+			M9MO_PARM_SET_ERASER_MODE, 0x01);
+		if (err < 0)
+			return err;
+	} else if ((mode == M9MO_PARMSET_MODE) && (state->mode != MODE_ERASER)){
+		err = m9mo_writeb(sd, M9MO_CATEGORY_PARM,
+			M9MO_PARM_SET_ERASER_MODE, 0x00);
+		if (err < 0)
+			return err;
+	}
 
 	if (mode == M9MO_STILLCAP_MODE
 		&& state->running_capture_mode != RUNNING_MODE_AE_BRACKET
-		&& state->running_capture_mode != RUNNING_MODE_LOWLIGHT) {
+		&& state->running_capture_mode != RUNNING_MODE_LOWLIGHT
+		&& state->running_capture_mode != RUNNING_MODE_HDR
+		&& state->running_capture_mode != RUNNING_MODE_BLINK) {
 
 		m9mo_wait_framesync(sd);
 
@@ -736,11 +1059,16 @@ static int m9mo_set_mode(struct v4l2_subdev *sd, u32 mode)
 		}
 	}
 
-	for (i = M9MO_I2C_VERIFY; i; i--) {
-		err = m9mo_readb(sd, M9MO_CATEGORY_SYS, M9MO_SYS_MODE, &val);
-		if (val == mode)
-			break;
-		msleep(20);
+	state->isp_mode = mode;
+
+	if (state->factory_test_num != 0x0) {
+		cam_trace("X\n");
+		return old_mode;
+	}
+
+	if (state->mode == MODE_SMART_AUTO || state->mode == MODE_SMART_SUGGEST) {
+		if (old_mode == M9MO_STILLCAP_MODE && mode == M9MO_MONITOR_MODE)
+			m9mo_set_smart_auto_default_value(sd, 0);
 	}
 
 	cam_trace("X\n");
@@ -753,24 +1081,24 @@ static int m9mo_set_mode_part1(struct v4l2_subdev *sd, u32 mode)
 	u32 old_mode, val;
 	u32 int_factor;
 	u32 int_en;
+	int retry_mode_change = 1;
 	struct m9mo_state *state = to_state(sd);
 	state->stream_on_part2 = false;
 
 	cam_trace("E\n");
 
 	err = m9mo_readb(sd, M9MO_CATEGORY_SYS, M9MO_SYS_MODE, &old_mode);
+	CHECK_ERR(err);
 
-	if (err < 0)
-		return err;
+	if (state->samsung_app) {
+		/* don't change mode when cap -> param */
+		if (old_mode == M9MO_STILLCAP_MODE && mode == M9MO_PARMSET_MODE)
+			return 10;
+	}
 
-	/* don't change mode when cap -> param */
-	if (old_mode == M9MO_STILLCAP_MODE && mode == M9MO_PARMSET_MODE)
-		return 10;
-
-#if 1	/* Dual Capture */
+	/* Dual Capture */
 	if (state->dual_capture_start && mode == M9MO_STILLCAP_MODE)
 		mode = M9MO_PARMSET_MODE;
-#endif
 
 	if (old_mode == mode) {
 		cam_dbg("%#x -> %#x\n", old_mode, mode);
@@ -779,6 +1107,7 @@ static int m9mo_set_mode_part1(struct v4l2_subdev *sd, u32 mode)
 
 	cam_dbg("%#x -> %#x\n", old_mode, mode);
 
+retry_mode_set:
 	switch (old_mode) {
 	case M9MO_SYSINIT_MODE:
 		cam_warn("sensor is initializing\n");
@@ -789,7 +1118,7 @@ static int m9mo_set_mode_part1(struct v4l2_subdev *sd, u32 mode)
 		if (mode == M9MO_STILLCAP_MODE) {
 			err = m9mo_writeb(sd, M9MO_CATEGORY_SYS,
 				M9MO_SYS_MODE, M9MO_MONITOR_MODE);
-			if (err < 0)
+			if (err <= 0)
 				break;
 			for (i = M9MO_I2C_VERIFY; i; i--) {
 				err = m9mo_readb(sd, M9MO_CATEGORY_SYS,
@@ -806,11 +1135,30 @@ static int m9mo_set_mode_part1(struct v4l2_subdev *sd, u32 mode)
 
 	default:
 		cam_warn("current mode is unknown, %d\n", old_mode);
-		err = 0;/* -EINVAL; */
+		err = 1;/* -EINVAL; */
 	}
 
-	if (err < 0)
+	if (err <= 0)
 		return err;
+
+	for (i = M9MO_I2C_VERIFY; i; i--) {
+		err = m9mo_readb(sd, M9MO_CATEGORY_SYS, M9MO_SYS_MODE, &val);
+		if (val == mode)
+			break;
+		msleep(20);
+	}
+
+	if (val != mode) {
+		if (retry_mode_change) {
+			retry_mode_change = 0;
+			goto retry_mode_set;
+		} else {
+			cam_warn("ISP mode not change, %d -> %d\n", val, mode);
+			return -ETIMEDOUT;
+		}
+	}
+
+	state->isp_mode = mode;
 
 	if (mode == M9MO_STILLCAP_MODE
 		&& state->running_capture_mode != RUNNING_MODE_AE_BRACKET
@@ -840,10 +1188,9 @@ static int m9mo_set_mode_part1(struct v4l2_subdev *sd, u32 mode)
 
 static int m9mo_set_mode_part2(struct v4l2_subdev *sd, u32 mode)
 {
-	int i, err;
-	u32 val;
 	u32 int_factor;
 	struct m9mo_state *state = to_state(sd);
+	int sys_status, err, cnt = 100;
 
 	if (state->running_capture_mode != RUNNING_MODE_SINGLE)
 		return 0;
@@ -853,10 +1200,9 @@ static int m9mo_set_mode_part2(struct v4l2_subdev *sd, u32 mode)
 
 	cam_trace("E, %d\n", mode);
 
-#if 1	/* Dual Capture */
+	/* Dual Capture */
 	if (state->dual_capture_start && mode == M9MO_STILLCAP_MODE)
 		mode = M9MO_PARMSET_MODE;
-#endif
 
 	if (mode == M9MO_STILLCAP_MODE
 		&& state->running_capture_mode != RUNNING_MODE_AE_BRACKET
@@ -871,13 +1217,23 @@ static int m9mo_set_mode_part2(struct v4l2_subdev *sd, u32 mode)
 					int_factor);
 			return -ETIMEDOUT;
 		}
-	}
 
-	for (i = M9MO_I2C_VERIFY; i; i--) {
-		err = m9mo_readb(sd, M9MO_CATEGORY_SYS, M9MO_SYS_MODE, &val);
-		if (val == mode)
-			break;
-		msleep(20);
+		/* Check ISP state */
+		err = m9mo_readb(sd, M9MO_CATEGORY_SYS,
+				0x0c, &sys_status);
+		CHECK_ERR(err);
+
+		while (sys_status != 7 && cnt) {
+			msleep(10);
+			err = m9mo_readb(sd, M9MO_CATEGORY_SYS,
+					0x0c, &sys_status);
+			CHECK_ERR(err);
+
+			if (sys_status == 7)
+				break;
+
+			cnt--;
+		}
 	}
 
 	state->stream_on_part2 = false;
@@ -886,9 +1242,87 @@ static int m9mo_set_mode_part2(struct v4l2_subdev *sd, u32 mode)
 	return 0;
 }
 
+static int m9mo_set_cap_rec_end_mode(struct v4l2_subdev *sd, u32 mode)
+{
+	u32 int_factor, old_mode;
+
+	cam_trace("E, %d\n", mode);
+
+	/* not use stop recording cmd */
+	if (mode == 100)
+		return 0;
+
+	old_mode = m9mo_set_mode(sd, M9MO_MONITOR_MODE);
+	if (old_mode <= 0) {
+		cam_err("failed to set mode\n");
+		return old_mode;
+	}
+
+	if (old_mode != M9MO_MONITOR_MODE) {
+		int_factor = m9mo_wait_interrupt(sd, M9MO_ISP_TIMEOUT);
+		if (!(int_factor & M9MO_INT_MODE)) {
+			cam_err("M9MO_INT_MODE isn't issued!!!\n");
+			return -ETIMEDOUT;
+		}
+	}
+
+	cam_trace("X\n");
+	return 0;
+}
+
+static int m9mo_set_OIS_cap_mode(struct v4l2_subdev *sd)
+{
+	int err;
+	int set_ois_cap_mode, read_ois_cap_mode;
+	struct m9mo_state *state = to_state(sd);
+
+	cam_trace("E\n");
+
+	err = m9mo_readb(sd, M9MO_CATEGORY_NEW,
+		M9MO_NEW_OIS_CUR_MODE, &read_ois_cap_mode);
+	CHECK_ERR(err);
+
+	switch (state->running_capture_mode) {
+	case RUNNING_MODE_CONTINUOUS:
+	case RUNNING_MODE_BEST:
+	case RUNNING_MODE_LOWLIGHT:
+	case RUNNING_MODE_AE_BRACKET:
+	case RUNNING_MODE_HDR:
+	case RUNNING_MODE_BLINK:
+	case RUNNING_MODE_BURST:
+		set_ois_cap_mode = 0x05;
+		break;
+
+	case RUNNING_MODE_SINGLE:
+	case RUNNING_MODE_WB_BRACKET:
+	default:
+		set_ois_cap_mode = 0x04;
+		break;
+	}
+
+	if (state->recording) {
+		if (state->fps <= 30)
+			set_ois_cap_mode = 0x01;
+		else
+			set_ois_cap_mode = 0x02;
+	} else if (state->mode == MODE_PANORAMA)
+		set_ois_cap_mode = 0x03;
+
+	if (set_ois_cap_mode != read_ois_cap_mode) {
+		err = m9mo_writeb(sd, M9MO_CATEGORY_NEW,
+			M9MO_NEW_OIS_CUR_MODE, set_ois_cap_mode);
+		CHECK_ERR(err);
+	}
+
+	cam_trace("X set mode : %d\n", set_ois_cap_mode);
+
+	return 0;
+}
+
+
 static int m9mo_set_capture_mode(struct v4l2_subdev *sd, int val)
 {
-	int err, capture_val, framecount, raw_enable;
+	int err, capture_val, framecount, raw_enable, int_en, evp_val;
 	struct m9mo_state *state = to_state(sd);
 
 	cam_trace("E capture_mode=%d\n", val);
@@ -898,6 +1332,18 @@ static int m9mo_set_capture_mode(struct v4l2_subdev *sd, int val)
 	err = m9mo_readb(sd, M9MO_CATEGORY_CAPCTRL,
 			M9MO_CAPCTRL_CAP_MODE, &capture_val);
 	CHECK_ERR(err);
+
+	if (state->mode == MODE_PROGRAM) {
+		err = m9mo_readb(sd, M9MO_CATEGORY_AE,
+				M9MO_AE_EP_MODE_CAP, &evp_val);
+		CHECK_ERR(err);
+
+		if (evp_val != 0) {
+			err = m9mo_writeb(sd, M9MO_CATEGORY_AE,
+					M9MO_AE_EP_MODE_CAP, 0X00);
+			CHECK_ERR(err);
+		}
+	}
 
 	switch (state->running_capture_mode) {
 	case RUNNING_MODE_CONTINUOUS:
@@ -962,10 +1408,17 @@ static int m9mo_set_capture_mode(struct v4l2_subdev *sd, int val)
 		if (state->running_capture_mode == RUNNING_MODE_LOWLIGHT) {
 			err = m9mo_writeb(sd, M9MO_CATEGORY_AE,
 				M9MO_AE_AUTO_BRACKET_EV, 0x0); /* EV 0.0 */
+#ifdef CONFIG_MACH_GC2PD
+			err = m9mo_writeb(sd, M9MO_CATEGORY_AE,
+				M9MO_AE_EP_MODE_CAP, 0x0A);
+#else
+			err = m9mo_writeb(sd, M9MO_CATEGORY_AE,
+				M9MO_AE_EP_MODE_CAP, 0x05);
+#endif
 		}
 
 		err = m9mo_writeb(sd, M9MO_CATEGORY_CAPCTRL,
-				M9MO_CAPCTRL_CAP_FRM_INTERVAL, 0x02);
+				M9MO_CAPCTRL_CAP_FRM_INTERVAL, 0x00);
 		CHECK_ERR(err); /* 0:7.5, 1:5, 2:3fps */
 	break;
 
@@ -1019,6 +1472,10 @@ static int m9mo_set_capture_mode(struct v4l2_subdev *sd, int val)
 
 	case RUNNING_MODE_BURST:
 		cam_trace("~~~~~~ burst capture mode ~~~~~~\n");
+		err = m9mo_writeb(sd, M9MO_CATEGORY_CAPCTRL,
+				M9MO_CAPCTRL_CAP_MODE, 0x0D);
+		CHECK_ERR(err);
+		state->mburst_start = false;
 		break;
 
 	case RUNNING_MODE_SINGLE:
@@ -1032,6 +1489,35 @@ static int m9mo_set_capture_mode(struct v4l2_subdev *sd, int val)
 		}
 		break;
 	}
+
+	/* set low light shot flag for ISP */
+	if (state->running_capture_mode == RUNNING_MODE_LOWLIGHT) {
+		err = m9mo_writeb(sd, M9MO_CATEGORY_LENS,
+			0x2E, 0x01);
+		CHECK_ERR(err);
+	} else {
+		err = m9mo_writeb(sd, M9MO_CATEGORY_LENS,
+			0x2E, 0x00);
+		CHECK_ERR(err);
+	}
+
+	err = m9mo_readw(sd, M9MO_CATEGORY_SYS,
+		M9MO_SYS_INT_EN, &int_en);
+	CHECK_ERR(err);
+
+	if (state->running_capture_mode == RUNNING_MODE_LOWLIGHT
+		|| state->running_capture_mode == RUNNING_MODE_AE_BRACKET
+		||  state->running_capture_mode == RUNNING_MODE_HDR
+		||  state->running_capture_mode == RUNNING_MODE_BLINK) {
+		int_en &= ~M9MO_INT_FRAME_SYNC;
+	} else {
+		int_en |= M9MO_INT_FRAME_SYNC;
+	}
+
+	err = m9mo_writew(sd, M9MO_CATEGORY_SYS, M9MO_SYS_INT_EN, int_en);
+	CHECK_ERR(err);
+
+	m9mo_set_OIS_cap_mode(sd);
 
 	cam_trace("X\n");
 	return state->running_capture_mode;
@@ -1061,14 +1547,24 @@ static int m9mo_queryctrl(struct v4l2_subdev *sd, struct v4l2_queryctrl *qc)
 static int m9mo_set_lock(struct v4l2_subdev *sd, int val)
 {
 	struct m9mo_state *state = to_state(sd);
-	int err, status;
+	int err ;
+#if 0
+	int status;
 	int cnt = 100;
+#endif
 
 	cam_trace("%s\n", val ? "on" : "off");
 
-	if (state->running_capture_mode == RUNNING_MODE_BURST)
-		return 0;
-
+#if 1
+	if (val == 0) {
+		err = m9mo_writeb(sd, M9MO_CATEGORY_AE, M9MO_AF_AE_LOCK, val);
+		CHECK_ERR(err);
+		err = m9mo_writeb(sd, M9MO_CATEGORY_AE, M9MO_AE_LOCK, val);
+		CHECK_ERR(err);
+		err = m9mo_writeb(sd, M9MO_CATEGORY_WB, M9MO_AWB_LOCK, val);
+		CHECK_ERR(err);
+	}
+#else
 	err = m9mo_writeb(sd, M9MO_CATEGORY_AE, M9MO_AF_AE_LOCK, val);
 	CHECK_ERR(err);
 
@@ -1090,6 +1586,7 @@ static int m9mo_set_lock(struct v4l2_subdev *sd, int val)
 	CHECK_ERR(err);
 	err = m9mo_writeb(sd, M9MO_CATEGORY_WB, M9MO_AWB_LOCK, val);
 	CHECK_ERR(err);
+#endif
 
 	state->focus.lock = val;
 
@@ -1099,7 +1596,8 @@ static int m9mo_set_lock(struct v4l2_subdev *sd, int val)
 
 static int m9mo_set_CAF(struct v4l2_subdev *sd, int val)
 {
-	int err, range_status, af_range, zoom_status;
+	int err, range_status, af_range, zoom_status, mode_status;
+	int window_status = -1;
 	struct m9mo_state *state = to_state(sd);
 
 	if (state->fps == 120) {
@@ -1125,27 +1623,40 @@ static int m9mo_set_CAF(struct v4l2_subdev *sd, int val)
 				m9mo_set_lock(sd, 0);
 
 			/* Set mode to Continuous */
-			err = m9mo_writeb(sd, M9MO_CATEGORY_LENS,
-				M9MO_LENS_AF_MODE, 0x01);
+			err = m9mo_readb(sd, M9MO_CATEGORY_LENS,
+				M9MO_LENS_AF_MODE, &mode_status);
+
+			if (mode_status != 1) {
+				err = m9mo_writeb(sd, M9MO_CATEGORY_LENS,
+					M9MO_LENS_AF_MODE, 0x01);
 			CHECK_ERR(err);
+			}
 
 			err = m9mo_readb(sd, M9MO_CATEGORY_LENS,
 				M9MO_LENS_AF_SCAN_RANGE, &range_status);
 
-			/* Set range to macro or auto-macro */
-			if (state->mode == MODE_CLOSE_UP)
-				af_range = 0x01;
-			else
+			/* Set range to auto-macro */
 				af_range = 0x02;
 
-			err = m9mo_writeb(sd, M9MO_CATEGORY_LENS,
-				M9MO_LENS_AF_SCAN_RANGE, af_range);
-			CHECK_ERR(err);
-
-			/* Set Zone REQ */
 			if (range_status != af_range) {
 				err = m9mo_writeb(sd, M9MO_CATEGORY_LENS,
-					M9MO_LENS_AF_INITIAL, 0x04);
+					M9MO_LENS_AF_SCAN_RANGE, af_range);
+				CHECK_ERR(err);
+#if 0
+				/* Set Zone REQ */
+				err = m9mo_writeb(sd, M9MO_CATEGORY_LENS,
+						M9MO_LENS_AF_INITIAL, 0x04);
+				CHECK_ERR(err);
+#endif
+			}
+
+			/* Set AF Window Mode to Center*/
+			err = m9mo_readb(sd, M9MO_CATEGORY_LENS,
+				M9MO_LENS_AF_WINDOW_MODE, &window_status);
+
+			if (window_status != 0x0) {
+				err = m9mo_writeb(sd, M9MO_CATEGORY_LENS,
+					M9MO_LENS_AF_WINDOW_MODE, 0x0);
 				CHECK_ERR(err);
 			}
 
@@ -1159,10 +1670,6 @@ static int m9mo_set_CAF(struct v4l2_subdev *sd, int val)
 		err = m9mo_writeb(sd, M9MO_CATEGORY_LENS,
 			M9MO_LENS_AF_START_STOP, 0x02);
 		CHECK_ERR(err);
-
-		/* need delay for AF stable time */
-		if (state->focus.mode == FOCUS_MODE_CONTINOUS)
-			msleep(100);
 	}
 
 	cam_trace("X val : %d %d\n", val, state->focus.mode);
@@ -1185,33 +1692,86 @@ static int m9mo_get_af_result(struct v4l2_subdev *sd,
 	CHECK_ERR(err);
 
 	if ((status != 0x1000) && (status != 0x0)) {
-		cam_dbg("~~~ success !!!~~~\n");
-		msleep(33);
+		cam_trace("~~~ success !!!~~~\n");
+		state->af_running = 0;
 		get_cnt = 0;
 	} else if (status == 0x0) {
-		cam_dbg("~~~ fail !!!~~~\n");
-		msleep(33);
+		cam_trace("~~~ fail !!!~~~\n");
+		state->af_running = 0;
 		get_cnt = 0;
 	} else if (status == 0x1000) {
 		cam_dbg("~~~ focusing !!!~~~\n");
+		state->af_running = 0;
 	}
 
-	if (state->focus.mode == FOCUS_MODE_TOUCH && status != 0x1000)
-		m9mo_set_lock(sd, 0);
+	ctrl->value = state->focus.status = status;
 
-	if (state->focus.lock && !(state->focus.start) && status != 0x1000)
-		m9mo_set_lock(sd, 0);
-
-	state->focus.status = status;
-
-	if (state->caf_state && !(state->focus.start) && status != 0x1000)
-		m9mo_set_CAF(sd, 1);
-
-	ctrl->value = state->focus.status;
-
-	cam_dbg("X, value 0x%04x\n", ctrl->value);
+	cam_trace("X, value 0x%04x\n", ctrl->value);
 
 	return ctrl->value;
+}
+
+static int m9mo_get_af_done(struct v4l2_subdev *sd,
+		struct v4l2_control *ctrl)
+{
+	struct m9mo_state *state = to_state(sd);
+	int sys_status, err;
+
+	/* Check ISP state */
+	err = m9mo_readb(sd, M9MO_CATEGORY_SYS,
+					0x0c, &sys_status);
+	CHECK_ERR(err);
+
+	if (sys_status == 2 || sys_status == 4 || sys_status == 5)
+		ctrl->value = 1; /* Done */
+	else
+		ctrl->value = 0; /* In progress */
+
+	if (ctrl->value == 1) {
+		if (state->focus.status == 0x1000) {
+			cam_err("Error!! Focus is still in progress\n");
+		}
+
+		if (state->focus.mode == FOCUS_MODE_TOUCH && state->focus.touch)
+			m9mo_set_lock(sd, 0);
+
+		if (state->focus.lock && !(state->focus.start))
+			m9mo_set_lock(sd, 0);
+
+		if (state->caf_state && !(state->focus.start))
+			m9mo_set_CAF(sd, 1);
+	}
+	return err;
+}
+
+static int m9mo_get_manual_focus(struct v4l2_subdev *sd,
+		struct v4l2_control *ctrl)
+{
+	int err;
+	int default_index, near_index, max_index;
+
+	cam_dbg("E\n");
+
+	err = m9mo_readb2(sd, M9MO_CATEGORY_LENS,
+		M9MO_LENS_MF_DEFAULT_INDEX, &default_index);
+	CHECK_ERR(err);
+
+	err = m9mo_readb2(sd, M9MO_CATEGORY_LENS,
+		M9MO_LENS_MF_NEARLIMIT_INDEX, &near_index);
+	CHECK_ERR(err);
+
+	err = m9mo_readb2(sd, M9MO_CATEGORY_LENS,
+		M9MO_LENS_MF_MAX_INDEX, &max_index);
+	CHECK_ERR(err);
+
+	ctrl->value = (default_index << 16)
+		| (near_index << 8)
+		| max_index;
+
+	cam_dbg("X, default_index 0x%x, near_index 0x%x, max_index 0x%x\n",
+		default_index, near_index, max_index);
+
+	return err;
 }
 
 static int m9mo_get_scene_mode(struct v4l2_subdev *sd,
@@ -1280,7 +1840,7 @@ static int m9mo_get_zoom_status(struct v4l2_subdev *sd,
 
 	if (state->zoom <= 0xF && (curr_zoom_info & 0xF) < 0xF)
 		state->zoom = curr_zoom_info & 0xF;
-	ctrl->value = curr_zoom_info & 0x3F;
+	ctrl->value = curr_zoom_info & 0x7F;
 
 	return 0;
 }
@@ -1331,12 +1891,17 @@ static int m9mo_get_flash_status(struct v4l2_subdev *sd,
 	struct v4l2_control *ctrl)
 {
 	int err;
-	int strobe_charge, strobe_up_down;
+	int strobe_charge;
+#if 0
+	int strobe_up_down;
+#endif
 
 	err = m9mo_readb2(sd, M9MO_CATEGORY_CAPPARM,
 		M9MO_CAPPARM_STROBE_CHARGE, &strobe_charge);
 	CHECK_ERR(err);
 
+	ctrl->value = strobe_charge;
+#if 0
 	err = m9mo_readb2(sd, M9MO_CATEGORY_CAPPARM,
 		M9MO_CAPPARM_STROBE_UP_DOWN, &strobe_up_down);
 	CHECK_ERR(err);
@@ -1346,12 +1911,11 @@ static int m9mo_get_flash_status(struct v4l2_subdev *sd,
 
 	ctrl->value = strobe_charge | (strobe_up_down << 8);
 
-#if 0
 	cam_trace(": strobe_charge %d  up_down %d\n",
 		strobe_charge, strobe_up_down);
 #endif
 
-	return 0;
+	return ctrl->value;
 }
 
 static int m9mo_get_object_tracking(struct v4l2_subdev *sd,
@@ -1497,7 +2061,7 @@ static int m9mo_get_WBcustomX(struct v4l2_subdev *sd, struct v4l2_control *ctrl)
 	int value, value2, err, int_factor, int_en;
 	int changed_capture_mode = false;
 
-	if (state->running_capture_mode != M9MO_CAP_MODE_SINGLE_CAPTURE) {
+	if (state->running_capture_mode != RUNNING_MODE_SINGLE) {
 		err = m9mo_writeb(sd, M9MO_CATEGORY_CAPCTRL,
 				M9MO_CAPCTRL_CAP_MODE,
 				M9MO_CAP_MODE_SINGLE_CAPTURE);
@@ -1516,6 +2080,8 @@ static int m9mo_get_WBcustomX(struct v4l2_subdev *sd, struct v4l2_control *ctrl)
 	err = m9mo_writeb(sd, M9MO_CATEGORY_WB,
 		M9MO_WB_CWB_MODE, 0x02);
 	CHECK_ERR(err);
+
+	msleep(100);
 
 	err = m9mo_writeb(sd, M9MO_CATEGORY_SYS,
 		M9MO_SYS_MODE, M9MO_STILLCAP_MODE);
@@ -1542,7 +2108,11 @@ static int m9mo_get_WBcustomX(struct v4l2_subdev *sd, struct v4l2_control *ctrl)
 		return -ETIMEDOUT;
 	}
 
-	m9mo_set_mode(sd, M9MO_MONITOR_MODE);
+	err = m9mo_set_mode(sd, M9MO_MONITOR_MODE);
+	if (err <= 0) {
+		cam_err("failed to set mode\n");
+		return err;
+	}
 
 	err = m9mo_wait_interrupt(sd, M9MO_ISP_TIMEOUT);
 	if (!(err & M9MO_INT_MODE)) {
@@ -1655,6 +2225,42 @@ static int m9mo_get_factory_OIS_info(struct v4l2_subdev *sd,
 	return 0;
 }
 
+static int m9mo_get_factory_flash_charge(struct v4l2_subdev *sd,
+	struct v4l2_control *ctrl)
+{
+	int err, val;
+
+	cam_trace("E\n");
+
+	err = m9mo_readb(sd, M9MO_CATEGORY_CAPPARM,
+			M9MO_CAPPARM_STROBE_CHARGE, &val);
+	CHECK_ERR(err);
+
+	cam_trace("X : %d\n", val);
+
+	return val;
+}
+
+static int m9mo_get_check_sum(struct v4l2_subdev *sd, struct v4l2_control *ctrl)
+{
+	int err, end_check = 0;
+	err = m9mo_readb(sd, M9MO_CATEGORY_LENS,
+		M9MO_LENS_CHECK_SUM, &end_check);
+	CHECK_ERR(err);
+	cam_trace("CHECK_SUM val = 0x%x\n", end_check);
+	return end_check;
+}
+
+static int m9mo_get_focus_check(struct v4l2_subdev *sd, struct v4l2_control *ctrl)
+{
+	int err, focus_check = 0;
+	err = m9mo_readb(sd, M9MO_CATEGORY_LENS,
+		M9MO_LENS_AF_FOCUS_CHECK, &focus_check);
+	CHECK_ERR(err);
+	cam_trace("CHECK_SUM val = 0x%x\n", focus_check);
+	return focus_check;
+}
+
 static int m9mo_g_ctrl(struct v4l2_subdev *sd, struct v4l2_control *ctrl)
 {
 	struct m9mo_state *state = to_state(sd);
@@ -1664,6 +2270,10 @@ static int m9mo_g_ctrl(struct v4l2_subdev *sd, struct v4l2_control *ctrl)
 	switch (ctrl->id) {
 	case V4L2_CID_CAMERA_AUTO_FOCUS_RESULT:
 		m9mo_get_af_result(sd, ctrl);
+		break;
+
+	case V4L2_CID_CAMERA_AUTO_FOCUS_DONE:
+		m9mo_get_af_done(sd, ctrl);
 		break;
 
 	case V4L2_CID_CAM_JPEG_MEMSIZE:
@@ -1749,8 +2359,10 @@ static int m9mo_g_ctrl(struct v4l2_subdev *sd, struct v4l2_control *ctrl)
 
 	case V4L2_CID_CAMERA_FACTORY_END_RESULT:
 		ctrl->value = state->factory_end_check;
-		cam_trace("leesm test ----- factory_end_check %d\n",
-			ctrl->value);
+		if (0 != ctrl->value) {
+			cam_trace("leesm test ----- factory_end_check %d\n",
+				ctrl->value);
+		}
 		break;
 
 	case V4L2_CID_CAMERA_ZOOM:
@@ -1759,6 +2371,10 @@ static int m9mo_g_ctrl(struct v4l2_subdev *sd, struct v4l2_control *ctrl)
 
 	case V4L2_CID_CAMERA_OPTICAL_ZOOM_CTRL:
 		err = m9mo_get_zoom_level(sd, ctrl);
+		break;
+
+	case V4L2_CID_CAMERA_MF:
+		err = m9mo_get_manual_focus(sd, ctrl);
 		break;
 
 	case V4L2_CID_CAMERA_FLASH_MODE:
@@ -1835,6 +2451,23 @@ static int m9mo_g_ctrl(struct v4l2_subdev *sd, struct v4l2_control *ctrl)
 		ctrl->value = m9mo_get_face_detect_number(sd, ctrl);
 		break;
 
+	case V4L2_CID_CAMERA_FACTORY_FLASH_CHARGE:
+		ctrl->value = m9mo_get_factory_flash_charge(sd, ctrl);
+		CHECK_ERR(err);
+		break;
+
+	case V4L2_CID_CAMERA_FW_CHECKSUM_VAL:
+		ctrl->value = state->fw_checksum_val;
+		break;
+
+	case V4L2_CID_CAMERA_FACTORY_CHECK_SUM:
+		ctrl->value = m9mo_get_check_sum(sd, ctrl);
+		break;
+
+	case V4L2_CID_CAMERA_FACTORY_FOCUS_CHECK:
+		ctrl->value = m9mo_get_focus_check(sd, ctrl);
+		break;
+
 	default:
 		cam_err("no such control id %d\n",
 				ctrl->id - V4L2_CID_PRIVATE_BASE);
@@ -1872,6 +2505,7 @@ static int m9mo_set_antibanding(struct v4l2_subdev *sd,
 
 	val -= qc.minimum;
 
+	/* Auto flickering is always used */
 	err = m9mo_writeb(sd, M9MO_CATEGORY_AE,
 					M9MO_AE_FLICKER, antibanding[val]);
 	CHECK_ERR(err);
@@ -1885,41 +2519,71 @@ static int m9mo_set_antibanding(struct v4l2_subdev *sd,
 static int m9mo_set_lens_off(struct v4l2_subdev *sd)
 {
 	struct m9mo_state *state = to_state(sd);
-	u32 int_factor = 0;
 	int err = 0;
-	int int_en;
+	int value;
+	int cnt = 3,  cnt2 = 500;
 
 	cam_trace("E\n");
+
+	if (state->factory_no_lens_off) {
+		state->factory_no_lens_off = false;
+		return err ;
+	}
 
 	if (unlikely(state->isp.bad_fw)) {
 		cam_err("\"Unknown\" state, please update F/W");
 		return -ENOSYS;
 	}
 
-	err = m9mo_readw(sd, M9MO_CATEGORY_SYS,
-			M9MO_SYS_INT_EN, &int_en);
-	CHECK_ERR(err);
-	int_en &= ~M9MO_INT_MODE;
-	err = m9mo_writew(sd, M9MO_CATEGORY_SYS,
-			M9MO_SYS_INT_EN, int_en);
-	CHECK_ERR(err);
-
-	err = m9mo_set_mode(sd, M9MO_MONITOR_MODE);
-	if (err <= 0) {
-		cam_err("failed to set mode\n");
+	if (m9mo_Lens_Off_Needed == 0) {
+		cam_err("Lens close. Already\n");
 		return err;
 	}
 
 	err = m9mo_writeb(sd, M9MO_CATEGORY_LENS,
-		0x01, 0x00);
+		M9MO_LENS_AF_LENS_CLOSE, 0x00);
+	CHECK_ERR(err);
 
-	int_factor = m9mo_wait_interrupt(sd, M9MO_ISP_TIMEOUT);
+	m9mo_Lens_Off_Needed = 0;
 
-	if (!(int_factor & M9MO_INT_LENS_INIT)) {
-		cam_err("M9MO_INT_LENS_INIT isn't issued, %#x\n",
-				int_factor);
-		return -ETIMEDOUT;
+	/* use polling method instead of ISR check */
+	msleep(200);
+
+	err = m9mo_readb(sd, M9MO_CATEGORY_LENS,
+		M9MO_LENS_LENS_STATUS, &value);
+	CHECK_ERR(err);
+
+	while (value != 4 && cnt) {
+		err = m9mo_writeb(sd, M9MO_CATEGORY_LENS,
+			M9MO_LENS_AF_LENS_CLOSE, 0x00);
+		CHECK_ERR(err);
+
+		msleep(200);
+
+		err = m9mo_readb(sd, M9MO_CATEGORY_LENS,
+			M9MO_LENS_LENS_STATUS, &value);
+		CHECK_ERR(err);
+
+		if (value == 4)
+			break;
+
+		cnt--;
 	}
+
+	while (value == 4 && cnt2) {
+		msleep(20);
+		err = m9mo_readb(sd, M9MO_CATEGORY_LENS,
+			M9MO_LENS_LENS_STATUS, &value);
+		CHECK_ERR(err);
+
+		if (value != 4 && value == 0)
+			break;
+
+		cnt2--;
+	}
+
+	if (value != 0)
+		return -1;
 
 	cam_trace("X\n");
 	return err;
@@ -1967,33 +2631,43 @@ static int m9mo_dump_fw(struct v4l2_subdev *sd)
 
 	err = m9mo_mem_write(sd, 0x04, SZ_64,
 				0x90001200 , buf_port_seting0);
-			CHECK_ERR(err);
-			mdelay(10);
+	if (err < 0) {
+		cam_err("i2c falied, err %d\n", err);
+		goto out;
+	}
+	mdelay(10);
 
 	err = m9mo_mem_write(sd, 0x04, SZ_64,
 				0x90001000 , buf_port_seting1);
-			CHECK_ERR(err);
-			mdelay(10);
+	if (err < 0) {
+		cam_err("i2c falied, err %d\n", err);
+		goto out;
+	}
+	mdelay(10);
 
 	err = m9mo_mem_write(sd, 0x04, SZ_64,
 				0x90001100 , buf_port_seting2);
-			CHECK_ERR(err);
-			mdelay(10);
+	if (err < 0) {
+		cam_err("i2c falied, err %d\n", err);
+		goto out;
+	}
+	mdelay(10);
 
 	err = m9mo_writel(sd, M9MO_CATEGORY_FLASH,
 				0x1C, 0x0247036D);
 
 	err = m9mo_writeb(sd, M9MO_CATEGORY_FLASH,
 				0x57, 01);
-
-	CHECK_ERR(err);
+	if (err < 0) {
+		cam_err("i2c falied, err %d\n", err);
+		goto out;
+	}
 
 
 	addr = M9MO_FLASH_READ_BASE_ADDR;
 	unit = SZ_4K;
 	count = 1024;
 	for (i = 0; i < count; i++) {
-
 			err = m9mo_mem_dump(sd,
 				unit, addr + (i * unit), buf);
 			cam_err("dump ~~ %d\n", i);
@@ -2023,7 +2697,7 @@ static int m9mo_dump_fw(struct v4l2_subdev *sd)
 
 out:
 	kfree(buf);
-	if (!IS_ERR(fp))
+	if (!IS_ERR(fp) && fp != NULL)
 		filp_close(fp, current->files);
 file_out:
 	set_fs(old_fs);
@@ -2034,15 +2708,15 @@ file_out:
 static int m9mo_get_sensor_fw_version(struct v4l2_subdev *sd)
 {
 	struct m9mo_state *state = to_state(sd);
-	int err;
+	int err = 0;
 	int fw_ver = 0x00;
 	int awb_ver = 0x00;
 	int af_ver = 0x00;
 	int ois_ver = 0x00;
 	int parm_ver = 0x00;
 	int user_ver_temp;
-	char user_ver[20];
-	char sensor_ver[7];
+	char user_ver[M9MO_FW_VER_LEN + 1] = {'\0',};
+	char sensor_ver[M9MO_FW_VER_TOKEN + 1] = {'\0',};
 	int i = 0;
 
 	cam_err("E\n");
@@ -2068,7 +2742,6 @@ static int m9mo_get_sensor_fw_version(struct v4l2_subdev *sd)
 		M9MO_NEW_OIS_VERSION, &ois_ver);
 	CHECK_ERR(err);
 
-
 	for (i = 0; i < M9MO_FW_VER_LEN; i++) {
 		err = m9mo_readb(sd, M9MO_CATEGORY_SYS,
 				M9MO_SYS_USER_VER, &user_ver_temp);
@@ -2082,12 +2755,12 @@ static int m9mo_get_sensor_fw_version(struct v4l2_subdev *sd)
 
 	}
 
-	user_ver[i] = '\0';
+	user_ver[M9MO_FW_VER_LEN] = '\0';
 
 	if (user_ver[0] == 'F' && user_ver[1] == 'C') {
-		for (i = 0; i < M9MO_FW_VER_LEN; i++) {
+		for (i = 0; i < M9MO_FW_VER_TOKEN; i++) {
 			if (user_ver[i] == 0x20) {
-				sensor_ver[i] = '\0';
+				sensor_ver[M9MO_FW_VER_TOKEN] = '\0';
 				break;
 			}
 			sensor_ver[i] = user_ver[i];
@@ -2104,9 +2777,10 @@ static int m9mo_get_sensor_fw_version(struct v4l2_subdev *sd)
 	cam_info("user version = %s\n", user_ver);
 	cam_info("sensor version = %s\n", sensor_ver);
 
-	sprintf(state->sensor_ver, "%s", sensor_ver);
-	sprintf(state->sensor_type, "%d %d %d %x",
-			awb_ver, af_ver, ois_ver, parm_ver);
+	snprintf(state->sensor_ver, M9MO_FW_VER_TOKEN, "%s",
+			sensor_ver);
+	snprintf(state->sensor_type, M9MO_SENSOR_TYPE_LEN,
+			"%d %d %d %x", awb_ver, af_ver, ois_ver, parm_ver);
 	memcpy(sysfs_sensor_fw, state->sensor_ver,
 			sizeof(state->sensor_ver));
 	memcpy(sysfs_sensor_type, state->sensor_type,
@@ -2125,27 +2799,54 @@ static int m9mo_get_phone_fw_version(struct v4l2_subdev *sd)
 	const struct firmware *fw;
 	int err = 0;
 
-	struct file *fp;
+	struct file *fp = NULL;
 	mm_segment_t old_fs;
 	long nread;
 	int fw_requested = 1;
-	char ver_tmp[20];
-	char phone_ver[7];
+	char ver_tmp[M9MO_FW_VER_LEN + 1];
+	char phone_ver[M9MO_FW_VER_TOKEN + 1];
 	int i = 0;
+	int retry_cnt = 2;
 
 	cam_info("E\n");
 
 	old_fs = get_fs();
 	set_fs(KERNEL_DS);
 
+#ifdef CONFIG_MACH_GC2PD
+	fp = filp_open(M9MO_FW_PATH, O_RDONLY, 0);
+	if (IS_ERR(fp) /* || sysfs_check_app == 1 */) { /* Remove condition temporarily for fw update */
+		cam_trace("failed to open %s, err %ld\n", M9MO_FW_PATH,  PTR_ERR(fp));
+		fp = filp_open(M9MO_FW_MMC_PATH, O_RDONLY, 0);
+		if (IS_ERR(fp)) {
+			cam_trace("failed to open %s, err %ld\n", M9MO_FW_MMC_PATH,  PTR_ERR(fp));
+			mmc_fw = 0;
+			if (PTR_ERR(fp) == -4) {
+				cam_err("%s: file open I/O is interrupted\n", __func__);
+				return -EIO;
+			}
+			goto request_fw;
+		} else {
+			cam_info("FW File(phone) M9MO_FW_MMC_PATH opened.\n");
+			mmc_fw = 2;
+		}
+	} else {
+		cam_info("FW File(phone) M9MO_FW_PATH opened.\n");
+		mmc_fw = 1;
+	}
+#else
 	fp = filp_open(M9MO_FW_PATH, O_RDONLY, 0);
 	if (IS_ERR(fp)) {
-		cam_trace("failed to open %s, err %ld\n", M9MO_FW_PATH,
-			  PTR_ERR(fp));
+		cam_trace("failed to open %s, err %ld\n", M9MO_FW_PATH,  PTR_ERR(fp));
+		if (PTR_ERR(fp) == -4) {
+				cam_err("%s: file open I/O is interrupted\n", __func__);
+				return -EIO;
+		}
 		goto request_fw;
 	} else {
-		cam_info("FW File(phone) opened.\n");
+		cam_info("FW File(phone) M9MO_FW_PATH opened.\n");
 	}
+#endif
 
 	fw_requested = 0;
 
@@ -2163,6 +2864,20 @@ static int m9mo_get_phone_fw_version(struct v4l2_subdev *sd)
 		err = -EIO;
 		goto out;
 	}
+
+#ifdef CONFIG_MACH_GC2PD
+	ver_tmp[M9MO_FW_VER_LEN] = '\0';
+
+	if ((!strcmp(ver_tmp, "")) || (strlen(ver_tmp) == 0)) {
+		if (!IS_ERR(fp) && fp != NULL)
+			filp_close(fp, current->files);
+		cam_err("start, (ver_tmp length == 0) || (ver_tmp == null) \n");
+		fw_requested = 1;
+		mmc_fw = 0;
+	}
+
+	cam_info("mmc_fw=%d \n", mmc_fw);
+#endif
 
 request_fw:
 	if (fw_requested) {
@@ -2192,20 +2907,32 @@ request_fw:
 #endif
 		}
 #else
-		if (system_rev > 1) {
-			cam_info("Firmware Path = %s\n",
-					M9MO_EVT31_FW_REQ_PATH);
-			err = request_firmware(&fw,
-					M9MO_EVT31_FW_REQ_PATH, dev);
-		} else {
-			cam_info("Firmware Path = %s\n", M9MO_FW_REQ_PATH);
-			err = request_firmware(&fw, M9MO_FW_REQ_PATH, dev);
-		}
+fw_retry:
+#ifdef CONFIG_MACH_GC2PD
+	cam_info("Firmware Path = %s\n", M9MO_FW_REQ_PATH);
+	err = request_firmware(&fw, M9MO_FW_REQ_PATH, dev);
+#else
+	if (system_rev > 1) {
+		cam_info("Firmware Path = %s\n", M9MO_EVT31_FW_REQ_PATH);
+		err = request_firmware(&fw, M9MO_EVT31_FW_REQ_PATH, dev);
+	} else {
+		cam_info("Firmware Path = %s\n", M9MO_FW_REQ_PATH);
+		err = request_firmware(&fw, M9MO_FW_REQ_PATH, dev);
+	}
+#endif /* CONFIG_MACH_GC2PD */
 #endif
 
 		if (err != 0) {
 			cam_err("request_firmware falied\n");
-			err = -EINVAL;
+			/* release_firmware funtion
+			   will check this error in below. */
+			if (retry_cnt > 0) {
+				retry_cnt--;
+				msleep(20);
+				cam_err("request_firmware retry %d\n",	retry_cnt);
+				goto fw_retry;
+			}
+
 			goto out;
 		}
 #if 0
@@ -2225,16 +2952,14 @@ request_fw:
 			if ((int)fw->data[M9MO_FW_VER_NUM+i] == 0x00)
 				break;
 
-			ver_tmp[i] = (int)fw->data[M9MO_FW_VER_NUM+i];
+			ver_tmp[i] = (char)fw->data[M9MO_FW_VER_NUM+i];
 		}
+		ver_tmp[M9MO_FW_VER_LEN] = '\0';
 	}
-out:
 
-	ver_tmp[M9MO_FW_VER_LEN-1] = '\0';
-
-	for (i = 0; i < M9MO_FW_VER_LEN; i++) {
+	for (i = 0; i < M9MO_FW_VER_TOKEN; i++) {
 		if (ver_tmp[i] == 0x20) {
-			phone_ver[i] = '\0';
+			phone_ver[M9MO_FW_VER_TOKEN] = '\0';
 			/*cam_info("phone_ver = %s\n", phone_ver);*/
 			break;
 		}
@@ -2243,19 +2968,365 @@ out:
 
 	cam_info("ver_tmp = %s\n", ver_tmp);
 	cam_info("phone_ver = %s\n", phone_ver);
-	sprintf(state->phone_ver, "%s", phone_ver);
-	memcpy(sysfs_phone_fw, state->phone_ver,
-				sizeof(state->phone_ver));
+	snprintf(state->phone_ver, M9MO_FW_VER_TOKEN, "%s", phone_ver);
+	memcpy(sysfs_phone_fw, state->phone_ver, sizeof(state->phone_ver));
+
+out:
 
 	if (!fw_requested) {
-		filp_close(fp, current->files);
+		if (!IS_ERR(fp) && fp != NULL)
+			filp_close(fp, current->files);
 		set_fs(old_fs);
 	} else {
-		release_firmware(fw);
+		if (!err && (fw != NULL))
+			release_firmware(fw);
+		else
+			cam_err("request_firmware is failed. skip release.\n");
 	}
 
 	cam_dbg("phone ver : %s\n", sysfs_phone_fw);
 	return 0;
+}
+
+static int m9mo_check_checksum(struct v4l2_subdev *sd)
+{
+	struct m9mo_state *state = to_state(sd);
+	int checksum_value, value, err, init_value;
+	int cnt = 100;
+
+	cam_trace("E\n");
+
+	err = m9mo_readl(sd, M9MO_CATEGORY_FLASH,
+			0x00, &init_value);
+	CHECK_ERR(err);
+
+	err = m9mo_writel(sd, M9MO_CATEGORY_FLASH,
+			0x00, 0x00);
+	CHECK_ERR(err);
+
+	err = m9mo_writeb(sd, M9MO_CATEGORY_FLASH,
+			0x09, 0x04);
+	CHECK_ERR(err);
+
+	err = m9mo_readb(sd, M9MO_CATEGORY_FLASH,
+			0x09, &value);
+	CHECK_ERR(err);
+
+	while (value == 4 && cnt) {
+		msleep(100);
+		err = m9mo_readb(sd, M9MO_CATEGORY_FLASH,
+				0x09, &value);
+		CHECK_ERR(err);
+
+		if (value == 0)
+			break;
+
+		cnt--;
+	}
+
+	err = m9mo_readw(sd, M9MO_CATEGORY_FLASH,
+			0x0A, &checksum_value);
+	CHECK_ERR(err);
+
+	cam_trace("X %d\n", checksum_value);
+
+	if (checksum_value == 0x0) {
+		state->fw_checksum_val = 1;
+		return 1;
+	} else {
+		state->fw_checksum_val = 0;
+		return 0;
+	}
+}
+
+static int m9mo_set_factory_data_erase(struct v4l2_subdev *sd, int val)
+{
+	int err;
+	struct m9mo_state *state = to_state(sd);
+
+	cam_trace("E val : %d\n", val);
+
+	switch (val) {
+	case FACTORY_DATA_ERASE_PUNT:
+		cam_trace("~ FACTORY_PUNT_DATA_ERASE ~\n");
+		err = m9mo_writeb(sd, M9MO_CATEGORY_LENS,
+			0x0E, 0xff);
+		CHECK_ERR(err);
+		break;
+
+	case FACTORY_DATA_ERASE_BACKLASH:
+		cam_trace("~ FACTORY_BACKLASH_DATA_REASE ~\n");
+		err = m9mo_writeb(sd, M9MO_CATEGORY_LENS,
+			0xAE, 0xff);
+		CHECK_ERR(err);
+		break;
+
+	default:
+		cam_err("~ m9mo_set_factory_data_erase  ~ val : %d", val);
+		break;
+	}
+
+	cam_trace("X\n");
+	return 0;
+}
+
+static int m9mo_write_shd_data(struct v4l2_subdev *sd,
+	u8 *buf, u32 unit, u32 count)
+{
+	u32 val;
+	int erase = 0x01;
+	int retries = 0;
+	int test_count = 0;
+	int i=0, err;
+	
+	for (i = 0; i < 45; i++) {
+		/* Set Flash ROM memory address */
+		err = m9mo_writel(sd, M9MO_CATEGORY_FLASH,
+			M9MO_FLASH_ADDR, (0x204000+i*0x1000));
+
+		/* Erase FLASH ROM entire memory */
+		err = m9mo_writeb(sd, M9MO_CATEGORY_FLASH,
+			M9MO_FLASH_ERASE, erase);
+
+		/* Response while sector-erase is operating */
+		retries = 0;
+		do {
+			msleep(10);
+			err = m9mo_readb(sd, M9MO_CATEGORY_FLASH,
+				M9MO_FLASH_ERASE, &val);
+		} while (val == erase && retries++ < M9MO_I2C_VERIFY);
+
+		if (val != 0) {
+			cam_err("failed to erase sector\n");
+			return -EFAULT;
+		}
+
+		/* Set FLASH ROM programming size */
+		err = m9mo_writew(sd, M9MO_CATEGORY_FLASH,
+				M9MO_FLASH_BYTE, SZ_4K);
+		CHECK_ERR(err);
+
+		err = m9mo_mem_write(sd, 0x04, SZ_4K,
+				M9MO_INT_RAM_BASE_ADDR, (buf + i*0x1000));
+			CHECK_ERR(err);
+		cam_err("fw Send = %x count = %d\n", i, test_count++);
+
+		/* Start Programming */
+		err = m9mo_writeb(sd, M9MO_CATEGORY_FLASH, M9MO_FLASH_WR, 0x01);
+		CHECK_ERR(err);
+
+		/* Confirm programming has been completed */
+		retries = 0;
+		do {
+			mdelay(30);
+			err = m9mo_readb(sd, M9MO_CATEGORY_FLASH,
+				M9MO_FLASH_WR, &val);
+			CHECK_ERR(err);
+		} while (val && retries++ < M9MO_I2C_VERIFY);
+
+		cam_err("exit :: retries = %d\n", retries);
+		if (val != 0) {
+			//m9mo_dump_SHD(sd);
+			cam_err("failed to program~~~~\n");
+			return -1;
+		}
+	}	
+	cam_err("err = %d\n", err);
+	return err;
+}
+static int m9mo_read_shd_data(struct v4l2_subdev *sd, int idx)
+{
+	struct m9mo_state *state = to_state(sd);
+	struct device *dev = sd->v4l2_dev->dev;
+	u8 *buf_m9mo = NULL;
+	unsigned int count = 0;
+	struct file *fp;
+	mm_segment_t old_fs;
+	long fsize, nread;
+	int i, err = 0, data_len = 45*SZ_4K; //180*SZ_1K;
+
+	cam_trace("E idx=%d\n",idx);
+
+	old_fs = get_fs();
+	set_fs(KERNEL_DS);
+
+	fp = filp_open(M9MO_SHD_DATA_PATH, O_RDONLY, 0);
+	if (IS_ERR(fp)) {
+		cam_trace("failed to open %s, err %ld\n",
+			M9MO_SHD_DATA_PATH, PTR_ERR(fp));
+		goto file_out;
+	}
+	
+	fsize = fp->f_path.dentry->d_inode->i_size;
+	count = fsize / SZ_4K;
+
+	cam_err("start, file path %s, size %ld Bytes, count %d, index %d\n",
+	M9MO_SHD_DATA_PATH, fsize, count, idx);
+
+	cam_err("(fsize/data_len) %d\n", ((int)(fsize/data_len)));
+
+	if(((int)(fsize/data_len)) <= idx) {
+		cam_err("wrong index value.\n");
+		err = -EINVAL;
+		goto out;
+	}
+
+ 	buf_m9mo = vmalloc(data_len);
+	if (!buf_m9mo) {
+		cam_err("failed to allocate memory\n");
+		err = -ENOMEM;
+		goto out;
+	}
+	err = vfs_llseek(fp, data_len*idx, SEEK_SET);
+	cam_trace("SEEK_SET err = %d\n", err);
+	if (err < 0) {
+		cam_warn("failed to fseek, %d\n", err);
+		goto out;
+	}
+
+	nread = vfs_read(fp, (char __user *)buf_m9mo, data_len, &fp->f_pos);
+	if (nread != data_len) {
+		cam_err("failed to read SDH data file, %ld Bytes\n", nread);
+		err = -EIO;
+		goto out;
+	}
+
+	err = m9mo_mem_write(sd, 0x04, SZ_64,
+			0x90001200 , buf_port_seting0);
+	CHECK_ERR(err);
+	mdelay(10);
+
+	err = m9mo_mem_write(sd, 0x04, SZ_64,
+			0x90001000 , buf_port_seting1);
+	CHECK_ERR(err);
+	mdelay(10);
+
+	err = m9mo_mem_write(sd, 0x04, SZ_64,
+			0x90001100 , buf_port_seting2);
+	CHECK_ERR(err);
+	mdelay(10);
+
+	//set clock frequency dividing value
+	err = m9mo_writel(sd, M9MO_CATEGORY_FLASH,
+			0x1C, 0x0247036D);
+	CHECK_ERR(err);
+
+	//start RAM for write Flash ROM
+	err = m9mo_writeb(sd, M9MO_CATEGORY_FLASH,
+			0x4A, 0x01);
+	CHECK_ERR(err);
+	mdelay(10);
+
+	/* program FLASH ROM */
+	err = m9mo_write_shd_data(sd, buf_m9mo, SZ_4K, count);
+
+out:
+	vfree(buf_m9mo);
+	if (!IS_ERR(fp) && fp != NULL)
+		filp_close(fp, current->files);
+
+file_out:
+	set_fs(old_fs);
+	cam_trace("err = %d\n", err);
+
+
+	return err;
+}
+
+static int m9mo_set_shd_data(struct v4l2_subdev *sd, int idx)
+{
+	struct i2c_client *client = v4l2_get_subdevdata(sd);
+	const struct m9mo_platform_data *pdata = client->dev.platform_data;
+	struct m9mo_state *state = to_state(sd);
+	int err = 0;
+
+	cam_dbg("E\n");
+
+	pdata->power_on_off(0);
+	msleep(5);
+	pdata->power_on_off(1);
+
+	err = m9mo_read_shd_data(sd, idx);
+	cam_err("err : %d - %s", err, err==1?"success":"fail");
+	err==1?(state->factory_end_check = 0x02):(state->factory_end_check = 0x01);
+
+	pdata->power_on_off(0);
+	msleep(100);
+	pdata->power_on_off(1);
+
+	pdata->config_sambaz(0);
+	msleep(1000);
+	
+	cam_dbg("X\n");
+	return err;
+}
+
+static int m9mo_set_clip_value(struct v4l2_subdev *sd, int val)
+{
+	int err;
+	struct m9mo_state *state = to_state(sd);
+
+	cam_trace("E val : %d:%02d:%02d\n", val, ((val >> 8) & 0xFF), (val & 0xFF));
+
+	err = m9mo_writeb(sd, M9MO_CATEGORY_ADJST,
+		M9MO_ADJST_CLIP_VALUE1, (val >> 8) & 0xFF );
+	CHECK_ERR(err);
+
+	err = m9mo_writeb(sd, M9MO_CATEGORY_ADJST,
+		M9MO_ADJST_CLIP_VALUE2, val & 0xFF );
+	CHECK_ERR(err);
+	
+	err==1?(state->factory_end_check = 0x02):(state->factory_end_check = 0x01);
+
+	cam_trace("X\n");
+	return err;
+}
+
+static int m9mo_set_tilt_location(struct v4l2_subdev *sd, int val)
+{
+	int err;
+	int value=0, mX=0, mY=0;
+	int mlocationX=0, mlocationY=0;
+
+	cam_trace("E\n");
+	value = (val >> 30 & 0x00000003);
+	mX = (val & 0x3FFF0000) >> 16;
+	mY = val & 0x0000FFFF;
+	cam_trace("E val : %d:%02d:%02d\n", value, mX, mY);
+
+	switch (value) {
+		case FACTORY_TILT_LOCATION_LEFT_UP:
+			mlocationX = 0xB0;
+			mlocationY = 0xB2;
+			break;
+		case FACTORY_TILT_LOCATION_RIGHT_UP:
+			mlocationX = 0xB4;
+			mlocationY = 0xB6;
+			break;
+		case FACTORY_TILT_LOCATION_LEFT_DOWN:
+			mlocationX = 0xB8;
+			mlocationY = 0xBA;
+			break;
+		case FACTORY_TILT_LOCATION_RIGHT_DOWN:
+			mlocationX = 0xBC;
+			mlocationY = 0xBE;
+			break;
+		default:
+			cam_err("~ m9mo_set_tilt_location  ~ error value: %d", value);
+			mlocationX = 0xB0;
+			mlocationY = 0xB2;
+			mX = 0;
+			mY = 0;
+	}
+
+	err = m9mo_writew(sd, M9MO_CATEGORY_MON,
+		mlocationX, mX );
+	CHECK_ERR(err);
+	err = m9mo_writew(sd, M9MO_CATEGORY_MON,
+		mlocationY, mY );
+	CHECK_ERR(err);
+	cam_trace("X\n");
+	return err;
 }
 
 static int m9mo_check_fw(struct v4l2_subdev *sd)
@@ -2270,12 +3341,14 @@ static int m9mo_check_fw(struct v4l2_subdev *sd)
 	int update_count = 0;
 #endif
 	u32 int_factor;
-	int err;
+	int err = 0;
 
 	cam_trace("E\n");
 
 	/* F/W version */
-	m9mo_get_phone_fw_version(sd);
+	err = m9mo_get_phone_fw_version(sd);
+	if (err == -EIO)
+		return err;
 
 #if 0
 	if (state->isp.bad_fw)
@@ -2332,9 +3405,32 @@ out:
 			sysfs_phone_fw, sysfs_sensor_fw);
 
 	cam_trace("X\n");
-	return 0;
+	return err;
 }
 
+static int m9mo_wait_make_CSV_rawdata(struct v4l2_subdev *sd)
+{
+	int err, val = 0x00, cnt = 100;
+
+	cam_trace("E \n");
+
+	while (cnt) {
+		msleep(20);
+		err = m9mo_readb(sd, M9MO_CATEGORY_LENS,
+			M9MO_LENS_AF_ADJ_OK_NG, &val);
+		CHECK_ERR(err);
+
+		if (val == 0x01 || val == 0x02) {
+			cam_trace(":: write rawdata \n");
+			break;
+		} else {
+			cam_err(":: not yet, cnt = %d \n", cnt);
+			cnt--;
+		}
+	}
+	cam_trace("X \n");
+	return err;
+}
 
 static int m9mo_make_CSV_rawdata(struct v4l2_subdev *sd,
 	u32 *address, bool bAddResult)
@@ -2344,6 +3440,8 @@ static int m9mo_make_CSV_rawdata(struct v4l2_subdev *sd,
 	u8 *buf;
 	u32 addr, unit, intram_unit = 0x1000;
 	int err;
+
+	cam_trace("m9mo_make_CSV_rawdata() \n");
 
 	old_fs = get_fs();
 	set_fs(KERNEL_DS);
@@ -2396,7 +3494,88 @@ Bit 5 : DefectPixel*/
 
 out:
 	kfree(buf);
-	if (!IS_ERR(fp))
+	if (!IS_ERR(fp) && fp != NULL)
+		filp_close(fp, current->files);
+file_out:
+	set_fs(old_fs);
+
+	return err;
+}
+
+static int m9mo_make_IR_cut_CSV_rawdata(struct v4l2_subdev *sd,
+	u32 *address, bool bAddResult)
+{
+	struct file *fp;
+	mm_segment_t old_fs;
+	u8 *buf, buf2[2] = {0,};
+	u32 unit_movie, intram_unit = 0x1000;
+	int i, j, val, err, start, end;
+	long nread;
+
+	cam_trace("m9mo_make_IR_cut_CSV_rawdata() \n");
+
+	old_fs = get_fs();
+	set_fs(KERNEL_DS);
+
+	fp = filp_open(M9MO_FACTORY_CSV_PATH,
+		O_RDWR|O_CREAT, S_IRUGO|S_IWUGO|S_IXUSR);
+	if (IS_ERR(fp)) {
+		cam_err("failed to open %s, err %ld\n",
+			M9MO_FACTORY_CSV_PATH, PTR_ERR(fp));
+		err = -ENOENT;
+		goto file_out;
+	}
+
+	buf = kmalloc(intram_unit, GFP_KERNEL);
+
+	if (!buf) {
+		cam_err("failed to allocate memory\n");
+		err = -ENOMEM;
+		goto out;
+	}
+
+	cam_dbg("start, file path %s\n", M9MO_FACTORY_CSV_PATH);
+
+	start = 0x9d ;
+	end = 0x9f ;
+	unit_movie = end - start + 1;
+
+	for (i = start; i <= end; i++) {
+		err = m9mo_readb(sd, M9MO_CATEGORY_LENS, i, &val);
+		if (err <= 0) {
+			cam_err("i2c failed, err %d\n", err);
+			goto out;
+		}
+		buf[i-start] = (u8)val;
+	}
+
+	err = vfs_llseek(fp, -2, SEEK_END);
+	if (err < 0) {
+		cam_warn("failed to fseek, %d\n", err);
+		goto out;
+	}
+
+	nread = vfs_read(fp, (char __user *)buf2, 2, &fp->f_pos);
+	if (nread != 2) {
+		cam_err("failed to read firmware file, %ld Bytes\n", nread);
+		err = -EIO;
+		goto out;
+	}
+
+	err = vfs_llseek(fp, -2, SEEK_END);
+	if (err < 0) {
+		cam_warn("failed to fseek, %d\n", err);
+		goto out;
+	}
+
+	vfs_write(fp, buf, unit_movie, &fp->f_pos);
+	vfs_write(fp, buf2, 2, &fp->f_pos);
+
+	msleep(20);
+
+out:
+	kfree(buf);
+	if (!IS_ERR(fp) && fp != NULL)
 		filp_close(fp, current->files);
 file_out:
 	set_fs(old_fs);
@@ -2406,12 +3585,14 @@ file_out:
 
 static int m9mo_make_CSV_rawdata_direct(struct v4l2_subdev *sd, int nkind)
 {
+	struct m9mo_state *state = to_state(sd);
 	struct file *fp;
 	mm_segment_t old_fs;
-	u8 *buf;
+	u8 *buf, *tempBuf;
 	int val;
-	u32 unit, intram_unit = 0x1000;
-	int i, err, start, end;
+	u32 unit_default, unit_movie, unit_defect;
+	u32 intram_unit = 0x1000;
+	int i, err = 0, start, end, buf_size = 0, cnt = 100;;
 
 	old_fs = get_fs();
 	set_fs(KERNEL_DS);
@@ -2432,26 +3613,100 @@ static int m9mo_make_CSV_rawdata_direct(struct v4l2_subdev *sd, int nkind)
 		goto out;
 	}
 
-	if (V4L2_CID_CAMERA_FACTORY_DEFECTPIXEL) {
+	if (nkind == V4L2_CID_CAMERA_FACTORY_DEFECTPIXEL) {
 		cam_dbg("start, file path %s\n", M9MO_FACTORY_CSV_PATH);
 
 		start = 0x69;
 		end = 0x8C;
-		unit = end-start + 1;
+		unit_default = end - start + 1;
 
 		for (i = start; i <= end; i++) {
 			err = m9mo_readb(sd, M9MO_CATEGORY_MON, i, &val);
-			CHECK_ERR(err);
-
+			if (err < 0){
+				cam_err("i2c falied, err %d\n", err);
+				kfree(buf);
+				return err;
+			}
 			buf[i-start] = (u8)val;
 		}
+
+		start = 0xA0;
+		end = 0xA5;
+		unit_movie = end - start + 1;
+
+		for (i = start; i <= end; i++) {
+			err = m9mo_readb(sd, M9MO_CATEGORY_MON, i, &val);
+			if (err < 0){
+				cam_err("i2c falied, err %d\n", err);
+				kfree(buf);
+				return err;
+			}
+			buf[unit_default + (i - start)] = (u8)val;
+		}
+
+		start = 0x61;
+		end = 0x67;
+		unit_defect = end - start + 1;
+
+		for (i = start; i <= end; i++) {
+			err = m9mo_readb(sd, M9MO_CATEGORY_MON, i, &val);
+			if (err < 0){
+				cam_err("i2c falied, err %d\n", err);
+				kfree(buf);
+				return err;
+			}
+			buf[unit_default + unit_movie + (i - start)] = (u8)val;
+		}
+
+		buf_size = unit_default + unit_movie + unit_defect;
+	} else if (nkind == V4L2_CID_CAMERA_FACTORY_LENS_CAP_LOG) {
+		cam_dbg("~FACTORY_LENS_CAP_LOG~");
+		while (cnt) {
+			msleep(20);
+			err = m9mo_readb(sd, M9MO_CATEGORY_ADJST, 0x96, &val);
+			if (err < 0){
+				cam_err("i2c falied, err %d\n", err);
+				kfree(buf);
+				return err;
+			}
+
+			if (val == 0x00) {
+				cam_trace("save is complete\n");
+				break;
+			} else {
+				cam_err("lens cpa G_AVG saving = %d \n", cnt);
+				cnt--;
+			}
+		}
+
+		buf_size = 4;
+		err = m9mo_readb(sd, M9MO_CATEGORY_ADJST, 0x9b, &val);
+		if (err < 0){
+			cam_err("i2c falied, err %d\n", err);
+			kfree(buf);
+			return err;
+		}
+		buf[1] = (u8)val;
+		/*Check value :: OK/NG 2byte*/
+		if (state->lenscap_bright_min <= val && val <= state->lenscap_bright_max) {
+			cam_err("result - OK");
+			buf[3] = 0x00;
+		} else {
+			cam_err("result - NG");
+			buf[3] = 0x01;
+		}
+		cam_err("lens cpa G_AVG val = %d \n", val);
+	} else {
+		cam_err("error!!! no case ->LOG-Write ");
+		goto out;
 	}
-	vfs_write(fp, buf, unit, &fp->f_pos);
+
+	vfs_write(fp, buf, buf_size, &fp->f_pos);
 
 out:
 	kfree(buf);
 
-	if (!IS_ERR(fp))
+	if (!IS_ERR(fp) && fp != NULL)
 		filp_close(fp, current->files);
 
 file_out:
@@ -2466,13 +3721,16 @@ static int m9mo_set_fast_capture(struct v4l2_subdev *sd)
 	struct m9mo_state *state = to_state(sd);
 	int err;
 	cam_info("E\n");
+	if (state->running_capture_mode == RUNNING_MODE_SINGLE) {
+		err = m9mo_set_mode_part1(sd, M9MO_STILLCAP_MODE);
+		if (err <= 0) {
+			cam_err("Mode change is failed to STILLCAP for fast capture\n");
+			return err;
+		} else {
+			cam_info("Fast capture is issued. mode change start.\n");
+		}
 
-	err = m9mo_set_mode(sd, M9MO_STILLCAP_MODE);
-	if (err < 0) {
-		cam_err("Mode change is failed to STILLCAP for fast capture\n");
-		return err;
-	} else {
-		cam_info("Fast capture is issued. mode change start.\n");
+		state->fast_capture_set = 1;
 	}
 	return 0;
 }
@@ -2481,16 +3739,18 @@ static int m9mo_set_fast_capture(struct v4l2_subdev *sd)
 static int m9mo_set_sensor_mode(struct v4l2_subdev *sd, int val)
 {
 	struct m9mo_state *state = to_state(sd);
+#if 0
 	int err;
 	int set_shutter_mode;
+#endif
 	cam_dbg("E, value %d\n", val);
 
-	/* Do not set CATE_408 0x01,0x02 at mode change */
-	err = m9mo_writeb(sd, M9MO_CATEGORY_NEW, 0x08, 0x00);
-	CHECK_ERR(err);
-
+#if 0
 	err = m9mo_set_mode(sd, M9MO_PARMSET_MODE);
-	CHECK_ERR(err);
+	if (err <= 0) {
+		cam_err("failed to set mode\n");
+		return err;
+	}
 
 	if (val == SENSOR_MOVIE)
 		set_shutter_mode = 0;  /* Rolling Shutter */
@@ -2499,6 +3759,7 @@ static int m9mo_set_sensor_mode(struct v4l2_subdev *sd, int val)
 	err = m9mo_writeb(sd, M9MO_CATEGORY_ADJST,
 		M9MO_ADJST_SHUTTER_MODE, set_shutter_mode);
 	CHECK_ERR(err);
+#endif
 
 	state->sensor_mode = val;
 
@@ -2525,14 +3786,10 @@ static int m9mo_set_flash(struct v4l2_subdev *sd, int val, int force)
 	struct m9mo_state *state = to_state(sd);
 	int strobe_en = 0;
 	int err;
-	cam_dbg("E, value %d\n", val);
+	cam_trace("E, value %d\n", val);
 
 	if (!force)
 		state->flash_mode = val;
-
-	/* movie flash mode should be set when recording is started */
-	if (state->sensor_mode == SENSOR_MOVIE && !state->recording)
-		return 0;
 
 retry:
 	switch (val) {
@@ -2573,6 +3830,8 @@ retry:
 		goto retry;
 	}
 
+	state->strobe_en = strobe_en;
+
 	if (val !=  FLASH_MODE_RED_EYE_FIX) {
 		err = m9mo_writeb(sd, M9MO_CATEGORY_FD,
 				M9MO_FD_RED_EYE, 0x00);
@@ -2612,6 +3871,7 @@ static int m9mo_set_iso(struct v4l2_subdev *sd, struct v4l2_control *ctrl)
 	struct m9mo_state *state = to_state(sd);
 	struct v4l2_queryctrl qc = {0,};
 	int val = ctrl->value, err, current_state;
+	int iso_idx;
 	u32 iso[] = {0x00, 0x01, 0x64, 0xC8, 0x190, 0x320, 0x640, 0xC80};
 
 	if (state->scene_mode != SCENE_MODE_NONE) {
@@ -2619,7 +3879,7 @@ static int m9mo_set_iso(struct v4l2_subdev *sd, struct v4l2_control *ctrl)
 		return 0;
 	}
 
-	cam_dbg("E, value %d\n", val);
+	cam_dbg("E, mode %d, value %d\n", state->mode, val);
 
 	qc.id = ctrl->id;
 	m9mo_queryctrl(sd, &qc);
@@ -2632,39 +3892,49 @@ static int m9mo_set_iso(struct v4l2_subdev *sd, struct v4l2_control *ctrl)
 	val -= qc.minimum;
 
 	switch (val) {
-	case 0:
+	case ISO_AUTO:
 		state->iso = 0;
+		iso_idx = 0;
 		break;
 
-	case 1:
+	case ISO_50:
 		state->iso = 50;
+		iso_idx = 1;
 		break;
 
-	case 2:
+	case ISO_100:
 		state->iso = 100;
+		iso_idx = 2;
 		break;
 
-	case 3:
+	case ISO_200:
 		state->iso = 200;
+		iso_idx = 3;
 		break;
 
-	case 4:
+	case ISO_400:
 		state->iso = 400;
+		iso_idx = 4;
 		break;
 
-	case 5:
+	case ISO_800:
 		state->iso = 800;
+		iso_idx = 5;
 		break;
 
-	case 6:
+	case ISO_1600:
 		state->iso = 1600;
+		iso_idx = 6;
 		break;
 
-	case 7:
+	case ISO_3200:
 		state->iso = 3200;
+		iso_idx = 7;
 		break;
 
 	default:
+		iso_idx = 0;
+		cam_dbg("Error, invalid value %d\n", val);
 		break;
 	}
 
@@ -2672,9 +3942,15 @@ static int m9mo_set_iso(struct v4l2_subdev *sd, struct v4l2_control *ctrl)
 		M9MO_AE_EV_PRG_MODE_CAP, &current_state);
 
 	/* ISO AUTO */
-	if (val == 0) {
+	if (val == ISO_AUTO) {
 		switch (state->mode) {
 		case MODE_PROGRAM:
+		case MODE_BEST_GROUP_POSE:
+		case MODE_BEAUTY_SHOT:
+		case MODE_BEST_SHOT:
+		case MODE_CONTINUOUS_SHOT:
+		case MODE_ERASER:
+		case MODE_PANORAMA:
 			err = m9mo_writeb(sd, M9MO_CATEGORY_AE,
 				M9MO_AE_EV_PRG_MODE_CAP, 0x00);
 			CHECK_ERR(err);
@@ -2698,6 +3974,12 @@ static int m9mo_set_iso(struct v4l2_subdev *sd, struct v4l2_control *ctrl)
 	} else {
 		switch (state->mode) {
 		case MODE_PROGRAM:
+		case MODE_BEST_GROUP_POSE:
+		case MODE_BEAUTY_SHOT:
+		case MODE_BEST_SHOT:
+		case MODE_CONTINUOUS_SHOT:
+		case MODE_ERASER:
+		case MODE_PANORAMA:
 			if (current_state != 0x04) {
 				err = m9mo_writeb(sd, M9MO_CATEGORY_AE,
 					M9MO_AE_EV_PRG_MODE_CAP, 0x04);
@@ -2725,7 +4007,7 @@ static int m9mo_set_iso(struct v4l2_subdev *sd, struct v4l2_control *ctrl)
 			break;
 		}
 		err = m9mo_writew(sd, M9MO_CATEGORY_AE,
-			M9MO_AE_EV_PRG_ISO_VALUE, iso[val]);
+		M9MO_AE_EV_PRG_ISO_VALUE, iso[iso_idx]);
 		CHECK_ERR(err);
 	}
 	cam_trace("X\n");
@@ -2779,17 +4061,23 @@ static int m9mo_set_exposure(struct v4l2_subdev *sd,
 	qc.id = ctrl->id;
 	m9mo_queryctrl(sd, &qc);
 
-	if (val < qc.minimum || val > qc.maximum) {
+	if ((val < qc.minimum || val > qc.maximum) && (val != 50)) {
 		cam_warn("invalied value, %d\n", val);
 		val = qc.default_value;
 	}
 
-	val -= qc.minimum;
+	if (val == 50) {
+		/* + 0.5 EV */
+		err = m9mo_writeb(sd, M9MO_CATEGORY_AE,
+			M9MO_AE_INDEX, 0x23);
+		CHECK_ERR(err);
+	} else {
+		val -= qc.minimum;
 
-	err = m9mo_writeb(sd, M9MO_CATEGORY_AE,
-		M9MO_AE_INDEX, exposure[val]);
-	CHECK_ERR(err);
-
+		err = m9mo_writeb(sd, M9MO_CATEGORY_AE,
+			M9MO_AE_INDEX, exposure[val]);
+		CHECK_ERR(err);
+	}
 	cam_trace("X\n");
 	return 0;
 }
@@ -2972,8 +4260,25 @@ retry:
 	return 0;
 }
 
+static int m9mo_set_coloradjust(struct v4l2_subdev *sd, int val)
+{
+	struct m9mo_state *state = to_state(sd);
+	int err;
+
+	cam_dbg("E, value %d\n", val);
+
+	err = m9mo_writeb(sd, M9MO_CATEGORY_WB,
+		M9MO_WB_COLOR_ADJ, val);
+	CHECK_ERR(err);
+
+	cam_trace("X\n");
+	return 0;
+}
+
+
 static int m9mo_set_sharpness(struct v4l2_subdev *sd, struct v4l2_control *ctrl)
 {
+	struct m9mo_state *state = to_state(sd);
 	struct v4l2_queryctrl qc = {0,};
 	int val = ctrl->value, err;
 	u32 sharpness[] = {0x01, 0x02, 0x03, 0x04, 0x05};
@@ -2990,6 +4295,8 @@ static int m9mo_set_sharpness(struct v4l2_subdev *sd, struct v4l2_control *ctrl)
 	err = m9mo_writeb(sd, M9MO_CATEGORY_MON,
 		M9MO_MON_EDGE_CTRL, sharpness[val]);
 	CHECK_ERR(err);
+
+	state->sharpness = sharpness[val];
 
 	cam_trace("X\n");
 	return 0;
@@ -3021,6 +4328,7 @@ static int m9mo_set_contrast(struct v4l2_subdev *sd, struct v4l2_control *ctrl)
 static int m9mo_set_saturation(struct v4l2_subdev *sd,
 	struct v4l2_control *ctrl)
 {
+	struct m9mo_state *state = to_state(sd);
 	struct v4l2_queryctrl qc = {0,};
 	int val = ctrl->value, err;
 	u32 saturation[] = {0x01, 0x02, 0x03, 0x04, 0x05};
@@ -3037,6 +4345,8 @@ static int m9mo_set_saturation(struct v4l2_subdev *sd,
 	err = m9mo_writeb(sd, M9MO_CATEGORY_MON,
 		M9MO_MON_CHROMA_LVL, saturation[val]);
 	CHECK_ERR(err);
+
+	state->saturation = saturation[val];
 
 	cam_trace("X\n");
 	return 0;
@@ -3176,6 +4486,8 @@ static int m9mo_set_effect_color(struct v4l2_subdev *sd, int val)
 		return 0;
 	}
 
+	err = m9mo_writeb(sd, M9MO_CATEGORY_MON, M9MO_MON_COLOR_EFFECT, 0x01);
+	CHECK_ERR(err);
 	err = m9mo_writeb(sd, M9MO_CATEGORY_MON, M9MO_MON_CFIXB, cb);
 	CHECK_ERR(err);
 	err = m9mo_writeb(sd, M9MO_CATEGORY_MON, M9MO_MON_CFIXR, cr);
@@ -3206,6 +4518,8 @@ static int m9mo_set_effect_point(struct v4l2_subdev *sd, int val)
 		return 0;
 	}
 
+	err = m9mo_writeb(sd, M9MO_CATEGORY_MON,
+		M9MO_MON_COLOR_EFFECT, 0x03);
 	err = m9mo_writeb(sd, M9MO_CATEGORY_MON,
 		M9MO_MON_POINT_COLOR, point);
 	CHECK_ERR(err);
@@ -3338,8 +4652,8 @@ static unsigned int m9mo_set_cal_rect_pos(struct v4l2_subdev *sd,
 
 	if (pos_val <= 40)
 		set_val = 40;
-	else if (pos_val > (state->preview->width - 40))
-		set_val = state->preview->width - 40;
+	else if (pos_val > (state->preview->sensor_height - 40))
+		set_val = state->preview->sensor_height - 40;
 	else
 		set_val = pos_val;
 
@@ -3362,8 +4676,8 @@ static int m9mo_set_object_tracking(struct v4l2_subdev *sd, int val)
 		set_x = m9mo_set_cal_rect_pos(sd, state->focus.pos_x);
 		set_y = m9mo_set_cal_rect_pos(sd, state->focus.pos_y);
 
-		cam_dbg("idx[%d] w[%d] h[%d]", state->preview->index,
-			state->preview->width, state->preview->height);
+		cam_dbg("idx[%d] sensor_w[%d] sensor_h[%d]", state->preview->index,
+			state->preview->sensor_width, state->preview->sensor_height);
 		cam_dbg("pos_x[%d] pos_y[%d] x[%d] y[%d]",
 			state->focus.pos_x, state->focus.pos_y,
 			set_x, set_y);
@@ -3397,8 +4711,13 @@ static int m9mo_set_object_tracking(struct v4l2_subdev *sd, int val)
 
 static int m9mo_set_image_stabilizer_OIS(struct v4l2_subdev *sd, int val)
 {
+	struct m9mo_state *state = to_state(sd);
 	int err, int_factor, set_ois, int_en;
 	int wait_int_ois = 0;
+
+	if (state->image_stabilizer_mode != V4L2_IMAGE_STABILIZER_OIS
+		|| state->mode == MODE_PANORAMA)
+		return 0;
 
 	cam_trace("E: mode %d\n", val);
 
@@ -3418,6 +4737,7 @@ retry:
 		wait_int_ois = 0;
 		break;
 
+#if 0
 	case V4L2_IS_OIS_MULTI:
 		set_ois = 0x03;
 		wait_int_ois = 0;
@@ -3427,11 +4747,18 @@ retry:
 		set_ois = 0x04;
 		wait_int_ois = 1;
 		break;
+#endif
 
 	default:
 		cam_warn("invalid value, %d", val);
 		val = V4L2_IS_OIS_STILL;
 		goto retry;
+	}
+
+	/* set movie mode when waterfall */
+	if (state->mode == MODE_WATERFALL) {
+		set_ois = 0x01;
+		wait_int_ois = 1;
 	}
 
 	if (wait_int_ois) {
@@ -3455,7 +4782,6 @@ retry:
 				int_factor);
 			return -ETIMEDOUT;
 		}
-		CHECK_ERR(err);
 
 		/* enable OIS_SET interrupt */
 		int_en &= ~M9MO_INT_OIS_SET;
@@ -3507,7 +4833,6 @@ retry:
 	case FOCUS_MODE_FACEDETECT:
 		af_mode = 0x00;
 		af_window = 0x02;
-		af_range = 0x02;
 		break;
 
 	case FOCUS_MODE_TOUCH:
@@ -3531,7 +4856,6 @@ retry:
 	case FOCUS_MODE_OBJECT_TRACKING:
 		af_mode = 0x00;
 		af_window = 0x02;
-		af_range = 0x02;
 		break;
 
 	default:
@@ -3557,13 +4881,15 @@ retry:
 		}
 	}
 
-	/* fix range to auto-macro when FD on */
-	if (state->facedetect_mode == FACE_DETECTION_NORMAL)
+	/* fix range */
+	if (state->mode == MODE_SMART_AUTO || state->mode == MODE_VIDEO
+	|| state->mode == MODE_CLOSE_UP || state->mode == MODE_BEAUTY_SHOT
+	|| state->mode == MODE_FOOD || state->mode == MODE_CANDLE
+	|| state->mode == MODE_SMART_SUGGEST) {
 		af_range = 0x02;
-
-	/* fix range to macro when CLOSE_UP mode */
-	if (state->mode == MODE_CLOSE_UP)
-		af_range = 0x01;
+	} else if (state->mode >= MODE_BEST_GROUP_POSE) {
+		af_range = 0x00;
+	}
 
 	/* fix window to center */
 	if ((state->focus.mode == 0 || state->focus.mode == 1)
@@ -3579,14 +4905,14 @@ retry:
 			M9MO_LENS_AF_SCAN_RANGE, af_range);
 		CHECK_ERR(err);
 	}
-
+#if 0
 	/* Set Zone REQ */
 	if (range_status != af_range) {
 		err = m9mo_writeb(sd, M9MO_CATEGORY_LENS,
 			M9MO_LENS_AF_INITIAL, 0x04);
 		CHECK_ERR(err);
 	}
-
+#endif
 	/* Set AF Window Mode */
 	err = m9mo_readb(sd, M9MO_CATEGORY_LENS,
 		M9MO_LENS_AF_WINDOW_MODE, &window_status);
@@ -3605,7 +4931,7 @@ static int m9mo_set_af(struct v4l2_subdev *sd, int val)
 	struct m9mo_state *state = to_state(sd);
 	struct i2c_client *client = v4l2_get_subdevdata(sd);
 	const struct m9mo_platform_data *pdata = client->dev.platform_data;
-	int status, err = 0;
+	int err = 0;
 
 	cam_info("%s, mode %d\n", val ? "start" : "stop", state->focus.mode);
 
@@ -3616,7 +4942,7 @@ static int m9mo_set_af(struct v4l2_subdev *sd, int val)
 		pdata->af_led_power(1);
 
 		if (state->facedetect_mode == FACE_DETECTION_NORMAL
-			&& state->mode == MODE_SMART_AUTO) {
+			&& (state->mode == MODE_SMART_AUTO || state->mode == MODE_SMART_SUGGEST)) {
 			err = m9mo_writeb(sd, M9MO_CATEGORY_FD,
 				M9MO_FD_CTL, 0x11);
 			CHECK_ERR(err);
@@ -3626,28 +4952,35 @@ static int m9mo_set_af(struct v4l2_subdev *sd, int val)
 
 		if (state->focus.mode != FOCUS_MODE_CONTINOUS) {
 			m9mo_set_lock(sd, 1);
-
+#if 0
 			/* Single AF Start */
 			err = m9mo_writeb(sd, M9MO_CATEGORY_LENS,
 					M9MO_LENS_AF_START_STOP, 0x00);
 			CHECK_ERR(err);
+#else
+			/* AF start */
+			err = m9mo_writeb(sd, M9MO_CATEGORY_MON, 0x5C, 0x10);
+			CHECK_ERR(err);
+			state->af_running = 1;
+#endif
 		}
 	} else {
-		err = m9mo_readw(sd, M9MO_CATEGORY_LENS,
-			M9MO_LENS_AF_RESULT, &status);
-		CHECK_ERR(err);
-
 		if (state->facedetect_mode == FACE_DETECTION_NORMAL
-			&& state->mode == MODE_SMART_AUTO) {
+			&& (state->mode == MODE_SMART_AUTO || state->mode == MODE_SMART_SUGGEST)) {
 			err = m9mo_writeb(sd, M9MO_CATEGORY_FD,
 				M9MO_FD_CTL, 0x01);
 			CHECK_ERR(err);
 		}
 
-		if (state->focus.lock && status != 0x1000) {
-			if (state->focus.mode != FOCUS_MODE_CONTINOUS)
-				m9mo_set_lock(sd, 0);
-		}
+		cam_info("lock %d, status %x, running %d\n",
+				state->focus.lock,
+				state->focus.status,
+				state->af_running);
+
+		if (state->focus.lock && state->focus.status != 0x1000
+			&& !state->af_running)
+			m9mo_set_lock(sd, 0);
+
 		/* AF LED regulator off */
 		pdata->af_led_power(0);
 	}
@@ -3659,6 +4992,24 @@ static int m9mo_set_af(struct v4l2_subdev *sd, int val)
 static int m9mo_set_af_mode(struct v4l2_subdev *sd, int val)
 {
 	struct m9mo_state *state = to_state(sd);
+	int err, af_mode, mode_status;
+
+	if (val == FOCUS_MODE_CONTINOUS)
+		af_mode = 0x01;
+	else
+		af_mode = 0x00;
+
+	/* Set AF Mode */
+	err = m9mo_readb(sd, M9MO_CATEGORY_LENS,
+		M9MO_LENS_AF_MODE, &mode_status);
+
+	if (mode_status != af_mode) {
+		if (state->focus.mode != FOCUS_MODE_TOUCH) {
+			err = m9mo_writeb(sd, M9MO_CATEGORY_LENS,
+				M9MO_LENS_AF_MODE, af_mode);
+			CHECK_ERR(err);
+		}
+	}
 
 	state->focus.mode = val;
 
@@ -3671,6 +5022,21 @@ static int m9mo_set_focus_range(struct v4l2_subdev *sd, int val)
 	struct m9mo_state *state = to_state(sd);
 	int err, range_status;
 
+	/* fix range */
+	if (state->sensor_mode == SENSOR_CAMERA) {
+		if (state->mode == MODE_SMART_AUTO || state->mode == MODE_VIDEO
+		|| state->mode >= MODE_BEST_GROUP_POSE || state->mode == MODE_SMART_SUGGEST) {
+			cam_trace("don't set !!!\n");
+			return 0;
+		}
+	} else if (state->sensor_mode == SENSOR_MOVIE) {
+		if (state->mode == MODE_VIDEO || state->mode >= MODE_BEST_GROUP_POSE
+		|| state->mode == MODE_SMART_SUGGEST) {
+			cam_trace("don't set !!!\n");
+			return 0;
+		}
+	}
+
 	/* Set AF Scan Range */
 	err = m9mo_readb(sd, M9MO_CATEGORY_LENS,
 		M9MO_LENS_AF_SCAN_RANGE, &range_status);
@@ -3679,11 +5045,12 @@ static int m9mo_set_focus_range(struct v4l2_subdev *sd, int val)
 		err = m9mo_writeb(sd, M9MO_CATEGORY_LENS,
 			M9MO_LENS_AF_SCAN_RANGE, val);
 		CHECK_ERR(err);
-
+#if 0
 		/* Set Zone REQ */
 		err = m9mo_writeb(sd, M9MO_CATEGORY_LENS,
 			M9MO_LENS_AF_INITIAL, 0x04);
 		CHECK_ERR(err);
+#endif
 	}
 
 	state->focus_range = val;
@@ -3695,6 +5062,17 @@ static int m9mo_set_focus_range(struct v4l2_subdev *sd, int val)
 static int m9mo_set_focus_area_mode(struct v4l2_subdev *sd, int val)
 {
 	struct m9mo_state *state = to_state(sd);
+	int err, window_status;
+
+	/* Set AF Window Mode */
+	err = m9mo_readb(sd, M9MO_CATEGORY_LENS,
+		M9MO_LENS_AF_WINDOW_MODE, &window_status);
+
+	if (window_status != val) {
+		err = m9mo_writeb(sd, M9MO_CATEGORY_LENS,
+			M9MO_LENS_AF_WINDOW_MODE, val);
+		CHECK_ERR(err);
+	}
 
 	state->focus_area_mode = val;
 
@@ -3717,6 +5095,18 @@ static int m9mo_set_touch_auto_focus(struct v4l2_subdev *sd, int val)
 		err = m9mo_writew(sd, M9MO_CATEGORY_LENS,
 				M9MO_LENS_AF_TOUCH_POSY, state->focus.pos_y);
 		CHECK_ERR(err);
+
+		if (state->facedetect_mode == FACE_DETECTION_BLINK) {
+			err = m9mo_writeb(sd, M9MO_CATEGORY_FD,
+				M9MO_FD_CTL, 0x01);
+			CHECK_ERR(err);
+		}
+	} else {
+		if (state->facedetect_mode == FACE_DETECTION_BLINK) {
+			err = m9mo_writeb(sd, M9MO_CATEGORY_FD,
+				M9MO_FD_CTL, 0x11);
+			CHECK_ERR(err);
+		}
 	}
 
 	cam_trace("X\n");
@@ -3743,12 +5133,123 @@ static int m9mo_set_AF_LED(struct v4l2_subdev *sd, int val)
 	return 0;
 }
 
+static int m9mo_set_Turn_AF_LED(struct v4l2_subdev *sd, int val)
+{
+	int err;
+	struct i2c_client *client = v4l2_get_subdevdata(sd);
+	const struct m9mo_platform_data *pdata = client->dev.platform_data;
+
+	cam_trace("E, value %d\n", val);
+
+	if (val) {
+		err = m9mo_writeb(sd, M9MO_CATEGORY_LENS,
+		M9MO_LENS_AF_LED, val);
+	}
+	pdata->af_led_power(val);/* AF LED regulator on :1, off:0 */
+	msleep(100);
+
+	err = m9mo_writeb(sd, M9MO_CATEGORY_LENS,
+		0x4E, val);
+	CHECK_ERR(err);
+
+	cam_trace("X\n");
+	return 0;
+}
+
+static int m9mo_set_timer_Mode(struct v4l2_subdev *sd, int val)
+{
+	int err;
+	int set_OIS_timer;
+
+	cam_trace("E for OIS, value %d\n", val);
+
+	if (val == 0)
+		set_OIS_timer = 0;
+	else
+		set_OIS_timer = 1;
+
+	err = m9mo_writeb(sd, M9MO_CATEGORY_NEW,
+		M9MO_NEW_OIS_TIMER, set_OIS_timer);
+	CHECK_ERR(err);
+
+	cam_trace("X\n");
+	return 0;
+}
+
+static int m9mo_set_timer_LED(struct v4l2_subdev *sd, int val)
+{
+	int err;
+	int set_timer_LED_On;
+
+	cam_trace("E, value %d\n", val);
+
+	switch (val) {
+	case V4L2_TIMER_LED_OFF:
+		set_timer_LED_On = 0;
+		break;
+
+	case V4L2_TIMER_LED_2_SEC:
+		set_timer_LED_On = 0x1;
+		break;
+
+	case V4L2_TIMER_LED_5_SEC:
+		set_timer_LED_On = 0x2;
+		break;
+
+	case V4L2_TIMER_LED_10_SEC:
+		set_timer_LED_On = 0x3;
+		break;
+
+	default:
+		cam_warn("invalid value, %d", val);
+		return 0;
+	}
+
+	err = m9mo_writeb(sd, M9MO_CATEGORY_LENS,
+		M9MO_LENS_TIMER_LED, set_timer_LED_On);
+	CHECK_ERR(err);
+
+	cam_trace("X\n");
+	return 0;
+}
+
+static int m9mo_set_zoom_action_method(struct v4l2_subdev *sd, int val)
+{
+	struct m9mo_state *state = to_state(sd);
+	int err = 0;
+
+	if (val < ZOOM_KEY || val > ZOOM_METHOD_MAX)
+		return -1;
+
+	cam_trace("E : zoom_action_method = %d\n", val);
+
+	if (val == ZOOM_KEY) {
+		err = m9mo_writeb(sd, M9MO_CATEGORY_LENS,
+			M9MO_LENS_ZOOM_ACTION_METHOD, M9MO_ZOOM_METHOD_KEY);
+		CHECK_ERR(err);
+	} else {
+		err = m9mo_writeb(sd, M9MO_CATEGORY_LENS,
+			M9MO_LENS_ZOOM_ACTION_METHOD, M9MO_ZOOM_METHOD_RING);
+		CHECK_ERR(err);
+	}
+	cam_trace("X\n");
+
+	return 0;
+}
 static int m9mo_set_zoom(struct v4l2_subdev *sd, struct v4l2_control *ctrl)
 {
 	struct m9mo_state *state = to_state(sd);
 	struct v4l2_queryctrl qc = {0,};
 	int val = ctrl->value, err;
 	int opti_val, digi_val;
+#if defined(CONFIG_MACH_GC2PD)
+	int opti_max = 10;
+	int optical_zoom_val[] = { 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10 };
+	int zoom_val[] = { 0x01,
+		0x0E, 0x17, 0x1D, 0x22, 0x26,
+		0x29, 0x2C, 0x2E, 0x30, 0x32,
+		0x34, 0x35, 0x36, 0x37, 0x38 };
+#else
 	int opti_max = 15;
 	int optical_zoom_val[] = { 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10,
 		11, 12, 13, 14, 15};
@@ -3756,6 +5257,7 @@ static int m9mo_set_zoom(struct v4l2_subdev *sd, struct v4l2_control *ctrl)
 		0x0E, 0x17, 0x1D, 0x22, 0x26,
 		0x29, 0x2C, 0x2E, 0x30, 0x32,
 		0x34, 0x35, 0x36, 0x37, 0x38 };
+#endif
 	cam_trace("E, value %d\n", val);
 
 	qc.id = ctrl->id;
@@ -3779,6 +5281,7 @@ static int m9mo_set_zoom(struct v4l2_subdev *sd, struct v4l2_control *ctrl)
 		digi_val = val - opti_max;
 	}
 
+#ifndef CONFIG_MACH_GC2PD
 	if (state->recording) {
 		err = m9mo_writeb(sd, M9MO_CATEGORY_LENS,
 			M9MO_LENS_ZOOM_SPEED, 0x00);
@@ -3793,6 +5296,7 @@ static int m9mo_set_zoom(struct v4l2_subdev *sd, struct v4l2_control *ctrl)
 	err = m9mo_writeb(sd, M9MO_CATEGORY_LENS,
 		M9MO_LENS_AF_START_STOP, 0x05);
 	CHECK_ERR(err);
+#endif
 
 	err = m9mo_writeb(sd, M9MO_CATEGORY_LENS,
 		M9MO_LENS_AF_ZOOM_LEVEL, optical_zoom_val[opti_val]);
@@ -3808,11 +5312,61 @@ static int m9mo_set_zoom(struct v4l2_subdev *sd, struct v4l2_control *ctrl)
 	return 0;
 }
 
+static int m9mo_set_dzoom(struct v4l2_subdev *sd, struct v4l2_control *ctrl)
+{
+	struct m9mo_state *state = to_state(sd);
+	int val = ctrl->value, err, int_factor, i;
+	int dzoom_val[] = { 1, 6, 11, 16, 21, 26, 31, 36, 41, 46, 51, 56 };
+	bool fps_done = false;
+	s32 value = 0;
+
+	cam_trace("E, value %d\n", dzoom_val[val]);
+	for (i = 0; i < 30; i++) {
+		err = m9mo_readb(sd, M9MO_CATEGORY_MON,
+			M9MO_MON_AF_FPS_CHECK, &value);
+		CHECK_ERR(err);
+		if (value == 0xFF)
+			fps_done = false;
+		else if (value == 0x01) {
+			fps_done = true;
+			break;
+		}
+		mdelay(10);
+	}
+
+	if (state->focus.mode == FOCUS_MODE_TOUCH && fps_done) {
+		err = m9mo_writeb(sd, M9MO_CATEGORY_MON, M9MO_MON_AF_SET_TOUCH, 0x07);
+		CHECK_ERR(err);
+	} else if (state->focus.mode != FOCUS_MODE_TOUCH && fps_done) {
+		err = m9mo_writeb(sd, M9MO_CATEGORY_MON, M9MO_MON_AF_SET_TOUCH, 0x08);
+		CHECK_ERR(err);
+	}
+
+	err = m9mo_writeb(sd, M9MO_CATEGORY_MON, M9MO_MON_ZOOM, dzoom_val[val]);
+	CHECK_ERR(err);
+
+	/* Clear Interrupt factor */
+	int_factor = m9mo_wait_interrupt(sd, M9MO_ISP_TIMEOUT);
+	if (!(int_factor & M9MO_INT_ZOOM)) {
+		cam_err("M9MO_INT_FRAME_SYNC isn't issued, factor = %#x, INT_ZOOM = %#x\n",
+			int_factor, M9MO_INT_ZOOM);
+		return -ETIMEDOUT;
+	}
+
+	if (val == 0) {
+		err = m9mo_writeb(sd, M9MO_CATEGORY_MON, M9MO_MON_AF_SET_TOUCH, 0x00);
+		CHECK_ERR(err);
+	}
+
+	cam_trace("X\n");
+	return 0;
+}
+
 static int m9mo_set_zoom_ctrl(struct v4l2_subdev *sd, int val)
 {
 	struct m9mo_state *state = to_state(sd);
 
-	int err;
+	int err, curr_zoom_info;
 	int zoom_ctrl, zoom_speed;
 	int read_ctrl, read_speed;
 
@@ -3821,12 +5375,20 @@ static int m9mo_set_zoom_ctrl(struct v4l2_subdev *sd, int val)
 	switch (val) {
 	case V4L2_OPTICAL_ZOOM_TELE_START:
 		zoom_ctrl = 0;
+#ifdef CONFIG_MACH_GC2PD
+		zoom_speed = 2;
+#else
 		zoom_speed = 1;
+#endif
 		break;
 
 	case V4L2_OPTICAL_ZOOM_WIDE_START:
 		zoom_ctrl = 1;
+#ifdef CONFIG_MACH_GC2PD
+		zoom_speed = 2;
+#else
 		zoom_speed = 1;
+#endif
 		break;
 
 	case V4L2_OPTICAL_ZOOM_SLOW_TELE_START:
@@ -3860,13 +5422,19 @@ static int m9mo_set_zoom_ctrl(struct v4l2_subdev *sd, int val)
 		M9MO_LENS_AF_ZOOM_CTRL, &read_ctrl);
 	CHECK_ERR(err);
 
+#ifndef CONFIG_MACH_GC2PD
 	if (read_speed != zoom_speed && val != V4L2_OPTICAL_ZOOM_STOP) {
 		err = m9mo_writeb(sd, M9MO_CATEGORY_LENS,
 			M9MO_LENS_ZOOM_SPEED, zoom_speed);
 		CHECK_ERR(err);
 	}
+#endif
 
-	if (read_ctrl != zoom_ctrl) {
+	err = m9mo_readb2(sd, M9MO_CATEGORY_PRO_MODE,
+		M9MO_PRO_SMART_READ3, &curr_zoom_info);
+	CHECK_ERR(err);
+
+	if ((read_ctrl != zoom_ctrl) || (curr_zoom_info & 0x40)) {
 		if (val != V4L2_OPTICAL_ZOOM_STOP) {
 			/* AF CANCEL */
 			err = m9mo_writeb(sd, M9MO_CATEGORY_LENS,
@@ -3877,6 +5445,44 @@ static int m9mo_set_zoom_ctrl(struct v4l2_subdev *sd, int val)
 		err = m9mo_writeb(sd, M9MO_CATEGORY_LENS,
 			M9MO_LENS_AF_ZOOM_CTRL, zoom_ctrl);
 		CHECK_ERR(err);
+	}
+
+#ifdef CONFIG_MACH_GC2PD
+	if (read_speed != zoom_speed && val != V4L2_OPTICAL_ZOOM_STOP) {
+		err = m9mo_writeb(sd, M9MO_CATEGORY_LENS,
+			M9MO_LENS_ZOOM_SPEED, zoom_speed);
+		CHECK_ERR(err);
+	}
+#endif
+
+	cam_trace("X\n");
+	return 0;
+}
+
+static int m9mo_set_zoom_speed(struct v4l2_subdev *sd, int zoom_speed)
+{
+	int err;
+	int read_speed;
+	int read_ctrl;
+
+	cam_trace("E, zoom_speed %d\n", zoom_speed);
+
+	err = m9mo_readb(sd, M9MO_CATEGORY_LENS,
+		M9MO_LENS_AF_ZOOM_CTRL, &read_ctrl);
+	CHECK_ERR(err);
+
+	if (read_ctrl != 2) {
+		err = m9mo_readb(sd, M9MO_CATEGORY_LENS,
+						M9MO_LENS_ZOOM_SPEED, &read_speed);
+		CHECK_ERR(err);
+
+		if (read_speed != zoom_speed) {
+			err = m9mo_writeb(sd, M9MO_CATEGORY_LENS,
+							M9MO_LENS_ZOOM_SPEED, zoom_speed);
+			CHECK_ERR(err);
+		}
+	} else {
+		cam_trace("Zoom has stopped. Abandon zoom speed \n");
 	}
 
 	cam_trace("X\n");
@@ -3892,11 +5498,11 @@ static int m9mo_set_smart_zoom(struct v4l2_subdev *sd, int val)
 	cam_trace("E, value %d\n", val);
 
 	if (val)
-		smart_zoom = 0x5C;
+		smart_zoom = 0x5B;
 	else
 		smart_zoom = 0;
 
-	/* Off:0x00, On: 0x01 ~ 0x5C */
+	/* Off:0x00, On: 0x01 ~ 0x5B */
 	err = m9mo_writeb(sd, M9MO_CATEGORY_MON,
 		M9MO_MON_HR_ZOOM, smart_zoom);
 	CHECK_ERR(err);
@@ -3972,6 +5578,7 @@ static int m9mo_get_exif(struct v4l2_subdev *sd)
 		7155
 	};
 
+#ifdef EXIF_ONE_HALF_STOP_STEP
 	s16 ss_std_values[] = {
 		-400, -358, -300, -258, -200,
 		-158, -100, -58, 0, 51,
@@ -3989,6 +5596,32 @@ static int m9mo_get_exif(struct v4l2_subdev *sd)
 		625, 675, 725, 775, 825,
 		875, 925, 975, 1025, 1075,
 	};
+#endif
+#ifdef EXIF_ONE_THIRD_STOP_STEP
+	s16 ss_std_values[] = {
+		-400, -370, -332, -300, -258,
+		-232, -200, -168, -132, -100,
+		-68, -38, 0, 32, 74,
+		100, 132, 158, 200, 232,
+		258, 300, 332, 370, 390,
+		432, 464, 490, 532, 564,
+		590, 632, 664, 697, 732,
+		764, 797, 832, 864, 897,
+		932, 964, 997, 1029, 1064,
+	};
+
+	s16 ss_qtable[] = {
+		-383, -350, -317, -283, -250,
+		-217, -183, -150, -117, -83,
+		-50, -17, 17, 50, 83,
+		117, 150, 183, 217, 250,
+		283, 317, 350, 383, 417,
+		450, 483, 517, 550, 583,
+		617, 650, 683, 717,	750,
+		783, 817, 850, 883, 917,
+		950, 983, 1017, 1050, 1083,
+	};
+#endif
 
 	int num, den, i, err;
 
@@ -4063,6 +5696,7 @@ static int m9mo_get_exif(struct v4l2_subdev *sd)
 		state->exif.bv = 0;
 
 	/* exposure bias value */
+#if 1
 	err = m9mo_readl(sd, M9MO_CATEGORY_EXIF, M9MO_EXIF_EBV_NUM, &num);
 	CHECK_ERR(err);
 	err = m9mo_readl(sd, M9MO_CATEGORY_EXIF, M9MO_EXIF_EBV_DEN, &den);
@@ -4071,6 +5705,12 @@ static int m9mo_get_exif(struct v4l2_subdev *sd)
 		state->exif.ebv = num*M9MO_DEF_APEX_DEN/den;
 	else
 		state->exif.ebv = 0;
+#else
+	err = m9mo_readb(sd, M9MO_CATEGORY_AE, M9MO_AE_INDEX, &num);
+	CHECK_ERR(err);
+	cam_info("%s: EV index = %d", __func__, num);
+	state->exif.ebv = (num - 30) * 10;
+#endif
 
 	/* Aperture */
 	err = m9mo_readl(sd, M9MO_CATEGORY_EXIF, M9MO_EXIF_AV_NUM, &num);
@@ -4118,7 +5758,7 @@ static int m9mo_get_fd_eye_blink_result(struct v4l2_subdev *sd)
 			M9MO_FD_BLINK_LEVEL_1+val_no-1, &val_level);
 	CHECK_ERR(err);
 
-	if (val_level >= 0x05)
+	if ((val_level == 0xFF) || (val_level <= 0x3C))
 		state->fd_eyeblink_cap = 1;
 	else
 		state->fd_eyeblink_cap = 0;
@@ -4260,6 +5900,8 @@ static int m9mo_start_postview_capture(struct v4l2_subdev *sd, int frame_num)
 	int err, int_factor;
 	cam_trace("E : %d frame\n", frame_num);
 
+	state->fast_capture_set = 0;
+
 	if (state->dual_capture_start)
 		return m9mo_start_dual_postview(sd, frame_num);
 
@@ -4271,6 +5913,7 @@ static int m9mo_start_postview_capture(struct v4l2_subdev *sd, int frame_num)
 		/* Select image number of frame */
 		err = m9mo_writeb(sd, M9MO_CATEGORY_CAPCTRL,
 				M9MO_CAPCTRL_FRM_PRV_SEL, frame_num);
+		CHECK_ERR(err);
 
 		/* Clear Interrupt factor */
 		int_factor = m9mo_wait_interrupt(sd, M9MO_ISP_TIMEOUT);
@@ -4284,6 +5927,7 @@ static int m9mo_start_postview_capture(struct v4l2_subdev *sd, int frame_num)
 		/* Select image number of frame */
 		err = m9mo_writeb(sd, M9MO_CATEGORY_CAPCTRL,
 				M9MO_CAPCTRL_FRM_PRV_SEL, frame_num);
+		CHECK_ERR(err);
 
 		/* Clear Interrupt factor */
 		int_factor = m9mo_wait_interrupt(sd, M9MO_ISP_TIMEOUT);
@@ -4296,6 +5940,7 @@ static int m9mo_start_postview_capture(struct v4l2_subdev *sd, int frame_num)
 		/* Select image number of frame */
 		err = m9mo_writeb(sd, M9MO_CATEGORY_CAPCTRL,
 				M9MO_CAPCTRL_FRM_PRV_SEL, frame_num);
+		CHECK_ERR(err);
 	} else if (state->running_capture_mode == RUNNING_MODE_HDR) {
 		cam_warn("HDR have no PostView\n");
 		return 0;
@@ -4303,6 +5948,7 @@ static int m9mo_start_postview_capture(struct v4l2_subdev *sd, int frame_num)
 		/* Select image number of frame */
 		err = m9mo_writeb(sd, M9MO_CATEGORY_CAPCTRL,
 				M9MO_CAPCTRL_FRM_PRV_SEL, 0xFF);
+		CHECK_ERR(err);
 
 		/* Clear Interrupt factor */
 		int_factor = m9mo_wait_interrupt(sd, M9MO_ISP_TIMEOUT);
@@ -4338,8 +5984,8 @@ static int m9mo_start_postview_capture(struct v4l2_subdev *sd, int frame_num)
 		/* Select image number of frame */
 		err = m9mo_writeb(sd, M9MO_CATEGORY_CAPCTRL,
 				M9MO_CAPCTRL_FRM_PRV_SEL, 0x01);
+		CHECK_ERR(err);
 	}
-	CHECK_ERR(err);
 
 	if (state->running_capture_mode != RUNNING_MODE_BURST) {
 		/* Set YUV out for Preview */
@@ -4423,10 +6069,11 @@ static int m9mo_start_YUV_capture(struct v4l2_subdev *sd, int frame_num)
 	err = m9mo_writeb(sd, M9MO_CATEGORY_CAPPARM,
 		M9MO_CAPPARM_MAIN_IMG_SIZE, state->capture->reg_val);
 	CHECK_ERR(err);
-	if (state->smart_zoom_mode)
+	if (state->smart_zoom_mode) {
 		m9mo_set_smart_zoom(sd, state->smart_zoom_mode);
-	cam_trace("Select image size [ w=%d, h=%d ]\n",
-			state->capture->width, state->capture->height);
+	}
+	cam_trace("Select sensor image size [ w=%d, h=%d ]\n",
+			state->capture->sensor_width, state->capture->sensor_height);
 
 	/* Get main YUV data */
 	err = m9mo_writeb(sd, M9MO_CATEGORY_CAPCTRL,
@@ -4459,11 +6106,62 @@ static int m9mo_start_YUV_capture(struct v4l2_subdev *sd, int frame_num)
 	return err;
 }
 
+static int m9mo_start_YUV_one_capture(struct v4l2_subdev *sd, int frame_num)
+{
+	struct m9mo_state *state = to_state(sd);
+	int err, int_factor;
+	cam_trace("E : %d frame\n", frame_num);
+
+	/* Select image number of frame */
+	err = m9mo_writeb(sd, M9MO_CATEGORY_CAPCTRL,
+			M9MO_CAPCTRL_FRM_SEL, 0x01);
+	CHECK_ERR(err);
+
+	/* Select main image format */
+	err = m9mo_writeb(sd, M9MO_CATEGORY_CAPPARM,
+			M9MO_CAPPARM_YUVOUT_MAIN, 0x00);
+	CHECK_ERR(err);
+
+	/* Select main image size */
+	err = m9mo_writeb(sd, M9MO_CATEGORY_CAPPARM,
+		M9MO_CAPPARM_MAIN_IMG_SIZE, state->capture->reg_val);
+	CHECK_ERR(err);
+
+	/* Get main YUV data */
+	err = m9mo_writeb(sd, M9MO_CATEGORY_CAPCTRL,
+			M9MO_CAPCTRL_TRANSFER, 0x01);
+
+	/* Clear Interrupt factor */
+	int_factor = m9mo_wait_interrupt(sd, M9MO_ISP_TIMEOUT);
+	if (!(int_factor & M9MO_INT_CAPTURE)) {
+		cam_warn("M9MO_INT_CAPTURE isn't issued on transfer, %#x\n",
+				int_factor);
+		return -ETIMEDOUT;
+	}
+
+	err = m9mo_readl(sd, M9MO_CATEGORY_CAPCTRL, M9MO_CAPCTRL_IMG_SIZE,
+				&state->jpeg.main_size);
+	CHECK_ERR(err);
+	cam_dbg("   ==> main image size=%d\n", state->jpeg.main_size);
+
+	state->jpeg.main_offset = 0;
+	state->jpeg.thumb_offset = M9MO_JPEG_MAXSIZE;
+	state->jpeg.postview_offset = M9MO_JPEG_MAXSIZE + M9MO_THUMB_MAXSIZE;
+
+	m9mo_get_exif(sd);
+
+	cam_trace("X\n");
+	return err;
+}
+
+
 static int m9mo_start_capture(struct v4l2_subdev *sd, int frame_num)
 {
 	struct m9mo_state *state = to_state(sd);
 	int err, int_factor;
 	cam_trace("E : %d frame\n", frame_num);
+
+	state->fast_capture_set = 0;
 
 	if (state->dual_capture_start)
 		return m9mo_start_dual_capture(sd, frame_num);
@@ -4611,6 +6309,12 @@ static int m9mo_start_capture(struct v4l2_subdev *sd, int frame_num)
 		}
 	}
 
+	if (state->running_capture_mode == RUNNING_MODE_SINGLE) {
+		cam_trace("~V4L2_CID_CAMERA_SET_PRE_LIVEVIEW ~\n");
+		err = m9mo_writeb(sd, M9MO_CATEGORY_LENS, 0x7C, 0x01);
+		CHECK_ERR(err);
+	}
+
 	err = m9mo_readl(sd, M9MO_CATEGORY_CAPCTRL, M9MO_CAPCTRL_IMG_SIZE,
 				&state->jpeg.main_size);
 	CHECK_ERR(err);
@@ -4627,7 +6331,12 @@ static int m9mo_start_capture(struct v4l2_subdev *sd, int frame_num)
 		if (frame_num == 1) {
 			m9mo_get_exif(sd);
 
-			m9mo_set_mode(sd, M9MO_MONITOR_MODE);
+			err = m9mo_set_mode(sd, M9MO_MONITOR_MODE);
+			if (err <= 0) {
+				cam_err("failed to set mode\n");
+				return err;
+			}
+
 			err = m9mo_wait_interrupt(sd, M9MO_ISP_TIMEOUT);
 			if (!(err & M9MO_INT_MODE)) {
 				cam_err("m9mo_start_capture() MONITOR_MODE error\n");
@@ -4710,12 +6419,13 @@ static int m9mo_set_facedetect(struct v4l2_subdev *sd, int val)
 
 	switch (state->facedetect_mode) {
 	case FACE_DETECTION_NORMAL:
+	case FACE_DETECTION_BLINK:
 		cam_dbg("~~~~~~ face detect on ~~~~~~ val : %d\n", val);
 		err = m9mo_writeb(sd, M9MO_CATEGORY_FD, M9MO_FD_SIZE, 0x04);
 		CHECK_ERR(err);
 		err = m9mo_writeb(sd, M9MO_CATEGORY_FD, M9MO_FD_MAX, 0x07);
 		CHECK_ERR(err);
-		if (state->mode == MODE_SMART_AUTO) {
+		if (state->mode == MODE_SMART_AUTO || state->mode == MODE_SMART_SUGGEST) {
 			err = m9mo_writeb(sd, M9MO_CATEGORY_FD,
 				M9MO_FD_CTL, 0x01);
 		} else {
@@ -4723,14 +6433,14 @@ static int m9mo_set_facedetect(struct v4l2_subdev *sd, int val)
 				M9MO_FD_CTL, 0x11);
 		}
 		CHECK_ERR(err);
+
+		if (state->isp_mode == M9MO_MONITOR_MODE)
+			msleep(30);
+
 		break;
 
 	case FACE_DETECTION_SMILE_SHOT:
 		cam_dbg("~~~~~~ fd smile shot ~~~~~~ val : %d\n", val);
-		break;
-
-	case FACE_DETECTION_BLINK:
-		cam_dbg("~~~~~~ fd eye blink ~~~~~~ val : %d\n", val);
 		break;
 
 	case FACE_DETECTION_OFF:
@@ -4738,6 +6448,7 @@ static int m9mo_set_facedetect(struct v4l2_subdev *sd, int val)
 		cam_dbg("~~~~~~ face detect off ~~~~~~ val : %d\n", val);
 		err = m9mo_writeb(sd, M9MO_CATEGORY_FD, M9MO_FD_CTL, 0x00);
 		CHECK_ERR(err);
+		msleep(30);
 		break;
 	}
 	cam_trace("X\n");
@@ -4750,6 +6461,13 @@ static int m9mo_set_bracket_aeb(struct v4l2_subdev *sd, int val)
 	cam_trace("E val : %d\n", val);
 
 	switch (val) {
+	case BRACKET_AEB_VALUE0:
+		cam_dbg("~~~~~~ AEB value0 ~~~~~~ val : %d\n", val);
+		err = m9mo_writeb(sd, M9MO_CATEGORY_AE,
+				M9MO_AE_AUTO_BRACKET_EV, 0x00); /* EV 0.0 */
+		CHECK_ERR(err);
+		break;
+
 	case BRACKET_AEB_VALUE1:
 		cam_dbg("~~~~~~ AEB value1 ~~~~~~ val : %d\n", val);
 		err = m9mo_writeb(sd, M9MO_CATEGORY_AE,
@@ -4926,7 +6644,12 @@ static int m9mo_set_factory_cam_sys_mode(struct v4l2_subdev *sd, int val)
 	switch (val) {
 	case FACTORY_SYSMODE_CAPTURE:
 		cam_trace("~ FACTORY_SYSMODE_CAPTURE ~\n");
+#if 0
 		old_mode = m9mo_set_mode(sd, M9MO_STILLCAP_MODE);
+#else
+		old_mode = m9mo_set_mode_part1(sd, M9MO_STILLCAP_MODE);
+		old_mode = m9mo_set_mode_part2(sd, M9MO_STILLCAP_MODE);
+#endif
 		break;
 
 	case FACTORY_SYSMODE_MONITOR:
@@ -4948,7 +6671,9 @@ static int m9mo_set_factory_cam_sys_mode(struct v4l2_subdev *sd, int val)
 
 static int m9mo_set_fps(struct v4l2_subdev *sd, int val)
 {
-	int err;
+	int err, int_factor;
+	int current_mode, old_mode;
+	bool mode_changed;
 
 	struct m9mo_state *state = to_state(sd);
 	cam_trace("E val : %d\n", val);
@@ -4963,16 +6688,43 @@ static int m9mo_set_fps(struct v4l2_subdev *sd, int val)
 	}
 
 	cam_info("set AE EP to %d\n", val);
+	mode_changed = false;
+	if ((val != 24) && (state->fps == 24)) {
+		err = m9mo_readb(sd, M9MO_CATEGORY_SYS, M9MO_SYS_MODE, &current_mode);
+		CHECK_ERR(err);
+		if (current_mode != M9MO_PARMSET_MODE) {
+			err = m9mo_set_mode(sd, M9MO_PARMSET_MODE);
+			if (err <= 0) {
+				cam_err("failed to set mode\n");
+				return err;
+			}
+			mode_changed = true;
+		}
+
+		err = m9mo_writeb(sd, M9MO_CATEGORY_PARM,
+			M9MO_PARM_FLEX_FPS, 0x00);
+		CHECK_ERR(err);
+	}
 
 	switch (val) {
 	case 120:
-		cam_trace("~~~~~~ 120 fps ~~~~~~\n");
-		err = m9mo_writeb(sd, M9MO_CATEGORY_AE,
-				M9MO_AE_EP_MODE_MON, 0x1C);
-		CHECK_ERR(err);
-		err = m9mo_writeb(sd, M9MO_CATEGORY_AE,
-				M9MO_AE_EP_MODE_CAP, 0x1C);
-		CHECK_ERR(err);
+		cam_trace("~~~~~~ 120 fps ~~~~~~%s\n",
+			state->mode == MODE_GOLF_SHOT ? " Golf Shot mode" : "");
+		if (state->mode == MODE_GOLF_SHOT) {
+			err = m9mo_writeb(sd, M9MO_CATEGORY_AE,
+					M9MO_AE_EP_MODE_MON, 0x12);
+			CHECK_ERR(err);
+			err = m9mo_writeb(sd, M9MO_CATEGORY_AE,
+					M9MO_AE_EP_MODE_CAP, 0x12);
+			CHECK_ERR(err);
+		} else {
+			err = m9mo_writeb(sd, M9MO_CATEGORY_AE,
+					M9MO_AE_EP_MODE_MON, 0x1C);
+			CHECK_ERR(err);
+			err = m9mo_writeb(sd, M9MO_CATEGORY_AE,
+					M9MO_AE_EP_MODE_CAP, 0x1C);
+			CHECK_ERR(err);
+		}
 		break;
 
 	case 60:
@@ -4995,18 +6747,71 @@ static int m9mo_set_fps(struct v4l2_subdev *sd, int val)
 		CHECK_ERR(err);
 		break;
 
+	case 24:
+		cam_trace("~~~~~~ 24 fps ~~~~~~\n");
+		err = m9mo_readb(sd, M9MO_CATEGORY_SYS, M9MO_SYS_MODE, &current_mode);
+		CHECK_ERR(err);
+		if (current_mode != M9MO_PARMSET_MODE) {
+			err = m9mo_set_mode(sd, M9MO_PARMSET_MODE);
+			if (err <= 0) {
+				cam_err("failed to set mode\n");
+				return err;
+			}
+			mode_changed = true;
+		}
+		err = m9mo_writeb(sd, M9MO_CATEGORY_PARM,
+				M9MO_PARM_FLEX_FPS, 0x18);
+		CHECK_ERR(err);
+		break;
+
+#if 0	/* after ISP update */
+	case 15:
+		cam_trace("~~~~~~ 15 fps ~~~~~~\n");
+		err = m9mo_writeb(sd, M9MO_CATEGORY_PARM,
+				M9MO_PARM_MON_FPS, 0x03);
+		CHECK_ERR(err);
+		break;
+#endif
+
 	default:
 		cam_trace("~~~~~~ default : auto fps ~~~~~~\n");
 		err = m9mo_writeb(sd, M9MO_CATEGORY_AE,
-				M9MO_AE_EP_MODE_MON, 0x00);
+				M9MO_AE_EP_MODE_MON, 0x09);
 		CHECK_ERR(err);
 		err = m9mo_writeb(sd, M9MO_CATEGORY_AE,
-				M9MO_AE_EP_MODE_CAP, 0x00);
+				M9MO_AE_EP_MODE_CAP, 0x09);
 		CHECK_ERR(err);
 		break;
 	}
 
+#if 0	/* after ISP update */
+	if (state->fps == 15 && val != 15) {
+		err = m9mo_writeb(sd, M9MO_CATEGORY_PARM,
+				M9MO_PARM_MON_FPS, 0x01);
+		CHECK_ERR(err);
+	}
+#endif
+
+	if (mode_changed) {
+		old_mode = m9mo_set_mode(sd, current_mode);
+		if (old_mode <= 0) {
+			cam_err("failed to set mode\n");
+			return err;
+		}
+
+		if (old_mode != M9MO_MONITOR_MODE && current_mode == M9MO_MONITOR_MODE) {
+			int_factor = m9mo_wait_interrupt(sd, M9MO_ISP_TIMEOUT);
+			if (!(int_factor & M9MO_INT_MODE)) {
+				cam_err("M9MO_INT_MODE isn't issued, %#x\n",
+					int_factor);
+				return -ETIMEDOUT;
+			}
+		}		
+	}
+
 	state->fps = val;
+
+	m9mo_set_OIS_cap_mode(sd);
 
 	cam_trace("X\n");
 	return 0;
@@ -5019,7 +6824,7 @@ static int m9mo_set_time_info(struct v4l2_subdev *sd, int val)
 	int read_hour, read_min;
 #endif
 
-	cam_trace("E val : %x\n", val);
+	cam_trace("E val : %02d:%02d\n", ((val >> 8) & 0xFF), (val & 0xFF));
 
 	err = m9mo_writew(sd, M9MO_CATEGORY_NEW,
 		M9MO_NEW_TIME_INFO, val);
@@ -5045,7 +6850,11 @@ static int m9mo_set_lens_off_timer(struct v4l2_subdev *sd, int val)
 {
 	int err;
 
-	cam_trace("E val : %x\n", val);
+	cam_trace("E val : %d\n", val);
+#if 1
+	cam_trace("Lens off timer is disabled.\n");
+	return 1;
+#endif
 
 	if (val > 0xFF) {
 		cam_warn("Can not set over 0xFF, but set 0x%x", val);
@@ -5057,16 +6866,56 @@ static int m9mo_set_lens_off_timer(struct v4l2_subdev *sd, int val)
 	CHECK_ERR(err);
 
 	cam_trace("X\n");
-	return 0;
+	return 1;
 }
 
 static int m9mo_set_widget_mode_level(struct v4l2_subdev *sd, int val)
 {
 	struct m9mo_state *state = to_state(sd);
 	int err;
+	int /*denominator = 500,*/ numerator = 8;
+	u32 f_number = 0x45;
+
+	/* 3 step -> 2 step, low level is not used */
+	if (val == 1)
+		val = 2;
 
 	/* valid values are 0, 2, 4 */
 	state->widget_mode_level = val * 2 - 2;
+
+	switch (state->mode) {
+	case MODE_HIGH_SPEED:
+		state->widget_mode_level = 4;
+		break;
+
+	case MODE_LIGHT_TRAIL_SHOT:
+		state->widget_mode_level = 4;
+		break;
+
+	case MODE_WATERFALL:
+		state->widget_mode_level = 4;
+		break;
+
+	case MODE_FIREWORKS:
+		state->widget_mode_level = 2;
+		break;
+
+	case MODE_SILHOUETTE:
+		state->widget_mode_level = 2;
+		break;
+
+	case MODE_SUNSET:
+		state->widget_mode_level = 2;
+		break;
+
+	case MODE_NATURAL_GREEN:
+		state->widget_mode_level = 4;
+		break;
+
+	case MODE_CLOSE_UP:
+		state->widget_mode_level = 4;
+		break;
+	}
 
 	/* LIKE A PRO STEP SET */
 	err = m9mo_writeb(sd, M9MO_CATEGORY_PRO_MODE,
@@ -5074,36 +6923,68 @@ static int m9mo_set_widget_mode_level(struct v4l2_subdev *sd, int val)
 	CHECK_ERR(err);
 
 	if (state->mode == MODE_SILHOUETTE) {
-		/* GAMMA_TBL_RGB_CAP */
+		err = m9mo_writeb(sd, M9MO_CATEGORY_CAPPARM,
+			0x41, 0x0);
+		CHECK_ERR(err);
 		err = m9mo_writeb(sd, M9MO_CATEGORY_CAPPARM,
 			0x42, 0x0D + state->widget_mode_level);
-		CHECK_ERR(err);
-
-		/* change to PARAM mode */
-		err = m9mo_set_mode(sd, M9MO_PARMSET_MODE);
-		CHECK_ERR(err);
-
-		/* GAMMA_TBL_RGB_MON */
-		err = m9mo_writeb(sd, M9MO_CATEGORY_PARM,
-			0x31, 0x0D + state->widget_mode_level);
-		CHECK_ERR(err);
-
-		/* change to MON mode */
-		m9mo_set_mode(sd, M9MO_MONITOR_MODE);
-		err = m9mo_wait_interrupt(sd, M9MO_ISP_TIMEOUT);
-		if (!(err & M9MO_INT_MODE)) {
-			cam_err("M9MO_INT_MODE isn't issued!!!\n");
-			return -ETIMEDOUT;
-		}
-	} else if (state->mode == MODE_BLUE_SKY) {
-		/* COLOR EFFECT SET */
-		err = m9mo_writeb(sd, M9MO_CATEGORY_MON,
-			M9MO_MON_COLOR_EFFECT, 0x11 + state->widget_mode_level);
 		CHECK_ERR(err);
 	} else if (state->mode == MODE_NATURAL_GREEN) {
 		/* COLOR EFFECT SET */
 		err = m9mo_writeb(sd, M9MO_CATEGORY_MON,
 			M9MO_MON_COLOR_EFFECT, 0x21 + state->widget_mode_level);
+		CHECK_ERR(err);
+	} else if (state->mode == MODE_FIREWORKS) {
+		/* Set Capture Shutter Speed Time */
+		err = m9mo_writew(sd, M9MO_CATEGORY_AE,
+			M9MO_AE_EV_PRG_SS_NUMERATOR, 32);
+		CHECK_ERR(err);
+		err = m9mo_writew(sd, M9MO_CATEGORY_AE,
+			M9MO_AE_EV_PRG_SS_DENOMINATOR, 10);
+		CHECK_ERR(err);
+
+		/* Set Still Capture F-Number Value */
+		err = m9mo_writeb(sd, M9MO_CATEGORY_AE,
+			M9MO_AE_EV_PRG_F_NUMBER, 0x80);
+		CHECK_ERR(err);
+
+	} else if (state->mode == MODE_LIGHT_TRAIL_SHOT) {
+		/* Set Capture Shutter Speed Time */
+		if (state->widget_mode_level == 0)
+			numerator = 3;
+		else if (state->widget_mode_level == 2)
+			numerator = 5;
+		else if (state->widget_mode_level == 4)
+			numerator = 10;
+
+		err = m9mo_writew(sd, M9MO_CATEGORY_AE,
+			M9MO_AE_EV_PRG_SS_NUMERATOR, numerator);
+		CHECK_ERR(err);
+		err = m9mo_writew(sd, M9MO_CATEGORY_AE,
+			M9MO_AE_EV_PRG_SS_DENOMINATOR, 1);
+		CHECK_ERR(err);
+	} else if (state->mode == MODE_HIGH_SPEED) {
+		/* Set Still Capture EV program mode */
+		if (state->widget_mode_level == 2) {
+			err = m9mo_writeb(sd, M9MO_CATEGORY_AE,
+				M9MO_AE_EP_MODE_CAP, 0x14);
+			CHECK_ERR(err);
+		} else if (state->widget_mode_level == 4) {
+			err = m9mo_writeb(sd, M9MO_CATEGORY_AE,
+				M9MO_AE_EP_MODE_CAP, 0x13);
+			CHECK_ERR(err);
+		}
+	} else if (state->mode == MODE_CLOSE_UP) {
+		/* Set Still Capture F-Number Value */
+		if (state->widget_mode_level == 0)
+			f_number = 0x80;
+		else if (state->widget_mode_level == 2)
+			f_number = 0x45;
+		else if (state->widget_mode_level == 4)
+			f_number = 0x28;
+
+		err = m9mo_writeb(sd, M9MO_CATEGORY_AE,
+			M9MO_AE_EV_PRG_F_NUMBER, f_number);
 		CHECK_ERR(err);
 	}
 
@@ -5205,6 +7086,7 @@ static int m9mo_set_aperture_capture(struct v4l2_subdev *sd, int val)
 
 static int m9mo_set_factory_OIS(struct v4l2_subdev *sd, int val)
 {
+	struct m9mo_state *state = to_state(sd);
 	int err;
 
 	cam_trace("E val : %d\n", val);
@@ -5251,9 +7133,11 @@ static int m9mo_set_factory_OIS(struct v4l2_subdev *sd, int val)
 		cam_trace("~ FACTORY_OIS_MODE_OFF ~\n");
 		break;
 	case FACTORY_OIS_LOG:
-		err = m9mo_writeb(sd, M9MO_CATEGORY_NEW,
-			0x19, 0x01);
-		CHECK_ERR(err);
+		if (state->factory_log_write) {
+			err = m9mo_writeb(sd, M9MO_CATEGORY_NEW,
+				0x19, 0x01);
+			CHECK_ERR(err);
+		}
 		msleep(40);
 		err = m9mo_make_CSV_rawdata(sd, M9MO_FLASH_FACTORY_OIS, false);
 		CHECK_ERR(err);
@@ -5264,6 +7148,13 @@ static int m9mo_set_factory_OIS(struct v4l2_subdev *sd, int val)
 		err = m9mo_writeb(sd, M9MO_CATEGORY_NEW,
 			0x11, 0x02);
 		CHECK_ERR(err);
+		break;
+
+	case FACTORY_OIS_DECENTER_LOG:
+		err = m9mo_make_CSV_rawdata(sd,
+			M9MO_FLASH_FACTORY_DECENTER, false);
+		CHECK_ERR(err);
+		cam_trace("~FACTORY_OIS_DECENTER_LOG ~\n");
 		break;
 
 	default:
@@ -5345,10 +7236,13 @@ static int m9mo_set_factory_punt(struct v4l2_subdev *sd, int val)
 		break;
 
 	case FACTORY_PUNT_LOG:
-		err = m9mo_writeb(sd, M9MO_CATEGORY_LENS,
-			0x0E, 0x04);
-		CHECK_ERR(err);
+		if (state->factory_log_write) {
+			err = m9mo_writeb(sd, M9MO_CATEGORY_LENS,
+				0x0E, 0x04);
+			CHECK_ERR(err);
+		}
 		msleep(40);
+		m9mo_wait_make_CSV_rawdata(sd);
 		err = m9mo_make_CSV_rawdata(sd, M9MO_FLASH_FACTORY_PUNT, false);
 		CHECK_ERR(err);
 		cam_trace("~FACTORY_PUNT_LOG ~\n");
@@ -5675,6 +7569,7 @@ static int m9mo_set_factory_common(struct v4l2_subdev *sd, int val)
 
 static int m9mo_set_factory_vib(struct v4l2_subdev *sd, int val)
 {
+	struct m9mo_state *state = to_state(sd);
 	int err;
 
 	cam_trace("m9mo_set_factory_vib E val : %d\n", val);
@@ -5692,9 +7587,11 @@ static int m9mo_set_factory_vib(struct v4l2_subdev *sd, int val)
 		break;
 
 	case FACTORY_VIB_LOG:
-		err = m9mo_writeb(sd, M9MO_CATEGORY_NEW,
-			0x19, 0x02);
-		CHECK_ERR(err);
+		if (state->factory_log_write) {
+			err = m9mo_writeb(sd, M9MO_CATEGORY_NEW,
+				0x19, 0x02);
+			CHECK_ERR(err);
+		}
 		msleep(40);
 		err = m9mo_make_CSV_rawdata(sd, M9MO_FLASH_FACTORY_VIB, false);
 		CHECK_ERR(err);
@@ -5712,6 +7609,7 @@ static int m9mo_set_factory_vib(struct v4l2_subdev *sd, int val)
 
 static int m9mo_set_factory_gyro(struct v4l2_subdev *sd, int val)
 {
+	struct m9mo_state *state = to_state(sd);
 	int err;
 
 	cam_trace("E val : %d\n", val);
@@ -5729,9 +7627,11 @@ static int m9mo_set_factory_gyro(struct v4l2_subdev *sd, int val)
 		break;
 
 	case FACTORY_GYRO_LOG:
-		err = m9mo_writeb(sd, M9MO_CATEGORY_NEW,
+		if (state->factory_log_write) {
+			err = m9mo_writeb(sd, M9MO_CATEGORY_NEW,
 			0x19, 0x03);
-		CHECK_ERR(err);
+			CHECK_ERR(err);
+		}
 		msleep(40);
 		err = m9mo_make_CSV_rawdata(sd, M9MO_FLASH_FACTORY_GYRO, false);
 		CHECK_ERR(err);
@@ -5748,6 +7648,7 @@ static int m9mo_set_factory_gyro(struct v4l2_subdev *sd, int val)
 
 static int m9mo_set_factory_backlash(struct v4l2_subdev *sd, int val)
 {
+	struct m9mo_state *state = to_state(sd);
 	int err;
 
 	cam_trace("E val : %d\n", val);
@@ -5775,9 +7676,11 @@ static int m9mo_set_factory_backlash(struct v4l2_subdev *sd, int val)
 		break;
 
 	case FACTORY_BACKLASH_LOG:
-		err = m9mo_writeb(sd, M9MO_CATEGORY_LENS,
-			0x0A, 0x05);
-		CHECK_ERR(err);
+		if (state->factory_log_write) {
+			err = m9mo_writeb(sd, M9MO_CATEGORY_LENS,
+				0x0A, 0x05);
+			CHECK_ERR(err);
+		}
 		msleep(40);
 		err = m9mo_make_CSV_rawdata(sd,
 			M9MO_FLASH_FACTORY_BACKLASH, false);
@@ -5836,20 +7739,30 @@ static int m9mo_set_factory_af(struct v4l2_subdev *sd, int val)
 		break;
 
 	case FACTORY_AF_STEP_LOG:
-		if (state->factory_test_num == 106) {
+		if ((state->factory_test_num ==
+					FACTORY_RESOL_WIDE) ||
+			(state->factory_test_num ==
+			 FACTORY_RESOL_WIDE_INSIDE)) {
 			cam_trace("~ FACTORY_AF_STEP_LOG WIDE ~\n");
-			err = m9mo_writeb(sd, M9MO_CATEGORY_LENS,
-				0x0D, 0x1A);
-			CHECK_ERR(err);
+			if (state->factory_log_write) {
+				err = m9mo_writeb(sd, M9MO_CATEGORY_LENS,
+					0x0D, 0x1A);
+				CHECK_ERR(err);
+			}
 			msleep(40);
 			err = m9mo_make_CSV_rawdata(sd,
 				M9MO_FLASH_FACTORY_WIDE_RESOL, false);
 			CHECK_ERR(err);
-		} else if (state->factory_test_num == 107) {
+		} else if ((state->factory_test_num ==
+					FACTORY_RESOL_TELE) ||
+			(state->factory_test_num ==
+			 FACTORY_RESOL_TELE_INSIDE)) {
 			cam_trace("~ FACTORY_AF_STEP_LOG TELE ~\n");
-			err = m9mo_writeb(sd, M9MO_CATEGORY_LENS,
-				0x0D, 0x19);
-			CHECK_ERR(err);
+			if (state->factory_log_write) {
+				err = m9mo_writeb(sd, M9MO_CATEGORY_LENS,
+					0x0D, 0x19);
+				CHECK_ERR(err);
+			}
 			msleep(40);
 			err = m9mo_make_CSV_rawdata(sd,
 				M9MO_FLASH_FACTORY_TELE_RESOL, false);
@@ -5871,9 +7784,11 @@ static int m9mo_set_factory_af(struct v4l2_subdev *sd, int val)
 		break;
 
 	case FACTORY_AF_FOCUS_LOG:
-		err = m9mo_writeb(sd, M9MO_CATEGORY_LENS,
-			0x0D, 0x0B);
-		CHECK_ERR(err);
+		if (state->factory_log_write) {
+			err = m9mo_writeb(sd, M9MO_CATEGORY_LENS,
+				0x0D, 0x0B);
+			CHECK_ERR(err);
+		}
 		msleep(40);
 		err = m9mo_make_CSV_rawdata(sd,
 			M9MO_FLASH_FACTORY_AF_FCS, false);
@@ -5928,9 +7843,11 @@ static int m9mo_set_factory_af(struct v4l2_subdev *sd, int val)
 		break;
 
 	case FACTORY_AF_LED_LOG:
-		err = m9mo_writeb(sd, M9MO_CATEGORY_LENS,
-			0x4D, 0x02);
-		CHECK_ERR(err);
+		if (state->factory_log_write) {
+			err = m9mo_writeb(sd, M9MO_CATEGORY_LENS,
+				0x4D, 0x02);
+			CHECK_ERR(err);
+		}
 		msleep(40);
 		err = m9mo_make_CSV_rawdata(sd,
 			M9MO_FLASH_FACTORY_AF_LED, false);
@@ -5941,7 +7858,7 @@ static int m9mo_set_factory_af(struct v4l2_subdev *sd, int val)
 
 	case FACTORY_AF_MOVE_END_CHECK:
 		cam_trace("~ FACTORY_AF_MOVE_END_CHECK ~\n");
-		err = m9mo_readw(sd, M9MO_CATEGORY_LENS,
+		err = m9mo_readb(sd, M9MO_CATEGORY_LENS,
 			0x29, &end_check);
 		CHECK_ERR(err);
 		state->factory_end_check = end_check;
@@ -6153,16 +8070,19 @@ static int m9mo_set_factory_af_zone(struct v4l2_subdev *sd, int val)
 static int m9mo_set_factory_af_lens(struct v4l2_subdev *sd, int val)
 {
 	int err;
+#if 0
 	u32 int_factor;
+#endif
 
 	cam_trace("E val : %d\n", val);
 
 	switch (val) {
 	case FACTORY_AFLENS_OPEN:
 		err = m9mo_writeb(sd, M9MO_CATEGORY_LENS,
-			0x00, 0x00);
+			0x00, 0x02);
 		CHECK_ERR(err);
 
+#if 0
 		int_factor = m9mo_wait_interrupt(sd, M9MO_ISP_TIMEOUT);
 
 		if (!(int_factor & M9MO_INT_LENS_INIT)) {
@@ -6170,7 +8090,7 @@ static int m9mo_set_factory_af_lens(struct v4l2_subdev *sd, int val)
 					int_factor);
 			return -ETIMEDOUT;
 		}
-
+#endif
 
 		cam_trace("~ FACTORY_AFLENS_OPEN ~\n");
 		break;
@@ -6267,11 +8187,12 @@ static int m9mo_set_factory_sh_close(struct v4l2_subdev *sd, int val)
 
 	case FACTORY_SH_CLOSE_END_CHECK:
 		cam_trace("~ FACTORY_SH_CLOSE_END_CHECK ~\n");
-		err = m9mo_readb(sd, M9MO_CATEGORY_LENS,
-			0x40, &end_check);
+		err = m9mo_readb(sd, M9MO_CATEGORY_ADJST,
+			0x53, &end_check);
 		CHECK_ERR(err);
 		state->factory_end_check = end_check;
-		if (end_check == 2) {
+
+		if (end_check == 0x6) {
 			int_factor = m9mo_wait_interrupt(sd, M9MO_ISP_TIMEOUT);
 			if (!(int_factor)) {
 				cam_warn("M9MO_INT_MODE isn't issued, %#x\n",
@@ -6279,20 +8200,24 @@ static int m9mo_set_factory_sh_close(struct v4l2_subdev *sd, int val)
 				return -ETIMEDOUT;
 			}
 		}
+
 		break;
 
 	case FACTORY_SH_CLOSE_LOG:
 		cam_trace("~ FACTORY_SH_CLOSE_LOG ~\n");
-		err = m9mo_make_CSV_rawdata(sd,
-			M9MO_FLASH_FACTORY_SH_CLOSE, true);
-		CHECK_ERR(err);
 
+/*
 		int_factor = m9mo_wait_interrupt(sd, M9MO_ISP_TIMEOUT);
 		if (!(int_factor)) {
 			cam_warn("M9MO_INT_CAPTURE isn't issued, %#x\n",
 				int_factor);
 			return -ETIMEDOUT;
 		}
+*/
+
+		err = m9mo_make_CSV_rawdata(sd,
+			M9MO_FLASH_FACTORY_SH_CLOSE, true);
+		CHECK_ERR(err);
 
 		break;
 
@@ -6467,24 +8392,18 @@ static int m9mo_set_image_stabilizer_mode(struct v4l2_subdev *sd, int val)
 {
 	struct m9mo_state *state = to_state(sd);
 	int err;
-#if 0	/* Not use Mode Chagne */
-	int old_mode, int_factor;
-#endif
 	int cnt = 30;
 	s32 ois_stability = 1;
 	cam_trace("E: mode %d\n", val);
 
-#if 0	/* Not use Mode Chagne */
-	old_mode = m9mo_set_mode(sd, M9MO_PARMSET_MODE);
-	CHECK_ERR(old_mode);
-#endif
-
 retry:
 	switch (val) {
 	case V4L2_IMAGE_STABILIZER_OFF:
-		err = m9mo_writeb(sd, M9MO_CATEGORY_NEW, 0x11, 0x04);
-		CHECK_ERR(err);
-
+		if (state->mode == MODE_PROGRAM || state->mode == MODE_M) {
+			err = m9mo_writeb(sd, M9MO_CATEGORY_AE,
+				M9MO_AE_EP_MODE_CAP, 0x00);
+			CHECK_ERR(err);
+		}
 		err = m9mo_writeb(sd, M9MO_CATEGORY_NEW, 0x1A, 0x01);
 		CHECK_ERR(err);
 		err = m9mo_writeb(sd, M9MO_CATEGORY_NEW, 0x11, 0x01);
@@ -6503,6 +8422,11 @@ retry:
 		break;
 
 	case V4L2_IMAGE_STABILIZER_OIS:
+		if (state->mode == MODE_PROGRAM || state->mode == MODE_M) {
+			err = m9mo_writeb(sd, M9MO_CATEGORY_AE,
+				M9MO_AE_EP_MODE_CAP, 0x18);
+			CHECK_ERR(err);
+		}
 		err = m9mo_writeb(sd, M9MO_CATEGORY_NEW, 0x1A, 0x01);
 		CHECK_ERR(err);
 		err = m9mo_writeb(sd, M9MO_CATEGORY_NEW, 0x11, 0x02);
@@ -6528,21 +8452,6 @@ retry:
 		goto retry;
 		break;
 	}
-
-#if 0	/* Not use Mode Chagne */
-	if (old_mode == M9MO_MONITOR_MODE) {
-		err = m9mo_set_mode(sd, old_mode);
-		CHECK_ERR(err);
-
-		int_factor = m9mo_wait_interrupt(sd, M9MO_ISP_TIMEOUT);
-		if (!(int_factor & M9MO_INT_MODE)) {
-			cam_err("M9MO_INT_MODE isn't issued, %#x\n",
-				int_factor);
-			return -ETIMEDOUT;
-		}
-		CHECK_ERR(err);
-	}
-#endif
 
 	state->image_stabilizer_mode = val;
 
@@ -6661,8 +8570,8 @@ static int m9mo_set_factory_flash(struct v4l2_subdev *sd, int val)
 
 	case FACTORY_FLASH_CHARGE_END_CHECK:
 		cam_trace("~ FACTORY_FLASH_CHARGE_END_CHECK ~\n");
-		err = m9mo_readb(sd, M9MO_CATEGORY_ADJST,
-			0x40, &end_check);
+		err = m9mo_readb(sd, M9MO_CATEGORY_CAPPARM,
+			0x27, &end_check);
 		CHECK_ERR(err);
 		state->factory_end_check = end_check;
 		break;
@@ -6684,8 +8593,10 @@ static int m9mo_set_factory_flash(struct v4l2_subdev *sd, int val)
 		break;
 
 	case FACTORY_FLASH_WB_LOG:
-		err = m9mo_writeb(sd, M9MO_CATEGORY_NEW,
-			0x31, 0x01);
+		if (state->factory_log_write) {
+			err = m9mo_writeb(sd, M9MO_CATEGORY_NEW,
+				0x31, 0x01);
+		}
 		msleep(40);
 		err = m9mo_make_CSV_rawdata(sd,
 				M9MO_FLASH_FACTORY_FLASH_WB, false);
@@ -6756,6 +8667,7 @@ static int m9mo_set_factory_defectpixel(struct v4l2_subdev *sd, int val)
 	int err;
 	int int_factor;
 	int end_check = 0;
+	bool go_end = false;
 #if 0
 	int i;
 #endif
@@ -6790,6 +8702,7 @@ static int m9mo_set_factory_defectpixel(struct v4l2_subdev *sd, int val)
 		err = m9mo_writeb(sd, M9MO_CATEGORY_LENS,
 			0x40, 0x00);
 		CHECK_ERR(err);
+		state->factory_end_interrupt = 0x0;
 		/*Interrrupt Disable*/
 #if 0
 		err = m9mo_readw(sd, M9MO_CATEGORY_SYS,
@@ -6844,10 +8757,19 @@ static int m9mo_set_factory_defectpixel(struct v4l2_subdev *sd, int val)
 			}
 		}
 #endif
-			m9mo_readw(sd, M9MO_CATEGORY_SYS,
-				M9MO_SYS_INT_FACTOR, &state->isp.int_factor);
-			cam_err("m9mo_wait_interrupt : state->isp.int_factor = %x\n",
+		if (state->factory_end_interrupt == 0x4)
+			go_end = true;
+
+		m9mo_readw(sd, M9MO_CATEGORY_SYS,
+			M9MO_SYS_INT_FACTOR, &state->isp.int_factor);
+		cam_err("m9mo_wait_interrupt : state->isp.int_factor = %x\n",
 						state->isp.int_factor);
+		if (state->isp.int_factor != 0x00)
+			state->factory_end_interrupt = state->isp.int_factor;
+
+		if ((go_end == true) && (state->isp.int_factor == 0x02))
+			state->factory_end_check = 0x02;
+
 		cam_trace("X\n");
 		break;
 
@@ -6905,7 +8827,7 @@ static int m9mo_set_factory_defectpixel(struct v4l2_subdev *sd, int val)
 				M9MO_SYS_INT_EN,
 				M9MO_INT_MODE | M9MO_INT_CAPTURE |
 				M9MO_INT_FRAME_SYNC | M9MO_INT_ATSCENE_UPDATE |
-				M9MO_INT_LENS_INIT/* | M9MO_INT_SOUND*/);
+				M9MO_INT_LENS_INIT | M9MO_INT_SOUND);
 			CHECK_ERR(err);
 
 		int_factor = m9mo_wait_interrupt(sd, M9MO_ISP_TIMEOUT);
@@ -7003,7 +8925,11 @@ static int m9mo_set_factory_IR_Check(struct v4l2_subdev *sd, int val)
 	case FACTORY_IR_CHECK_LOG:
 		cam_trace("~ FACTORY_IR_CHECK_LOG ~\n");
 		msleep(40);
+		m9mo_wait_make_CSV_rawdata(sd);
 		err = m9mo_make_CSV_rawdata(sd,
+			M9MO_FLASH_FACTORY_IR_CHECK, false);
+		CHECK_ERR(err);
+		err = m9mo_make_IR_cut_CSV_rawdata(sd,
 			M9MO_FLASH_FACTORY_IR_CHECK, false);
 		CHECK_ERR(err);
 		break;
@@ -7014,6 +8940,23 @@ static int m9mo_set_factory_IR_Check(struct v4l2_subdev *sd, int val)
 	}
 
 	cam_trace("X\n");
+	return 0;
+}
+
+static int m9mo_set_factory_IR_Check_GAvg(struct v4l2_subdev *sd, int val)
+{
+	int err, end_check = 0, retval = 0;
+	int min = 0, max = 0;
+	struct m9mo_state *state = to_state(sd);
+
+	min = val >> 16;
+	max =  val & 0xFFFF;
+	err = m9mo_readb(sd, M9MO_CATEGORY_LENS, 0x9e, &retval);
+	CHECK_ERR(err);
+	cam_trace("min = %d, max = %d, retval = %d\n", min, max, retval);
+
+	state->factory_end_check = (min <= retval && retval <= max)? 0x02 :0x01;
+	cam_trace("X state->factory_end_check = %d\n", state->factory_end_check);
 	return 0;
 }
 
@@ -7050,6 +8993,68 @@ static int m9mo_send_factory_command_value(struct v4l2_subdev *sd)
 	CHECK_ERR(err);
 	return err;
 }
+
+static int m9mo_set_factory_eepwrite_mark(struct v4l2_subdev *sd, int val)
+{
+	int err;
+	int param1, param2;
+
+	param1 = (u8)val >> 4;
+	param2 = (u8)val & 0x0F;
+	cam_trace("E val : %d=0x%x / param1=%d/ param2=0x%x\n", val, val, param1, param2);
+
+	switch (param1) {
+	case FACTORY_EEPWRITE_CHECK:
+		err = m9mo_writeb(sd, M9MO_CATEGORY_LENS,
+			0x9A, param2);
+		CHECK_ERR(err);
+		cam_trace("FACTORY_EEPWRITE_CHECK\n");
+		break;
+	case FACTORY_EEPWRITE_REPAIR:
+		err = m9mo_writeb(sd, M9MO_CATEGORY_LENS,
+			0x99, param2);
+		CHECK_ERR(err);
+		cam_trace("FACTORY_EEPWRITE_REPAIR\n");
+		break;
+	case FACTORY_EEPWRITE_STEP1:
+		err = m9mo_writeb(sd, M9MO_CATEGORY_LENS,
+			0xA2, param2);
+		CHECK_ERR(err);
+		cam_trace("FACTORY_EEPWRITE_STEP1\n");
+		break;
+	case FACTORY_EEPWRITE_STEP2:
+		err = m9mo_writeb(sd, M9MO_CATEGORY_LENS,
+			0xA4, param2);
+		CHECK_ERR(err);
+		cam_trace("FACTORY_EEPWRITE_STEP2\n");
+		break;
+	case FACTORY_EEPWRITE_STEP3:
+		err = m9mo_writeb(sd, M9MO_CATEGORY_LENS,
+			0xA5, param2);
+		CHECK_ERR(err);
+		cam_trace("FACTORY_EEPWRITE_STEP3\n");
+		break;
+	case FACTORY_EEPWRITE_STEP4:
+		err = m9mo_writeb(sd, M9MO_CATEGORY_LENS,
+			0xA6, param2);
+		CHECK_ERR(err);
+		cam_trace("FACTORY_EEPWRITE_STEP4\n");
+		break;
+	case FACTORY_EEPWRITE_STEP0:
+		err = m9mo_writeb(sd, M9MO_CATEGORY_LENS,
+			0xA7, param2);
+		CHECK_ERR(err);
+		cam_trace("FACTORY_EEPWRITE_STEP0\n");
+		break;
+	default:
+		cam_err("~ m9mo_set_factory_eepwrite_mark ~ val : %d", val);
+		break;
+	}
+
+	cam_trace("X\n");
+	return 0;
+}
+
 
 static int m9mo_set_aeawblock(struct v4l2_subdev *sd, int val)
 {
@@ -7158,7 +9163,10 @@ static int m9mo_set_dual_capture_mode(struct v4l2_subdev *sd, int val)
 	}
 
 	old_mode = m9mo_set_mode(sd, M9MO_PARMSET_MODE);
-	CHECK_ERR(old_mode);
+	if (old_mode <= 0) {
+		cam_err("failed to set mode\n");
+		return old_mode;
+	}
 
 	switch (val) {
 	case 0:
@@ -7214,6 +9222,50 @@ static int m9mo_start_set_dual_capture(struct v4l2_subdev *sd, int frame_num)
 	return err;
 }
 
+static int m9mo_set_smart_moving_recording(struct v4l2_subdev *sd, int val)
+{
+	int err = 0, read_mon_size;
+	u32 size_val = 0, value;
+	struct m9mo_state *state = to_state(sd);
+
+	cam_dbg("E val=%d\n", val);
+
+	/* add recording check for zoom move */
+	if (val == 1) {  /* recording start */
+		if (state->smart_scene_detect_mode == 1) {
+			err = m9mo_writeb(sd, M9MO_CATEGORY_NEW,
+				0x0A, 0x02);
+			CHECK_ERR(err);
+		}
+
+		state->recording = 1;
+		err = m9mo_writeb(sd, M9MO_CATEGORY_ADJST,
+			M9MO_ADJST_SHUTTER_MODE, 0);	// Rolling Shutter
+		CHECK_ERR(err);
+
+		err = m9mo_writeb(sd, M9MO_CATEGORY_LENS, 0x27, 0x01);
+		CHECK_ERR(err);
+	} else if (val == 2) {  /* record end */
+		if (state->smart_scene_detect_mode == 1) {
+			err = m9mo_writeb(sd, M9MO_CATEGORY_NEW,
+				0x0A, 0x01);
+			CHECK_ERR(err);
+
+			m9mo_set_smart_auto_default_value(sd, 1);
+		}
+
+		state->recording = 0;
+		err = m9mo_writeb(sd, M9MO_CATEGORY_ADJST,
+			M9MO_ADJST_SHUTTER_MODE, 1);	// Mechanical Shutter
+		CHECK_ERR(err);
+		err = m9mo_writeb(sd, M9MO_CATEGORY_LENS, 0x27, 0x00);
+		CHECK_ERR(err);
+	}
+	m9mo_set_OIS_cap_mode(sd);
+
+	return err;
+}
+
 static int m9mo_continue_proc(struct v4l2_subdev *sd, int val)
 {
 	int err = 1, int_factor;
@@ -7222,12 +9274,12 @@ static int m9mo_continue_proc(struct v4l2_subdev *sd, int val)
 
 	switch (val) {
 	case V4L2_INT_STATE_FRAME_SYNC:
-		int_factor = m9mo_wait_interrupt(sd, M9MO_ISP_TIMEOUT);
-		if (!(int_factor & M9MO_INT_FRAME_SYNC)) {
-			cam_dbg("m9mo_continue_proc() INT_FRAME_SYNC error%#x\n",
-					int_factor);
-			return -ETIMEDOUT;
-		}
+		int_factor = m9mo_wait_interrupt(sd, M9MO_SOUND_TIMEOUT);
+			if (!(int_factor & M9MO_INT_SOUND)) {
+				cam_dbg("m9mo_continue_proc() INT_FRAME_SOUND error%#x\n",
+						int_factor);
+				return -ETIMEDOUT;
+			}
 		break;
 
 	case V4L2_INT_STATE_CAPTURE_SYNC:
@@ -7250,7 +9302,11 @@ static int m9mo_continue_proc(struct v4l2_subdev *sd, int val)
 		break;
 
 	case V4L2_INT_STATE_CONTINUE_END:
-		m9mo_set_mode(sd, M9MO_MONITOR_MODE);
+		err = m9mo_set_mode(sd, M9MO_MONITOR_MODE);
+		if (err <= 0) {
+			cam_err("failed to set mode\n");
+			return err;
+		}
 
 		err = m9mo_wait_interrupt(sd, M9MO_ISP_TIMEOUT);
 		if (!(err & M9MO_INT_MODE)) {
@@ -7260,7 +9316,11 @@ static int m9mo_continue_proc(struct v4l2_subdev *sd, int val)
 		break;
 
 	case V4L2_INT_STATE_START_CAPTURE:
-		m9mo_set_mode(sd, M9MO_STILLCAP_MODE);
+		err = m9mo_set_mode(sd, M9MO_STILLCAP_MODE);
+		if (err <= 0) {
+			cam_err("failed to set mode\n");
+			return err;
+		}
 		break;
 	}
 
@@ -7289,8 +9349,8 @@ static int m9mo_burst_set_postview_size(struct v4l2_subdev *sd, int val)
 	*frmsize = &postview_frmsizes[num_entries-1];
 
 	for (i = 0; i < num_entries; i++) {
-		if (width == postview_frmsizes[i].width &&
-			height == postview_frmsizes[i].height) {
+		if (width == postview_frmsizes[i].target_width &&
+			height == postview_frmsizes[i].target_height) {
 			*frmsize = &postview_frmsizes[i];
 			break;
 		}
@@ -7323,8 +9383,8 @@ static int m9mo_burst_set_snapshot_size(struct v4l2_subdev *sd, int val)
 	*frmsize = &capture_frmsizes[num_entries-1];
 
 	for (i = 0; i < num_entries; i++) {
-		if (width == capture_frmsizes[i].width &&
-			height == capture_frmsizes[i].height) {
+		if (width == capture_frmsizes[i].target_width &&
+			height == capture_frmsizes[i].target_height) {
 			*frmsize = &capture_frmsizes[i];
 			break;
 		}
@@ -7350,12 +9410,14 @@ static int m9mo_burst_proc(struct v4l2_subdev *sd, int val)
 	case V4L2_INT_STATE_BURST_START:
 		cam_trace("Burstshot  Capture  START ~~~~~~\n");
 
+		state->mburst_start = true;
+
 		err = m9mo_writeb(sd, M9MO_CATEGORY_CAPPARM,
 				0x0F, 0x0);
 		CHECK_ERR(err);
 
 		err = m9mo_writeb(sd, M9MO_CATEGORY_CAPPARM,
-				0x10, 0x50);
+				0x10, 0x30);
 		CHECK_ERR(err);
 
 		err = m9mo_writeb(sd, M9MO_CATEGORY_CAPPARM,
@@ -7371,20 +9433,16 @@ static int m9mo_burst_proc(struct v4l2_subdev *sd, int val)
 		CHECK_ERR(err);
 
 		err = m9mo_writeb(sd, M9MO_CATEGORY_CAPCTRL,
-				M9MO_CAPCTRL_CAP_MODE, 0x0D);
+			M9MO_CAPCTRL_START_DUALCAP,
+			M9MO_CAP_MODE_MULTI_CAPTURE);
 		CHECK_ERR(err);
 
-		err = m9mo_writeb(sd, M9MO_CATEGORY_CAPCTRL,
-		M9MO_CAPCTRL_START_DUALCAP, M9MO_CAP_MODE_MULTI_CAPTURE);
-		CHECK_ERR(err);
-#if 0
 		int_factor = m9mo_wait_interrupt(sd, M9MO_ISP_TIMEOUT);
 		if (!(int_factor & M9MO_INT_SOUND)) {
 			cam_dbg("m9mo_continue_proc() INT_FRAME_SYNC error%#x\n",
 					int_factor);
 			return -ETIMEDOUT;
 		}
-#endif
 		break;
 
 	case V4L2_INT_STATE_BURST_SYNC:
@@ -7397,11 +9455,37 @@ static int m9mo_burst_proc(struct v4l2_subdev *sd, int val)
 		}
 		break;
 
-	case V4L2_INT_STATE_BURST_STOP:
+	case V4L2_INT_STATE_BURST_SOUND:
+		cam_trace("Burstshot  Page SOUND~~~\n");
+		int_factor = m9mo_wait_interrupt(sd, M9MO_ISP_TIMEOUT);
+		if (!(int_factor & M9MO_INT_SOUND)) {
+			cam_dbg("m9mo_continue_proc() INT_FRAME_SOUND error%#x\n",
+					int_factor);
+			return -ETIMEDOUT;
+		}
+		break;
+
+	case V4L2_INT_STATE_BURST_STOP_REQ:
 		/* continue cancel */
 		err = m9mo_writeb(sd, M9MO_CATEGORY_CAPCTRL,
-				M9MO_CAPCTRL_START_DUALCAP, 0x02);
-			CHECK_ERR(err);
+			M9MO_CAPCTRL_START_DUALCAP, 0x03);
+		CHECK_ERR(err);
+
+		cam_trace("Burstshot  Capture  Shot Stop ~~~~~~\n");
+		break;
+
+
+	case V4L2_INT_STATE_BURST_STOP:
+		state->mburst_start = false;
+
+		err = m9mo_writel(sd, M9MO_CATEGORY_CAPPARM,
+			M9MO_CAPPARM_JPEG_SIZE_MAX, 0x00A00000);
+		CHECK_ERR(err);
+
+		/* continue cancel */
+		err = m9mo_writeb(sd, M9MO_CATEGORY_CAPCTRL,
+			M9MO_CAPCTRL_START_DUALCAP, 0x02);
+		CHECK_ERR(err);
 
 		/* CAPTURE wait interrupt -> V4L2_INT_STATE_CAPTURE_SYNC */
 		err = m9mo_wait_interrupt(sd, M9MO_ISP_TIMEOUT);
@@ -7409,8 +9493,6 @@ static int m9mo_burst_proc(struct v4l2_subdev *sd, int val)
 			cam_err("m9mo_burst_proc() INT_STATE_CONTINUE_END error\n");
 			return -ETIMEDOUT;
 		}
-
-		state->running_capture_mode = RUNNING_MODE_SINGLE;
 
 		cam_trace("Burstshot  Capture  STOP ~~~~~~\n");
 		break;
@@ -7420,68 +9502,131 @@ static int m9mo_burst_proc(struct v4l2_subdev *sd, int val)
 	return err;
 }
 
+static int m9mo_set_iqgrp(struct v4l2_subdev *sd, int val)
+{
+	struct m9mo_state *state = to_state(sd);
+	int err, current_val, current_mode;
+	u32 iqgrp_val = 0x01;
+
+	cam_trace("E\n");
+
+	err = m9mo_readb(sd, M9MO_CATEGORY_SYS, M9MO_SYS_MODE, &current_mode);
+
+	if (current_mode != M9MO_PARMSET_MODE) {
+		cam_trace("~ return !!! %d\n", current_mode);
+		return 0;
+	}
+
+	if (state->fps == 60) {
+		if (state->preview_height == 480)
+			iqgrp_val = 0x68;
+		else if (state->preview_height == 720)
+			iqgrp_val = 0x65;
+	} else if (state->sensor_mode == SENSOR_MOVIE
+		&& (state->fps == 30 || state->fps == 0)) {
+		if (state->preview_height == 1080)
+			iqgrp_val = 0x64;
+		else if (state->preview_height == 720)
+			iqgrp_val = 0x66;
+		else if (state->preview_height == 480)
+			iqgrp_val = 0x69;
+		else if (state->preview_height == 240)
+			iqgrp_val = 0x69;
+	} else {
+		if (state->preview_width == 768
+			|| state->mode == MODE_GOLF_SHOT)
+			iqgrp_val = 0x67;
+		else
+			iqgrp_val = 0x01;
+	}
+
+	if (val == 1080)
+		iqgrp_val = 0x64;
+
+	err = m9mo_readb(sd, M9MO_CATEGORY_MON,
+		0x59, &current_val);
+	CHECK_ERR(err);
+
+	if (current_val != iqgrp_val) {
+		err = m9mo_writeb(sd, M9MO_CATEGORY_MON,
+			0x59, iqgrp_val);
+		CHECK_ERR(err);
+	}
+
+	cam_trace("X\n");
+	return 0;
+}
+
 static int m9mo_set_gamma(struct v4l2_subdev *sd)
 {
 	struct m9mo_state *state = to_state(sd);
 	int err = 0;
-	int gamma_rgb_mon, mon_gamma, cap_gamma, gamma_rgb_cap;
+	int cap_gamma, gamma_rgb_cap;
+	int current_mode;
 
 	cam_trace("E, mode %d\n", state->mode);
 
-	/* Set Monitor/Video flag */
-	if (state->mode == MODE_VIDEO) {
-		err = m9mo_writeb(sd, M9MO_CATEGORY_PARM,
-			M9MO_PARM_MON_MOVIE_SELECT, 0x01);
-		CHECK_ERR(err);
-	} else {
-		err = m9mo_writeb(sd, M9MO_CATEGORY_PARM,
-			M9MO_PARM_MON_MOVIE_SELECT, 0x00);
-		CHECK_ERR(err);
+	err = m9mo_readb(sd, M9MO_CATEGORY_SYS, M9MO_SYS_MODE, &current_mode);
+
+	if (current_mode != M9MO_PARMSET_MODE) {
+		cam_trace("~ return !!! %d\n", current_mode);
+		return 0;
 	}
 
 	/* Set Gamma value */
-	err = m9mo_readb(sd, M9MO_CATEGORY_PARM, 0x0A, &gamma_rgb_mon);
-	CHECK_ERR(err);
-	err = m9mo_readb(sd, M9MO_CATEGORY_PARM, 0x31, &mon_gamma);
-	CHECK_ERR(err);
 	err = m9mo_readb(sd, M9MO_CATEGORY_CAPPARM, 0x41, &cap_gamma);
 	CHECK_ERR(err);
 	err = m9mo_readb(sd, M9MO_CATEGORY_CAPPARM, 0x42, &gamma_rgb_cap);
 	CHECK_ERR(err);
 
-	if (mon_gamma < 0xD && gamma_rgb_cap < 0xD) {
-		state->gamma_rgb_mon = gamma_rgb_mon;
-		state->gamma_tbl_rgb_mon = mon_gamma;
+	if (gamma_rgb_cap < 0xD) {
 		state->gamma_rgb_cap = cap_gamma;
 		state->gamma_tbl_rgb_cap = gamma_rgb_cap;
 	}
 
 	if (state->mode == MODE_SILHOUETTE) {
-		err = m9mo_writeb(sd, M9MO_CATEGORY_PARM,
-			0x0A, 0x00);
-		CHECK_ERR(err);
-		err = m9mo_writeb(sd, M9MO_CATEGORY_PARM,
-			0x31, 0x0D + state->widget_mode_level);
-		CHECK_ERR(err);
-		err = m9mo_writeb(sd, M9MO_CATEGORY_CAPPARM,
-			0x41, 0x00);
-		CHECK_ERR(err);
-		err = m9mo_writeb(sd, M9MO_CATEGORY_CAPPARM,
-			0x42, 0x0D + state->widget_mode_level);
-		CHECK_ERR(err);
+		if (cap_gamma != 0x00) {
+			err = m9mo_writeb(sd, M9MO_CATEGORY_CAPPARM,
+				0x41, 0x00);
+			CHECK_ERR(err);
+		}
+#ifdef CONFIG_MACH_GC2PD
+		if (gamma_rgb_cap != 0x0F + state->widget_mode_level) {
+			err = m9mo_writeb(sd, M9MO_CATEGORY_CAPPARM,
+				0x42, 0x0F);
+			CHECK_ERR(err);
+		}
+#else
+		if (gamma_rgb_cap != 0x0D + state->widget_mode_level) {
+			err = m9mo_writeb(sd, M9MO_CATEGORY_CAPPARM,
+				0x42, 0x0D + state->widget_mode_level);
+			CHECK_ERR(err);
+		}
+#endif
+	} else if (state->mode == MODE_DAWN) {
+#ifdef CONFIG_MACH_GC2PD
+		if (cap_gamma != 0x00) {
+			err = m9mo_writeb(sd, M9MO_CATEGORY_CAPPARM,
+				0x41, 0x00);
+			CHECK_ERR(err);
+		}
+		if (gamma_rgb_cap != 0x0D + state->widget_mode_level) {
+			err = m9mo_writeb(sd, M9MO_CATEGORY_CAPPARM,
+				0x42, 0x19);
+			CHECK_ERR(err);
+		}
+#endif
 	} else {
-		err = m9mo_writeb(sd, M9MO_CATEGORY_PARM,
-			0x0A, state->gamma_rgb_mon);
-		CHECK_ERR(err);
-		err = m9mo_writeb(sd, M9MO_CATEGORY_PARM,
-			0x31, state->gamma_tbl_rgb_mon);
-		CHECK_ERR(err);
-		err = m9mo_writeb(sd, M9MO_CATEGORY_CAPPARM,
-			0x41, state->gamma_rgb_cap);
-		CHECK_ERR(err);
-		err = m9mo_writeb(sd, M9MO_CATEGORY_CAPPARM,
-			0x42, state->gamma_tbl_rgb_cap);
-		CHECK_ERR(err);
+		if (cap_gamma != state->gamma_rgb_cap) {
+			err = m9mo_writeb(sd, M9MO_CATEGORY_CAPPARM,
+				0x41, state->gamma_rgb_cap);
+			CHECK_ERR(err);
+		}
+		if (gamma_rgb_cap != state->gamma_tbl_rgb_cap) {
+			err = m9mo_writeb(sd, M9MO_CATEGORY_CAPPARM,
+				0x42, state->gamma_tbl_rgb_cap);
+			CHECK_ERR(err);
+		}
 	}
 
 	cam_trace("X\n");
@@ -7492,22 +9637,46 @@ static int m9mo_set_PASM_mode(struct v4l2_subdev *sd, int val)
 {
 	struct m9mo_state *state = to_state(sd);
 	int err = 0;
-	int color_effect, current_mode;
+	int color_effect, current_mode, old_mode, int_factor;
+	bool mode_changed = false;
+	/*int denominator = 500, numerator = 8;*/
+	/*u32 f_number = 0x45;*/
 
 	cam_dbg("E, value %d\n", val);
 
 	state->mode = val;
 
 	err = m9mo_readb(sd, M9MO_CATEGORY_SYS, M9MO_SYS_MODE, &current_mode);
+	CHECK_ERR(err);
+	if (current_mode != M9MO_PARMSET_MODE) {
+		err = m9mo_set_mode(sd, M9MO_PARMSET_MODE);
+		if (err <= 0) {
+			cam_err("failed to set mode\n");
+			return err;
+		}
+		mode_changed = true;
+	}
+
+	err = m9mo_writeb(sd, M9MO_CATEGORY_PARM,
+			M9MO_PARM_SET_ERASER_MODE, 0x00);
+	CHECK_ERR(err);
 
 	switch (val) {
 	case MODE_SMART_AUTO:
+	case MODE_SMART_SUGGEST:
+		err = m9mo_writeb(sd, M9MO_CATEGORY_AE, 0x53, 0x01);
+		CHECK_ERR(err);
+
 		err = m9mo_writeb(sd, M9MO_CATEGORY_MON,
 			M9MO_MON_COLOR_EFFECT, state->color_effect);
 		CHECK_ERR(err);
 
 		/* Set LIKE_PRO_EN Disable */
 		err = m9mo_writeb(sd, M9MO_CATEGORY_PRO_MODE, 0x00, 0x00);
+		CHECK_ERR(err);
+
+		/* LIKE PRO DISPLAY SET */
+		err = m9mo_writeb(sd, M9MO_CATEGORY_PRO_MODE, 0x07, 0x00);
 		CHECK_ERR(err);
 
 		/* Set Still Mode */
@@ -7518,26 +9687,97 @@ static int m9mo_set_PASM_mode(struct v4l2_subdev *sd, int val)
 		err = m9mo_writeb(sd, M9MO_CATEGORY_MON, 0x58, 0x01);
 		CHECK_ERR(err);
 
+		/* Set Monitor EV program mode */
+		err = m9mo_writeb(sd, M9MO_CATEGORY_AE,
+			M9MO_AE_EP_MODE_MON, 0x05);
+		CHECK_ERR(err);
+
+		/* Set Still Capture EV program mode */
+		err = m9mo_writeb(sd, M9MO_CATEGORY_AE,
+			M9MO_AE_EP_MODE_CAP, 0x05);
+		CHECK_ERR(err);
+
 		/* SMART AUTO CAP */
 		err = m9mo_writeb(sd, M9MO_CATEGORY_AE,
 			M9MO_AE_EV_PRG_MODE_CAP, 0x10);
 		CHECK_ERR(err);
 
-		if (state->facedetect_mode == FACE_DETECTION_NORMAL) {
-			err = m9mo_writeb(sd, M9MO_CATEGORY_FD,
-				M9MO_FD_CTL, 0x01);
+		/* Set AF range to AUTO-MACRO */
+		err = m9mo_writeb(sd, M9MO_CATEGORY_LENS,
+			M9MO_LENS_AF_SCAN_RANGE, 0x02);
 			CHECK_ERR(err);
-		}
-
 		break;
 
-	case MODE_PROGRAM:
+	case MODE_PANORAMA:
+		err = m9mo_writeb(sd, M9MO_CATEGORY_AE, 0x53, 0x01);
+		CHECK_ERR(err);
+
 		err = m9mo_writeb(sd, M9MO_CATEGORY_MON,
 			M9MO_MON_COLOR_EFFECT, state->color_effect);
 		CHECK_ERR(err);
 
 		/* Set LIKE_PRO_EN Disable */
 		err = m9mo_writeb(sd, M9MO_CATEGORY_PRO_MODE, 0x00, 0x00);
+		CHECK_ERR(err);
+
+		/* LIKE PRO DISPLAY SET */
+		err = m9mo_writeb(sd, M9MO_CATEGORY_PRO_MODE, 0x07, 0x00);
+		CHECK_ERR(err);
+
+		/* Set CATE_408 to None */
+		err = m9mo_writeb(sd, M9MO_CATEGORY_NEW, 0x08, 0x00);
+		CHECK_ERR(err);
+
+		/* Set HISTOGRAM OFF */
+		err = m9mo_writeb(sd, M9MO_CATEGORY_MON, 0x58, 0x00);
+		CHECK_ERR(err);
+
+		/* Set Monitor EV program mode */
+		err = m9mo_writeb(sd, M9MO_CATEGORY_AE,
+			M9MO_AE_EP_MODE_MON, 0x10);
+		CHECK_ERR(err);
+
+		/* Set Still Capture EV program mode */
+		err = m9mo_writeb(sd, M9MO_CATEGORY_AE,
+			M9MO_AE_EP_MODE_CAP, 0x10);
+		CHECK_ERR(err);
+
+		/* Still Capture EVP Set Parameter Mode */
+		if (state->iso == 0) {
+			err = m9mo_writeb(sd, M9MO_CATEGORY_AE,
+				M9MO_AE_EV_PRG_MODE_CAP, 0x00);
+			CHECK_ERR(err);
+		} else {
+			err = m9mo_writeb(sd, M9MO_CATEGORY_AE,
+				M9MO_AE_EV_PRG_MODE_CAP, 0x04);
+			CHECK_ERR(err);
+		}
+
+		/* Set AF range to auto */
+		err = m9mo_writeb(sd, M9MO_CATEGORY_LENS,
+			M9MO_LENS_AF_SCAN_RANGE, 0x00);
+		CHECK_ERR(err);
+		break;
+
+	case MODE_PROGRAM:
+	case MODE_BEST_GROUP_POSE:
+	case MODE_BEAUTY_SHOT:
+	case MODE_BEST_SHOT:
+	case MODE_CONTINUOUS_SHOT:
+	case MODE_ERASER:
+		err = m9mo_writeb(sd, M9MO_CATEGORY_AE, 0x53, 0x01);
+		CHECK_ERR(err);
+
+		err = m9mo_writeb(sd, M9MO_CATEGORY_MON,
+			M9MO_MON_COLOR_EFFECT, state->color_effect);
+		CHECK_ERR(err);
+
+		/* Set LIKE_PRO_EN Disable */
+		err = m9mo_writeb(sd, M9MO_CATEGORY_PRO_MODE, 0x00, 0x00);
+		CHECK_ERR(err);
+
+		/* LIKE PRO DISPLAY SET */
+		err = m9mo_writeb(sd, M9MO_CATEGORY_PRO_MODE, 0x07, 0x00);
 		CHECK_ERR(err);
 
 		/* Set CATE_408 to None */
@@ -7554,10 +9794,21 @@ static int m9mo_set_PASM_mode(struct v4l2_subdev *sd, int val)
 		CHECK_ERR(err);
 
 		/* Set Still Capture EV program mode */
-		err = m9mo_writeb(sd, M9MO_CATEGORY_AE,
-			M9MO_AE_EP_MODE_CAP, 0x00);
-		CHECK_ERR(err);
-
+		if (val == MODE_PROGRAM) {
+			if (state->image_stabilizer_mode == V4L2_IMAGE_STABILIZER_OIS) {
+				err = m9mo_writeb(sd, M9MO_CATEGORY_AE,
+					M9MO_AE_EP_MODE_CAP, 0x18);
+				CHECK_ERR(err);
+			} else {
+				err = m9mo_writeb(sd, M9MO_CATEGORY_AE,
+					M9MO_AE_EP_MODE_CAP, 0x00);
+				CHECK_ERR(err);
+			}
+		} else {
+			err = m9mo_writeb(sd, M9MO_CATEGORY_AE,
+				M9MO_AE_EP_MODE_CAP, 0x00);
+			CHECK_ERR(err);
+		}
 		/* Still Capture EVP Set Parameter Mode */
 		if (state->iso == 0) {
 			err = m9mo_writeb(sd, M9MO_CATEGORY_AE,
@@ -7568,15 +9819,42 @@ static int m9mo_set_PASM_mode(struct v4l2_subdev *sd, int val)
 				M9MO_AE_EV_PRG_MODE_CAP, 0x04);
 			CHECK_ERR(err);
 		}
+
+		if (state->mode == MODE_BEAUTY_SHOT) {
+			/* Set AF range to auto-macro */
+			err = m9mo_writeb(sd, M9MO_CATEGORY_LENS,
+				M9MO_LENS_AF_SCAN_RANGE, 0x02);
+			CHECK_ERR(err);
+		} else if (state->mode == MODE_BEST_GROUP_POSE
+		|| state->mode == MODE_BEST_SHOT
+		|| state->mode == MODE_CONTINUOUS_SHOT) {
+			/* Set AF range to auto */
+			err = m9mo_writeb(sd, M9MO_CATEGORY_LENS,
+				M9MO_LENS_AF_SCAN_RANGE, 0x00);
+			CHECK_ERR(err);
+		}
+
+		if (state->mode == MODE_ERASER) {
+			err = m9mo_writeb(sd, M9MO_CATEGORY_PARM,
+				M9MO_PARM_SET_ERASER_MODE, 0x01);
+			CHECK_ERR(err);
+		}
 		break;
 
 	case MODE_A:
+		err = m9mo_writeb(sd, M9MO_CATEGORY_AE, 0x53, 0x01);
+		CHECK_ERR(err);
+
 		err = m9mo_writeb(sd, M9MO_CATEGORY_MON,
 			M9MO_MON_COLOR_EFFECT, state->color_effect);
 		CHECK_ERR(err);
 
 		/* Set LIKE_PRO_EN Disable */
 		err = m9mo_writeb(sd, M9MO_CATEGORY_PRO_MODE, 0x00, 0x00);
+		CHECK_ERR(err);
+
+		/* LIKE PRO DISPLAY SET */
+		err = m9mo_writeb(sd, M9MO_CATEGORY_PRO_MODE, 0x07, 0x00);
 		CHECK_ERR(err);
 
 		/* Set CATE_408 to None */
@@ -7615,12 +9893,19 @@ static int m9mo_set_PASM_mode(struct v4l2_subdev *sd, int val)
 		break;
 
 	case MODE_S:
+		err = m9mo_writeb(sd, M9MO_CATEGORY_AE, 0x53, 0x01);
+		CHECK_ERR(err);
+
 		err = m9mo_writeb(sd, M9MO_CATEGORY_MON,
 			M9MO_MON_COLOR_EFFECT, state->color_effect);
 		CHECK_ERR(err);
 
 		/* Set LIKE_PRO_EN Disable */
 		err = m9mo_writeb(sd, M9MO_CATEGORY_PRO_MODE, 0x00, 0x00);
+		CHECK_ERR(err);
+
+		/* LIKE PRO DISPLAY SET */
+		err = m9mo_writeb(sd, M9MO_CATEGORY_PRO_MODE, 0x07, 0x00);
 		CHECK_ERR(err);
 
 		/* Set CATE_408 to None */
@@ -7662,12 +9947,19 @@ static int m9mo_set_PASM_mode(struct v4l2_subdev *sd, int val)
 		break;
 
 	case MODE_M:
+		err = m9mo_writeb(sd, M9MO_CATEGORY_AE, 0x53, 0x01);
+		CHECK_ERR(err);
+
 		err = m9mo_writeb(sd, M9MO_CATEGORY_MON,
 			M9MO_MON_COLOR_EFFECT, state->color_effect);
 		CHECK_ERR(err);
 
 		/* Set LIKE_PRO_EN Disable */
 		err = m9mo_writeb(sd, M9MO_CATEGORY_PRO_MODE, 0x00, 0x00);
+		CHECK_ERR(err);
+
+		/* LIKE PRO DISPLAY SET */
+		err = m9mo_writeb(sd, M9MO_CATEGORY_PRO_MODE, 0x07, 0x00);
 		CHECK_ERR(err);
 
 		/* Set CATE_408 to None */
@@ -7684,9 +9976,15 @@ static int m9mo_set_PASM_mode(struct v4l2_subdev *sd, int val)
 		CHECK_ERR(err);
 
 		/* Set Still Capture EV program mode */
-		err = m9mo_writeb(sd, M9MO_CATEGORY_AE,
-			M9MO_AE_EP_MODE_CAP, 0x00);
-		CHECK_ERR(err);
+		if (state->image_stabilizer_mode == V4L2_IMAGE_STABILIZER_OIS) {
+			err = m9mo_writeb(sd, M9MO_CATEGORY_AE,
+				M9MO_AE_EP_MODE_CAP, 0x18);
+			CHECK_ERR(err);
+		} else {
+			err = m9mo_writeb(sd, M9MO_CATEGORY_AE,
+				M9MO_AE_EP_MODE_CAP, 0x00);
+			CHECK_ERR(err);
+		}
 
 		/* Still Capture EVP Set Parameter Mode */
 		err = m9mo_writeb(sd, M9MO_CATEGORY_AE,
@@ -7706,19 +10004,36 @@ static int m9mo_set_PASM_mode(struct v4l2_subdev *sd, int val)
 			M9MO_AE_EV_PRG_SS_DENOMINATOR, state->denominator);
 		CHECK_ERR(err);
 
+#ifndef CONFIG_MACH_GC2PD
 		/* Set Still Capture ISO Value */
 		err = m9mo_writew(sd, M9MO_CATEGORY_AE,
 			M9MO_AE_EV_PRG_ISO_VALUE, state->iso);
 		CHECK_ERR(err);
+#endif
 		break;
 
 	case MODE_VIDEO:
+		err = m9mo_writeb(sd, M9MO_CATEGORY_AE, 0x53, 0x01);
+		CHECK_ERR(err);
+
 		err = m9mo_writeb(sd, M9MO_CATEGORY_MON,
 			M9MO_MON_COLOR_EFFECT, state->color_effect);
 		CHECK_ERR(err);
 
+		if (state->smart_scene_detect_mode) {
+			err = m9mo_writeb(sd, M9MO_CATEGORY_NEW, 0x08, 0x02);
+			CHECK_ERR(err);
+		} else {
+			err = m9mo_writeb(sd, M9MO_CATEGORY_NEW, 0x08, 0x00);
+			CHECK_ERR(err);
+		}
+
 		/* Set LIKE_PRO_EN Disable */
 		err = m9mo_writeb(sd, M9MO_CATEGORY_PRO_MODE, 0x00, 0x00);
+		CHECK_ERR(err);
+
+		/* LIKE PRO DISPLAY SET */
+		err = m9mo_writeb(sd, M9MO_CATEGORY_PRO_MODE, 0x07, 0x00);
 		CHECK_ERR(err);
 
 		/* Set HISTOGRAM OFF */
@@ -7729,9 +10044,29 @@ static int m9mo_set_PASM_mode(struct v4l2_subdev *sd, int val)
 		err = m9mo_writeb(sd, M9MO_CATEGORY_AE,
 			M9MO_AE_EV_PRG_MODE_CAP, 0x00);
 		CHECK_ERR(err);
+
+		/* Set AF range to AUTO-MACRO */
+		err = m9mo_writeb(sd, M9MO_CATEGORY_LENS,
+			M9MO_LENS_AF_SCAN_RANGE, 0x02);
+		CHECK_ERR(err);
+
+		if (state->fps == 120) {
+			/* Set Monitor EV program mode : 120 fps */
+			err = m9mo_writeb(sd, M9MO_CATEGORY_AE,
+				M9MO_AE_EP_MODE_MON, 0x1C);
+			CHECK_ERR(err);
+
+			/* Set Still Capture EV program mode : 120 fps */
+			err = m9mo_writeb(sd, M9MO_CATEGORY_AE,
+				M9MO_AE_EP_MODE_CAP, 0x1C);
+			CHECK_ERR(err);
+		}
 		break;
 
 	case MODE_HIGH_SPEED:
+		err = m9mo_writeb(sd, M9MO_CATEGORY_AE, 0x53, 0x00);
+		CHECK_ERR(err);
+
 		/* Set CATE_408 to None */
 		err = m9mo_writeb(sd, M9MO_CATEGORY_NEW, 0x08, 0x00);
 		CHECK_ERR(err);
@@ -7744,9 +10079,28 @@ static int m9mo_set_PASM_mode(struct v4l2_subdev *sd, int val)
 		err = m9mo_writeb(sd, M9MO_CATEGORY_PRO_MODE, 0x01, 0x01);
 		CHECK_ERR(err);
 
+		/* LIKE PRO DISPLAY SET */
+		err = m9mo_writeb(sd, M9MO_CATEGORY_PRO_MODE, 0x07, 0x00);
+		CHECK_ERR(err);
+
+		/* Still Capture EVP Set Parameter Mode */
+		err = m9mo_writeb(sd, M9MO_CATEGORY_AE,
+			M9MO_AE_EV_PRG_MODE_CAP, 0x00);
+		CHECK_ERR(err);
+
+		/* Set Monitor EV program mode */
+		err = m9mo_writeb(sd, M9MO_CATEGORY_AE,
+			M9MO_AE_EP_MODE_MON, 0x04);
+		CHECK_ERR(err);
+
+		/* Set Still Capture EV program mode */
+		err = m9mo_writeb(sd, M9MO_CATEGORY_AE,
+			M9MO_AE_EP_MODE_CAP, 0x13);
+		CHECK_ERR(err);
+
 		/* LIKE A PRO STEP SET */
 		err = m9mo_writeb(sd, M9MO_CATEGORY_PRO_MODE,
-			0x02, state->widget_mode_level);
+			0x02, 0x04);
 		CHECK_ERR(err);
 
 		err = m9mo_writeb(sd, M9MO_CATEGORY_MON,
@@ -7760,9 +10114,17 @@ static int m9mo_set_PASM_mode(struct v4l2_subdev *sd, int val)
 		/* Set CATE_409 to 1(PREVIEW) */
 		err = m9mo_writeb(sd, M9MO_CATEGORY_NEW, 0x09, 0x01);
 		CHECK_ERR(err);
+
+		/* Set AF range to auto */
+		err = m9mo_writeb(sd, M9MO_CATEGORY_LENS,
+			M9MO_LENS_AF_SCAN_RANGE, 0x00);
+		CHECK_ERR(err);
 		break;
 
 	case MODE_LIGHT_TRAIL_SHOT:
+		err = m9mo_writeb(sd, M9MO_CATEGORY_AE, 0x53, 0x00);
+		CHECK_ERR(err);
+
 		/* Set CATE_408 to None */
 		err = m9mo_writeb(sd, M9MO_CATEGORY_NEW, 0x08, 0x00);
 		CHECK_ERR(err);
@@ -7775,15 +10137,62 @@ static int m9mo_set_PASM_mode(struct v4l2_subdev *sd, int val)
 		err = m9mo_writeb(sd, M9MO_CATEGORY_PRO_MODE, 0x01, 0x02);
 		CHECK_ERR(err);
 
+		/* LIKE PRO DISPLAY SET */
+		err = m9mo_writeb(sd, M9MO_CATEGORY_PRO_MODE, 0x07, 0x00);
+		CHECK_ERR(err);
+#ifdef CONFIG_MACH_GC2PD
+		/* Still Capture EVP Set Parameter Mode */
+		err = m9mo_writeb(sd, M9MO_CATEGORY_AE,
+			M9MO_AE_EV_PRG_MODE_CAP, 0x00);
+		CHECK_ERR(err);
+
+		/* Set Monitor EV program mode */
+		err = m9mo_writeb(sd, M9MO_CATEGORY_AE,
+			M9MO_AE_EP_MODE_MON, 0x00);
+		CHECK_ERR(err);
+
+		/* Set Still Capture EV program mode */
+		err = m9mo_writeb(sd, M9MO_CATEGORY_AE,
+			M9MO_AE_EP_MODE_CAP, 0x16);
+		CHECK_ERR(err);
+#else
+		/* Still Capture EVP Set Parameter Mode */
+		err = m9mo_writeb(sd, M9MO_CATEGORY_AE,
+			M9MO_AE_EV_PRG_MODE_CAP, 0x06);
+		CHECK_ERR(err);
+
+		/* Set Monitor EV program mode */
+		err = m9mo_writeb(sd, M9MO_CATEGORY_AE,
+			M9MO_AE_EP_MODE_MON, 0x04);
+		CHECK_ERR(err);
+
+		/* Set Still Capture EV program mode */
+		err = m9mo_writeb(sd, M9MO_CATEGORY_AE,
+			M9MO_AE_EP_MODE_CAP, 0x04);
+		CHECK_ERR(err);
+#endif
 		/* LIKE A PRO STEP SET */
 		err = m9mo_writeb(sd, M9MO_CATEGORY_PRO_MODE,
-			0x02, state->widget_mode_level);
+			0x02, 0x4);
 		CHECK_ERR(err);
 
 		err = m9mo_writeb(sd, M9MO_CATEGORY_MON,
 			M9MO_MON_COLOR_EFFECT, state->color_effect);
 		CHECK_ERR(err);
+#ifndef CONFIG_MACH_GC2PD
+		/* Set Capture Shutter Speed Time - 10s */
+		err = m9mo_writew(sd, M9MO_CATEGORY_AE,
+			M9MO_AE_EV_PRG_SS_NUMERATOR, 0x0A);
+		CHECK_ERR(err);
+		err = m9mo_writew(sd, M9MO_CATEGORY_AE,
+			M9MO_AE_EV_PRG_SS_DENOMINATOR, 1);
+		CHECK_ERR(err);
 
+		/* Set Still Capture ISO Value */
+		err = m9mo_writew(sd, M9MO_CATEGORY_AE,
+			M9MO_AE_EV_PRG_ISO_VALUE, 0x64);
+		CHECK_ERR(err);
+#endif
 		/* Set LIKE_PRO_EN Enable */
 		err = m9mo_writeb(sd, M9MO_CATEGORY_PRO_MODE, 0x00, 0x01);
 		CHECK_ERR(err);
@@ -7791,9 +10200,17 @@ static int m9mo_set_PASM_mode(struct v4l2_subdev *sd, int val)
 		/* Set CATE_409 to 1(PREVIEW) */
 		err = m9mo_writeb(sd, M9MO_CATEGORY_NEW, 0x09, 0x01);
 		CHECK_ERR(err);
+
+		/* Set AF range to auto */
+		err = m9mo_writeb(sd, M9MO_CATEGORY_LENS,
+			M9MO_LENS_AF_SCAN_RANGE, 0x00);
+		CHECK_ERR(err);
 		break;
 
 	case MODE_WATERFALL:
+		err = m9mo_writeb(sd, M9MO_CATEGORY_AE, 0x53, 0x01);
+		CHECK_ERR(err);
+
 		/* Set CATE_408 to None */
 		err = m9mo_writeb(sd, M9MO_CATEGORY_NEW, 0x08, 0x00);
 		CHECK_ERR(err);
@@ -7806,13 +10223,32 @@ static int m9mo_set_PASM_mode(struct v4l2_subdev *sd, int val)
 		err = m9mo_writeb(sd, M9MO_CATEGORY_PRO_MODE, 0x01, 0x03);
 		CHECK_ERR(err);
 
+		/* LIKE PRO DISPLAY SET */
+		err = m9mo_writeb(sd, M9MO_CATEGORY_PRO_MODE, 0x07, 0x00);
+		CHECK_ERR(err);
+
+		/* Still Capture EVP Set Parameter Mode */
+		err = m9mo_writeb(sd, M9MO_CATEGORY_AE,
+			M9MO_AE_EV_PRG_MODE_CAP, 0x00);
+		CHECK_ERR(err);
+
 		/* LIKE A PRO STEP SET */
 		err = m9mo_writeb(sd, M9MO_CATEGORY_PRO_MODE,
-			0x02, state->widget_mode_level);
+			0x02, 0x04);
 		CHECK_ERR(err);
 
 		err = m9mo_writeb(sd, M9MO_CATEGORY_MON,
 			M9MO_MON_COLOR_EFFECT, state->color_effect);
+		CHECK_ERR(err);
+
+		/* Set Monitor EV program mode */
+		err = m9mo_writeb(sd, M9MO_CATEGORY_AE,
+			M9MO_AE_EP_MODE_MON, 0x00);
+		CHECK_ERR(err);
+
+		/* Set Still Capture EV program mode */
+		err = m9mo_writeb(sd, M9MO_CATEGORY_AE,
+			M9MO_AE_EP_MODE_CAP, 0x0E);
 		CHECK_ERR(err);
 
 		/* Set LIKE_PRO_EN Enable */
@@ -7822,9 +10258,17 @@ static int m9mo_set_PASM_mode(struct v4l2_subdev *sd, int val)
 		/* Set CATE_409 to 1(PREVIEW) */
 		err = m9mo_writeb(sd, M9MO_CATEGORY_NEW, 0x09, 0x01);
 		CHECK_ERR(err);
+
+		/* Set AF range to auto */
+		err = m9mo_writeb(sd, M9MO_CATEGORY_LENS,
+			M9MO_LENS_AF_SCAN_RANGE, 0x00);
+		CHECK_ERR(err);
 		break;
 
 	case MODE_SILHOUETTE:
+		err = m9mo_writeb(sd, M9MO_CATEGORY_AE, 0x53, 0x01);
+		CHECK_ERR(err);
+
 		/* Set CATE_408 to None */
 		err = m9mo_writeb(sd, M9MO_CATEGORY_NEW, 0x08, 0x00);
 		CHECK_ERR(err);
@@ -7837,9 +10281,28 @@ static int m9mo_set_PASM_mode(struct v4l2_subdev *sd, int val)
 		err = m9mo_writeb(sd, M9MO_CATEGORY_PRO_MODE, 0x01, 0x04);
 		CHECK_ERR(err);
 
+		/* LIKE PRO DISPLAY SET */
+		err = m9mo_writeb(sd, M9MO_CATEGORY_PRO_MODE, 0x07, 0x00);
+		CHECK_ERR(err);
+
+		/* Set Monitor EV program mode */
+		err = m9mo_writeb(sd, M9MO_CATEGORY_AE,
+			M9MO_AE_EP_MODE_MON, 0x00);
+		CHECK_ERR(err);
+
+		/* Set Still Capture EV program mode */
+		err = m9mo_writeb(sd, M9MO_CATEGORY_AE,
+			M9MO_AE_EP_MODE_CAP, 0x00);
+		CHECK_ERR(err);
+
+		/* Still Capture EVP Set Parameter Mode */
+		err = m9mo_writeb(sd, M9MO_CATEGORY_AE,
+			M9MO_AE_EV_PRG_MODE_CAP, 0x00);
+		CHECK_ERR(err);
+
 		/* LIKE A PRO STEP SET */
 		err = m9mo_writeb(sd, M9MO_CATEGORY_PRO_MODE,
-			0x02, state->widget_mode_level);
+			0x02, 0x02);
 		CHECK_ERR(err);
 
 		/* Set Color effect */
@@ -7854,9 +10317,17 @@ static int m9mo_set_PASM_mode(struct v4l2_subdev *sd, int val)
 		/* Set CATE_409 to 1(PREVIEW) */
 		err = m9mo_writeb(sd, M9MO_CATEGORY_NEW, 0x09, 0x01);
 		CHECK_ERR(err);
+
+		/* Set AF range to auto */
+		err = m9mo_writeb(sd, M9MO_CATEGORY_LENS,
+			M9MO_LENS_AF_SCAN_RANGE, 0x00);
+		CHECK_ERR(err);
 		break;
 
 	case MODE_SUNSET:
+		err = m9mo_writeb(sd, M9MO_CATEGORY_AE, 0x53, 0x01);
+		CHECK_ERR(err);
+
 		/* Set CATE_408 to None */
 		err = m9mo_writeb(sd, M9MO_CATEGORY_NEW, 0x08, 0x00);
 		CHECK_ERR(err);
@@ -7869,13 +10340,32 @@ static int m9mo_set_PASM_mode(struct v4l2_subdev *sd, int val)
 		err = m9mo_writeb(sd, M9MO_CATEGORY_PRO_MODE, 0x01, 0x05);
 		CHECK_ERR(err);
 
+		/* LIKE PRO DISPLAY SET */
+		err = m9mo_writeb(sd, M9MO_CATEGORY_PRO_MODE, 0x07, 0x00);
+		CHECK_ERR(err);
+
+		/* Still Capture EVP Set Parameter Mode */
+		err = m9mo_writeb(sd, M9MO_CATEGORY_AE,
+			M9MO_AE_EV_PRG_MODE_CAP, 0x00);
+		CHECK_ERR(err);
+
 		/* LIKE A PRO STEP SET */
 		err = m9mo_writeb(sd, M9MO_CATEGORY_PRO_MODE,
-			0x02, state->widget_mode_level);
+			0x02, 0x02);
 		CHECK_ERR(err);
 
 		err = m9mo_writeb(sd, M9MO_CATEGORY_MON,
 			M9MO_MON_COLOR_EFFECT, state->color_effect);
+		CHECK_ERR(err);
+
+		/* Set Monitor EV program mode */
+		err = m9mo_writeb(sd, M9MO_CATEGORY_AE,
+			M9MO_AE_EP_MODE_MON, 0x00);
+		CHECK_ERR(err);
+
+		/* Set Still Capture EV program mode */
+		err = m9mo_writeb(sd, M9MO_CATEGORY_AE,
+			M9MO_AE_EP_MODE_CAP, 0x00);
 		CHECK_ERR(err);
 
 		/* Set LIKE_PRO_EN Enable */
@@ -7885,9 +10375,17 @@ static int m9mo_set_PASM_mode(struct v4l2_subdev *sd, int val)
 		/* Set CATE_409 to 1(PREVIEW) */
 		err = m9mo_writeb(sd, M9MO_CATEGORY_NEW, 0x09, 0x01);
 		CHECK_ERR(err);
+
+		/* Set AF range to auto */
+		err = m9mo_writeb(sd, M9MO_CATEGORY_LENS,
+			M9MO_LENS_AF_SCAN_RANGE, 0x00);
+		CHECK_ERR(err);
 		break;
 
 	case MODE_CLOSE_UP:
+		err = m9mo_writeb(sd, M9MO_CATEGORY_AE, 0x53, 0x01);
+		CHECK_ERR(err);
+
 		/* Set CATE_408 to None */
 		err = m9mo_writeb(sd, M9MO_CATEGORY_NEW, 0x08, 0x00);
 		CHECK_ERR(err);
@@ -7900,13 +10398,42 @@ static int m9mo_set_PASM_mode(struct v4l2_subdev *sd, int val)
 		err = m9mo_writeb(sd, M9MO_CATEGORY_PRO_MODE, 0x01, 0x06);
 		CHECK_ERR(err);
 
+		/* LIKE PRO DISPLAY SET */
+		err = m9mo_writeb(sd, M9MO_CATEGORY_PRO_MODE, 0x07, 0x00);
+		CHECK_ERR(err);
+
+		/* Still Capture EVP Set Parameter Mode */
+		err = m9mo_writeb(sd, M9MO_CATEGORY_AE,
+			M9MO_AE_EV_PRG_MODE_CAP, 0x01);
+		CHECK_ERR(err);
+
+		/* Set Monitor EV program mode */
+		err = m9mo_writeb(sd, M9MO_CATEGORY_AE,
+			M9MO_AE_EP_MODE_MON, 0x02);
+		CHECK_ERR(err);
+
+		/* Set Still Capture EV program mode */
+		err = m9mo_writeb(sd, M9MO_CATEGORY_AE,
+			M9MO_AE_EP_MODE_CAP, 0x02);
+		CHECK_ERR(err);
+
 		/* LIKE A PRO STEP SET */
 		err = m9mo_writeb(sd, M9MO_CATEGORY_PRO_MODE,
-			0x02, state->widget_mode_level);
+			0x02, 0x04);
 		CHECK_ERR(err);
 
 		err = m9mo_writeb(sd, M9MO_CATEGORY_MON,
 			M9MO_MON_COLOR_EFFECT, state->color_effect);
+		CHECK_ERR(err);
+
+		/* Set Still Capture F-Number Value - 2.8 or 3.1*/
+#ifdef CONFIG_MACH_GC2PD
+		err = m9mo_writeb(sd, M9MO_CATEGORY_AE,
+			M9MO_AE_EV_PRG_F_NUMBER, 0x31);
+#else
+		err = m9mo_writeb(sd, M9MO_CATEGORY_AE,
+			M9MO_AE_EV_PRG_F_NUMBER, 0x28);
+#endif
 		CHECK_ERR(err);
 
 		/* Set LIKE_PRO_EN Enable */
@@ -7916,9 +10443,23 @@ static int m9mo_set_PASM_mode(struct v4l2_subdev *sd, int val)
 		/* Set CATE_409 to 1(PREVIEW) */
 		err = m9mo_writeb(sd, M9MO_CATEGORY_NEW, 0x09, 0x01);
 		CHECK_ERR(err);
+
+		/* Set AF range to auto-macro */
+#ifdef CONFIG_MACH_GC2PD
+		err = m9mo_writeb(sd, M9MO_CATEGORY_LENS,
+			M9MO_LENS_AF_SCAN_RANGE, 0x01);
+#else
+		err = m9mo_writeb(sd, M9MO_CATEGORY_LENS,
+			M9MO_LENS_AF_SCAN_RANGE, 0x02);
+#endif
+		CHECK_ERR(err);
+
 		break;
 
 	case MODE_FIREWORKS:
+		err = m9mo_writeb(sd, M9MO_CATEGORY_AE, 0x53, 0x00);
+		CHECK_ERR(err);
+
 		/* Set CATE_408 to None */
 		err = m9mo_writeb(sd, M9MO_CATEGORY_NEW, 0x08, 0x00);
 		CHECK_ERR(err);
@@ -7931,83 +10472,52 @@ static int m9mo_set_PASM_mode(struct v4l2_subdev *sd, int val)
 		err = m9mo_writeb(sd, M9MO_CATEGORY_PRO_MODE, 0x01, 0x07);
 		CHECK_ERR(err);
 
+		/* LIKE PRO DISPLAY SET */
+		err = m9mo_writeb(sd, M9MO_CATEGORY_PRO_MODE, 0x07, 0x00);
+		CHECK_ERR(err);
+
+		/* Still Capture EVP Set Parameter Mode */
+		err = m9mo_writeb(sd, M9MO_CATEGORY_AE,
+			M9MO_AE_EV_PRG_MODE_CAP, 0x07);
+		CHECK_ERR(err);
+
 		/* LIKE A PRO STEP SET */
 		err = m9mo_writeb(sd, M9MO_CATEGORY_PRO_MODE,
-			0x02, state->widget_mode_level);
+			0x02, 0x02);
 		CHECK_ERR(err);
 
 		err = m9mo_writeb(sd, M9MO_CATEGORY_MON,
 			M9MO_MON_COLOR_EFFECT, state->color_effect);
 		CHECK_ERR(err);
 
-		/* Set LIKE_PRO_EN Enable */
-		err = m9mo_writeb(sd, M9MO_CATEGORY_PRO_MODE, 0x00, 0x01);
+		/* Set Capture Shutter Speed Time - 3.2s*/
+		err = m9mo_writew(sd, M9MO_CATEGORY_AE,
+			M9MO_AE_EV_PRG_SS_NUMERATOR, 32);
+		CHECK_ERR(err);
+		err = m9mo_writew(sd, M9MO_CATEGORY_AE,
+			M9MO_AE_EV_PRG_SS_DENOMINATOR, 10);
 		CHECK_ERR(err);
 
-		/* Set CATE_409 to 1(PREVIEW) */
-		err = m9mo_writeb(sd, M9MO_CATEGORY_NEW, 0x09, 0x01);
+		/* Set Still Capture F-Number Value  - 8.0 */
+#ifndef CONFIG_MACH_GC2PD
+		err = m9mo_writeb(sd, M9MO_CATEGORY_AE,
+			M9MO_AE_EV_PRG_F_NUMBER, 0x80);
 		CHECK_ERR(err);
-		break;
+#endif
 
-	case MODE_BACKLIGHT:
-		/* Set CATE_408 to None */
-		err = m9mo_writeb(sd, M9MO_CATEGORY_NEW, 0x08, 0x00);
-		CHECK_ERR(err);
-
-		/* Set HISTOGRAM ON */
-		err = m9mo_writeb(sd, M9MO_CATEGORY_MON, 0x58, 0x01);
+		/* Set Still Capture ISO Value - 100 */
+		err = m9mo_writew(sd, M9MO_CATEGORY_AE,
+			M9MO_AE_EV_PRG_ISO_VALUE, 0x64);
 		CHECK_ERR(err);
 
-		/* LIKE A PRO MODE SET */
-		err = m9mo_writeb(sd, M9MO_CATEGORY_PRO_MODE, 0x01, 0x0A);
+		/* Set Monitor EV program mode */
+		err = m9mo_writeb(sd, M9MO_CATEGORY_AE,
+			M9MO_AE_EP_MODE_MON, 0x00);
 		CHECK_ERR(err);
 
-		/* LIKE A PRO STEP SET */
-		err = m9mo_writeb(sd, M9MO_CATEGORY_PRO_MODE,
-			0x02, state->widget_mode_level);
-		CHECK_ERR(err);
-
-		err = m9mo_writeb(sd, M9MO_CATEGORY_MON,
-			M9MO_MON_COLOR_EFFECT, state->color_effect);
-		CHECK_ERR(err);
-
-		/* Set LIKE_PRO_EN Enable */
-		err = m9mo_writeb(sd, M9MO_CATEGORY_PRO_MODE, 0x00, 0x01);
-		CHECK_ERR(err);
-
-		/* Set CATE_409 to 1(PREVIEW) */
-		err = m9mo_writeb(sd, M9MO_CATEGORY_NEW, 0x09, 0x01);
-		CHECK_ERR(err);
-		break;
-
-	case MODE_BLUE_SKY:
-		/* Set CATE_408 to None */
-		err = m9mo_writeb(sd, M9MO_CATEGORY_NEW, 0x08, 0x00);
-		CHECK_ERR(err);
-
-		/* Set HISTOGRAM ON */
-		err = m9mo_writeb(sd, M9MO_CATEGORY_MON, 0x58, 0x01);
-		CHECK_ERR(err);
-
-		/* LIKE A PRO MODE SET */
-		err = m9mo_writeb(sd, M9MO_CATEGORY_PRO_MODE, 0x01, 0x08);
-		CHECK_ERR(err);
-
-		/* LIKE A PRO STEP SET */
-		err = m9mo_writeb(sd, M9MO_CATEGORY_PRO_MODE,
-			0x02, state->widget_mode_level);
-		CHECK_ERR(err);
-
-		/* COLOR EFFECT SET */
-		err = m9mo_readb(sd, M9MO_CATEGORY_MON,
-			M9MO_MON_COLOR_EFFECT, &color_effect);
-		CHECK_ERR(err);
-
-		if (color_effect < 0x11)
-			state->color_effect = color_effect;
-
-		err = m9mo_writeb(sd, M9MO_CATEGORY_MON,
-			M9MO_MON_COLOR_EFFECT, 0x11 + state->widget_mode_level);
+		/* Set Still Capture EV program mode */
+		err = m9mo_writeb(sd, M9MO_CATEGORY_AE,
+			M9MO_AE_EP_MODE_CAP, 0x04);
 		CHECK_ERR(err);
 
 		/* Set LIKE_PRO_EN Enable */
@@ -8016,25 +10526,52 @@ static int m9mo_set_PASM_mode(struct v4l2_subdev *sd, int val)
 
 		/* Set CATE_409 to 1(PREVIEW) */
 		err = m9mo_writeb(sd, M9MO_CATEGORY_NEW, 0x09, 0x01);
+		CHECK_ERR(err);
+
+		/* Set AF range to auto */
+		err = m9mo_writeb(sd, M9MO_CATEGORY_LENS,
+			M9MO_LENS_AF_SCAN_RANGE, 0x00);
 		CHECK_ERR(err);
 		break;
 
 	case MODE_NATURAL_GREEN:
+		err = m9mo_writeb(sd, M9MO_CATEGORY_AE, 0x53, 0x01);
+		CHECK_ERR(err);
+
 		/* Set CATE_408 to None */
 		err = m9mo_writeb(sd, M9MO_CATEGORY_NEW, 0x08, 0x00);
 		CHECK_ERR(err);
 
 		/* Set HISTOGRAM ON */
 		err = m9mo_writeb(sd, M9MO_CATEGORY_MON, 0x58, 0x01);
+		CHECK_ERR(err);
+
+		/* Set Monitor EV program mode */
+		err = m9mo_writeb(sd, M9MO_CATEGORY_AE,
+			M9MO_AE_EP_MODE_MON, 0x00);
+		CHECK_ERR(err);
+
+		/* Set Still Capture EV program mode */
+		err = m9mo_writeb(sd, M9MO_CATEGORY_AE,
+			M9MO_AE_EP_MODE_CAP, 0x00);
 		CHECK_ERR(err);
 
 		/* LIKE A PRO MODE SET */
 		err = m9mo_writeb(sd, M9MO_CATEGORY_PRO_MODE, 0x01, 0x09);
 		CHECK_ERR(err);
 
+		/* LIKE PRO DISPLAY SET */
+		err = m9mo_writeb(sd, M9MO_CATEGORY_PRO_MODE, 0x07, 0x00);
+		CHECK_ERR(err);
+
+		/* Still Capture EVP Set Parameter Mode */
+		err = m9mo_writeb(sd, M9MO_CATEGORY_AE,
+			M9MO_AE_EV_PRG_MODE_CAP, 0x00);
+		CHECK_ERR(err);
+
 		/* LIKE A PRO STEP SET */
 		err = m9mo_writeb(sd, M9MO_CATEGORY_PRO_MODE,
-			0x02, state->widget_mode_level);
+			0x02, 0x04);
 		CHECK_ERR(err);
 
 		/* COLOR EFFECT SET */
@@ -8046,7 +10583,7 @@ static int m9mo_set_PASM_mode(struct v4l2_subdev *sd, int val)
 			state->color_effect = color_effect;
 
 		err = m9mo_writeb(sd, M9MO_CATEGORY_MON,
-			M9MO_MON_COLOR_EFFECT, 0x21 + state->widget_mode_level);
+			M9MO_MON_COLOR_EFFECT, 0x21 + 0x04);
 		CHECK_ERR(err);
 
 		/* Set LIKE_PRO_EN Enable */
@@ -8056,11 +10593,428 @@ static int m9mo_set_PASM_mode(struct v4l2_subdev *sd, int val)
 		/* Set CATE_409 to 1(PREVIEW) */
 		err = m9mo_writeb(sd, M9MO_CATEGORY_NEW, 0x09, 0x01);
 		CHECK_ERR(err);
+
+		/* Set AF range to auto */
+		err = m9mo_writeb(sd, M9MO_CATEGORY_LENS,
+			M9MO_LENS_AF_SCAN_RANGE, 0x00);
+		CHECK_ERR(err);
+		break;
+
+	case MODE_DAWN:
+		err = m9mo_writeb(sd, M9MO_CATEGORY_AE, 0x53, 0x01);
+		CHECK_ERR(err);
+
+		err = m9mo_writeb(sd, M9MO_CATEGORY_MON,
+			M9MO_MON_COLOR_EFFECT, state->color_effect);
+		CHECK_ERR(err);
+
+		/* Set CATE_408 to None */
+		err = m9mo_writeb(sd, M9MO_CATEGORY_NEW, 0x08, 0x00);
+		CHECK_ERR(err);
+
+		/* Set HISTOGRAM ON */
+		err = m9mo_writeb(sd, M9MO_CATEGORY_MON, 0x58, 0x01);
+		CHECK_ERR(err);
+
+		/* LIKE A PRO MODE SET */
+		err = m9mo_writeb(sd, M9MO_CATEGORY_PRO_MODE, 0x01, 0x0B);
+		CHECK_ERR(err);
+
+		/* Set Monitor EV program mode */
+		err = m9mo_writeb(sd, M9MO_CATEGORY_AE,
+			M9MO_AE_EP_MODE_MON, 0x00);
+		CHECK_ERR(err);
+
+		/* Set Still Capture EV program mode */
+		err = m9mo_writeb(sd, M9MO_CATEGORY_AE,
+			M9MO_AE_EP_MODE_CAP, 0x00);
+		CHECK_ERR(err);
+
+		/* LIKE PRO DISPLAY SET */
+#ifdef CONFIG_MACH_GC2PD
+		err = m9mo_writeb(sd, M9MO_CATEGORY_PRO_MODE, 0x07, 0x00);
+#else
+		err = m9mo_writeb(sd, M9MO_CATEGORY_PRO_MODE, 0x07, 0x01);
+#endif
+		CHECK_ERR(err);
+
+		/* Still Capture EVP Set Parameter Mode */
+		err = m9mo_writeb(sd, M9MO_CATEGORY_AE,
+			M9MO_AE_EV_PRG_MODE_CAP, 0x00);
+		CHECK_ERR(err);
+
+		/* Set LIKE_PRO_EN Enable */
+		err = m9mo_writeb(sd, M9MO_CATEGORY_PRO_MODE, 0x00, 0x01);
+		CHECK_ERR(err);
+
+		/* Set CATE_409 to 1(PREVIEW) */
+		err = m9mo_writeb(sd, M9MO_CATEGORY_NEW, 0x09, 0x01);
+		CHECK_ERR(err);
+
+		/* Set AF range to auto */
+		err = m9mo_writeb(sd, M9MO_CATEGORY_LENS,
+			M9MO_LENS_AF_SCAN_RANGE, 0x00);
+		CHECK_ERR(err);
+		break;
+
+
+	case MODE_SNOW:
+		err = m9mo_writeb(sd, M9MO_CATEGORY_AE, 0x53, 0x01);
+		CHECK_ERR(err);
+
+		err = m9mo_writeb(sd, M9MO_CATEGORY_MON,
+			M9MO_MON_COLOR_EFFECT, state->color_effect);
+		CHECK_ERR(err);
+
+		/* Set CATE_408 to None */
+		err = m9mo_writeb(sd, M9MO_CATEGORY_NEW, 0x08, 0x00);
+		CHECK_ERR(err);
+
+		/* Set HISTOGRAM ON */
+		err = m9mo_writeb(sd, M9MO_CATEGORY_MON, 0x58, 0x01);
+		CHECK_ERR(err);
+
+		/* LIKE A PRO MODE SET */
+		err = m9mo_writeb(sd, M9MO_CATEGORY_PRO_MODE, 0x01, 0x0C);
+		CHECK_ERR(err);
+
+		/* Set Monitor EV program mode */
+		err = m9mo_writeb(sd, M9MO_CATEGORY_AE,
+			M9MO_AE_EP_MODE_MON, 0x00);
+		CHECK_ERR(err);
+
+		/* Set Still Capture EV program mode */
+		err = m9mo_writeb(sd, M9MO_CATEGORY_AE,
+			M9MO_AE_EP_MODE_CAP, 0x00);
+		CHECK_ERR(err);
+
+		/* LIKE PRO DISPLAY SET */
+		err = m9mo_writeb(sd, M9MO_CATEGORY_PRO_MODE, 0x07, 0x04);
+		CHECK_ERR(err);
+
+		/* LIKE PRO EV VIAS SET */
+		err = m9mo_writeb(sd, M9MO_CATEGORY_PRO_MODE, 0x08, 0x28);
+		CHECK_ERR(err);
+
+		/* Still Capture EVP Set Parameter Mode */
+		err = m9mo_writeb(sd, M9MO_CATEGORY_AE,
+			M9MO_AE_EV_PRG_MODE_CAP, 0x00);
+		CHECK_ERR(err);
+
+		/* Set LIKE_PRO_EN Enable */
+		err = m9mo_writeb(sd, M9MO_CATEGORY_PRO_MODE, 0x00, 0x01);
+		CHECK_ERR(err);
+
+		/* Set CATE_409 to 1(PREVIEW) */
+		err = m9mo_writeb(sd, M9MO_CATEGORY_NEW, 0x09, 0x01);
+		CHECK_ERR(err);
+
+		/* Set AF range to auto */
+		err = m9mo_writeb(sd, M9MO_CATEGORY_LENS,
+			M9MO_LENS_AF_SCAN_RANGE, 0x00);
+		CHECK_ERR(err);
+		break;
+
+	case MODE_BEACH:
+		err = m9mo_writeb(sd, M9MO_CATEGORY_AE, 0x53, 0x01);
+		CHECK_ERR(err);
+
+		/* Set CATE_408 to None */
+		err = m9mo_writeb(sd, M9MO_CATEGORY_NEW, 0x08, 0x00);
+		CHECK_ERR(err);
+
+		/* Set HISTOGRAM ON */
+		err = m9mo_writeb(sd, M9MO_CATEGORY_MON, 0x58, 0x01);
+		CHECK_ERR(err);
+
+		/* LIKE A PRO MODE SET */
+		err = m9mo_writeb(sd, M9MO_CATEGORY_PRO_MODE, 0x01, 0x0D);
+		CHECK_ERR(err);
+
+		/* Set Monitor EV program mode */
+		err = m9mo_writeb(sd, M9MO_CATEGORY_AE,
+			M9MO_AE_EP_MODE_MON, 0x00);
+		CHECK_ERR(err);
+
+		/* Set Still Capture EV program mode */
+		err = m9mo_writeb(sd, M9MO_CATEGORY_AE,
+			M9MO_AE_EP_MODE_CAP, 0x00);
+		CHECK_ERR(err);
+
+		/* LIKE PRO DISPLAY SET */
+		err = m9mo_writeb(sd, M9MO_CATEGORY_PRO_MODE, 0x07, 0x04);
+		CHECK_ERR(err);
+
+		/* LIKE PRO EV VIAS SET */
+		err = m9mo_writeb(sd, M9MO_CATEGORY_PRO_MODE, 0x08, 0x25);
+		CHECK_ERR(err);
+
+		/* Still Capture EVP Set Parameter Mode */
+		err = m9mo_writeb(sd, M9MO_CATEGORY_AE,
+			M9MO_AE_EV_PRG_MODE_CAP, 0x00);
+		CHECK_ERR(err);
+
+		/* SET GAMMA TBL RGB CAP */
+		err = m9mo_writeb(sd, M9MO_CATEGORY_MON,
+			M9MO_MON_COLOR_EFFECT, 0x23);
+		CHECK_ERR(err);
+
+		/* Set LIKE_PRO_EN Enable */
+		err = m9mo_writeb(sd, M9MO_CATEGORY_PRO_MODE, 0x00, 0x01);
+		CHECK_ERR(err);
+
+		/* Set CATE_409 to 1(PREVIEW) */
+		err = m9mo_writeb(sd, M9MO_CATEGORY_NEW, 0x09, 0x01);
+		CHECK_ERR(err);
+
+		/* Set AF range to auto */
+		err = m9mo_writeb(sd, M9MO_CATEGORY_LENS,
+			M9MO_LENS_AF_SCAN_RANGE, 0x00);
+		CHECK_ERR(err);
+		break;
+
+	case MODE_FOOD:
+		err = m9mo_writeb(sd, M9MO_CATEGORY_AE, 0x53, 0x01);
+		CHECK_ERR(err);
+
+		/* Set CATE_408 to None */
+		err = m9mo_writeb(sd, M9MO_CATEGORY_NEW, 0x08, 0x00);
+		CHECK_ERR(err);
+
+		/* Set HISTOGRAM ON */
+		err = m9mo_writeb(sd, M9MO_CATEGORY_MON, 0x58, 0x01);
+		CHECK_ERR(err);
+
+		/* LIKE A PRO MODE SET */
+		err = m9mo_writeb(sd, M9MO_CATEGORY_PRO_MODE, 0x01, 0x0E);
+		CHECK_ERR(err);
+
+		/* Set Monitor EV program mode */
+		err = m9mo_writeb(sd, M9MO_CATEGORY_AE,
+			M9MO_AE_EP_MODE_MON, 0x00);
+		CHECK_ERR(err);
+
+		/* Set Still Capture EV program mode */
+		err = m9mo_writeb(sd, M9MO_CATEGORY_AE,
+			M9MO_AE_EP_MODE_CAP, 0x00);
+		CHECK_ERR(err);
+
+		/* LIKE PRO DISPLAY SET */
+		err = m9mo_writeb(sd, M9MO_CATEGORY_PRO_MODE, 0x07, 0x02);
+		CHECK_ERR(err);
+
+		/* Still Capture EVP Set Parameter Mode */
+		err = m9mo_writeb(sd, M9MO_CATEGORY_AE,
+			M9MO_AE_EV_PRG_MODE_CAP, 0x00);
+		CHECK_ERR(err);
+
+		/* SET GAMMA TBL RGB CAP */
+		err = m9mo_writeb(sd, M9MO_CATEGORY_MON,
+			M9MO_MON_COLOR_EFFECT, 0x15);
+		CHECK_ERR(err);
+
+		/* Set LIKE_PRO_EN Enable */
+		err = m9mo_writeb(sd, M9MO_CATEGORY_PRO_MODE, 0x00, 0x01);
+		CHECK_ERR(err);
+
+		/* Set CATE_409 to 1(PREVIEW) */
+		err = m9mo_writeb(sd, M9MO_CATEGORY_NEW, 0x09, 0x01);
+		CHECK_ERR(err);
+
+		/* Set AF range to auto-macro */
+		err = m9mo_writeb(sd, M9MO_CATEGORY_LENS,
+			M9MO_LENS_AF_SCAN_RANGE, 0x02);
+		CHECK_ERR(err);
+		break;
+
+	case MODE_CANDLE:
+		err = m9mo_writeb(sd, M9MO_CATEGORY_AE, 0x53, 0x01);
+		CHECK_ERR(err);
+
+		err = m9mo_writeb(sd, M9MO_CATEGORY_MON,
+			M9MO_MON_COLOR_EFFECT, state->color_effect);
+		CHECK_ERR(err);
+
+		/* Set CATE_408 to None */
+		err = m9mo_writeb(sd, M9MO_CATEGORY_NEW, 0x08, 0x00);
+		CHECK_ERR(err);
+
+		/* Set HISTOGRAM ON */
+		err = m9mo_writeb(sd, M9MO_CATEGORY_MON, 0x58, 0x01);
+		CHECK_ERR(err);
+
+		/* LIKE A PRO MODE SET */
+		err = m9mo_writeb(sd, M9MO_CATEGORY_PRO_MODE, 0x01, 0x0F);
+		CHECK_ERR(err);
+
+		/* Set Monitor EV program mode */
+		err = m9mo_writeb(sd, M9MO_CATEGORY_AE,
+			M9MO_AE_EP_MODE_MON, 0x00);
+		CHECK_ERR(err);
+
+		/* Set Still Capture EV program mode */
+		err = m9mo_writeb(sd, M9MO_CATEGORY_AE,
+			M9MO_AE_EP_MODE_CAP, 0x00);
+		CHECK_ERR(err);
+
+		/* LIKE PRO DISPLAY SET */
+		err = m9mo_writeb(sd, M9MO_CATEGORY_PRO_MODE, 0x07, 0x06);
+		CHECK_ERR(err);
+
+		/* LIKE PRO EV VIAS SET */
+		err = m9mo_writeb(sd, M9MO_CATEGORY_PRO_MODE, 0x08, 0x14);
+		CHECK_ERR(err);
+
+		/* Still Capture EVP Set Parameter Mode */
+		err = m9mo_writeb(sd, M9MO_CATEGORY_AE,
+			M9MO_AE_EV_PRG_MODE_CAP, 0x00);
+		CHECK_ERR(err);
+
+		/* Set LIKE_PRO_EN Enable */
+		err = m9mo_writeb(sd, M9MO_CATEGORY_PRO_MODE, 0x00, 0x01);
+		CHECK_ERR(err);
+
+		/* Set CATE_409 to 1(PREVIEW) */
+		err = m9mo_writeb(sd, M9MO_CATEGORY_NEW, 0x09, 0x01);
+		CHECK_ERR(err);
+
+		/* Set AF range to auto-macro */
+		err = m9mo_writeb(sd, M9MO_CATEGORY_LENS,
+			M9MO_LENS_AF_SCAN_RANGE, 0x02);
+		CHECK_ERR(err);
+		break;
+
+	case MODE_PARTY_INDOOR:
+		err = m9mo_writeb(sd, M9MO_CATEGORY_AE, 0x53, 0x01);
+		CHECK_ERR(err);
+
+		err = m9mo_writeb(sd, M9MO_CATEGORY_MON,
+			M9MO_MON_COLOR_EFFECT, state->color_effect);
+		CHECK_ERR(err);
+
+		/* Set CATE_408 to None */
+		err = m9mo_writeb(sd, M9MO_CATEGORY_NEW, 0x08, 0x00);
+		CHECK_ERR(err);
+
+		/* Set HISTOGRAM ON */
+		err = m9mo_writeb(sd, M9MO_CATEGORY_MON, 0x58, 0x01);
+		CHECK_ERR(err);
+
+		/* LIKE A PRO MODE SET */
+		err = m9mo_writeb(sd, M9MO_CATEGORY_PRO_MODE, 0x01, 0x10);
+		CHECK_ERR(err);
+
+		/* Set Monitor EV program mode */
+		err = m9mo_writeb(sd, M9MO_CATEGORY_AE,
+			M9MO_AE_EP_MODE_MON, 0x15);
+		CHECK_ERR(err);
+
+		/* Set Still Capture EV program mode */
+		err = m9mo_writeb(sd, M9MO_CATEGORY_AE,
+			M9MO_AE_EP_MODE_CAP, 0x15);
+		CHECK_ERR(err);
+
+		/* LIKE PRO DISPLAY SET */
+		err = m9mo_writeb(sd, M9MO_CATEGORY_PRO_MODE, 0x07, 0x01);
+		CHECK_ERR(err);
+
+		/* Still Capture EVP Set Parameter Mode */
+		err = m9mo_writeb(sd, M9MO_CATEGORY_AE,
+			M9MO_AE_EV_PRG_MODE_CAP, 0x00);
+		CHECK_ERR(err);
+
+		/* Set LIKE_PRO_EN Enable */
+		err = m9mo_writeb(sd, M9MO_CATEGORY_PRO_MODE, 0x00, 0x01);
+		CHECK_ERR(err);
+
+		/* Set CATE_409 to 1(PREVIEW) */
+		err = m9mo_writeb(sd, M9MO_CATEGORY_NEW, 0x09, 0x01);
+		CHECK_ERR(err);
+
+		/* Set AF range to auto */
+		err = m9mo_writeb(sd, M9MO_CATEGORY_LENS,
+			M9MO_LENS_AF_SCAN_RANGE, 0x00);
+		CHECK_ERR(err);
+		break;
+
+	case MODE_GOLF_SHOT:
+		/* Set Monitor EV program mode : GolfShot */
+		err = m9mo_writeb(sd, M9MO_CATEGORY_AE,
+			M9MO_AE_EP_MODE_MON, 0x12);
+		CHECK_ERR(err);
+
+		/* Set Still Capture EV program mode : GolfShot */
+		err = m9mo_writeb(sd, M9MO_CATEGORY_AE,
+			M9MO_AE_EP_MODE_CAP, 0x12);
+		CHECK_ERR(err);
+
+		err = m9mo_writeb(sd, M9MO_CATEGORY_AE, 0x53, 0x00);
+		CHECK_ERR(err);
+
+		/* Set CATE_408 to None */
+		err = m9mo_writeb(sd, M9MO_CATEGORY_NEW, 0x08, 0x00);
+		CHECK_ERR(err);
+
+		/* Set HISTOGRAM OFF */
+		err = m9mo_writeb(sd, M9MO_CATEGORY_MON, 0x58, 0x00);
+		CHECK_ERR(err);
+
+		/* LIKE PRO DISPLAY SET */
+		err = m9mo_writeb(sd, M9MO_CATEGORY_PRO_MODE, 0x07, 0x00);
+		CHECK_ERR(err);
+
+		/* Set LIKE_PRO_EN Disable */
+		err = m9mo_writeb(sd, M9MO_CATEGORY_PRO_MODE, 0x00, 0x00);
+		CHECK_ERR(err);
+
+		/* Still Capture EVP Set Parameter Mode */
+		err = m9mo_writeb(sd, M9MO_CATEGORY_AE,
+			M9MO_AE_EV_PRG_MODE_CAP, 0x00);
+		CHECK_ERR(err);
+
+		/* Set AF range to auto */
+		err = m9mo_writeb(sd, M9MO_CATEGORY_LENS,
+			M9MO_LENS_AF_SCAN_RANGE, 0x00);
+		CHECK_ERR(err);
 		break;
 
 	default:
 		break;
 	}
+
+	if (state->facedetect_mode == FACE_DETECTION_NORMAL
+		|| state->facedetect_mode == FACE_DETECTION_BLINK) {
+		if (state->mode == MODE_SMART_AUTO || state->mode == MODE_SMART_SUGGEST) {
+			err = m9mo_writeb(sd, M9MO_CATEGORY_FD,
+				M9MO_FD_CTL, 0x01);
+		} else {
+			err = m9mo_writeb(sd, M9MO_CATEGORY_FD,
+				M9MO_FD_CTL, 0x11);
+		}
+		CHECK_ERR(err);
+	}
+
+	m9mo_set_gamma(sd);
+	m9mo_set_iqgrp(sd, 0);
+
+	if (mode_changed) {
+		old_mode = m9mo_set_mode(sd, current_mode);
+		if (old_mode <= 0) {
+			cam_err("failed to set mode\n");
+			return old_mode;
+		}
+
+		if (old_mode != M9MO_MONITOR_MODE && current_mode == M9MO_MONITOR_MODE) {
+			int_factor = m9mo_wait_interrupt(sd, M9MO_ISP_TIMEOUT);
+			if (!(int_factor & M9MO_INT_MODE)) {
+				cam_err("M9MO_INT_MODE isn't issued, %#x\n",
+					int_factor);
+				return -ETIMEDOUT;
+			}
+		}
+	}
+
+	m9mo_set_OIS_cap_mode(sd);
 
 	cam_trace("X\n");
 
@@ -8080,152 +11034,237 @@ static int m9mo_set_shutter_speed(struct v4l2_subdev *sd, int val)
 	}
 
 	switch (val) {
+	case 0:	/* default */
+		numerator = 1;
+		denominator = 30;
+		break;
+
 	case 1:
 		numerator = 16;
 		denominator = 1;
 		break;
 
 	case 2:
-		numerator = 12;
+		numerator = 13;
 		denominator = 1;
 		break;
 
 	case 3:
-		numerator = 8;
+		numerator = 10;
 		denominator = 1;
 		break;
 
 	case 4:
-		numerator = 6;
+		numerator = 8;
 		denominator = 1;
 		break;
 
 	case 5:
-		numerator = 4;
+		numerator = 6;
 		denominator = 1;
 		break;
 
 	case 6:
-		numerator = 3;
+		numerator = 5;
 		denominator = 1;
 		break;
 
 	case 7:
-		numerator = 2;
+		numerator = 4;
 		denominator = 1;
 		break;
 
 	case 8:
-		numerator = 15;
+		numerator = 32;
 		denominator = 10;
 		break;
 
 	case 9:
-		numerator = 1;
-		denominator = 1;
-		break;
-
-	case 10:
-		numerator = 7;
+		numerator = 25;
 		denominator = 10;
 		break;
 
+	case 10:
+		numerator = 2;
+		denominator = 1;
+		break;
+
 	case 11:
-		numerator = 5;
+		numerator = 16;
 		denominator = 10;
 		break;
 
 	case 12:
-		numerator = 1;
-		denominator = 3;
+		numerator = 13;
+		denominator = 10;
 		break;
 
 	case 13:
 		numerator = 1;
-		denominator = 4;
+		denominator = 1;
 		break;
 
 	case 14:
-		numerator = 1;
-		denominator = 6;
+		numerator = 8;
+		denominator = 10;
 		break;
 
 	case 15:
-		numerator = 1;
-		denominator = 8;
+		numerator = 6;
+		denominator = 10;
 		break;
 
 	case 16:
-		numerator = 1;
-		denominator = 15;
+		numerator = 5;
+		denominator = 10;
 		break;
 
 	case 17:
-		numerator = 1;
-		denominator = 20;
+		numerator = 4;
+		denominator = 10;
 		break;
 
 	case 18:
 		numerator = 1;
-		denominator = 30;
+		denominator = 3;
 		break;
 
 	case 19:
 		numerator = 1;
-		denominator = 45;
+		denominator = 4;
 		break;
 
 	case 20:
 		numerator = 1;
-		denominator = 60;
+		denominator = 5;
 		break;
 
 	case 21:
 		numerator = 1;
-		denominator = 90;
+		denominator = 6;
 		break;
 
 	case 22:
 		numerator = 1;
-		denominator = 125;
+		denominator = 8;
 		break;
 
 	case 23:
 		numerator = 1;
-		denominator = 180;
+		denominator = 10;
 		break;
 
 	case 24:
 		numerator = 1;
-		denominator = 250;
+		denominator = 13;
 		break;
 
 	case 25:
 		numerator = 1;
-		denominator = 350;
+		denominator = 15;
 		break;
 
 	case 26:
 		numerator = 1;
-		denominator = 500;
+		denominator = 20;
 		break;
 
 	case 27:
 		numerator = 1;
-		denominator = 750;
+		denominator = 25;
 		break;
 
 	case 28:
 		numerator = 1;
-		denominator = 1000;
+		denominator = 30;
 		break;
 
 	case 29:
 		numerator = 1;
-		denominator = 1500;
+		denominator = 40;
 		break;
 
 	case 30:
+		numerator = 1;
+		denominator = 50;
+		break;
+
+	case 31:
+		numerator = 1;
+		denominator = 60;
+		break;
+
+	case 32:
+		numerator = 1;
+		denominator = 80;
+		break;
+
+	case 33:
+		numerator = 1;
+		denominator = 100;
+		break;
+
+	case 34:
+		numerator = 1;
+		denominator = 125;
+		break;
+
+	case 35:
+		numerator = 1;
+		denominator = 160;
+		break;
+
+	case 36:
+		numerator = 1;
+		denominator = 200;
+		break;
+
+	case 37:
+		numerator = 1;
+		denominator = 250;
+		break;
+
+	case 38:
+		numerator = 1;
+		denominator = 320;
+		break;
+
+	case 39:
+		numerator = 1;
+		denominator = 400;
+		break;
+
+	case 40:
+		numerator = 1;
+		denominator = 500;
+		break;
+
+	case 41:
+		numerator = 1;
+		denominator = 640;
+		break;
+
+	case 42:
+		numerator = 1;
+		denominator = 800;
+		break;
+
+	case 43:
+		numerator = 1;
+		denominator = 1000;
+		break;
+
+	case 44:
+		numerator = 1;
+		denominator = 1250;
+		break;
+
+	case 45:
+		numerator = 1;
+		denominator = 1600;
+		break;
+
+	case 46:
 		numerator = 1;
 		denominator = 2000;
 		break;
@@ -8257,8 +11296,13 @@ static int m9mo_set_f_number(struct v4l2_subdev *sd, int val)
 	cam_dbg("E, value %d\n", val);
 
 	/* Max value : 15.9 */
+#ifdef CONFIG_MACH_GC2PD
+	if (val > 178)
+		val = 178;
+#else
 	if (val > 159)
 		val = 159;
+#endif
 
 	val = (val / 10) * 16 + (val % 10);
 	state->f_number = val;
@@ -8314,12 +11358,20 @@ static int m9mo_set_smart_auto_s1_push(struct v4l2_subdev *sd, int val)
 
 	cam_dbg("E val : %d\n", val);
 
-	if (state->mode == MODE_SMART_AUTO ||
-		state->mode >= MODE_BACKGROUND_BLUR) {
+	if ((state->mode == MODE_SMART_AUTO || state->mode == MODE_SMART_SUGGEST)
+		|| (state->mode >= MODE_BACKGROUND_BLUR &&
+		state->mode <= MODE_PARTY_INDOOR)) {
 		if (val == 1) {
 			err = m9mo_writeb(sd, M9MO_CATEGORY_NEW, 0x09, 0x02);
 			CHECK_ERR(err);
 		} else if (val == 2) {
+			if (state->facedetect_mode == FACE_DETECTION_NORMAL
+				&& (state->mode == MODE_SMART_AUTO || state->mode == MODE_SMART_SUGGEST)) {
+				err = m9mo_writeb(sd, M9MO_CATEGORY_FD,
+					M9MO_FD_CTL, 0x01);
+				CHECK_ERR(err);
+			}
+
 			err = m9mo_writeb(sd, M9MO_CATEGORY_NEW, 0x09, 0x04);
 			CHECK_ERR(err);
 
@@ -8331,6 +11383,9 @@ static int m9mo_set_smart_auto_s1_push(struct v4l2_subdev *sd, int val)
 			}
 			CHECK_ERR(err);
 		} else {
+			if (state->mode == MODE_SMART_AUTO || state->mode == MODE_SMART_SUGGEST)
+				m9mo_set_smart_auto_default_value(sd, 0);
+
 			err = m9mo_writeb(sd, M9MO_CATEGORY_NEW, 0x09, 0x03);
 			CHECK_ERR(err);
 		}
@@ -8342,12 +11397,20 @@ static int m9mo_set_smart_auto_s1_push(struct v4l2_subdev *sd, int val)
 static int m9mo_set_mon_size(struct v4l2_subdev *sd, int val)
 {
 	struct m9mo_state *state = to_state(sd);
-	int err, vss_val;
+	int err, vss_val, current_mode;
 	u32 size_val;
 
 	if (state->isp_fw_ver < 0xA02B) {
 		cam_dbg("%x firmware cannot working quick monitor mode\n",
 			state->isp_fw_ver);
+		return 0;
+	}
+
+	err = m9mo_readb(sd, M9MO_CATEGORY_SYS, M9MO_SYS_MODE, &current_mode);
+	CHECK_ERR(err);
+
+	if (current_mode != M9MO_PARMSET_MODE) {
+		cam_trace("only param mode !!!\n");
 		return 0;
 	}
 
@@ -8359,17 +11422,16 @@ static int m9mo_set_mon_size(struct v4l2_subdev *sd, int val)
 		else if (state->preview_height == 720)
 			size_val = 0x25;
 		vss_val = 0;
-	} else if (state->sensor_mode == SENSOR_MOVIE
-		&& state->fps == 30) {
+	} else if (state->fps == 30) {
 		if (state->preview_height == 1080)
-			size_val = 0x2C;
+			size_val = 0x28;
 		else if (state->preview_height == 720)
-			size_val = 0x2D;
+			size_val = 0x21;
 		else if (state->preview_height == 480)
-			size_val = 0x2E;
+			size_val = 0x17;
 		else if (state->preview_height == 240)
-			size_val = 0x36;
-		vss_val = 1;
+			size_val = 0x09;
+		vss_val = 0;
 	} else {
 		if (state->preview_width == 640)
 			size_val = 0x17;
@@ -8381,21 +11443,25 @@ static int m9mo_set_mon_size(struct v4l2_subdev *sd, int val)
 			size_val = 0x35;
 		else if (state->preview_width == 1280)
 			size_val = 0x21;
+		else if (state->preview_width == 1920)
+			size_val = 0x28;
 		vss_val = 0;
 	}
 
 	if (val == 1080) {
-		size_val = 0x2C;
-		vss_val = 1;
+		if (state->factory_test_num)
+			size_val = 0x37;
 	}
 
 	err = m9mo_writeb(sd, M9MO_CATEGORY_PARM,
 		M9MO_PARM_MON_SIZE, size_val);
 	CHECK_ERR(err);
 
+	m9mo_set_iqgrp(sd, val);
+
 	m9mo_set_dual_capture_mode(sd, vss_val);
 
-	err = m9mo_writeb(sd, M9MO_CATEGORY_CAPCTRL, 0x25, 0x01);
+	err = m9mo_writeb(sd, M9MO_CATEGORY_CAPCTRL, M9MO_CAPCTRL_AUTOMATIC_SHIFT_EN, 0x01);
 	CHECK_ERR(err);
 
 	cam_trace("start quick monitor mode !!!\n");
@@ -8465,7 +11531,7 @@ static int m9mo_g_ext_ctrl(struct v4l2_subdev *sd,
 		struct v4l2_ext_control *ctrl)
 {
 	int err = 0, i = 0;
-
+	struct m9mo_state *state = to_state(sd);
 	char *buf = NULL;
 
 	int size = 0, rtn = 0, cmd_size = 0;
@@ -8499,10 +11565,14 @@ static int m9mo_g_ext_ctrl(struct v4l2_subdev *sd,
 		memset(buf, 0, size-cmd_size);
 		for (i = 0; i < size-cmd_size; i++) {
 			err = m9mo_readb(sd, category, sub+i, &rtn);
+			if (err < 0){
+				cam_err("i2c falied, err %d\n", err);
+				kfree(buf);
+				return err;
+			}
 			buf[i] = rtn;
 			cam_dbg("ISPD m9mo_readb(sd, %x, %x, %x\n",
 						category, sub+i, buf[i]);
-			CHECK_ERR(err);
 		}
 
 		if (copy_to_user((void __user *)ctrl->string,
@@ -8540,6 +11610,10 @@ static int m9mo_g_ext_ctrl(struct v4l2_subdev *sd,
 		kfree(buf);
 		break;
 
+	case V4L2_CID_CAM_SENSOR_FW_VER:
+		strcpy(ctrl->string, state->sensor_ver);
+		break;
+
 	default:
 		cam_err("no such control id %d\n",
 				ctrl->id - V4L2_CID_CAMERA_CLASS_BASE);
@@ -8573,87 +11647,6 @@ static int m9mo_g_ext_ctrls(struct v4l2_subdev *sd,
 	return err;
 }
 
-static int m9mo_makeLog(struct v4l2_subdev *sd, char *filename)
-{
-	int addr = 0, len = 0xff; /* init */
-	int err = 0;
-	int i = 0, no = 0;
-	char buf[256];
-
-	struct file *fp;
-	mm_segment_t old_fs;
-	char filepath[256];
-
-	old_fs = get_fs();
-	set_fs(KERNEL_DS);
-
-	sprintf(filepath, "/sdcard/ISPD/%s%c", filename, 0);
-
-	fp = filp_open(filepath,
-		O_WRONLY|O_CREAT|O_TRUNC, S_IRUGO|S_IWUGO|S_IXUSR);
-	if (IS_ERR(fp)) {
-		cam_err("failed to open %s, err %ld\n",
-			filepath, PTR_ERR(fp));
-		return  -1;
-	}
-
-	err = m9mo_writeb(sd, 0x0d, 0x06, 0x0);
-	CHECK_ERR(err);
-
-	err = m9mo_readl(sd, 0x0d, 0x08, &addr);
-	CHECK_ERR(err);
-
-	err = m9mo_writeb(sd, 0x0d, 0x0e, 0x2);
-	CHECK_ERR(err);
-
-	while (no < 10000) { /* max log count : 10000 */
-		err = m9mo_writew(sd, 0x0d, 0x0c, no);
-		CHECK_ERR(err);
-
-		err = m9mo_writeb(sd, 0x0d, 0x0e, 0x3);
-		CHECK_ERR(err);
-
-		while (len == 0xff) {
-			err = m9mo_readb(sd, 0x0d, 0x07, &len);
-			CHECK_ERR(err);
-
-			if (i++ > 3000)  /* only delay code */
-				break;
-		}
-
-		if (len == 0 || len == 0xff) {
-			err = m9mo_writeb(sd, 0x0d, 0x0e, 0x1);
-			CHECK_ERR(err);
-			break;
-		}
-
-		i = 0;
-		len += 1;
-		if (len > sizeof(buf))
-			len = sizeof(buf);
-		err = m9mo_mem_read(sd,  len, addr, buf);
-		if (err < 0)
-			cam_err("ISPD i2c falied, err %d\n", err);
-
-		buf[len-1] = '\n';
-
-		vfs_write(fp, buf, len,  &fp->f_pos);
-#if 0
-		cam_dbg("ISPD Log : %x[%d], %d, %32s)\n",
-					addr, no, len, buf);
-#endif
-		len = 0xff; /* init */
-		no++;
-	}
-
-	if (!IS_ERR(fp))
-		filp_close(fp, current->files);
-
-	set_fs(old_fs);
-
-	return 0;
-}
-
 static int m9mo_s_ext_ctrl(struct v4l2_subdev *sd,
 		struct v4l2_ext_control *ctrl)
 {
@@ -8673,8 +11666,10 @@ static int m9mo_s_ext_ctrl(struct v4l2_subdev *sd,
 	case V4L2_CID_ISP_DEBUG_WRITE:
 
 		cmd_size = 2;
-		if (size < cmd_size+1)
+		if (size < cmd_size+1) {
+			cam_dbg(" return -2 /ISP_DBG write() cmd_size=%d, size=%d\n", cmd_size, size);
 			return -2;
+		}
 
 		buf = kmalloc(ctrl->size, GFP_KERNEL);
 		if (copy_from_user(buf,  (void __user *)ctrl->string, size)) {
@@ -8691,7 +11686,11 @@ static int m9mo_s_ext_ctrl(struct v4l2_subdev *sd,
 			err = m9mo_writeb(sd, category, sub+i, buf[i+cmd_size]);
 			cam_dbg("ISPD m9mo_writeb(sd, %x, %x, %x\n",
 				category, sub+i, buf[i+cmd_size]);
-			CHECK_ERR(err);
+			if (err < 0){
+				cam_err("i2c falied, err %d\n", err);
+				kfree(buf);
+				return err;
+			}
 		}
 
 		kfree(buf);
@@ -8736,13 +11735,44 @@ static int m9mo_s_ext_ctrl(struct v4l2_subdev *sd,
 			}
 			buf[size] = 0;
 
-			m9mo_makeLog(sd, buf);
+			m9mo_makeLog(sd, buf, false);
 
 			kfree(buf);
 		} else {
-			m9mo_makeLog(sd, "default.log");
+			m9mo_makeLog(sd, "default.log", false);
 		}
 
+		break;
+
+	case V4L2_CID_CAMERA_FACTORY_EEP_WRITE_VERSION:
+	case V4L2_CID_CAMERA_FACTORY_EEP_WRITE_SN:
+
+		buf = kmalloc(ctrl->size, GFP_KERNEL);
+		if (copy_from_user(buf,  (void __user *)ctrl->string, size)) {
+			err = -1;
+			break;
+		}
+
+		cmd_size = (V4L2_CID_CAMERA_FACTORY_EEP_WRITE_VERSION == ctrl->id) ? 12 : 19;
+		sub = (V4L2_CID_CAMERA_FACTORY_EEP_WRITE_VERSION == ctrl->id) ? 0xA0 : 0xA1;
+
+		for (i = 0; i < cmd_size; i++) {
+			if (size > i)
+				err = m9mo_writeb(sd, M9MO_CATEGORY_LENS, 0xB0+i, buf[i]);
+			else
+				err = m9mo_writeb(sd, M9MO_CATEGORY_LENS, 0xB0+i, 0x00);
+			cam_dbg("EEP_WRITE_VERSION m9mo_writeb(sd, %x, %x, %x)\n",
+				M9MO_CATEGORY_LENS, 0xB0+i, (size > i) ? buf[i] : 0x00);
+			if (err < 0){
+				cam_err("i2c falied, err %d\n", err);
+				kfree(buf);
+				return err;
+			}
+		}
+
+		err = m9mo_writeb(sd, M9MO_CATEGORY_LENS, sub, 0x00);
+
+		kfree(buf);
 		break;
 
 	default:
@@ -8810,6 +11840,7 @@ static int m9mo_program_fw(struct v4l2_subdev *sd,
 	int erase = 0x01;
 	int test_count = 0;
 	int retries = 0;
+	int checksum = 0;
 
 	for (i = 0; i < unit*count; i += unit) {
 		/* Set Flash ROM memory address */
@@ -8863,8 +11894,15 @@ static int m9mo_program_fw(struct v4l2_subdev *sd,
 			return -1;
 		}
 	}
+
+	checksum = m9mo_check_checksum(sd);
+
 	cam_err("m9mo_program_fw out ~~~~~~~~~~~\n");
-	return 0;
+
+	if (checksum == 1)
+		return 0;
+	else
+		return -1;
 }
 
 static int m9mo_load_fw_main(struct v4l2_subdev *sd)
@@ -8874,21 +11912,81 @@ static int m9mo_load_fw_main(struct v4l2_subdev *sd)
 	const struct firmware *fw = NULL;
 	u8 *buf_m9mo = NULL;
 	unsigned int count = 0;
-	/*int offset;*/
-	int err = 0;
-
 	struct file *fp;
 	mm_segment_t old_fs;
 	long fsize, nread;
 	int fw_requested = 1;
+	int err = 0;
+#ifdef CONFIG_VIDEO_M9MO_SPI
+	int txSize = 0;
+#endif
 
 	old_fs = get_fs();
 	set_fs(KERNEL_DS);
+
+#ifdef CONFIG_VIDEO_M9MO_SPI
+	cam_trace("mmc_fw = %d \n", mmc_fw);
+
+	if (mmc_fw == 1)
+		fp = filp_open(M9MO_FW_PATH, O_RDONLY, 0);
+	else
+		fp = filp_open(M9MO_FW_MMC_PATH, O_RDONLY, 0);
+
+	if (mmc_fw == 0) {
+		if (!IS_ERR(fp) && fp != NULL)
+			filp_close(fp, current->files);
+		goto request_fw;
+	}
+
+	if (IS_ERR(fp)) {
+		cam_trace("failed to open %s/%s, err %ld\n", M9MO_FW_PATH, M9MO_FW_MMC_PATH , PTR_ERR(fp));
+		if (PTR_ERR(fp) == -4) {
+			cam_err("%s: file open I/O is interrupted\n", __func__);
+			return -EIO;
+		}
+		goto request_fw;
+	}
+
+	fw_requested = 0;
+	if (mmc_fw == 1)
+		fsize = fp->f_path.dentry->d_inode->i_size;
+	else
+		fsize = FW_BIN_SIZE;
+	count = fsize / SZ_4K;
+
+	if (mmc_fw == 1)
+		cam_err("start, file path %s, size %ld Bytes, count %d\n", M9MO_FW_PATH, fsize, count);
+	else
+		cam_err("start, file path %s, size %ld Bytes, count %d\n", M9MO_FW_MMC_PATH, fsize, count);
+
+	if (system_rev < 5) {
+		buf_m9mo = vmalloc(fsize);
+		if (!buf_m9mo) {
+			cam_err("failed to allocate memory\n");
+			err = -ENOMEM;
+			goto out;
+		}
+
+		nread = vfs_read(fp, (char __user *)buf_m9mo, fsize, &fp->f_pos);
+		if (nread != fsize) {
+			cam_err("failed to read firmware file, %ld Bytes\n", nread);
+			err = -EIO;
+			goto out;
+		}
+		if (!IS_ERR(fp) && fp != NULL)
+			filp_close(fp, current->files);
+	}
+
+#else
 
 	fp = filp_open(M9MO_FW_PATH, O_RDONLY, 0);
 	if (IS_ERR(fp)) {
 		cam_trace("failed to open %s, err %ld\n",
 			M9MO_FW_PATH, PTR_ERR(fp));
+		if (PTR_ERR(fp) == -4) {
+			cam_err("%s: file open I/O is interrupted\n", __func__);
+			return -EIO;
+		}
 		goto request_fw;
 	}
 
@@ -8897,7 +11995,7 @@ static int m9mo_load_fw_main(struct v4l2_subdev *sd)
 	count = fsize / SZ_4K;
 
 	cam_err("start, file path %s, size %ld Bytes, count %d\n",
-		M9MO_FW_PATH, fsize, count);
+	M9MO_FW_PATH, fsize, count);
 
 	buf_m9mo = vmalloc(fsize);
 	if (!buf_m9mo) {
@@ -8912,84 +12010,164 @@ static int m9mo_load_fw_main(struct v4l2_subdev *sd)
 		err = -EIO;
 		goto out;
 	}
-
-	filp_close(fp, current->files);
+	if (!IS_ERR(fp) && fp != NULL)
+		filp_close(fp, current->files);
+#endif
 
 request_fw:
 	if (fw_requested) {
-		set_fs(old_fs);
-		if (system_rev > 1) {
-			cam_info("Firmware Path = %s\n",
-					M9MO_EVT31_FW_REQ_PATH);
-			err = request_firmware(&fw,
-					M9MO_EVT31_FW_REQ_PATH, dev);
-		} else {
-			cam_info("Firmware Path = %s\n", M9MO_FW_REQ_PATH);
-			err = request_firmware(&fw, M9MO_FW_REQ_PATH, dev);
+#ifdef CONFIG_VIDEO_M9MO_SPI
+		if (system_rev >= 5) {
+			fp = filp_open(M9MO_FW_REQ_PATH2, O_RDONLY, 0);
+			if (IS_ERR(fp)) {
+				cam_trace("failed to open %s, err %ld\n",
+					M9MO_FW_REQ_PATH2, PTR_ERR(fp));
+				if (PTR_ERR(fp) == -4) {
+					cam_err("%s: file open I/O is interrupted\n", __func__);
+					return -EIO;
+				}
+				goto request_fw;
+			}
+
+			fsize = fp->f_path.dentry->d_inode->i_size;
+			count = fsize / SZ_4K;
+
+			cam_err("start, file path %s, size %ld Bytes, count %d\n",
+				M9MO_FW_REQ_PATH2, fsize, count);
+		} else
+#endif
+		{
+			set_fs(old_fs);
+
+#ifndef CONFIG_MACH_GC2PD
+			if (system_rev > 1) {
+				cam_info("Firmware Path = %s\n",
+						M9MO_EVT31_FW_REQ_PATH);
+				err = request_firmware(&fw,
+						M9MO_EVT31_FW_REQ_PATH, dev);
+			} else
+#endif
+			{
+				cam_info("Firmware Path = %s\n", M9MO_FW_REQ_PATH);
+				err = request_firmware(&fw, M9MO_FW_REQ_PATH, dev);
+			}
+
+			if (err != 0) {
+				cam_err("request_firmware failed\n");
+				err = -EINVAL;
+				goto out;
+			}
+			buf_m9mo = (u8 *)fw->data;
+			fsize = fw->size;
 		}
+	}
 
+#ifdef CONFIG_VIDEO_M9MO_SPI
+	if (system_rev >= 5) {
+		cam_err("%s: Load firmware by SPI : Start.\n", __func__);
 
-		if (err != 0) {
-			cam_err("request_firmware failed\n");
-			err = -EINVAL;
+		nread = vfs_read(fp, (char __user *)FW_buf,
+			fsize, &fp->f_pos);
+		if (nread != fsize) {
+			cam_err("failed to read firmware file, %ld Bytes\n", nread);
+			err = -EIO;
 			goto out;
 		}
-		count = fw->size / SZ_4K;
-		cam_err("start, size %d Bytes  count = %d\n", fw->size, count);
-		buf_m9mo = (u8 *)fw->data;
-	}
 
-	err = m9mo_mem_write(sd, 0x04, SZ_64,
-			0x90001200 , buf_port_seting0);
-	CHECK_ERR(err);
-	mdelay(10);
+		set_fs(old_fs);
 
-	err = m9mo_mem_write(sd, 0x04, SZ_64,
-			0x90001000 , buf_port_seting1);
-	CHECK_ERR(err);
-	mdelay(10);
+		/* NSS is High Control */
+		if (!gpio_request(EXYNOS4_GPB(5), "SPI_NSS")) {
+			gpio_direction_output(EXYNOS4_GPB(5), 1);
+			gpio_free(EXYNOS4_GPB(5));
+			cam_dbg("CS is setting to 1.\n");
+		}
 
-	err = m9mo_mem_write(sd, 0x04, SZ_64,
-			0x90001100 , buf_port_seting2);
-	CHECK_ERR(err);
-	mdelay(10);
+		/* MISO is High Control */
+		if (!gpio_request(EXYNOS4_GPB(6), "SPI_MISO")) {
+			gpio_direction_output(EXYNOS4_GPB(6), 1);
+			gpio_free(EXYNOS4_GPB(6));
+			cam_dbg("MISO is setting to 1.\n");
+		}
 
-	err = m9mo_writel(sd, M9MO_CATEGORY_FLASH,
-			0x1C, 0x0247036D);
-	CHECK_ERR(err);
+		mdelay(30);
+		//txSize = FW_WRITE_SIZE; /*QCTK*/
+		txSize = 8*1024;
+		cam_dbg("buf size == %ld\n", fsize);
 
-	err = m9mo_writeb(sd, M9MO_CATEGORY_FLASH,
-			0x4A, 0x01);
-	CHECK_ERR(err);
-	mdelay(10);
+		err = m9mo_spi_write(FW_buf, fsize, txSize);
+		if (err < 0) {
+			cam_err("m9mo_spi_write falied\n");
+			goto out;
+		}
 
-	/* program FLASH ROM */
-	err = m9mo_program_fw(sd, buf_m9mo, M9MO_FLASH_BASE_ADDR, SZ_4K, count);
-	if (err < 0)
-		goto out;
+		/* NSS is Low Control */
+		if (!gpio_request(EXYNOS4_GPB(5), "SPI_NSS")) {
+			gpio_direction_output(EXYNOS4_GPB(5), 0);
+			gpio_free(EXYNOS4_GPB(5));
+			cam_dbg("CS is setting to 0.\n");
+		}
 
-
-#if 0
-	offset = SZ_64K * 31;
-	if (id == 0x01) {
-		err = m9mo_program_fw(sd, buf + offset,
-				M9MO_FLASH_BASE_ADDR + offset, SZ_8K, 4, id);
-	} else {
-		err = m9mo_program_fw(sd, buf + offset,
-				M9MO_FLASH_BASE_ADDR + offset, SZ_4K, 8, id);
-	}
+		/* MISO is Low Control */
+		if (!gpio_request(EXYNOS4_GPB(6), "SPI_MISO")) {
+			gpio_direction_output(EXYNOS4_GPB(6), 0);
+			gpio_free(EXYNOS4_GPB(6));
+			cam_dbg("MISO is setting to 0.\n");
+		}
+	}else
 #endif
-	cam_err("end\n");
-	state->isp.bad_fw = 0;
+	{
+		err = m9mo_mem_write(sd, 0x04, SZ_64,
+				0x90001200 , buf_port_seting0);
+		CHECK_ERR(err);
+		mdelay(10);
+
+		err = m9mo_mem_write(sd, 0x04, SZ_64,
+				0x90001000 , buf_port_seting1);
+		CHECK_ERR(err);
+		mdelay(10);
+
+		err = m9mo_mem_write(sd, 0x04, SZ_64,
+				0x90001100 , buf_port_seting2);
+		CHECK_ERR(err);
+		mdelay(10);
+
+		err = m9mo_writel(sd, M9MO_CATEGORY_FLASH,
+				0x1C, 0x0247036D);
+		CHECK_ERR(err);
+
+		err = m9mo_writeb(sd, M9MO_CATEGORY_FLASH,
+				0x4A, 0x01);
+		CHECK_ERR(err);
+		mdelay(10);
+
+		/* program FLASH ROM */
+		err = m9mo_program_fw(sd, buf_m9mo, M9MO_FLASH_BASE_ADDR, SZ_4K, count);
+		if (err < 0)
+			goto out;
+
+		cam_err("end\n");
+		state->isp.bad_fw = 0;
+	}
 
 out:
-	if (!fw_requested) {
-		vfree(buf_m9mo);
-
-		filp_close(fp, current->files);
+#ifdef CONFIG_VIDEO_M9MO_SPI
+	if (system_rev >= 5) {
+		if (!IS_ERR(fp) && fp != NULL)
+			filp_close(fp, current->files);
 		set_fs(old_fs);
-	} else {
-		release_firmware(fw);
+	} else
+#endif
+	{
+		if (!fw_requested) {
+			vfree(buf_m9mo);
+
+			if (!IS_ERR(fp) && fp != NULL)
+				filp_close(fp, current->files);
+			set_fs(old_fs);
+		} else {
+			release_firmware(fw);
+		}
 	}
 
 	return err;
@@ -8997,9 +12175,7 @@ out:
 
 static int m9mo_load_fw_info(struct v4l2_subdev *sd)
 {
-	const struct firmware *fw = NULL;
 	u8 *buf_m9mo = NULL;
-	/*int offset;*/
 	int err = 0;
 
 	struct file *fp;
@@ -9014,6 +12190,10 @@ static int m9mo_load_fw_info(struct v4l2_subdev *sd)
 	if (IS_ERR(fp)) {
 		cam_trace("failed to open %s, err %ld\n",
 			M9MO_FW_PATH, PTR_ERR(fp));
+		if (PTR_ERR(fp) == -4) {
+			cam_err("%s: file open I/O is interrupted\n", __func__);
+			return -EIO;
+		}
 	}
 	fsize = fp->f_path.dentry->d_inode->i_size;
 
@@ -9076,14 +12256,10 @@ static int m9mo_load_fw_info(struct v4l2_subdev *sd)
 	cam_err("end\n");
 
 out:
-	if (!fw_requested) {
-		vfree(buf_m9mo);
-
+	vfree(buf_m9mo);
+	if (!IS_ERR(fp) && fp != NULL)
 		filp_close(fp, current->files);
-		set_fs(old_fs);
-	} else {
-		release_firmware(fw);
-	}
+	set_fs(old_fs);
 
 	return err;
 }
@@ -9111,6 +12287,10 @@ static int m9mo_load_fw(struct v4l2_subdev *sd)
 	if (IS_ERR(fp)) {
 		cam_err("failed to open %s, err %ld\n",
 			M9MO_FW_PATH, PTR_ERR(fp));
+		if (PTR_ERR(fp) == -4) {
+			cam_err("%s: file open I/O is interrupted\n", __func__);
+			return -EIO;
+		}
 		goto request_fw;
 	}
 
@@ -9133,12 +12313,17 @@ static int m9mo_load_fw(struct v4l2_subdev *sd)
 		goto out;
 	}
 
-	filp_close(fp, current->files);
+	if (!IS_ERR(fp) && fp != NULL)
+		filp_close(fp, current->files);
 
 	fp = filp_open(FW_INFO_PATH, O_RDONLY, 0);
 	if (IS_ERR(fp)) {
 		cam_trace("failed to open %s, err %ld\n",
 			FW_INFO_PATH, PTR_ERR(fp));
+		if (PTR_ERR(fp) == -4) {
+			cam_err("%s: file open I/O is interrupted\n", __func__);
+			return -EIO;
+		}
 		goto request_fw;
 	}
 
@@ -9222,10 +12407,12 @@ request_fw:
 	if (err < 0)
 		goto out;
 
-	err = m9mo_program_fw(sd, buf_fw_info,
-			M9MO_FLASH_BASE_ADDR_1, SZ_4K, 1);
-	if (err < 0)
-		goto out;
+	if (buf_fw_info > 0) {
+		err = m9mo_program_fw(sd, buf_fw_info,
+				M9MO_FLASH_BASE_ADDR_1, SZ_4K, 1);
+		if (err < 0)
+			goto out;
+	}
 
 #if 0
 	offset = SZ_64K * 31;
@@ -9244,7 +12431,8 @@ out:
 		vfree(buf_m9mo);
 		vfree(buf_fw_info);
 
-		filp_close(fp, current->files);
+		if (!IS_ERR(fp) && fp != NULL)
+			filp_close(fp, current->files);
 		set_fs(old_fs);
 	} else {
 		release_firmware(fw);
@@ -9253,16 +12441,247 @@ out:
 	return err;
 }
 
+#ifdef CONFIG_VIDEO_M9MO_SPI
+static int m9mo_init_fw_load(struct v4l2_subdev *sd)
+{
+	u32 val;
+	int i;
+	int err = 0;
+	int erase = 0x01;
+	int retries = 50;
+	int checksum = 0, fw_retry_cnt = 0;
+
+retry :
+	cam_dbg("E\n");
+
+#ifdef M9MO_LOAD_FW_4MB
+	for (i = 0; i < 1024; i++) {
+#else
+	for (i = 0; i < 512; i++) {
+#endif
+		//cam_err("i == %d\n", i);
+		/* Set Flash ROM memory address */
+		err = m9mo_writel(sd, M9MO_CATEGORY_FLASH,
+			M9MO_FLASH_ADDR, i * 0x0001000);
+
+		/* Erase FLASH ROM entire memory */
+		err = m9mo_writeb(sd, M9MO_CATEGORY_FLASH,
+			M9MO_FLASH_ERASE, erase);
+
+		/* Response while sector-erase is operating */
+		retries = 0;
+		do {
+			msleep(10);
+			err = m9mo_readb(sd, M9MO_CATEGORY_FLASH,
+				M9MO_FLASH_ERASE, &val);
+		} while (val == erase && retries++ < M9MO_I2C_VERIFY);
+
+		if (val != 0) {
+			cam_err("failed to erase sector\n");
+			return -EFAULT;
+		}
+	}
+
+	cam_err("err : %d - %s", err, err==1?"success":"fail");
+
+	err = m9mo_writel(sd, M9MO_CATEGORY_FLASH,
+			0x1C, 0x0247036D);
+	cam_err("err : %d - %s", err, err==1?"success":"fail");
+
+	err = m9mo_writeb(sd, M9MO_CATEGORY_FLASH,
+			0x4A, 0x02);
+	cam_err("err : %d - %s", err, err==1?"success":"fail");
+
+	msleep(3);
+
+	err = m9mo_writel(sd, M9MO_CATEGORY_FLASH,
+			0x14, 0x20000000);
+	cam_err("err : %d - %s", err, err==1?"success":"fail");
+
+	err = m9mo_writel(sd, M9MO_CATEGORY_FLASH,
+			0x18, 0x00200000);
+	cam_err("err : %d - %s", err, err==1?"success":"fail");
+
+	err = m9mo_load_fw_main(sd);
+
+	err = m9mo_writel(sd, M9MO_CATEGORY_FLASH,
+			0x00, 0x00);
+	cam_err("err : %d - %s", err, err==1?"success":"fail");
+
+	err = m9mo_writel(sd, M9MO_CATEGORY_FLASH,
+			0x18, 0x00200000);
+	cam_err("err : %d - %s", err, err==1?"success":"fail");
+
+	err = m9mo_writeb(sd, M9MO_CATEGORY_FLASH,
+			M9MO_FLASH_WR, 0x01);
+	cam_err("err : %d - %s", err, err==1?"success":"fail");
+
+	retries = 50;
+	do {
+		msleep(300);
+		err = m9mo_readb(sd, M9MO_CATEGORY_FLASH,
+			M9MO_FLASH_WR, &val);
+	} while (val == 0x01 && retries++ < M9MO_I2C_VERIFY);
+
+	//err = m9mo_dump_fw(sd);
+	if (val == 0x01) {
+		cam_err("~~~~~~timeout~~~~~~~\n");
+		return -EBUSY;
+	}
+
+	checksum = m9mo_check_checksum(sd);
+	if (checksum == 1)
+		err = 0;
+	else
+		err = -1;
+
+	if (err != 0 && fw_retry_cnt < 2) {
+		cam_err("checksum error!! retry fw write!!: %d", fw_retry_cnt);
+		fw_retry_cnt++;
+		goto retry;
+	}
+
+	mmc_fw = 0;
+
+	cam_dbg("X\n");
+
+	return err;
+}
+#endif
+
+#ifdef CONFIG_VIDEO_M9MO_SPI
+static int m9mo_SIO_loader(struct v4l2_subdev *sd)
+{
+	u8 *buf_m9mo = NULL;
+	unsigned int count = 0;
+	/*int offset;*/
+	int err = 0;
+
+	struct file *fp;
+	mm_segment_t old_fs;
+	long fsize, nread;
+
+	cam_dbg("E\n");
+
+	old_fs = get_fs();
+	set_fs(KERNEL_DS);
+
+	fp = filp_open(M9MO_SIO_LOADER_PATH_M9MO, O_RDONLY, 0);
+	if (IS_ERR(fp)) {
+		cam_err("failed to open %s, err %ld\n",
+			M9MO_SIO_LOADER_PATH_M9MO, PTR_ERR(fp));
+		goto out;
+	}
+
+	fsize = fp->f_path.dentry->d_inode->i_size;
+	count = fsize / SZ_4K;
+
+	cam_err("start, file path %s, size %ld Bytes, count %d\n",
+		M9MO_SIO_LOADER_PATH_M9MO, fsize, count);
+
+	buf_m9mo = vmalloc(fsize);
+	if (!buf_m9mo) {
+		cam_err("failed to allocate memory\n");
+		err = -ENOMEM;
+		goto out;
+	}
+
+	nread = vfs_read(fp, (char __user *)buf_m9mo, fsize, &fp->f_pos);
+	if (nread != fsize) {
+		cam_err("failed to read firmware file, %ld Bytes\n", nread);
+		err = -EIO;
+		goto out;
+	}
+
+	err = m9mo_mem_write(sd, 0x08, SZ_64,
+			0x90001200 , buf_port_seting0);
+
+	cam_err("err : %d - %s", err, err==1?"success":"fail");
+
+	msleep(10);
+
+	err = m9mo_mem_write(sd, 0x08, SZ_64,
+			0x90001000 , buf_port_seting1);
+	msleep(10);
+
+	cam_err("err : %d - %s", err, err==1?"success":"fail");
+
+	err = m9mo_mem_write(sd, 0x08, SZ_64,
+			0x90001100 , buf_port_seting2);
+	msleep(10);
+
+	cam_err("err : %d - %s", err, err==1?"success":"fail");
+
+	/* program FLASH ROM */
+	err = m9mo_mem_write(sd, 0x04, SZ_4K,
+			0x01000100 , buf_m9mo);
+
+	cam_err("err : %d - %s", err, err==1?"success":"fail");
+
+	err = m9mo_mem_write(sd, 0x04, SZ_4K,
+			0x01001100 , buf_m9mo+SZ_4K);
+
+	cam_err("err : %d - %s", err, err==1?"success":"fail");
+
+	err = m9mo_mem_write(sd, 0x04, SZ_4K,
+			0x01002100 , buf_m9mo+SZ_8K);
+
+	cam_err("err : %d - %s", err, err==1?"success":"fail");
+
+	err = m9mo_mem_write(sd, 0x04, fsize-(SZ_4K|SZ_8K),
+			0x01003100 , buf_m9mo+(SZ_4K|SZ_8K));
+
+	cam_err("err : %d - %s", err, err==1?"success":"fail");
+
+	err = m9mo_writel(sd, M9MO_CATEGORY_FLASH,
+			0x0C, 0x01000100);
+
+	cam_err("err : %d - %s", err, err==1?"success":"fail");
+
+	/* Start Programming */
+		err = m9mo_writeb(sd, M9MO_CATEGORY_FLASH, 0x12, 0x02);
+
+	cam_err("err : %d - %s", err, err==1?"success":"fail");
+
+out:
+	if (buf_m9mo)
+		vfree(buf_m9mo);
+
+	if (!IS_ERR(fp) && fp != NULL)
+		filp_close(fp, current->files);
+
+	set_fs(old_fs);
+	cam_err("return err : %d", err);
+
+	return err;
+}
+#endif
+
+
+
+static int m9mo_set_factory_af_led_onoff(struct v4l2_subdev *sd, bool on)
+{
+	struct i2c_client *client = v4l2_get_subdevdata(sd);
+	const struct m9mo_platform_data *pdata = client->dev.platform_data;
+
+	if (on == true) {
+		/* AF LED regulator on */
+		pdata->af_led_power(1);
+	} else {
+		/* AF LED regulator off */
+		pdata->af_led_power(0);
+	}
+	return 0;
+}
 
 static int m9mo_s_ctrl(struct v4l2_subdev *sd, struct v4l2_control *ctrl)
 {
 	struct m9mo_state *state = to_state(sd);
 	int err = 0;
-	int int_en = 0;
 	s16 temp;
 
 	if (ctrl->id != V4L2_CID_CAMERA_LENS_TIMER) {
-		cam_trace(" id %d, value %d\n",
+		cam_dbg(" id %d, value %d\n",
 		ctrl->id - V4L2_CID_PRIVATE_BASE, ctrl->value);
 	}
 
@@ -9272,10 +12691,11 @@ static int m9mo_s_ctrl(struct v4l2_subdev *sd, struct v4l2_control *ctrl)
 	}
 
 	switch (ctrl->id) {
+#ifdef HOLD_LENS_SUPPORT
 	case V4L2_CID_CAMERA_HOLD_LENS:
 		leave_power = true;
 		break;
-
+#endif
 	case V4L2_CID_CAM_UPDATE_FW:
 		if (ctrl->value == FW_MODE_DUMP)
 			err = m9mo_dump_fw(sd);
@@ -9284,11 +12704,7 @@ static int m9mo_s_ctrl(struct v4l2_subdev *sd, struct v4l2_control *ctrl)
 		break;
 
 	case V4L2_CID_CAMERA_SENSOR_MODE:
-#ifdef FAST_CAPTURE
-		err = m9mo_set_fast_capture(sd);
-#else
 		err = m9mo_set_sensor_mode(sd, ctrl->value);
-#endif
 		break;
 
 	case V4L2_CID_CAMERA_FLASH_MODE:
@@ -9300,8 +12716,7 @@ static int m9mo_s_ctrl(struct v4l2_subdev *sd, struct v4l2_control *ctrl)
 		break;
 
 	case V4L2_CID_CAMERA_METERING:
-		if (state->sensor_mode == SENSOR_CAMERA)
-			err = m9mo_set_metering(sd, ctrl->value);
+		err = m9mo_set_metering(sd, ctrl->value);
 		break;
 
 	case V4L2_CID_CAMERA_BRIGHTNESS:
@@ -9322,6 +12737,10 @@ static int m9mo_s_ctrl(struct v4l2_subdev *sd, struct v4l2_control *ctrl)
 
 	case V4L2_CID_CAMERA_WHITE_BALANCE:
 		err = m9mo_set_whitebalance(sd, ctrl->value);
+		break;
+
+	case V4L2_CID_CAMERA_COLOR_ADJUST:
+		err = m9mo_set_coloradjust(sd, ctrl->value);
 		break;
 
 	case V4L2_CID_CAMERA_SCENE_MODE:
@@ -9350,6 +12769,13 @@ static int m9mo_s_ctrl(struct v4l2_subdev *sd, struct v4l2_control *ctrl)
 
 	case V4L2_CID_CAMERA_SET_AUTO_FOCUS:
 		err = m9mo_set_af(sd, ctrl->value);
+		break;
+
+	case V4L2_CID_CAMERA_MF:
+		cam_trace("V4L2_CID_CAMERA_MF : 0x%x\n", ctrl->value);
+		err = m9mo_writeb(sd, M9MO_CATEGORY_LENS,
+			M9MO_LENS_MF_RUN, ctrl->value);
+		CHECK_ERR(err);
 		break;
 
 	case V4L2_CID_CAMERA_OBJECT_POSITION_X:
@@ -9394,8 +12820,32 @@ static int m9mo_s_ctrl(struct v4l2_subdev *sd, struct v4l2_control *ctrl)
 		err = m9mo_set_AF_LED(sd, ctrl->value);
 		break;
 
+	case V4L2_CID_CAMERA_TURN_AF_LED:
+		err = m9mo_set_Turn_AF_LED(sd, ctrl->value);
+		break;
+
+	case V4L2_CID_CAMERA_TIMER_LED:
+		err = m9mo_set_timer_LED(sd, ctrl->value);
+		break;
+
+	case V4L2_CID_CAMERA_TIMER_MODE:
+		err = m9mo_set_timer_Mode(sd, ctrl->value);
+		break;
+
+	case V4L2_CID_ZOOM_ACTION_METHOD:
+		err = m9mo_set_zoom_action_method(sd, ctrl->value);
+		break;
+
 	case V4L2_CID_CAMERA_ZOOM:
 		err = m9mo_set_zoom(sd, ctrl);
+		break;
+
+	case V4L2_CID_CAMERA_DZOOM:
+		err = m9mo_set_dzoom(sd, ctrl);
+		break;
+
+	case V4L2_CID_ZOOM_SPEED:
+		err = m9mo_set_zoom_speed(sd, ctrl->value);
 		break;
 
 	case V4L2_CID_CAMERA_OPTICAL_ZOOM_CTRL:
@@ -9415,7 +12865,19 @@ static int m9mo_s_ctrl(struct v4l2_subdev *sd, struct v4l2_control *ctrl)
 		break;
 
 	case V4L2_CID_CAMERA_YUV_CAPTURE:
-		err = m9mo_start_YUV_capture(sd, ctrl->value);
+		cam_dbg(" @@@ V4L2_CID_CAMERA_YUV_CAPTURE :: state->factory_test_num %d \n",	  state->factory_test_num);
+		if ((state->factory_test_num == FACTORY_RESOL_WIDE_INSIDE)
+			|| (state->factory_test_num == FACTORY_RESOL_TELE_INSIDE)
+			|| (state->factory_test_num == FACTORY_TILT_TEST_INSIDE)
+			|| (state->factory_test_num == FACTORY_DUST_TEST_INSIDE)
+			|| (state->factory_test_num == FACTORY_LENS_SHADING_TEST_INSIDE)
+			|| (state->factory_test_num == FACTORY_NOISE_TEST_INSIDE)
+			|| (state->factory_test_num == FACTORY_REDIMAGE_TEST_INSIDE)
+			) {
+			err = m9mo_start_YUV_one_capture(sd, ctrl->value);
+		} else {
+			err = m9mo_start_YUV_capture(sd, ctrl->value);
+		}
 		break;
 
 	case V4L2_CID_CAMERA_POSTVIEW_CAPTURE:
@@ -9432,6 +12894,10 @@ static int m9mo_s_ctrl(struct v4l2_subdev *sd, struct v4l2_control *ctrl)
 
 	case V4L2_CID_CAMERA_VT_MODE:
 		state->vt_mode = ctrl->value;
+		break;
+
+	case V4L2_CID_CAMERA_SAMSUNG_APP:
+		state->samsung_app = ctrl->value;
 		break;
 
 	case V4L2_CID_CAMERA_CHECK_DATALINE:
@@ -9555,6 +13021,19 @@ static int m9mo_s_ctrl(struct v4l2_subdev *sd, struct v4l2_control *ctrl)
 		cam_trace("~ FACTORY_PUNT_LONG_SCAN_START ~\n");
 		err = m9mo_writeb(sd, M9MO_CATEGORY_LENS,
 			0x0E, 0x02);
+		CHECK_ERR(err);
+		break;
+
+	case V4L2_CID_CAMERA_FACTORY_PUNT_INTERPOLATION:
+		cam_trace("~ FACTORY_PUNT_INTERPOLATION ~\n");
+		err = m9mo_writeb(sd, M9MO_CATEGORY_LENS,
+			0x1B, ctrl->value);
+		CHECK_ERR(err);
+		err = m9mo_writeb(sd, M9MO_CATEGORY_LENS,
+			0x0E, 0x0A);
+		CHECK_ERR(err);
+		err = m9mo_writeb(sd, M9MO_CATEGORY_LENS,
+			0x0E, 0x0B);
 		CHECK_ERR(err);
 		break;
 
@@ -9784,21 +13263,49 @@ static int m9mo_s_ctrl(struct v4l2_subdev *sd, struct v4l2_control *ctrl)
 	case V4L2_CID_CAMERA_FACTORY_TEST_NUMBER:
 		cam_trace("==========FACTORY_TEST_NUMBER : 0x%x\n",
 			ctrl->value);
-
-		err = m9mo_readw(sd, M9MO_CATEGORY_SYS,
-						M9MO_SYS_INT_EN, &int_en);
-		CHECK_ERR(err);
-		int_en &= ~M9MO_INT_SOUND;
-		err = m9mo_writew(sd, M9MO_CATEGORY_SYS,
-						M9MO_SYS_INT_EN, int_en);
+		
+		err = m9mo_writeb(sd, M9MO_CATEGORY_CAPCTRL, M9MO_CAPCTRL_AUTOMATIC_SHIFT_EN, (ctrl->value ? 0x00 : 0x01));
 		CHECK_ERR(err);
 
 		err = m9mo_writeb(sd, M9MO_CATEGORY_LENS,
 			0x41, ctrl->value);
 		state->factory_test_num = ctrl->value;
+
+		/* AF LED on/off */
+		if (ctrl->value == 120)
+			m9mo_set_factory_af_led_onoff(sd, true);
+		else
+			m9mo_set_factory_af_led_onoff(sd, false);
+
 		CHECK_ERR(err);
 		break;
-
+	case V4L2_CID_CAMERA_FACTORY_LOG_WRITE_ALL:
+		cam_trace("FACTORY_LOG_WRITE_ALL : 0x%x\n",
+			ctrl->value);
+		state->factory_log_write = ctrl->value;
+		break;
+		
+	case V4L2_CID_CAMERA_FACTORY_NO_LENS_OFF:
+		cam_trace("FACTORY_NO_LENS_OFF : 0x%x\n",
+			ctrl->value);
+		state->factory_no_lens_off = ctrl->value;
+		break;
+		
+	case V4L2_CID_CAMERA_FACTORY_FOCUS_CLOSEOPEN:
+		if (ctrl->value == 0) {
+			err = m9mo_writeb(sd, M9MO_CATEGORY_LENS, 
+					M9MO_LENS_AF_FOCUS_ADJ, 0x02);
+			CHECK_ERR(err);
+		} else if (ctrl->value == 1) {
+			err = m9mo_writeb(sd, M9MO_CATEGORY_LENS, 
+					M9MO_LENS_AF_FOCUS_ADJ, 0x00);
+			CHECK_ERR(err);
+		}
+		else
+			cam_trace("error/ FACTORY_FOCUS_CLOSEOPENCHECK : 0x%x\n",
+				ctrl->value);
+		break;
+		
 	case V4L2_CID_SET_CONTINUE_FPS:
 		state->continueFps = ctrl->value;
 		break;
@@ -10275,28 +13782,7 @@ static int m9mo_s_ctrl(struct v4l2_subdev *sd, struct v4l2_control *ctrl)
 		break;
 
 	case V4L2_CID_CAMERA_SMART_MOVIE_RECORDING:
-		if (state->smart_scene_detect_mode == 1) {
-			if (ctrl->value == 1) {
-				err = m9mo_writeb(sd, M9MO_CATEGORY_NEW,
-					0x0A, 0x02);
-				CHECK_ERR(err);
-			} else {
-				err = m9mo_writeb(sd, M9MO_CATEGORY_NEW,
-					0x0A, 0x01);
-				CHECK_ERR(err);
-			}
-		}
-
-		/* add recording check for zoom move */
-		if (ctrl->value == 1) {
-			state->recording = 1;
-			err = m9mo_writeb(sd, M9MO_CATEGORY_LENS, 0x27, 0x01);
-			CHECK_ERR(err);
-		} else {
-			state->recording = 0;
-			err = m9mo_writeb(sd, M9MO_CATEGORY_LENS, 0x27, 0x00);
-			CHECK_ERR(err);
-		}
+		err = m9mo_set_smart_moving_recording(sd, ctrl->value);
 		break;
 
 	case V4L2_CID_CAMERA_SMART_AUTO_S1_PUSH:
@@ -10321,6 +13807,10 @@ static int m9mo_s_ctrl(struct v4l2_subdev *sd, struct v4l2_control *ctrl)
 
 	case V4L2_CID_CAMERA_STREAM_PART2: /* for shutter sound */
 		err = m9mo_set_mode_part2(sd, M9MO_STILLCAP_MODE);
+		break;
+
+	case V4L2_CID_CAMERA_CAPTURE_END:
+		err = m9mo_set_cap_rec_end_mode(sd, ctrl->value);
 		break;
 
 	case V4L2_CID_CAMERA_FACTORY_SEND_SETTING:
@@ -10354,6 +13844,11 @@ static int m9mo_s_ctrl(struct v4l2_subdev *sd, struct v4l2_control *ctrl)
 	case V4L2_CID_CAMERA_FACTORY_IR_CHECK:
 		cam_trace("IR_CHECK : 0x%x\n", ctrl->value);
 		m9mo_set_factory_IR_Check(sd, ctrl->value);
+		break;
+
+	case V4L2_CID_CAMERA_FACTORY_IR_CHECK_G_AVG:
+		cam_trace("IR_CHECK_G_AVG : 0x%x\n", ctrl->value);
+		m9mo_set_factory_IR_Check_GAvg(sd, ctrl->value);
 		break;
 
 	case V4L2_CID_CAMERA_FACTORY_TILT_SCAN_MIN:
@@ -10446,6 +13941,136 @@ static int m9mo_s_ctrl(struct v4l2_subdev *sd, struct v4l2_control *ctrl)
 			0x3D, (u8)ctrl->value);
 		CHECK_ERR(err);
 		break;
+	case V4L2_CID_CAMERA_FACTORY_MEM_COPY:
+		cam_trace("V4L2_CID_CAMERA_FACTORY_MEM_COPY : 0x%x, 0x%x\n",
+			(u8)ctrl->value >> 4, (u8)ctrl->value & 0x0F);
+		err = m9mo_writeb(sd, M9MO_CATEGORY_LENS,
+			0xB0, (u8)ctrl->value >> 4);
+		CHECK_ERR(err);
+		err = m9mo_writeb(sd, M9MO_CATEGORY_LENS,
+			0xB1, (u8)ctrl->value & 0x0F);
+		CHECK_ERR(err);
+		err = m9mo_writeb(sd, M9MO_CATEGORY_LENS,
+			0x97, 0x00);
+		CHECK_ERR(err);
+		break;
+	case V4L2_CID_CAMERA_FACTORY_MEM_MODE:
+		cam_trace("V4L2_CID_CAMERA_FACTORY_MEM_MODE : 0x%x\n", ctrl->value);
+		err = m9mo_writeb(sd, M9MO_CATEGORY_LENS,
+			0x98, (u8)ctrl->value);
+		CHECK_ERR(err);
+		break;
+	case V4L2_CID_CAMERA_FACTORY_EEP_WRITE_MARK:
+		cam_trace("V4L2_CID_CAMERA_FACTORY_EEP_WRITE_MARK : 0x%x\n", ctrl->value);
+		m9mo_set_factory_eepwrite_mark(sd, ctrl->value);
+		break;
+	case V4L2_CID_CAMERA_FACTORY_EEP_WRITE_OIS_SHIFT:
+		cam_trace("V4L2_CID_CAMERA_FACTORY_EEP_WRITE_OIS_SHIFT : 0x%x, 0x%x, 0x%x, 0x%x\n",
+			(ctrl->value & 0xff000000) >> 24, (ctrl->value & 0x00ff0000)>>16,
+			(ctrl->value & 0x0000ff00) >> 8, (ctrl->value & 0x000000ff));
+		err = m9mo_writeb(sd, M9MO_CATEGORY_LENS,
+			0xB0, (ctrl->value & 0xff000000) >> 24);
+		CHECK_ERR(err);
+		err = m9mo_writeb(sd, M9MO_CATEGORY_LENS,
+			0xB1, (ctrl->value & 0x00ff0000) >> 16);
+		CHECK_ERR(err);
+		err = m9mo_writeb(sd, M9MO_CATEGORY_LENS,
+			0xB2, (ctrl->value & 0x0000ff00) >> 8);
+		CHECK_ERR(err);
+		err = m9mo_writeb(sd, M9MO_CATEGORY_LENS,
+			0xB3, (ctrl->value & 0x000000ff));
+		CHECK_ERR(err);
+		err = m9mo_writeb(sd, M9MO_CATEGORY_LENS,
+			0xA3, 0x00);
+		CHECK_ERR(err);
+		break;
+	case V4L2_CID_CAMERA_FACTORY_LENS_CAP:
+		cam_trace("V4L2_CID_CAMERA_FACTORY_LENS_CAP : 0x%x /%d\n", ctrl->value, ctrl->value >> 30 & 0x00000003);
+		if ((ctrl->value >> 30 & 0x00000003) == 1) {
+			err = m9mo_writeb(sd, M9MO_CATEGORY_ADJST,
+				0x97, (ctrl->value & 0x3FFF0000) >> 16);
+			CHECK_ERR(err);
+			err = m9mo_writeb(sd, M9MO_CATEGORY_ADJST,
+				0x99, (ctrl->value & 0x0000FFFF));
+			CHECK_ERR(err);
+		}
+		if ((ctrl->value >> 30 & 0x00000003) == 2) {
+			err = m9mo_writeb(sd, M9MO_CATEGORY_ADJST,
+				0x98, (ctrl->value & 0x3FFF0000) >> 16);
+			CHECK_ERR(err);
+			err = m9mo_writeb(sd, M9MO_CATEGORY_ADJST,
+				0x9A, (ctrl->value & 0x0000FFFF));
+			CHECK_ERR(err);
+		}
+		if ((ctrl->value >> 30 & 0x00000003) == 3) {
+			state->lenscap_bright_min = ((ctrl->value & 0x3FFF0000) >> 16);
+			state->lenscap_bright_max = (ctrl->value & 0x0000FFFF);
+			err = m9mo_writeb(sd, M9MO_CATEGORY_ADJST, 0x96, 0x01);
+			CHECK_ERR(err);
+		}
+		break;
+
+	case V4L2_CID_CAMERA_FACTORY_LENS_CAP_LOG:
+		cam_trace("~FACTORY_LENS_CAP_LOG~");
+		m9mo_make_CSV_rawdata_direct(sd,
+			V4L2_CID_CAMERA_FACTORY_LENS_CAP_LOG);
+		break;
+
+	case V4L2_CID_START_CAPTURE_KIND:
+		cam_trace("START_CAP_KIND : 0x%x\n", ctrl->value);
+		state->start_cap_kind = ctrl->value;
+		break;
+
+	case V4L2_CID_CAMERA_INIT:
+		cam_trace("MANUAL INIT launched.");
+		err = m9mo_init(sd, ctrl->value);
+		break;
+
+	case V4L2_CID_CAMERA_POST_INIT:
+		cam_trace("MANUAL OIS INIT launched.");
+		err = m9mo_post_init(sd, ctrl->value);
+		break;
+
+	case V4L2_CID_CAMERA_FACTORY_DATA_ERASE:
+		err = m9mo_set_factory_data_erase(sd, ctrl->value);
+		break;
+
+	case V4L2_CID_CAMERA_FACTORY_RESOLUTION_LOG:
+		cam_trace("~FACTORY_RESOLUTION_LOG ~\n");
+		err = m9mo_make_CSV_rawdata(sd, M9MO_FLASH_FACTORY_RESOLUTION, false);
+		CHECK_ERR(err);
+		break;
+
+	case V4L2_CID_CAMERA_FACTORY_SHD_LOG:
+		cam_trace("~V4L2_CID_CAMERA_FACTORY_SHD_LOG ~\n");
+		err = m9mo_make_CSV_rawdata(sd,
+			M9MO_FLASH_FACTORY_BEFORE_SHD_CHECK, false);
+		CHECK_ERR(err);
+		break;
+
+	case V4L2_CID_CAMERA_FACTORY_WRITE_SHD_DATA:
+		cam_trace("~V4L2_CID_CAMERA_FACTORY_WRITE_SHD_DATA~\n");
+		err = m9mo_set_shd_data(sd,ctrl->value);
+		CHECK_ERR(err);
+		break;
+
+	case V4L2_CID_CAMERA_FACTORY_CLIP_VALUE:
+		cam_trace("~V4L2_CID_CAMERA_FACTORY_CLIP_VALUE~\n");
+		err = m9mo_set_clip_value(sd,ctrl->value);
+		CHECK_ERR(err);
+		break;
+
+	case V4L2_CID_CAMERA_FACTORY_TILT_LOCATION:
+		cam_trace("~V4L2_CID_CAMERA_FACTORY_TILT_LOCATION\n");
+		err = m9mo_set_tilt_location(sd,ctrl->value);
+		CHECK_ERR(err);
+		break;
+
+#ifdef FAST_CAPTURE
+	case V4L2_CID_CAMERA_FAST_CAPTURE:
+		err = m9mo_set_fast_capture(sd);
+		break;
+#endif
 
 	default:
 		cam_err("no such control id %d, value %d\n",
@@ -10461,6 +14086,27 @@ static int m9mo_s_ctrl(struct v4l2_subdev *sd, struct v4l2_control *ctrl)
 	return err;
 }
 
+static bool m9mo_check_postview(struct v4l2_subdev *sd)
+{
+	struct m9mo_state *state = to_state(sd);
+
+	if (state->pixelformat == V4L2_COLORSPACE_JPEG
+		|| state->running_capture_mode == RUNNING_MODE_LOWLIGHT
+		|| state->running_capture_mode == RUNNING_MODE_HDR) {
+		/* capture */
+		return false;
+	} else {
+		/* New capture condition for resolution factory test.
+		   This condition is necessary if you captured
+		   YUV postview + YUV main image. */
+		if (state->start_cap_kind != START_CAPTURE_POSTVIEW) {
+			/* capture */
+			return false;
+		}
+	}
+	/* postview */
+	return true;
+}
 
 /*
  * v4l2_subdev_video_ops
@@ -10482,53 +14128,89 @@ static int m9mo_set_frmsize(struct v4l2_subdev *sd)
 {
 	struct m9mo_state *state = to_state(sd);
 	int err;
+	int value = 0;
 	int read_mon_size;
 	u32 size_val;
+
 	cam_trace("E\n");
 
 	if (state->format_mode == V4L2_PIX_FMT_MODE_PREVIEW) {
 		err = m9mo_set_mode(sd, M9MO_PARMSET_MODE);
-		CHECK_ERR(err);
-
-		m9mo_set_gamma(sd);
-
-		err = m9mo_readb(sd, M9MO_CATEGORY_PARM,
-			M9MO_PARM_MON_SIZE, &read_mon_size);
-		CHECK_ERR(err);
+		if (err <= 0) {
+			cam_err("failed to set mode\n");
+			return err;
+		}
 
 		/* don't set frmsize when returning preivew after capture */
 		if (err == 10)
 			cam_trace("~~~~ return when CAP->PAR ~~~~\n");
 		else {
+		err = m9mo_readb(sd, M9MO_CATEGORY_PARM,
+			M9MO_PARM_MON_SIZE, &read_mon_size);
+		CHECK_ERR(err);
+
 		if (state->fps == 60) {
-			if (state->preview->height == 480)
+			if (state->preview->sensor_height == 480)
 				size_val = 0x2F;
-			else if (state->preview->height == 720)
+			else if (state->preview->sensor_height == 720)
 				size_val = 0x25;
+			else
+				size_val = read_mon_size;
 
 			if (read_mon_size != size_val) {
 				err = m9mo_writeb(sd, M9MO_CATEGORY_PARM,
 					M9MO_PARM_MON_SIZE, size_val);
 				CHECK_ERR(err);
 			}
-		} else if (state->sensor_mode == SENSOR_MOVIE
-			&& state->fps == 30) {
-			if (state->preview->height == 1080)
-				size_val = 0x2C;
-			else if (state->preview->height == 720)
-				size_val = 0x2D;
-			else if (state->preview->width == 640
-				&& state->preview->height == 480)
-				size_val = 0x2E;
-			else if (state->preview->width == 320
-				&& state->preview->height == 240)
-				size_val = 0x36;
+		} else if (state->fps == 30) {
+			if (state->sensor_mode == SENSOR_MOVIE) {
+				int value = 0;
+				state->vss_mode = 1;
+				if (state->preview->sensor_height == 1080)
+					size_val = 0x2C;
+				else if (state->preview->sensor_height == 720)
+					size_val = 0x2D;
+				else if (state->preview->sensor_width == 640
+					&& state->preview->sensor_height == 480)
+					size_val = 0x2E;
+				else if (state->preview->sensor_width == 320
+					&& state->preview->sensor_height == 240)
+					size_val = 0x36;
+				else if (state->preview->sensor_width == 704
+					&& state->preview->sensor_height == 576) {
+					size_val = state->preview->reg_val;
+					state->vss_mode = 0; /* VSS is not supported in 11:9 ratio */
+				}
+				else if (state->preview->sensor_width == 1920
+					&& state->preview->sensor_height == 1080
+				&& state->factory_test_num == FACTORY_TILT_DIVISION){
+					size_val = 0x3F;
+				}
+				else
+					size_val = state->preview->reg_val;
+			} else {
+				state->vss_mode = 0;
+				if (state->preview->sensor_height == 1080)
+					size_val = 0x28;
+				else if (state->preview->sensor_height == 720)
+					size_val = 0x21;
+				else if (state->preview->sensor_height == 480)
+					size_val = 0x17;
+				else if (state->preview->sensor_height == 240)
+					size_val = 0x09;
+				else
+					size_val = state->preview->reg_val;
+			}
 
 			if (read_mon_size != size_val) {
 				err = m9mo_writeb(sd, M9MO_CATEGORY_PARM,
 					M9MO_PARM_MON_SIZE, size_val);
 				CHECK_ERR(err);
 			}
+
+			err = m9mo_writeb(sd, M9MO_CATEGORY_PARM,
+				M9MO_PARM_VSS_MODE, state->vss_mode);
+			CHECK_ERR(err);
 		} else {
 			if (read_mon_size != state->preview->reg_val) {
 				err = m9mo_writeb(sd, M9MO_CATEGORY_PARM,
@@ -10538,22 +14220,35 @@ static int m9mo_set_frmsize(struct v4l2_subdev *sd)
 			}
 		}
 
-#if 1	/* Dual Capture */
-		if (size_val == 0x2C
-			|| size_val == 0x2D
-			|| size_val == 0x2E
-			|| size_val == 0x36)
-			m9mo_set_dual_capture_mode(sd, 1);
-		else
-			m9mo_set_dual_capture_mode(sd, 0);
-#endif
+		err = m9mo_readb(sd, M9MO_CATEGORY_PARM,
+			M9MO_PARM_MON_MOVIE_SELECT, &value);
+		CHECK_ERR(err);
+		if (state->sensor_mode == SENSOR_MOVIE) {
+			if (value != SENSOR_MOVIE) {
+				err = m9mo_writeb(sd, M9MO_CATEGORY_PARM,
+					M9MO_PARM_MON_MOVIE_SELECT, 0x01);
+				CHECK_ERR(err);
+			}
+		} else {
+			if (value != SENSOR_CAMERA) {
+				err = m9mo_writeb(sd, M9MO_CATEGORY_PARM,
+					M9MO_PARM_MON_MOVIE_SELECT, 0x00);
+				CHECK_ERR(err);
+			}
 		}
-		cam_err("preview frame size %dx%d\n",
-			state->preview->width, state->preview->height);
+
+		m9mo_set_gamma(sd);
+		m9mo_set_iqgrp(sd, 0);
+
+		if (state->sensor_mode != SENSOR_MOVIE)
+			m9mo_set_dual_capture_mode(sd, 0);
+
+		}
+		cam_err("fps %d, target preview frame size %dx%d\n",
+			state->fps, state->preview->target_width,
+			state->preview->target_height);
 	} else {
-		if (state->pixelformat == V4L2_COLORSPACE_JPEG
-			|| state->running_capture_mode == RUNNING_MODE_LOWLIGHT
-			|| state->running_capture_mode == RUNNING_MODE_HDR) {
+		if (!m9mo_check_postview(sd)) {
 			if (!state->dual_capture_start) {
 				err = m9mo_writeb(sd, M9MO_CATEGORY_CAPPARM,
 						M9MO_CAPPARM_MAIN_IMG_SIZE,
@@ -10563,17 +14258,19 @@ static int m9mo_set_frmsize(struct v4l2_subdev *sd)
 					m9mo_set_smart_zoom(sd,
 						state->smart_zoom_mode);
 			}
-			cam_info("capture frame size %dx%d\n",
-					state->capture->width,
-					state->capture->height);
+			cam_info("target capture frame size %dx%d\n",
+					state->capture->target_width,
+					state->capture->target_height);
 		} else {
-			err = m9mo_writeb(sd, M9MO_CATEGORY_CAPPARM,
-					M9MO_CAPPARM_PREVIEW_IMG_SIZE,
-					state->postview->reg_val);
-			CHECK_ERR(err);
-			cam_info("postview frame size %dx%d\n",
-					state->postview->width,
-					state->postview->height);
+			if (!state->fast_capture_set) {
+				err = m9mo_writeb(sd, M9MO_CATEGORY_CAPPARM,
+						M9MO_CAPPARM_PREVIEW_IMG_SIZE,
+						state->postview->reg_val);
+				CHECK_ERR(err);
+				cam_info("target postview frame size %dx%d\n",
+						state->postview->target_width,
+						state->postview->target_height);
+			}
 		}
 	}
 	cam_trace("X\n");
@@ -10589,6 +14286,7 @@ static int m9mo_s_fmt(struct v4l2_subdev *sd, struct v4l2_mbus_framefmt *ffmt)
 	u32 height = ffmt->height;
 	u32 old_index;
 	int i, num_entries;
+
 	cam_trace("E\n");
 
 	if (unlikely(state->isp.bad_fw)) {
@@ -10601,9 +14299,7 @@ static int m9mo_s_fmt(struct v4l2_subdev *sd, struct v4l2_mbus_framefmt *ffmt)
 
 	if (state->format_mode == V4L2_PIX_FMT_MODE_PREVIEW)
 		frmsize = &state->preview;
-	else if (state->pixelformat == V4L2_COLORSPACE_JPEG
-		|| state->running_capture_mode == RUNNING_MODE_LOWLIGHT
-		|| state->running_capture_mode == RUNNING_MODE_HDR)
+	else if (!m9mo_check_postview(sd))
 		frmsize = &state->capture;
 	else
 		frmsize = &state->postview;
@@ -10614,20 +14310,45 @@ static int m9mo_s_fmt(struct v4l2_subdev *sd, struct v4l2_mbus_framefmt *ffmt)
 	if (state->format_mode == V4L2_PIX_FMT_MODE_PREVIEW) {
 		num_entries = ARRAY_SIZE(preview_frmsizes);
 		for (i = 0; i < num_entries; i++) {
-			if (width == preview_frmsizes[i].width &&
-				height == preview_frmsizes[i].height) {
+			if (state->sensor_mode == SENSOR_MOVIE &&
+				state->fps == 120 && width == 768 && height == 512) {
+				*frmsize = m9mo_get_frmsize(preview_frmsizes,
+					num_entries, M9MO_PREVIEW_D1_120FPS);
+				break;
+			}
+			// Workaround for 768x512 60fps 1/2x. Should be Removed later.
+			else if (state->sensor_mode == SENSOR_MOVIE &&
+				state->fps == 60 && width == 768 && height == 512) {
+				*frmsize = m9mo_get_frmsize(preview_frmsizes,
+					num_entries, M9MO_PREVIEW_720P_60FPS);
+				break;
+			}
+			// Workaround for 960x540 30fps for Factory. Should be Removed later.
+			else if (state->sensor_mode == SENSOR_MOVIE &&
+				state->fps == 30 && width == 960 && height == 540) {
+				*frmsize = m9mo_get_frmsize(preview_frmsizes,
+					num_entries, M9MO_PREVIEW_720P);
+				break;
+			}
+			/*Workaround for target size 960x540 for Factory Tilt test.*/
+			else if (state->sensor_mode == SENSOR_CAMERA &&
+				state->factory_test_num == FACTORY_TILT_DIVISION){
+				*frmsize = m9mo_get_frmsize(preview_frmsizes,
+					num_entries, M9MO_PREVIEW_FACTORY_TILT);
+				break;
+			}
+			if (width == preview_frmsizes[i].target_width &&
+				height == preview_frmsizes[i].target_height) {
 				*frmsize = &preview_frmsizes[i];
 				break;
 			}
 		}
 	} else {
-		if (state->pixelformat == V4L2_COLORSPACE_JPEG
-			|| state->running_capture_mode == RUNNING_MODE_LOWLIGHT
-			|| state->running_capture_mode == RUNNING_MODE_HDR) {
+		if (!m9mo_check_postview(sd)) {
 			num_entries = ARRAY_SIZE(capture_frmsizes);
 			for (i = 0; i < num_entries; i++) {
-				if (width == capture_frmsizes[i].width &&
-					height == capture_frmsizes[i].height) {
+				if (width == capture_frmsizes[i].target_width &&
+					height == capture_frmsizes[i].target_height) {
 					*frmsize = &capture_frmsizes[i];
 					break;
 				}
@@ -10635,8 +14356,8 @@ static int m9mo_s_fmt(struct v4l2_subdev *sd, struct v4l2_mbus_framefmt *ffmt)
 		} else {
 			num_entries = ARRAY_SIZE(postview_frmsizes);
 			for (i = 0; i < num_entries; i++) {
-				if (width == postview_frmsizes[i].width &&
-					height == postview_frmsizes[i].height) {
+				if (width == postview_frmsizes[i].target_width &&
+					height == postview_frmsizes[i].target_height) {
 					*frmsize = &postview_frmsizes[i];
 					break;
 				}
@@ -10649,9 +14370,7 @@ static int m9mo_s_fmt(struct v4l2_subdev *sd, struct v4l2_mbus_framefmt *ffmt)
 		if (state->format_mode == V4L2_PIX_FMT_MODE_PREVIEW)
 			*frmsize = m9mo_get_frmsize(preview_frmsizes,
 				num_entries, M9MO_PREVIEW_720P);
-		else if (state->pixelformat == V4L2_COLORSPACE_JPEG
-			|| state->running_capture_mode == RUNNING_MODE_LOWLIGHT
-			|| state->running_capture_mode == RUNNING_MODE_HDR)
+		else if (!m9mo_check_postview(sd))
 			*frmsize = m9mo_get_frmsize(capture_frmsizes,
 				num_entries, M9MO_CAPTURE_12MPW);
 		else
@@ -10659,7 +14378,7 @@ static int m9mo_s_fmt(struct v4l2_subdev *sd, struct v4l2_mbus_framefmt *ffmt)
 				num_entries, M9MO_CAPTURE_POSTWHD);
 	}
 
-	cam_err("%dx%d\n", (*frmsize)->width, (*frmsize)->height);
+	cam_err("target size %dx%d\n", (*frmsize)->target_width, (*frmsize)->target_height);
 	m9mo_set_frmsize(sd);
 
 	cam_trace("X\n");
@@ -10717,26 +14436,24 @@ static int m9mo_enum_framesizes(struct v4l2_subdev *sd,
 			return -EINVAL;
 
 		fsize->type = V4L2_FRMSIZE_TYPE_DISCRETE;
-		fsize->discrete.width = state->preview->width;
-		fsize->discrete.height = state->preview->height;
-	} else if (state->pixelformat == V4L2_COLORSPACE_JPEG
-		|| state->running_capture_mode == RUNNING_MODE_LOWLIGHT
-		|| state->running_capture_mode == RUNNING_MODE_HDR) {
+		fsize->discrete.width = state->preview->sensor_width;
+		fsize->discrete.height = state->preview->sensor_height;
+	} else if (!m9mo_check_postview(sd)) {
 		if (state->capture == NULL
 				/* FIXME || state->capture->index < 0 */)
 			return -EINVAL;
 
 		fsize->type = V4L2_FRMSIZE_TYPE_DISCRETE;
-		fsize->discrete.width = state->capture->width;
-		fsize->discrete.height = state->capture->height;
+		fsize->discrete.width = state->capture->sensor_width;
+		fsize->discrete.height = state->capture->sensor_height;
 	} else {
 		if (state->postview == NULL
 				/* FIXME || state->postview->index < 0 */)
 			return -EINVAL;
 
 		fsize->type = V4L2_FRMSIZE_TYPE_DISCRETE;
-		fsize->discrete.width = state->postview->width;
-		fsize->discrete.height = state->postview->height;
+		fsize->discrete.width = state->postview->sensor_width;
+		fsize->discrete.height = state->postview->sensor_height;
 	}
 
 	return 0;
@@ -10794,10 +14511,15 @@ static int m9mo_s_stream_capture(struct v4l2_subdev *sd, int enable)
 	int err;
 	struct m9mo_state *state = to_state(sd);
 
-#ifndef FAST_CAPTURE
 	if (enable) {
 		if (state->running_capture_mode == RUNNING_MODE_SINGLE) {
+#ifndef FAST_CAPTURE
 			m9mo_set_mode_part1(sd, M9MO_STILLCAP_MODE);
+#else
+			if (state->factory_test_num != 0)
+				m9mo_set_mode_part1(sd, M9MO_STILLCAP_MODE);
+			state->fast_capture_set = 0;
+#endif
 		} else {
 			err = m9mo_set_mode(sd, M9MO_STILLCAP_MODE);
 			if (err <= 0) {
@@ -10814,7 +14536,6 @@ static int m9mo_s_stream_capture(struct v4l2_subdev *sd, int enable)
 		}
 */
 	}
-#endif
 	return 0;
 }
 
@@ -10883,7 +14604,7 @@ static int m9mo_s_stream_hdr(struct v4l2_subdev *sd, int enable)
 static int m9mo_s_stream(struct v4l2_subdev *sd, int enable)
 {
 	struct m9mo_state *state = to_state(sd);
-	int err;
+	int err = 0;
 
 	cam_trace("E\n");
 
@@ -10893,7 +14614,9 @@ static int m9mo_s_stream(struct v4l2_subdev *sd, int enable)
 	}
 
 	cam_info("state->format_mode=%d\n", state->format_mode);
-	if (state->running_capture_mode == RUNNING_MODE_BURST) {
+
+	if (state->running_capture_mode == RUNNING_MODE_BURST
+			&& state->mburst_start) {
 		cam_trace("X\n");
 		return 0;
 	}
@@ -10951,7 +14674,7 @@ static int m9mo_s_stream(struct v4l2_subdev *sd, int enable)
 	}
 
 	cam_trace("X\n");
-	return 0;
+	return err;
 }
 
 static int m9mo_check_version(struct v4l2_subdev *sd)
@@ -10982,7 +14705,7 @@ static int m9mo_init_param(struct v4l2_subdev *sd)
 	err = m9mo_writew(sd, M9MO_CATEGORY_SYS, M9MO_SYS_INT_EN,
 			M9MO_INT_MODE | M9MO_INT_CAPTURE | M9MO_INT_FRAME_SYNC
 			| M9MO_INT_ATSCENE_UPDATE
-			| M9MO_INT_SOUND);
+			| M9MO_INT_SOUND | M9MO_INT_ZOOM);
 	CHECK_ERR(err);
 
 	err = m9mo_writeb(sd, M9MO_CATEGORY_PARM,
@@ -10996,28 +14719,26 @@ static int m9mo_init_param(struct v4l2_subdev *sd)
 
 	m9mo_set_sensor_mode(sd, state->sensor_mode);
 
-#if 0
-	err = m9mo_writel(sd, M9MO_CATEGORY_CAPPARM,
-		M9MO_CAPPARM_THUMB_JPEG_MAX, M9MO_THUMB_MAXSIZE);
-	CHECK_ERR(err);
-
-	/* Face detect */
-	err = m9mo_writeb(sd, M9MO_CATEGORY_FD, M9MO_FD_SIZE, 0x01);
-	CHECK_ERR(err);
-
-	err = m9mo_writeb(sd, M9MO_CATEGORY_FD, M9MO_FD_MAX, 0x0B);
-	CHECK_ERR(err);
-
-	/* HDR */
-	err = m9mo_writeb(sd, M9MO_CATEGORY_CAPCTRL,
-			M9MO_CAPCTRL_CAP_FRM_COUNT, 0x03);
-	CHECK_ERR(err);
-
-	err = m9mo_writeb(sd, M9MO_CATEGORY_AE, M9MO_AE_AUTO_BRACKET_EV, 0x64);
-	CHECK_ERR(err);
-#endif
 	cam_trace("X\n");
 	return 0;
+}
+
+static int m9mo_fw_writing(struct v4l2_subdev *sd)
+{
+	int err = 0;
+
+#ifdef CONFIG_VIDEO_M9MO_SPI
+	/*download fw by SPI*/
+	if (system_rev >= 5) {
+		if (m9mo_SIO_loader(sd))
+			err = m9mo_init_fw_load(sd);
+	} else
+#endif
+	{
+		err = m9mo_load_fw_main(sd);
+	}
+
+	return err;
 }
 
 static int m9mo_ois_init(struct v4l2_subdev *sd)
@@ -11081,14 +14802,47 @@ static int m9mo_ois_init(struct v4l2_subdev *sd)
 	} while (try_cnt);
 
 	/* Lens boot */
-	err = m9mo_writeb(sd, M9MO_CATEGORY_LENS,
-			M9MO_LENS_AF_INITIAL, 0x00);
-	int_factor = m9mo_wait_interrupt(sd, M9MO_ISP_TIMEOUT);
-	if (!(int_factor & M9MO_INT_LENS_INIT)) {
-		cam_err("M9MO_INT_LENS_INIT isn't issued, %#x\n",
-				int_factor);
-		return -ETIMEDOUT;
+	if (!m9mo_Lens_close_hold) {
+		err = m9mo_writeb(sd, M9MO_CATEGORY_LENS,
+				M9MO_LENS_AF_INITIAL, 0x00);
+		int_factor = m9mo_wait_interrupt(sd, M9MO_ISP_TIMEOUT);
+		if (!(int_factor & M9MO_INT_LENS_INIT)) {
+			cam_err("M9MO_INT_LENS_INIT isn't issued, %#x\n",
+					int_factor);
+			return -ETIMEDOUT;
+		}
+		m9mo_Lens_Off_Needed = 1;
 	}
+	cam_dbg("m9mo_Lens_Off_Needed = %d\n", m9mo_Lens_Off_Needed);
+	cam_dbg("X\n");
+
+	return err;
+}
+
+static int m9mo_auto_fw_check(struct v4l2_subdev *sd)
+{
+	struct i2c_client *client = v4l2_get_subdevdata(sd);
+	const struct m9mo_platform_data *pdata = client->dev.platform_data;
+	int err = 0;
+
+	cam_info("sysfs_check_app == %d\n", sysfs_check_app);
+	if (sysfs_check_app != 1) return -1;
+
+	if (!(strcmp(sysfs_phone_fw, sysfs_sensor_fw) > 0)) return -1;
+	cam_dbg("Auto Firmware update start ~~~\n");
+
+	pdata->power_on_off(0);
+	msleep(5);
+	pdata->power_on_off(1);
+
+	err = m9mo_fw_writing(sd);
+
+	pdata->power_on_off(0);
+	msleep(100);
+	pdata->power_on_off(1);
+
+	pdata->config_sambaz(0);
+	msleep(1000);
 
 	cam_dbg("X\n");
 
@@ -11103,9 +14857,11 @@ static int m9mo_init(struct v4l2_subdev *sd, u32 val)
 	u32 int_factor;
 	/*u32 value;*/
 	int err;
+	int lens_mem;
 
 	cam_dbg("E : val = %d\n", val);
-
+	cam_dbg("system_rev : %d\n", system_rev);
+re_init:
 	/* Default state values */
 	state->preview = NULL;
 	state->capture = NULL;
@@ -11126,6 +14882,8 @@ static int m9mo_init(struct v4l2_subdev *sd, u32 val)
 	state->zoom = 0;
 	state->smart_zoom_mode = 0;
 
+	state->fast_capture_set = 0;
+
 	state->vss_mode = 0;
 	state->dual_capture_start = 0;
 	state->dual_capture_frame = 1;
@@ -11141,8 +14899,17 @@ static int m9mo_init(struct v4l2_subdev *sd, u32 val)
 	state->gamma_tbl_rgb_cap = 1;
 	state->gamma_tbl_rgb_mon = 1;
 
+	state->mburst_start = false;
+	state->factory_log_write = true;
+	state->factory_no_lens_off = false;
+
 	memset(&state->focus, 0, sizeof(state->focus));
 
+	m9mo_Lens_close_hold = (val & 0x00FF);
+	lens_mem = (val >> 8) & 0xFF;
+	m9mo_Lens_Off_Needed = 0;
+
+#ifdef HOLD_LENS_SUPPORT
 	if (!leave_power) {
 		/* SambaZ PLL enable */
 		cam_dbg("SambaZ On start ~~~\n");
@@ -11168,24 +14935,90 @@ static int m9mo_init(struct v4l2_subdev *sd, u32 val)
 		}
 		cam_info("ISP boot complete\n");
 	}
+#else
+	/* SambaZ PLL enable */
+	cam_dbg("SambaZ On start ~~~\n");
+	pdata->config_sambaz(1);
+	cam_dbg("SambaZ On finish ~~~\n");
+
+#ifdef CONFIG_MACH_GC2PD
+	err = m9mo_writel(sd, M9MO_CATEGORY_FLASH,
+			0x0C, 0x27c00020);
+#else
+	if (system_rev > 0) {
+		err = m9mo_writel(sd, M9MO_CATEGORY_FLASH,
+				0x0C, 0x27c00020);
+	}
+#endif
+	/* start camera program(parallel FLASH ROM) */
+	cam_info("write 0x0f, 0x12~~~\n");
+	err = m9mo_writeb(sd, M9MO_CATEGORY_FLASH,
+			M9MO_FLASH_CAM_START, 0x01);
+	CHECK_ERR(err);
+
+	int_factor = m9mo_wait_interrupt(sd, M9MO_ISP_TIMEOUT);
+	if (!(int_factor & M9MO_INT_MODE)) {
+		cam_err("firmware was erased?\n");
+		state->isp.bad_fw++;
+		return -ENOSYS;
+	}
+	cam_info("ISP boot complete\n");
+#endif
 
 	/* check up F/W version */
 	err = m9mo_check_fw(sd);
+#ifdef CONFIG_MACH_GC2PD
+	err = m9mo_auto_fw_check(sd);
+	if (err == 0) goto re_init;
+#endif
+	cam_info("M9MO init complete\n");
 
+	cam_info("M9MO set init target memory(%d)\n", lens_mem);
+	err = m9mo_writeb(sd, M9MO_CATEGORY_LENS,
+			M9MO_LENS_MEM_INIT_TARGET, lens_mem);
+
+#ifdef CONFIG_GC2PD_LTE
+	cam_info("M9MO set LTE\n");
+	err = m9mo_writeb(sd, M9MO_CATEGORY_PARM,
+			0x17, 0x01);
+#endif
+
+	return 0;
+}
+
+static int m9mo_post_init(struct v4l2_subdev *sd, u32 val)
+{
+	int err;
+
+	cam_info("post init E");
+	cam_info("Thermistor val: True(0~40C) or False = %d\n", val);
+
+	err = m9mo_writeb(sd, M9MO_CATEGORY_LENS,
+			M9MO_LENS_AF_TEMP_INDICATE, val);
+	CHECK_ERR(err);
+
+#ifdef HOLD_LENS_SUPPORT
 	if (!leave_power) {
 		m9mo_init_param(sd);
 		m9mo_ois_init(sd);
 	}
+#else
+	m9mo_init_param(sd);
+	m9mo_ois_init(sd);
+#endif
 
+#ifdef HOLD_LENS_SUPPORT
 	leave_power = false;
-	cam_info("Lens boot complete - M9MO init complete\n");
+#endif
+
+	cam_info("Lens boot complete - M9MO post init complete\n");
 
 	return 0;
 }
 
 static const struct v4l2_subdev_core_ops m9mo_core_ops = {
 	.init = m9mo_init,		/* initializing API */
-	.load_fw = m9mo_load_fw_main,
+	.load_fw = m9mo_fw_writing,
 	.queryctrl = m9mo_queryctrl,
 	.g_ctrl = m9mo_g_ctrl,
 	.s_ctrl = m9mo_s_ctrl,
@@ -11218,9 +15051,81 @@ static ssize_t m9mo_camera_fw_show(struct device *dev,
 	return sprintf(buf, "%s %s\n", sysfs_phone_fw, sysfs_sensor_fw);
 }
 
+static ssize_t m9mo_check_app_store(struct device *dev,
+			struct device_attribute *attr, const char *buf, size_t count)
+{
+	int v = simple_strtoul(buf, NULL, 10);
+	sysfs_check_app = v;
+	return count;
+}
+
+static ssize_t m9mo_camera_close(struct device *dev,
+			struct device_attribute *attr, const char *buf, size_t count)
+{
+	struct v4l2_subdev *sd;
+	const struct m9mo_platform_data *pdata;
+	int err = 0;
+
+	if (tempclient == NULL) {
+		cam_err("i2c client is NULL!!!!\n");
+		return count;
+	}
+
+	if (m9mo_Lens_Off_Needed == 0) {
+		cam_err("Lens close. Already\n");
+		return count;
+	}
+
+	sd = i2c_get_clientdata(tempclient);
+	pdata = tempclient->dev.platform_data;
+
+	cam_trace("E\n");
+
+	/* AF LED regulator off */
+	pdata->af_led_power(0);
+
+	/* Lens Close */
+	if (m9mo_set_lens_off(sd) < 0)
+		cam_err("failed to set m9mo_set_lens_off~~~~~\n");
+
+	cam_trace("x\n");
+	return count;
+}
+
+
+static ssize_t m9mo_cancelwait_store(struct device *dev,
+			struct device_attribute *attr, const char *buf, size_t count)
+{
+	struct v4l2_subdev *sd;
+	struct m9mo_state *state;
+	int cnt = 0;
+
+	if (tempclient == NULL) {
+		cam_err("i2c client is NULL!!!!\n");
+		return count;
+	}
+
+	sd = i2c_get_clientdata(tempclient);
+	state = to_state(sd);
+
+	cam_trace("E : %s\n", buf);
+	/* cancel capture of Long_AE */
+	if (!strcmp(buf, "534")) {
+		cam_trace("Wake-up\n");
+		state->isp.issued = 1;
+		wake_up(&state->isp.wait);
+	}
+
+	cam_trace("x\n");
+	return count;
+}
+
 static DEVICE_ATTR(rear_camtype, S_IRUGO, m9mo_camera_type_show, NULL);
 static DEVICE_ATTR(rear_camfw, S_IRUGO, m9mo_camera_fw_show, NULL);
+static DEVICE_ATTR(rear_camclose, S_IRUGO|S_IWUSR, NULL, m9mo_camera_close);
 
+static DEVICE_ATTR(rear_checkApp, S_IRUGO|S_IWUSR, NULL, m9mo_check_app_store);
+static DEVICE_ATTR(rear_cancelwait, S_IRUGO|S_IWUSR, NULL, m9mo_cancelwait_store);
 /*
  * m9mo_probe
  * Fetching platform data is being done with s_config subdev call.
@@ -11242,11 +15147,36 @@ static int __devinit m9mo_probe(struct i2c_client *client,
 	sd = &state->sd;
 	strcpy(sd->name, M9MO_DRIVER_NAME);
 
+	/* MISO is Low Control */
+	if (!gpio_request(EXYNOS4_GPB(6), "SPI_MISO")) {
+		s3c_gpio_cfgpin(EXYNOS4_GPB(6), S3C_GPIO_SFN(0));
+		s3c_gpio_setpull(EXYNOS4_GPB(6), S3C_GPIO_PULL_DOWN);
+		gpio_direction_output(EXYNOS4_GPB(6), 0);
+		gpio_free(EXYNOS4_GPB(6));
+		cam_dbg("MISO is setting to 0.\n");
+	}
+	/* NSS is Low Control */
+	if (!gpio_request(EXYNOS4_GPB(5), "SPI_NSS")) {
+		s3c_gpio_cfgpin(EXYNOS4_GPB(5), S3C_GPIO_SFN(0));
+		s3c_gpio_setpull(EXYNOS4_GPB(5), S3C_GPIO_PULL_DOWN);
+		gpio_direction_output(EXYNOS4_GPB(5), 0);
+		gpio_free(EXYNOS4_GPB(5));
+		cam_dbg("CS is setting to 0.\n");
+	}
+
 	/* Registering subdev */
 	v4l2_i2c_subdev_init(sd, client, &m9mo_ops);
 
 #ifdef CAM_DEBUG
-	state->dbg_level = CAM_TRACE | CAM_DEBUG;
+	state->dbg_level = CAM_TRACE | CAM_DEBUG | CAM_I2C;
+#endif
+
+#ifdef M9MO_ISP_DEBUG
+	state->dbg_level = CAM_TRACE | CAM_DEBUG | CAM_I2C;
+#endif
+
+#ifdef M9MO_BUS_FREQ_LOCK
+	dev_lock(bus_dev, m9mo_dev, 400200);
 #endif
 
 	/* wait queue initialize */
@@ -11263,31 +15193,67 @@ static int __devinit m9mo_probe(struct i2c_client *client,
 	}
 	state->isp.irq = pdata->irq;
 	state->isp.issued = 0;
-
+	tempclient = client;
 	cam_dbg("%s\n", __func__);
 
 	return 0;
 }
 
+#ifdef M9MO_ISP_DEBUG
+static int m9mo_LogNo;
+#endif
 static int __devexit m9mo_remove(struct i2c_client *client)
 {
 	struct v4l2_subdev *sd = i2c_get_clientdata(client);
 	struct m9mo_state *state = to_state(sd);
+	const struct m9mo_platform_data *pdata = client->dev.platform_data;
 	int err = 0;
-	/*int err;*/
 
+	cam_trace("E\n");
+
+	/* AF LED regulator off */
+	pdata->af_led_power(0);
+
+#ifdef HOLD_LENS_SUPPORT
 	if (!leave_power) {
+#ifdef M9MO_ISP_DEBUG
+		char filename[32];
+		sprintf(filename, "_ISP_%06d.LOG%c", ++m9mo_LogNo, 0);
+		m9mo_makeLog(sd, filename, false);
+#endif
 		if (m9mo_set_lens_off(sd) < 0)
 			cam_err("failed to set m9mo_set_lens_off~~~~~\n");
+	} else {
+		m9mo_set_capture_mode(sd, RUNNING_MODE_SINGLE);
 	}
+#else
+#ifdef M9MO_ISP_DEBUG
+	char filename[32];
+	sprintf(filename, "_ISP_%06d.LOG%c", ++m9mo_LogNo, 0);
+	m9mo_makeLog(sd, filename, false);
+#endif
+	if (m9mo_set_lens_off(sd) < 0) {
+		cam_err("failed to set m9mo_set_lens_off~~~~~\n");
+		tempclient = NULL;
+	}
+#endif
 
+#ifdef HOLD_LENS_SUPPORT
 	if (leave_power) {
 		err = m9mo_set_lens_off_timer(sd, 0);
 		CHECK_ERR(err);
 
-		err = m9mo_set_mode(sd, M9MO_PARMSET_MODE);
-		CHECK_ERR(err);
+		/*err = m9mo_set_mode(sd, M9MO_PARMSET_MODE);
+		CHECK_ERR(err);*/
 	}
+#else
+	err = m9mo_set_lens_off_timer(sd, 0);
+	if (err < 1) {
+		cam_err("failed to set m9mo_set_lens_off_timer~~~~~\n");
+		tempclient = NULL;
+	}
+	CHECK_ERR(err);
+#endif
 
 	if (state->isp.irq > 0)
 		free_irq(state->isp.irq, sd);
@@ -11297,8 +15263,13 @@ static int __devexit m9mo_remove(struct i2c_client *client)
 #if 0
 	kfree(state->sensor_type);
 #endif
+#ifdef M9MO_BUS_FREQ_LOCK
+	dev_unlock(bus_dev, m9mo_dev);
+#endif
 	kfree(state);
+	tempclient = NULL;
 
+	cam_trace("x\n");
 	return 0;
 }
 
@@ -11319,6 +15290,9 @@ static struct i2c_driver m9mo_i2c_driver = {
 
 static int __init m9mo_mod_init(void)
 {
+#ifdef M9MO_BUS_FREQ_LOCK
+	bus_dev = dev_get("exynos-busfreq");
+#endif
 	if (!m9mo_dev) {
 		m9mo_dev =
 		device_create(camera_class, NULL, 0, NULL, "rear");
@@ -11336,6 +15310,22 @@ static int __init m9mo_mod_init(void)
 			cam_err("failed to create device file, %s\n",
 			dev_attr_rear_camfw.attr.name);
 		}
+		if (device_create_file
+		(m9mo_dev, &dev_attr_rear_checkApp) < 0) {
+			cam_err("failed to create device file, %s\n",
+			dev_attr_rear_checkApp.attr.name);
+		}
+		if (device_create_file
+		(m9mo_dev, &dev_attr_rear_camclose) < 0) {
+			cam_err("failed to create device file, %s\n",
+			dev_attr_rear_camclose.attr.name);
+		}
+		if (device_create_file
+		(m9mo_dev, &dev_attr_rear_cancelwait) < 0) {
+			cam_err("failed to create device file, %s\n",
+			dev_attr_rear_cancelwait.attr.name);
+		}
+
 	}
 	return i2c_add_driver(&m9mo_i2c_driver);
 }

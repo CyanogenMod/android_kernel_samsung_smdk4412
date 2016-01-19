@@ -259,8 +259,7 @@ static int k3g_report_gyro_values(struct k3g_data *k3g_data)
 		return k3g_restart_fifo(k3g_data);
 	}
 
-	#if defined(CONFIG_MACH_U1_NA_SPR) \
-	|| defined(CONFIG_MACH_U1_NA_USCC)
+	#if defined(CONFIG_MACH_U1_NA_SPR)
 	input_report_rel(k3g_data->input_dev, REL_RX, -data.x);
 	input_report_rel(k3g_data->input_dev, REL_RY, -data.y);
 	#else

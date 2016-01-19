@@ -300,6 +300,7 @@
 #ifdef CONFIG_USB_CDFS_SUPPORT
 #ifdef CONFIG_USB_ANDROID_SAMSUNG_COMPOSITE
 #define _SUPPORT_MAC_   /* support to recognize CDFS on OSX (MAC PC) */
+#define VENDER_CMD_VERSION_INFO	0xfa  /* Image version info */
 #endif
 #endif
 
@@ -414,6 +415,8 @@ struct fsg_common {
 #ifdef CONFIG_USB_ANDROID_SAMSUNG_COMPOSITE
 	char vendor_string[8 + 1];
 	char product_string[16 + 1];
+	/* Additional image version info for SUA */
+	char version_string[100 + 1];
 #endif
 
 	struct kref		ref;
@@ -500,20 +503,39 @@ static int send_message(struct fsg_common *common, char *msg)
 	return 0;
 }
 
-static int do_autorun_check(struct fsg_common *common)
+static int do_timer_stop(struct fsg_common *common)
 {
 	printk(KERN_INFO "%s called\n", __func__);
-	send_message(common, "autorun");
+	send_message(common, "time stop");
 
 	return 0;
 }
 
-static int do_switch_atmode(struct fsg_common *common)
+static int do_timer_reset(struct fsg_common *common)
 {
 	printk(KERN_INFO "%s called\n", __func__);
-	send_message(common, "Load AT");
+	send_message(common, "time reset");
 
 	return 0;
+}
+
+static int get_version_info(struct fsg_common *common, struct fsg_buffhd *bh)
+{
+	u8	*buf = (u8 *) bh->buf;
+	u8 return_size=common->data_size_from_cmnd;
+
+	memset(buf,0,common->data_size_from_cmnd);
+	if (return_size > sizeof(common->version_string))
+	{
+		/* driver version infor reply */
+		memcpy(buf , common->version_string, sizeof(common->version_string));
+		return_size = sizeof(common->version_string);
+	}
+	else
+	{
+		memcpy(buf , common->version_string, return_size);
+	}
+	return return_size;
 }
 #endif /* CONFIG_USB_ANDROID_SAMSUNG_COMPOSITE */
 #endif
@@ -1076,11 +1098,7 @@ static int do_read(struct fsg_common *common)
 		curlun->sense_data = SS_LOGICAL_BLOCK_ADDRESS_OUT_OF_RANGE;
 		return -EINVAL;
 	}
-	if (curlun->cdrom)
-		file_offset = ((loff_t) lba) << 11;
-	else
-		file_offset = ((loff_t) lba) << 9;
-
+	file_offset = ((loff_t) lba) << 9;
 
 	/* Carry out the file reads */
 	amount_left = common->data_size_from_cmnd;
@@ -1095,8 +1113,6 @@ static int do_read(struct fsg_common *common)
 		bh->inreq->length = 0;
 		return -EIO;		/* No default reply */
 	}
-	if (curlun->cdrom)
-		amount_left <<= 2;
 
 	for (;;) {
 		/*
@@ -1671,7 +1687,7 @@ static int do_read_capacity(struct fsg_common *common, struct fsg_buffhd *bh)
 
 	put_unaligned_be32(curlun->num_sectors - 1, &buf[0]);
 						/* Max logical block */
-	put_unaligned_be32(curlun->cdrom ? 2048 : 512, &buf[4]);	/* Block length */
+	put_unaligned_be32(512, &buf[4]);	/* Block length */
 	return 8;
 }
 
@@ -1780,6 +1796,10 @@ static int do_mode_sense(struct fsg_common *common, struct fsg_buffhd *bh)
 	 * The mode pages, in numerical order.  The only page we support
 	 * is the Caching page.
 	 */
+	/*
+	* When our device works like CD-ROM device, we need to support
+	* Page code 0x2a
+	*/
 	if (page_code == 0x08 || all_pages) {
 		valid_page = 1;
 		buf[0] = 0x08;		/* Page code */
@@ -1800,6 +1820,19 @@ static int do_mode_sense(struct fsg_common *common, struct fsg_buffhd *bh)
 		}
 		buf += 12;
 	}
+#ifdef CONFIG_USB_CDFS_SUPPORT
+	else if (page_code == 0x2A) {
+		valid_page = 1;
+		buf[0] = 0x2A;		/* Page code */
+		buf[1] = 26;		/* Page length */
+		memset(buf+2, 0,26);/* None of the fields are changeable */
+		buf[2] = 0x02;
+		buf[3] = 0x02;
+		buf[4] = 0x04;
+		buf[6] = 0x28;
+		buf += 28;
+	 }
+#endif
 
 	/*
 	 * Check that a valid page was requested and the mode data length
@@ -1930,7 +1963,7 @@ static int do_read_format_capacities(struct fsg_common *common,
 
 	put_unaligned_be32(curlun->num_sectors, &buf[0]);
 						/* Number of blocks */
-	put_unaligned_be32(curlun->cdrom ? 2048 : 512, &buf[4]);	/* Block length */
+	put_unaligned_be32(512, &buf[4]);	/* Block length */
 	buf[4] = 0x02;				/* Current capacity */
 	return 12;
 }
@@ -2480,7 +2513,16 @@ static int do_scsi_command(struct fsg_common *common)
 		common->data_size_from_cmnd =
 			get_unaligned_be16(&common->cmnd[7]);
 		reply = check_command(common, 10, DATA_DIR_TO_HOST,
+#if defined(CONFIG_USB_CDFS_SUPPORT)
+#ifdef _SUPPORT_MAC_
 				      (0xf<<6) | (1<<1), 1,
+#else
+				      (7<<6) | (1<<1), 1,
+#endif
+#else
+				      (7<<6) | (1<<1), 1,
+#endif
+
 				      "READ TOC");
 		if (reply == 0)
 			reply = do_read_toc(common, bh);
@@ -2575,12 +2617,12 @@ static int do_scsi_command(struct fsg_common *common)
 
 #if defined(CONFIG_USB_CDFS_SUPPORT)
 #ifdef CONFIG_USB_ANDROID_SAMSUNG_COMPOSITE
-	case RELEASE:	/* SC_AUTORUN_CHECK0 : 0x17 */
-		reply = do_switch_atmode(common);
+	case RELEASE:	/* SUA Timer Stop : 0x17 */
+		reply = do_timer_stop(common);
 		break;
 
-	case RESERVE:	/* SC_AUTORUN_CHECK1 : 0x16 */
-		reply = do_autorun_check(common);
+	case RESERVE:	/* SUA Timer Reset : 0x16 */
+		reply = do_timer_reset(common);
 		break;
 
 #ifdef _SUPPORT_MAC_
@@ -2596,6 +2638,12 @@ static int do_scsi_command(struct fsg_common *common)
 		break;
 
 #endif /* _SUPPORT_MAC_ */
+
+	/* reply current image version */
+	case VENDER_CMD_VERSION_INFO:
+		common->data_size_from_cmnd = common->cmnd[4];
+		reply = get_version_info(common,bh);
+		break;
 #endif
 #endif
 	/* Some mandatory commands that we recognize but don't implement.
@@ -3144,7 +3192,6 @@ static int fsg_main_thread(void *common_)
 static DEVICE_ATTR(ro, 0644, fsg_show_ro, fsg_store_ro);
 static DEVICE_ATTR(nofua, 0644, fsg_show_nofua, fsg_store_nofua);
 static DEVICE_ATTR(file, 0644, fsg_show_file, fsg_store_file);
-static DEVICE_ATTR(cdrom, 0644, fsg_show_cdrom, fsg_store_cdrom);
 
 
 /****************************** FSG COMMON ******************************/
@@ -3227,7 +3274,7 @@ static struct fsg_common *fsg_common_init(struct fsg_common *common,
 
 	for (i = 0, lcfg = cfg->luns; i < nluns; ++i, ++curlun, ++lcfg) {
 		curlun->cdrom = !!lcfg->cdrom;
-		curlun->ro = lcfg->cdrom || lcfg->ro;
+		curlun->ro = lcfg->ro;
 		curlun->initially_ro = curlun->ro;
 		curlun->removable = lcfg->removable;
 #ifdef CONFIG_USB_ANDROID_SAMSUNG_COMPOSITE
@@ -3260,10 +3307,6 @@ static struct fsg_common *fsg_common_init(struct fsg_common *common,
 		rc = device_create_file(&curlun->dev, &dev_attr_nofua);
 		if (rc)
 			goto error_luns;
-		rc = device_create_file(&curlun->dev, &dev_attr_cdrom);
-		if (rc)
-			goto error_luns;
-
 
 		if (lcfg->filename) {
 			rc = fsg_lun_open(curlun, lcfg->filename);
@@ -3405,7 +3448,6 @@ static void fsg_common_release(struct kref *ref)
 			device_remove_file(&lun->dev, &dev_attr_nofua);
 			device_remove_file(&lun->dev, &dev_attr_ro);
 			device_remove_file(&lun->dev, &dev_attr_file);
-			device_remove_file(&lun->dev, &dev_attr_cdrom);
 			fsg_lun_close(lun);
 			device_unregister(&lun->dev);
 		}

@@ -182,8 +182,10 @@ static int ohci_hcd_s5p_drv_runtime_resume(struct device *dev)
 		ret = pdata->phy_resume(pdev, S5P_USB_PHY_HOST);
 
 	if (!ret) {
-		set_bit(HCD_FLAG_HW_ACCESSIBLE, &hcd->flags);
-		ohci_finish_controller_resume(hcd);
+		if (hcd) {
+			set_bit(HCD_FLAG_HW_ACCESSIBLE, &hcd->flags);
+			ohci_finish_controller_resume(hcd);
+		}
 	}
 
 	return 0;
@@ -280,6 +282,10 @@ static ssize_t store_ohci_power(struct device *dev,
 	device_lock(dev);
 	if (!power_on && s5p_ohci->power_on) {
 		printk(KERN_DEBUG "%s: OHCI turns off\n", __func__);
+#if defined(CONFIG_LINK_DEVICE_HSIC) || defined(CONFIG_LINK_DEVICE_USB)
+		if (hcd->self.root_hub)
+			pm_runtime_forbid(&hcd->self.root_hub->dev);
+#endif
 		pm_runtime_forbid(dev);
 		s5p_ohci->power_on = 0;
 		usb_remove_hcd(hcd);
@@ -470,11 +476,19 @@ static void ohci_hcd_s5p_drv_shutdown(struct platform_device *pdev)
 	if (!s5p_ohci->power_on)
 		return;
 
-	if (pdata && pdata->phy_resume)
-		pdata->phy_resume(pdev, S5P_USB_PHY_HOST);
+	if (!hcd)
+		return;
 
-	if (hcd->driver->shutdown)
-		hcd->driver->shutdown(hcd);
+	if (!hcd->rh_registered)
+		return;
+
+	if(!&hcd->flags)
+		return;
+
+	if (test_bit(HCD_FLAG_HW_ACCESSIBLE, &hcd->flags)) {
+		if (hcd->driver->shutdown)
+			hcd->driver->shutdown(hcd);
+	}
 
 	clear_bit(HCD_FLAG_HW_ACCESSIBLE, &hcd->flags);
 

@@ -120,6 +120,11 @@ static struct modem_io_t tdscdma_io_devices[] = {
 	},
 };
 
+static struct modemlink_pm_data modem_link_pm_data = {
+	.name = "td_link_pm",
+	.gpio_link_enable = 0,
+};
+
 /* To get modem state, register phone active irq using resource */
 static struct resource tdscdma_modem_res[] = {
 };
@@ -148,6 +153,8 @@ static struct modem_data tdscdma_modem_data = {
 
 	.num_iodevs = ARRAY_SIZE(tdscdma_io_devices),
 	.iodevs = tdscdma_io_devices,
+
+	.link_pm_data = &modem_link_pm_data,
 };
 
 /* if use more than one modem device, then set id num */
@@ -173,6 +180,7 @@ static void tdscdma_modem_cfg_gpio(void)
 	unsigned gpio_ipc_srdy = tdscdma_modem_data.gpio_ipc_srdy;
 	unsigned gpio_ipc_sub_mrdy = tdscdma_modem_data.gpio_ipc_sub_mrdy;
 	unsigned gpio_ipc_sub_srdy = tdscdma_modem_data.gpio_ipc_sub_srdy;
+	unsigned gpio_ap_cp_int2 = tdscdma_modem_data.gpio_ap_cp_int2;
 #ifdef CONFIG_SEC_DUAL_MODEM_MODE
 	unsigned gpio_sim_io_sel = tdscdma_modem_data.gpio_sim_io_sel;
 	unsigned gpio_cp_ctrl1 = tdscdma_modem_data.gpio_cp_ctrl1;
@@ -298,6 +306,16 @@ static void tdscdma_modem_cfg_gpio(void)
 
 			irq_set_irq_type(gpio_to_irq(gpio_ipc_sub_srdy),
 				IRQ_TYPE_EDGE_RISING);
+		}
+	}
+
+	if (gpio_ap_cp_int2) {
+		err = gpio_request(gpio_ap_cp_int2, "AP_CP_INT2");
+		if (err) {
+			printk(KERN_ERR "ipc_spi_cfg_gpio - fail to request gpio %s : %d\n",
+				"AP_CP_INT2", err);
+		} else {
+			gpio_direction_output(gpio_ap_cp_int2, 0);
 		}
 	}
 

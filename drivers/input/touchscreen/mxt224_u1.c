@@ -766,7 +766,7 @@ void check_chip_calibration(unsigned char one_touch_input_flag)
 			}
 		}
 
-		pr_debug("[TSP] t: %d, a: %d\n", tch_ch, atch_ch);
+		printk(KERN_ERR "[TSP] t: %d, a: %d\n", tch_ch, atch_ch);
 
 		/* send page up command so we can detect
 		when data updates next time, page byte will sit at 1
@@ -1240,7 +1240,7 @@ static void report_input_data(struct mxt224_data *data)
 			printk(KERN_ERR "[TSP] Up[%d] %4d,%4d\n", i,
 			       data->fingers[i].x, data->fingers[i].y);
 #else
-			pr_debug("[TSP] Up[%d]\n", i);
+			printk(KERN_ERR "[TSP] Up[%d]\n", i);
 #endif
 
 			continue;
@@ -1284,7 +1284,7 @@ static void report_input_data(struct mxt224_data *data)
 			       data->fingers[i].x, data->fingers[i].y);
 #else
 		if (copy_data->touch_is_pressed_arr[i] == 1) {
-			pr_debug("[TSP] Dn[%d]\n", i);
+			printk(KERN_ERR "[TSP] Dn[%d]\n", i);
 			copy_data->touch_is_pressed_arr[i] = 2;
 		}
 #endif
@@ -2908,6 +2908,7 @@ static ssize_t set_mxt_update_show(struct device *dev,
 		copy_data->firm_status_data = 3;
 		printk(KERN_ERR
 			"[TSP The firmware update failed(%d)\n", error);
+		enable_irq(data->client->irq);
 		return error;
 	} else {
 		dev_dbg(dev, "The firmware update succeeded\n");

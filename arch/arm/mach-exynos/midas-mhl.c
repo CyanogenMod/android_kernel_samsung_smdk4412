@@ -1,5 +1,8 @@
 #include <linux/platform_device.h>
 #include <linux/gpio.h>
+#ifdef	CONFIG_MACH_TAB3
+#include <linux/err.h>
+#endif
 #include <linux/i2c.h>
 #include <linux/i2c-gpio.h>
 #include <linux/irq.h>
@@ -15,6 +18,12 @@
 #include "midas.h"
 #include <plat/udc-hs.h>
 
+#if defined(CONFIG_MACH_M3_USA_TMO) || defined(CONFIG_MACH_ZEST)
+#define	CONFIG_USE_HPD_EN
+#endif
+
+#include "board-exynos4212.h"
+
 /*Event of receiving*/
 #define PSY_BAT_NAME "battery"
 /*Event of sending*/
@@ -23,6 +32,7 @@
 #ifdef CONFIG_SAMSUNG_MHL
 static void sii9234_cfg_gpio(void)
 {
+	int ret;
 	printk(KERN_INFO "%s()\n", __func__);
 
 	/* AP_MHL_SDA */
@@ -38,7 +48,11 @@ static void sii9234_cfg_gpio(void)
 	irq_set_irq_type(MHL_WAKEUP_IRQ, IRQ_TYPE_EDGE_RISING);
 	s3c_gpio_setpull(GPIO_MHL_WAKE_UP, S3C_GPIO_PULL_DOWN);
 
-	gpio_request(GPIO_MHL_INT, "MHL_INT");
+	ret = gpio_request(GPIO_MHL_INT, "MHL_INT");
+	if (unlikely(ret)) {
+		pr_err("[ERROR] %s(): failed on gpio_request()!\n", __func__);
+		return;
+	}
 	s5p_register_gpio_interrupt(GPIO_MHL_INT);
 	s3c_gpio_setpull(GPIO_MHL_INT, S3C_GPIO_PULL_DOWN);
 	irq_set_irq_type(MHL_INT_IRQ, IRQ_TYPE_EDGE_RISING);
@@ -55,18 +69,48 @@ static void sii9234_cfg_gpio(void)
 #if !defined(CONFIG_MACH_C1_KOR_LGT) && !defined(CONFIG_SAMSUNG_MHL_9290)
 #if !defined(CONFIG_MACH_P4NOTE) && !defined(CONFIG_MACH_T0) && \
 	!defined(CONFIG_MACH_M3) && !defined(CONFIG_MACH_SLP_T0_LTE) && \
-	!defined(CONFIG_MACH_KONA)
+	!defined(CONFIG_MACH_KONA) && !defined(CONFIG_MACH_TAB3) && \
+	!defined(CONFIG_MACH_GD2) && !defined(CONFIG_MACH_SP7160LTE) && \
+	!defined(CONFIG_MACH_ZEST)
 	s3c_gpio_cfgpin(GPIO_MHL_SEL, S3C_GPIO_OUTPUT);
 	s3c_gpio_setpull(GPIO_MHL_SEL, S3C_GPIO_PULL_NONE);
 	gpio_set_value(GPIO_MHL_SEL, GPIO_LEVEL_LOW);
 #endif
 #endif
+
+#ifdef	CONFIG_USE_HPD_EN
+	s3c_gpio_cfgpin(GPIO_HDMI_HPD_EN, S3C_GPIO_OUTPUT);
+	s3c_gpio_setpull(GPIO_HDMI_HPD_EN, S3C_GPIO_PULL_NONE);
+	gpio_set_value(GPIO_HDMI_HPD_EN, GPIO_LEVEL_LOW);
+#endif
 }
 
 static void sii9234_power_onoff(bool on)
 {
+#ifdef	CONFIG_MACH_TAB3
+	struct regulator *regulator_1_2v;
+	struct regulator *regulator_1_8v;
+	struct regulator *regulator_3_3v;
+#endif
 	printk(KERN_INFO "%s(%d)\n", __func__, on);
 
+#ifdef	CONFIG_MACH_TAB3
+	regulator_1_2v = regulator_get(NULL, "vsil_1.2v");
+	if (IS_ERR(regulator_1_2v)) {
+		pr_err("[ERROR] cannot get the vsil_1.2v!\n");
+		return;
+	}
+	regulator_1_8v = regulator_get(NULL, "vcc_1.8v_mhl");
+	if (IS_ERR(regulator_1_8v)) {
+		pr_err("[ERROR] cannot get the vcc_1.8v_mhl!\n");
+		return;
+	}
+	regulator_3_3v = regulator_get(NULL, "vcc_3.3v_mhl");
+	if (IS_ERR(regulator_3_3v)) {
+		pr_err("[ERROR] cannot get the vcc_3.3v_mhl!\n");
+		return;
+	}
+#endif
 	if (on) {
 		/* To avoid floating state of the HPD pin *
 		 * in the absence of external pull-up     */
@@ -75,6 +119,15 @@ static void sii9234_power_onoff(bool on)
 
 		s3c_gpio_setpull(GPIO_MHL_SCL_1_8V, S3C_GPIO_PULL_DOWN);
 		s3c_gpio_setpull(GPIO_MHL_SCL_1_8V, S3C_GPIO_PULL_NONE);
+
+#ifdef	CONFIG_USE_HPD_EN
+		gpio_set_value(GPIO_HDMI_HPD_EN, GPIO_LEVEL_HIGH);
+#endif
+#ifdef	CONFIG_MACH_TAB3
+		regulator_enable(regulator_1_2v);
+		regulator_enable(regulator_1_8v);
+		regulator_enable(regulator_3_3v);
+#endif
 
 		/* sii9234_unmaks_interrupt(); // - need to add */
 		/* VCC_SUB_2.0V is always on */
@@ -89,7 +142,30 @@ static void sii9234_power_onoff(bool on)
 		gpio_set_value(GPIO_HDMI_EN, GPIO_LEVEL_LOW);
 
 		gpio_set_value(GPIO_MHL_RST, GPIO_LEVEL_LOW);
+
+#ifdef	CONFIG_USE_HPD_EN
+		gpio_set_value(GPIO_HDMI_HPD_EN, GPIO_LEVEL_LOW);
+#endif
+#ifdef	CONFIG_MACH_TAB3
+		if (regulator_is_enabled(regulator_1_2v))
+			regulator_disable(regulator_1_2v);
+		else
+			regulator_force_disable(regulator_1_2v);
+		if (regulator_is_enabled(regulator_1_8v))
+			regulator_disable(regulator_1_8v);
+		else
+			regulator_force_disable(regulator_1_8v);
+		if (regulator_is_enabled(regulator_3_3v))
+			regulator_disable(regulator_3_3v);
+		else
+			regulator_force_disable(regulator_3_3v);
+#endif
 	}
+#ifdef	CONFIG_MACH_TAB3
+	regulator_put(regulator_1_2v);
+	regulator_put(regulator_1_8v);
+	regulator_put(regulator_3_3v);
+#endif
 }
 
 #ifdef __MHL_NEW_CBUS_MSC_CMD__
@@ -182,7 +258,7 @@ static void sii9234_reset(void)
 }
 
 #ifndef CONFIG_SAMSUNG_USE_11PIN_CONNECTOR
-#if defined(CONFIG_MACH_P4NOTE) || defined(CONFIG_MACH_KONA)
+#if defined(CONFIG_MACH_P4NOTE) || defined(CONFIG_MACH_SP7160LTE) || defined(CONFIG_MACH_KONA) || defined(CONFIG_MACH_TAB3)
 #else
 static void mhl_usb_switch_control(bool on)
 {
@@ -203,10 +279,89 @@ static void mhl_usb_switch_control(bool on)
 #endif
 #endif
 
+#if defined(CONFIG_TAB3_01_BD)
+static void muic_mhl_cb(bool otg_enable, int plim)
+{
+	/* This function will be implemented by charger part. *
+	 * copied temporarily from JA.                        */
+
+	union power_supply_propval value;
+	int i, ret = 0;
+	struct power_supply *psy;
+	int current_cable_type = POWER_SUPPLY_TYPE_MISC;
+	int sub_type = ONLINE_SUB_TYPE_MHL;
+	int power_type = ONLINE_POWER_TYPE_UNKNOWN;
+	int muic_cable_type = max77693_muic_get_charging_type();
+
+	pr_info("%s: muic cable_type = %d\n",
+			__func__, muic_cable_type);
+	switch (muic_cable_type) {
+		case CABLE_TYPE_SMARTDOCK_MUIC:
+		case CABLE_TYPE_SMARTDOCK_TA_MUIC:
+		case CABLE_TYPE_SMARTDOCK_USB_MUIC:
+			return;
+		default:
+			break;
+	}
+
+	pr_info("%s: muic_mhl_cb:otg_enable=%d, plim=%d\n", __func__, otg_enable, plim);
+
+	if (plim == 0x00) {
+		pr_info("TA charger 500mA\n");
+		power_type = ONLINE_POWER_TYPE_MHL_500;
+	} else if (plim == 0x01) {
+		pr_info("TA charger 900mA\n");
+		power_type = ONLINE_POWER_TYPE_MHL_900;
+	} else if (plim == 0x02) {
+		pr_info("TA charger 1500mA\n");
+		power_type = ONLINE_POWER_TYPE_MHL_1500;
+	} else if (plim == 0x03) {
+		pr_info("USB charger\n");
+		power_type = ONLINE_POWER_TYPE_USB;
+	} else
+		current_cable_type = POWER_SUPPLY_TYPE_BATTERY;
+
+	if (otg_enable) {
+		psy_do_property("sec-charger", get,
+				POWER_SUPPLY_PROP_ONLINE, value);
+		pr_info("sec-charger : %d\n", value.intval);
+		if (value.intval == POWER_SUPPLY_TYPE_BATTERY ||
+				value.intval == POWER_SUPPLY_TYPE_WIRELESS){
+			if (!lpcharge) {
+				otg_control(true);
+				current_cable_type = POWER_SUPPLY_TYPE_BATTERY;
+				power_type = ONLINE_POWER_TYPE_UNKNOWN;
+			}
+		}
+	} else
+		otg_control(false);
+
+	for (i = 0; i < 10; i++) {
+		psy = power_supply_get_by_name("battery");
+		if (psy)
+			break;
+	}
+	if (i == 10) {
+		pr_err("%s: fail to get battery ps\n", __func__);
+		return;
+	}
+
+	value.intval = current_cable_type<<ONLINE_TYPE_MAIN_SHIFT
+		| sub_type<<ONLINE_TYPE_SUB_SHIFT
+		| power_type<<ONLINE_TYPE_PWR_SHIFT;
+	ret = psy->set_property(psy, POWER_SUPPLY_PROP_ONLINE,
+			&value);
+	if (ret) {
+		pr_err("%s: fail to set power_suppy ONLINE property(%d)\n",
+				__func__, ret);
+	}
+}
+#endif
+
 static struct sii9234_platform_data sii9234_pdata = {
 	.init = sii9234_cfg_gpio,
 #if defined(CONFIG_SAMSUNG_USE_11PIN_CONNECTOR) || \
-		defined(CONFIG_MACH_P4NOTE) || defined(CONFIG_MACH_KONA)
+		defined(CONFIG_MACH_P4NOTE) || defined(CONFIG_MACH_SP7160LTE) || defined(CONFIG_MACH_KONA) || defined(CONFIG_MACH_TAB3)
 	.mhl_sel = NULL,
 #else
 	.mhl_sel = mhl_usb_switch_control,
@@ -218,6 +373,11 @@ static struct sii9234_platform_data sii9234_pdata = {
 #ifdef CONFIG_SAMSUNG_MHL_UNPOWERED
 	.get_vbus_status = sii9234_get_vbus_status,
 	.sii9234_otg_control = sii9234_otg_control,
+#endif
+#if defined(CONFIG_TAB3_01_BD)
+	.sii9234_muic_cb = muic_mhl_cb,
+#else
+	.sii9234_muic_cb = NULL,
 #endif
 #ifdef CONFIG_EXTCON
 	.extcon_name = "max77693-muic",
@@ -260,8 +420,9 @@ static int __init midas_mhl_init(void)
 	}
 #if defined(CONFIG_MACH_T0_EUR_OPEN) || defined(CONFIG_MACH_T0_CHN_OPEN)
 	sii9234_pdata.ddc_i2c_num = 6;
-#elif defined(CONFIG_MACH_P4NOTE) || defined(CONFIG_MACH_T0) \
-	 || defined(CONFIG_MACH_KONA)
+#elif defined(CONFIG_MACH_P4NOTE) || defined(CONFIG_MACH_SP7160LTE) || defined(CONFIG_MACH_T0) \
+	 || defined(CONFIG_MACH_KONA) || defined(CONFIG_MACH_TAB3) || \
+	defined(CONFIG_MACH_GD2) || defined(CONFIG_MACH_GC2PD)
 	sii9234_pdata.ddc_i2c_num = 5;
 #else
 	sii9234_pdata.ddc_i2c_num = (system_rev == 3 ? 16 : 5);

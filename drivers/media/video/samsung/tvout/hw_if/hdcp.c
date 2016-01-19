@@ -799,7 +799,9 @@ int s5p_hdcp_stop(void)
 
 	return 0;
 }
-
+#ifdef CONFIG_SAMSUNG_MHL_9290
+extern void sii9234_tmds_reset(void);
+#endif
 int s5p_hdcp_start(void)
 {
 	u32  sfr_val;
@@ -828,7 +830,9 @@ int s5p_hdcp_start(void)
 	s5p_hdmi_reg_intc_enable(HDMI_IRQ_HDCP, 1);
 
 	hdcp_info.hdcp_enable = 1;
-
+#ifdef CONFIG_SAMSUNG_MHL_9290
+	sii9234_tmds_reset();
+#endif
 	return 0;
 }
 

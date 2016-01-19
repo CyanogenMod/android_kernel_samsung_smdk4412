@@ -43,7 +43,6 @@ extern void midas_config_sleep_gpio_table(void);
 #define GPIO_CAM_EN1		EXYNOS4212_GPJ0(6)
 #define GPIO_5M_nSTBY		EXYNOS4212_GPJ0(7)
 #else
-//#define GPIO_3M_nSTBY		EXYNOS4212_GPM0(6)
 #endif
 #ifdef CONFIG_VIDEO_S5K5CCGX_COMMON
 #define GPIO_2M_nRST		EXYNOS4212_GPM1(6)
@@ -356,6 +355,7 @@ extern void midas_config_sleep_gpio_table(void);
 #define GPIO_LED_BACKLIGHT_RESET	EXYNOS4212_GPM0(1)
 #define GPIO_LVDS_NSHDN		EXYNOS4212_GPM0(5)
 #endif
+
 
 #if defined(CONFIG_QC_MODEM)
 /* Modem Interface GPIOs - MDM */

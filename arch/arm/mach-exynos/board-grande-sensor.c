@@ -84,7 +84,7 @@ static int stm_get_position(void)
 		position = 4; /* bottom/upper-left */
 	else
 		position = 3; /* top/lower-left */
-#elif defined(CONFIG_MACH_P4NOTE)
+#elif defined(CONFIG_MACH_P4NOTE) || defined(CONFIG_MACH_TAB3)
 	position = 4; /* bottom/upper-left */
 #elif defined(CONFIG_MACH_M0_GRANDECTC)
 	if (system_rev == 13)

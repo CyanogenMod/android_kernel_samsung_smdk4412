@@ -246,6 +246,7 @@ static inline int atomic_add_unless(atomic_t *v, int a, int u)
 
 #define atomic_inc_not_zero(v) atomic_add_unless((v), 1, 0)
 
+#ifndef CONFIG_ZSWAP
 /*
  * atomic_dec_if_positive - decrement by 1 if old value positive
  * @v: pointer of type atomic_t
@@ -268,6 +269,7 @@ static inline int atomic_dec_if_positive(atomic_t *v)
 	}
 	return dec;
 }
+#endif
 
 /**
  * atomic_inc_short - increment of a short integer

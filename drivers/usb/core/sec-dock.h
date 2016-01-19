@@ -31,7 +31,8 @@ static struct usb_device_id battery_notify_exception_table[] = {
 #if defined(CONFIG_MUIC_MAX77693_SUPPORT_OTG_AUDIO_DOCK)
 static struct usb_device_id audio_dock_table[] = {
 /* add exception table list */
-{ USB_DEVICE(0x04e8, 0x1220), }, /* Samsung Audio Dock */
+{ USB_DEVICE(0x04e8, 0x1220), }, /* Previous Samsung Audio Dock */
+{ USB_DEVICE(0x04e8, 0x2081), }, /* Samsung Audio Dock */
 { USB_DEVICE(0x08bb, 0x27c4), }, /* TI USB Audio DAC */
 { }	/* Terminating entry */
 };

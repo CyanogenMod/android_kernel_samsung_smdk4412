@@ -53,25 +53,16 @@ config MACH_C1_USA_VZW
 endchoice
 
 choice
-	prompt "C2 USA Target Carrier"
-	depends on MACH_M3 && \
-		(TARGET_LOCALE_USA || TARGET_LOCALE_JPN)
-	default MACH_M3_USA_VZW
+	prompt "M3 Target Carrier"
+	depends on MACH_M3 && (TARGET_LOCALE_USA || TARGET_LOCALE_JPN)
+	default MACH_M3_USA_TMO
 
-config MACH_M3_USA_VZW
-	bool "C2 Verizon"
-
-config MACH_M3_USA_SPR
-	bool "C2 Sprint"
+config MACH_M3_USA_TMO
+	bool "M3 T-Mobile (Stretto)"
 
 config MACH_M3_JPN_DCM
 	bool "M3 JPN DCM"
-
 endchoice
-
-config MACH_T0_LTE
-	bool "T0 LTE Target"
-	depends on MACH_T0
 
 choice
 	prompt "T0 Target"
@@ -81,26 +72,21 @@ choice
 
 config MACH_T0_USA_ATT
 	bool "ATT"
-	select MACH_T0_LTE
 
 config MACH_T0_USA_TMO
 	bool "TMO"
-	select MACH_T0_LTE
 
 config MACH_T0_USA_VZW
 	bool "VZW"
-	select MACH_T0_LTE
 
 config MACH_T0_USA_SPR
 	bool "SPR"
-	select MACH_T0_LTE
 
 config MACH_T0_USA_USCC
 	bool "USCC"
 
 config MACH_T0_EUR_LTE
 	bool "EUR LTE"
-	select MACH_T0_LTE
 
 config MACH_T0_EUR_OPEN
 	bool "EUR OPEN"
@@ -180,6 +166,51 @@ config MACH_M0_KOR_KT
 
 config MACH_M0_KOR_LGT
 	bool "LG U+"
+endchoice
+
+choice
+	prompt "CAMERA LTE KOR Target Carrier"
+	depends on MACH_GC1 && TARGET_LOCALE_KOR
+	default MACH_GC1_KOR_SKT
+
+config MACH_GC1_KOR_SKT
+	bool "SKT"
+
+config MACH_GC1_KOR_KT
+	bool "KT"
+
+config MACH_GC1_KOR_LGT
+	bool "LG U+"
+endchoice
+
+choice
+	prompt "CAMERA2 WIFI KOR Target Carrier"
+	depends on MACH_GD2 && TARGET_LOCALE_KOR
+	default MACH_GD2_KOR_ANY
+
+config MACH_GD2_KOR_SKT
+	bool "SKT"
+
+config MACH_GD2_KOR_KT
+	bool "KT"
+
+config MACH_GD2_KOR_LGT
+	bool "LG U+"
+
+config MACH_GD2_KOR_ANY
+	bool "WIFI ANY"
+endchoice
+
+choice
+	prompt "S USA Target Carrier"
+	depends on MACH_GC1 && TARGET_LOCALE_USA
+	default MACH_GC1_USA_ATT
+
+config MACH_GC1_USA_ATT
+	bool "S USA ATT Board"
+
+config MACH_GC1_USA_VZW
+	bool "S USA VZW Board"
 endchoice
 
 choice
@@ -269,6 +300,9 @@ config MACH_BAFFIN_KOR_KT
 
 config MACH_BAFFIN_KOR_LGT
 	bool "LG U+"
+
+config MACH_SUPERIOR_KOR_SKT
+	bool "SUPERIOR SKT"
 endchoice
 
 choice

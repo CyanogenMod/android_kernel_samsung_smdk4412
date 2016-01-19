@@ -29,13 +29,14 @@
 #include <linux/module.h>
 #include <linux/platform_device.h>
 #include <linux/rfkill.h>
-#include <linux/serial_core.h>
 #include <linux/wakelock.h>
+
 
 #include <asm/mach-types.h>
 
 #include <mach/gpio.h>
 #include <plat/gpio-cfg.h>
+#include <mach/board-bluetooth-bcm.h>
 
 #define BT_UART_CFG
 #define BT_LPM_ENABLE
@@ -50,9 +51,28 @@ struct bcm_bt_lpm {
 
 	struct uart_port *uport;
 
-	struct wake_lock wake_lock;
+	struct wake_lock host_wake_lock;
+	struct wake_lock bt_wake_lock;
 	char wake_lock_name[100];
 } bt_lpm;
+
+static int gpio_rev(int gpio)
+{
+	if (gpio == GPIO_BT_WAKE)
+	{
+#if defined(CONFIG_MACH_GD2)
+		if (system_rev >= 6) //hw rev 0.1
+		{
+			gpio = GPIO_BT_WAKE_REV01;
+		}
+#endif
+
+#if defined(CONFIG_MACH_KONA_EUR_LTE) || defined(CONFIG_MACH_KONALTE_USA_ATT)
+		gpio = GPIO_BT_NEW_WAKE;
+#endif
+	}
+	return gpio;
+}
 
 #ifdef BT_UART_CFG
 int bt_is_running;
@@ -62,10 +82,10 @@ extern int s3c_gpio_slp_cfgpin(unsigned int pin, unsigned int config);
 extern int s3c_gpio_slp_setpull_updown(unsigned int pin, unsigned int config);
 
 static unsigned int bt_uart_on_table[][4] = {
-	{EXYNOS4_GPA0(0), 2, 2, S3C_GPIO_PULL_NONE},
-	{EXYNOS4_GPA0(1), 2, 2, S3C_GPIO_PULL_NONE},
-	{EXYNOS4_GPA0(2), 2, 2, S3C_GPIO_PULL_NONE},
-	{EXYNOS4_GPA0(3), 2, 2, S3C_GPIO_PULL_NONE},
+	{GPIO_BT_RXD, 2, 2, S3C_GPIO_PULL_NONE},
+	{GPIO_BT_TXD, 2, 2, S3C_GPIO_PULL_NONE},
+	{GPIO_BT_CTS, 2, 2, S3C_GPIO_PULL_NONE},
+	{GPIO_BT_RTS, 2, 2, S3C_GPIO_PULL_NONE},
 };
 
 void bt_config_gpio_table(int array_size, unsigned int (*gpio_table)[4])
@@ -87,17 +107,17 @@ void bt_uart_rts_ctrl(int flag)
 		return;
 	if (flag) {
 		/* BT RTS Set to HIGH */
-		s3c_gpio_cfgpin(EXYNOS4_GPA0(3), S3C_GPIO_OUTPUT);
-		s3c_gpio_setpull(EXYNOS4_GPA0(3), S3C_GPIO_PULL_NONE);
-		gpio_set_value(EXYNOS4_GPA0(3), 1);
-		s3c_gpio_slp_cfgpin(EXYNOS4_GPA0(3), S3C_GPIO_SLP_OUT0);
-		s3c_gpio_slp_setpull_updown(EXYNOS4_GPA0(3), S3C_GPIO_PULL_NONE);
+		s3c_gpio_cfgpin(GPIO_BT_RTS, S3C_GPIO_OUTPUT);
+		s3c_gpio_setpull(GPIO_BT_RTS, S3C_GPIO_PULL_NONE);
+		gpio_set_value(GPIO_BT_RTS, 1);
+		s3c_gpio_slp_cfgpin(GPIO_BT_RTS, S3C_GPIO_SLP_OUT0);
+		s3c_gpio_slp_setpull_updown(GPIO_BT_RTS, S3C_GPIO_PULL_NONE);
 	} else {
 		/* BT RTS Set to LOW */
-		s3c_gpio_cfgpin(EXYNOS4_GPA0(3), S3C_GPIO_OUTPUT);
-		gpio_set_value(EXYNOS4_GPA0(3), 0);
-		s3c_gpio_cfgpin(EXYNOS4_GPA0(3), S3C_GPIO_SFN(2));
-		s3c_gpio_setpull(EXYNOS4_GPA0(3), S3C_GPIO_PULL_NONE);
+		s3c_gpio_cfgpin(GPIO_BT_RTS, S3C_GPIO_OUTPUT);
+		gpio_set_value(GPIO_BT_RTS, 0);
+		s3c_gpio_cfgpin(GPIO_BT_RTS, S3C_GPIO_SFN(2));
+		s3c_gpio_setpull(GPIO_BT_RTS, S3C_GPIO_PULL_NONE);
 	}
 }
 EXPORT_SYMBOL(bt_uart_rts_ctrl);
@@ -113,6 +133,7 @@ static int bcm4334_bt_rfkill_set_power(void *data, bool blocked)
 					bt_uart_on_table);
 #endif
 		gpio_set_value(GPIO_BT_EN, 1);
+		bt_is_running = 1;
 		msleep(50);
 	} else {
 		pr_info("[BT] Bluetooth Power Off.\n");
@@ -129,20 +150,19 @@ static const struct rfkill_ops bcm4334_bt_rfkill_ops = {
 #ifdef BT_LPM_ENABLE
 static void set_wake_locked(int wake)
 {
+	if (wake)
+		wake_lock(&bt_lpm.bt_wake_lock);
 
-	if (!wake)
-		wake_unlock(&bt_lpm.wake_lock);
-
-	gpio_set_value(GPIO_BT_WAKE, wake);
+	gpio_set_value(gpio_rev(GPIO_BT_WAKE), wake);
 }
 
 static enum hrtimer_restart enter_lpm(struct hrtimer *timer)
 {
-	unsigned long flags;
-	spin_lock_irqsave(&bt_lpm.uport->lock, flags);
+	if (bt_lpm.uport != NULL)
+		set_wake_locked(0);
+
 	bt_is_running = 0;
-	set_wake_locked(0);
-	spin_unlock_irqrestore(&bt_lpm.uport->lock, flags);
+	wake_lock_timeout(&bt_lpm.bt_wake_lock, HZ/2);
 
 	return HRTIMER_NORESTART;
 }
@@ -155,10 +175,10 @@ void bcm_bt_lpm_exit_lpm_locked(struct uart_port *uport)
 	bt_is_running = 1;
 	set_wake_locked(1);
 
+	pr_info("[BT] bt_lpm_exit_lpm_locked.\n");
 	hrtimer_start(&bt_lpm.enter_lpm_timer, bt_lpm.enter_lpm_delay,
 		HRTIMER_MODE_REL);
 }
-EXPORT_SYMBOL(bcm_bt_lpm_exit_lpm_locked);
 
 static void update_host_wake_locked(int host_wake)
 {
@@ -168,21 +188,21 @@ static void update_host_wake_locked(int host_wake)
 	bt_lpm.host_wake = host_wake;
 
 	bt_is_running = 1;
+
 	if (host_wake) {
-		wake_lock(&bt_lpm.wake_lock);
+		wake_lock(&bt_lpm.host_wake_lock);
 	} else  {
 		/* Take a timed wakelock, so that upper layers can take it.
 		 * The chipset deasserts the hostwake lock, when there is no
 		 * more data to send.
 		 */
-		wake_lock_timeout(&bt_lpm.wake_lock, HZ/2);
+		wake_lock_timeout(&bt_lpm.host_wake_lock, HZ/2);
 	}
 }
 
 static irqreturn_t host_wake_isr(int irq, void *dev)
 {
 	int host_wake;
-	unsigned long flags;
 
 	host_wake = gpio_get_value(GPIO_BT_HOST_WAKE);
 	irq_set_irq_type(irq, host_wake ? IRQF_TRIGGER_LOW : IRQF_TRIGGER_HIGH);
@@ -192,9 +212,7 @@ static irqreturn_t host_wake_isr(int irq, void *dev)
 		return IRQ_HANDLED;
 	}
 
-	spin_lock_irqsave(&bt_lpm.uport->lock, flags);
 	update_host_wake_locked(host_wake);
-	spin_unlock_irqrestore(&bt_lpm.uport->lock, flags);
 
 	return IRQ_HANDLED;
 }
@@ -206,15 +224,20 @@ static int bcm_bt_lpm_init(struct platform_device *pdev)
 
 	hrtimer_init(&bt_lpm.enter_lpm_timer, CLOCK_MONOTONIC,
 			HRTIMER_MODE_REL);
-	bt_lpm.enter_lpm_delay = ktime_set(1, 0);  /* 1 sec */
+	bt_lpm.enter_lpm_delay = ktime_set(4, 0);  /* 1 sec */ /*1->3*//*3->4*/
 	bt_lpm.enter_lpm_timer.function = enter_lpm;
 
 	bt_lpm.host_wake = 0;
 	bt_is_running = 0;
 
 	snprintf(bt_lpm.wake_lock_name, sizeof(bt_lpm.wake_lock_name),
-			"BTLowPower");
-	wake_lock_init(&bt_lpm.wake_lock, WAKE_LOCK_SUSPEND,
+			"BT_host_wake");
+	wake_lock_init(&bt_lpm.host_wake_lock, WAKE_LOCK_SUSPEND,
+			 bt_lpm.wake_lock_name);
+
+	snprintf(bt_lpm.wake_lock_name, sizeof(bt_lpm.wake_lock_name),
+			"BT_bt_wake");
+	wake_lock_init(&bt_lpm.bt_wake_lock, WAKE_LOCK_SUSPEND,
 			 bt_lpm.wake_lock_name);
 
 	irq = IRQ_BT_HOST_WAKE;
@@ -233,6 +256,7 @@ static int bcm_bt_lpm_init(struct platform_device *pdev)
 
 	return 0;
 }
+
 #endif
 
 static int bcm4334_bluetooth_probe(struct platform_device *pdev)
@@ -245,7 +269,7 @@ static int bcm4334_bluetooth_probe(struct platform_device *pdev)
 		pr_err("[BT] GPIO_BT_EN request failed.\n");
 		return rc;
 	}
-	rc = gpio_request(GPIO_BT_WAKE, "bcm4334_btwake_gpio");
+	rc = gpio_request(gpio_rev(GPIO_BT_WAKE), "bcm4334_btwake_gpio");
 	if (unlikely(rc)) {
 		pr_err("[BT] GPIO_BT_WAKE request failed.\n");
 		gpio_free(GPIO_BT_EN);
@@ -254,12 +278,12 @@ static int bcm4334_bluetooth_probe(struct platform_device *pdev)
 	rc = gpio_request(GPIO_BT_HOST_WAKE, "bcm4334_bthostwake_gpio");
 	if (unlikely(rc)) {
 		pr_err("[BT] GPIO_BT_HOST_WAKE request failed.\n");
-		gpio_free(GPIO_BT_WAKE);
+		gpio_free(gpio_rev(GPIO_BT_WAKE));
 		gpio_free(GPIO_BT_EN);
 		return rc;
 	}
 	gpio_direction_input(GPIO_BT_HOST_WAKE);
-	gpio_direction_output(GPIO_BT_WAKE, 0);
+	gpio_direction_output(gpio_rev(GPIO_BT_WAKE), 0);
 	gpio_direction_output(GPIO_BT_EN, 0);
 
 	bt_rfkill = rfkill_alloc("bcm4334 Bluetooth", &pdev->dev,
@@ -269,7 +293,7 @@ static int bcm4334_bluetooth_probe(struct platform_device *pdev)
 	if (unlikely(!bt_rfkill)) {
 		pr_err("[BT] bt_rfkill alloc failed.\n");
 		gpio_free(GPIO_BT_HOST_WAKE);
-		gpio_free(GPIO_BT_WAKE);
+		gpio_free(gpio_rev(GPIO_BT_WAKE));
 		gpio_free(GPIO_BT_EN);
 		return -ENOMEM;
 	}
@@ -282,7 +306,7 @@ static int bcm4334_bluetooth_probe(struct platform_device *pdev)
 		pr_err("[BT] bt_rfkill register failed.\n");
 		rfkill_destroy(bt_rfkill);
 		gpio_free(GPIO_BT_HOST_WAKE);
-		gpio_free(GPIO_BT_WAKE);
+		gpio_free(gpio_rev(GPIO_BT_WAKE));
 		gpio_free(GPIO_BT_EN);
 		return -1;
 	}
@@ -296,7 +320,7 @@ static int bcm4334_bluetooth_probe(struct platform_device *pdev)
 		rfkill_destroy(bt_rfkill);
 
 		gpio_free(GPIO_BT_HOST_WAKE);
-		gpio_free(GPIO_BT_WAKE);
+		gpio_free(gpio_rev(GPIO_BT_WAKE));
 		gpio_free(GPIO_BT_EN);
 	}
 #endif
@@ -309,10 +333,12 @@ static int bcm4334_bluetooth_remove(struct platform_device *pdev)
 	rfkill_destroy(bt_rfkill);
 
 	gpio_free(GPIO_BT_EN);
-	gpio_free(GPIO_BT_WAKE);
+	gpio_free(gpio_rev(GPIO_BT_WAKE));
 	gpio_free(GPIO_BT_HOST_WAKE);
 
-	wake_lock_destroy(&bt_lpm.wake_lock);
+	wake_lock_destroy(&bt_lpm.host_wake_lock);
+	wake_lock_destroy(&bt_lpm.bt_wake_lock);
+
 	return 0;
 }
 

@@ -28,6 +28,9 @@
 #include <linux/kernel.h>
 #include <linux/delay.h>
 
+#include <linux/sensor/sensors_core.h>
+#undef BMA254_LOGGING
+
 #define SENSOR_NAME			"bma254"
 #define GRAVITY_EARTH                   9806550
 #define ABSMIN_2G                       (-GRAVITY_EARTH * 2)
@@ -272,8 +275,10 @@ struct bma254_data {
 	struct delayed_work work;
 	struct work_struct irq_work;
 	struct early_suspend early_suspend;
-
 	atomic_t selftest_result;
+	struct device *dev;
+	int position;
+	bool axis_adjust;
 };
 
 #ifdef CONFIG_HAS_EARLYSUSPEND
@@ -472,15 +477,54 @@ static int bma254_get_bandwidth(struct i2c_client *client, unsigned char *BW)
 	return comres;
 }
 
-static int bma254_read_accel_xyz(struct i2c_client *client,
+static void bma254_xyz_position_adjust(struct bma254acc *acc,
+		int position)
+{
+	const int position_map[][3][3] = {
+	{{ 0, -1,  0}, { 1,  0,  0}, { 0,  0,  1} }, /* 0 top/upper-left */
+	{{ 1,  0,  0}, { 0,  1,  0}, { 0,  0,  1} }, /* 1 top/upper-right */
+	{{ 0,  1,  0}, {-1,  0,  0}, { 0,  0,  1} }, /* 2 top/lower-right */
+	{{-1,  0,  0}, { 0, -1,  0}, { 0,  0,  1} }, /* 3 top/lower-left */
+	{{ 0,  1,  0}, { 1,  0,  0}, { 0,  0, -1} }, /* 4 bottom/upper-left */
+	{{-1,  0,  0}, { 0,  1,  0}, { 0,  0, -1} }, /* 5 bottom/upper-right */
+	{{ 0, -1,  0}, {-1,  0,  0}, { 0,  0, -1} }, /* 6 bottom/lower-right */
+	{{ 1,  0,  0}, { 0, -1,  0}, { 0,  0, -1} }, /* 7 bottom/lower-left*/
+	};
+
+	struct bma254acc xyz_adjusted = {0,};
+	s16 raw[3] = {0,};
+	int j;
+	raw[0] = acc->x;
+	raw[1] = acc->y;
+	raw[2] = acc->z;
+	for (j = 0; j < 3; j++) {
+		xyz_adjusted.x +=
+		(position_map[position][0][j] * raw[j]);
+		xyz_adjusted.y +=
+		(position_map[position][1][j] * raw[j]);
+		xyz_adjusted.z +=
+		(position_map[position][2][j] * raw[j]);
+	}
+	acc->x = xyz_adjusted.x;
+	acc->y = xyz_adjusted.y;
+	acc->z = xyz_adjusted.z;
+}
+
+static int bma254_read_accel_xyz(struct bma254_data *bma254,
 		struct bma254acc *acc)
 {
 	int comres;
 	unsigned char data[6];
-	if (client == NULL) {
+
+#ifdef	BMA254_LOGGING
+	pr_err("%s, position= %d\n" , __func__, bma254->position);
+#endif
+
+	if (bma254->bma254_client == NULL) {
 		comres = -1;
+		pr_err("%s, client err = %d\n", __func__, comres);
 	} else{
-		comres = bma254_smbus_read_byte_block(client,
+		comres = bma254_smbus_read_byte_block(bma254->bma254_client,
 				BMA254_ACC_X_LSB__REG, data, 6);
 
 		acc->x = BMA254_GET_BITSLICE(data[0], BMA254_ACC_X_LSB)
@@ -507,6 +551,19 @@ static int bma254_read_accel_xyz(struct i2c_client *client,
 					+ BMA254_ACC_Z_MSB__LEN));
 	}
 
+#ifdef	BMA254_LOGGING
+	pr_err("preraw     x = %d, y = %d, z = %d, adjust = %d\n",
+		acc->x, acc->y, acc->z, bma254->axis_adjust);
+#endif
+
+	if (bma254->axis_adjust)
+		bma254_xyz_position_adjust(acc, bma254->position);
+
+#ifdef	BMA254_LOGGING
+	pr_err("raw        x = %d, y = %d, z = %d, adjust = %d\n",
+		acc->x, acc->y, acc->z, bma254->axis_adjust);
+#endif
+
 	return comres;
 }
 
@@ -517,7 +574,7 @@ static void bma254_work_func(struct work_struct *work)
 	static struct bma254acc acc;
 	unsigned long delay = msecs_to_jiffies(atomic_read(&bma254->delay));
 
-	bma254_read_accel_xyz(bma254->bma254_client, &acc);
+	bma254_read_accel_xyz(bma254, &acc);
 
 	input_report_abs(bma254->input, ABS_X, acc.x);
 	input_report_abs(bma254->input, ABS_Y, acc.y);
@@ -670,6 +727,9 @@ static ssize_t bma254_delay_store(struct device *dev,
 	if (data < BMA254_MIN_DELAY)
 		data = BMA254_MIN_DELAY;
 
+	if (data > BMA254_DEFAULT_DELAY)
+		data = BMA254_DEFAULT_DELAY;
+
 	atomic_set(&bma254->delay, (unsigned int) data);
 
 	return count;
@@ -735,7 +795,7 @@ static ssize_t bma254_update_store(struct device *dev,
 	struct bma254_data *bma254 = i2c_get_clientdata(client);
 
 	mutex_lock(&bma254->value_mutex);
-	bma254_read_accel_xyz(bma254->bma254_client, &bma254->value);
+	bma254_read_accel_xyz(bma254, &bma254->value);
 	mutex_unlock(&bma254->value_mutex);
 	return count;
 }
@@ -1211,7 +1271,7 @@ static DEVICE_ATTR(mode, S_IRUGO|S_IWUSR|S_IWGRP|S_IWOTH,
 		bma254_mode_show, bma254_mode_store);
 static DEVICE_ATTR(value, S_IRUGO,
 		bma254_value_show, NULL);
-static DEVICE_ATTR(delay, S_IRUGO|S_IWUSR|S_IWGRP|S_IWOTH,
+static DEVICE_ATTR(poll_delay, S_IRUGO|S_IWUSR|S_IWGRP|S_IWOTH,
 		bma254_delay_show, bma254_delay_store);
 static DEVICE_ATTR(enable, S_IRUGO|S_IWUSR|S_IWGRP|S_IWOTH,
 		bma254_enable_show, bma254_enable_store);
@@ -1234,7 +1294,7 @@ static struct attribute *bma254_attributes[] = {
 	&dev_attr_bandwidth.attr,
 	&dev_attr_mode.attr,
 	&dev_attr_value.attr,
-	&dev_attr_delay.attr,
+	&dev_attr_poll_delay.attr,
 	&dev_attr_enable.attr,
 	&dev_attr_update.attr,
 	&dev_attr_selftest.attr,
@@ -1256,7 +1316,7 @@ static int bma254_input_init(struct bma254_data *bma254)
 	dev = input_allocate_device();
 	if (!dev)
 		return -ENOMEM;
-	dev->name = SENSOR_NAME;
+	dev->name = "accelerometer";
 	dev->id.bustype = BUS_I2C;
 
 	input_set_capability(dev, EV_ABS, ABS_MISC);
@@ -1271,6 +1331,7 @@ static int bma254_input_init(struct bma254_data *bma254)
 		input_free_device(dev);
 		return err;
 	}
+
 	bma254->input = dev;
 
 	return 0;
@@ -1283,13 +1344,23 @@ static void bma254_input_delete(struct bma254_data *bma254)
 	input_unregister_device(dev);
 	input_free_device(dev);
 }
+static ssize_t bma254_accel_name_show(struct device *dev,
+	struct device_attribute *attr, char *buf)
+{
+	return sprintf(buf, "%s\n", SENSOR_NAME);
+}
 
+static DEVICE_ATTR(name, 0664, bma254_accel_name_show, NULL);
+static DEVICE_ATTR(raw_data, 0664, bma254_value_show, NULL);
 static int bma254_probe(struct i2c_client *client,
 		const struct i2c_device_id *id)
 {
 	int err = 0;
 	int tempvalue;
 	struct bma254_data *data;
+	struct accel_platform_data *pdata;
+
+	pr_info("%s, is called, acceleometer\n", __func__);
 
 	if (!i2c_check_functionality(client->adapter, I2C_FUNC_I2C)) {
 		pr_err("i2c_check_functionality error\n");
@@ -1321,6 +1392,22 @@ static int bma254_probe(struct i2c_client *client,
 	bma254_set_bandwidth(client, BMA254_BW_SET);
 	bma254_set_range(client, BMA254_RANGE_SET);
 
+	/* accelerometer position set */
+	pdata = client->dev.platform_data;
+	if (!pdata) {
+		/*Set by default position 1, it doesn't adjust raw value*/
+		data->position = 1;
+		data->axis_adjust = false;
+		pr_err("using defualt position = %d\n", data->position);
+	} else {
+		data->position = pdata->accel_get_position();
+		data->axis_adjust = pdata->axis_adjust;
+		pr_info("successful, position = %d\n", data->position);
+	}
+
+#ifdef	BMA254_LOGGING
+	pr_info("%s, ## data->position = %d\n", __func__, data->position);
+#endif
 	INIT_DELAYED_WORK(&data->work, bma254_work_func);
 	atomic_set(&data->delay, BMA254_DEFAULT_DELAY);
 	atomic_set(&data->enable, 0);
@@ -1330,9 +1417,32 @@ static int bma254_probe(struct i2c_client *client,
 
 	err = sysfs_create_group(&data->input->dev.kobj,
 			&bma254_attribute_group);
+
 	if (err < 0)
 		goto error_sysfs;
+	data->dev = sensors_classdev_register("accelerometer_sensor");
+	if (IS_ERR(data->dev)) {
+		pr_err("%s: class create failed(accelerometer_sensor)\n",
+			__func__);
+		err = PTR_ERR(data->dev);
+		goto error_sysfs;
+	}
 
+	err = device_create_file(data->dev, &dev_attr_name);
+	if (err < 0) {
+		pr_err("%s: Failed to create device file(%s)\n",
+			__func__, dev_attr_name.attr.name);
+		goto err_name_device_create_file;
+	}
+
+	err = device_create_file(data->dev, &dev_attr_raw_data);
+	if (err < 0) {
+		pr_err("%s: Failed to create device file(%s)\n",
+				__func__, dev_attr_raw_data.attr.name);
+		goto err_raw_data_device_create_file;
+	}
+
+	dev_set_drvdata(data->dev, data);
 #ifdef CONFIG_HAS_EARLYSUSPEND
 	data->early_suspend.level = EARLY_SUSPEND_LEVEL_BLANK_SCREEN + 1;
 	data->early_suspend.suspend = bma254_early_suspend;
@@ -1342,6 +1452,10 @@ static int bma254_probe(struct i2c_client *client,
 
 	return 0;
 
+err_name_device_create_file:
+	device_remove_file(data->dev, &dev_attr_name);
+err_raw_data_device_create_file:
+	device_remove_file(data->dev, &dev_attr_raw_data);
 error_sysfs:
 	bma254_input_delete(data);
 
@@ -1387,8 +1501,14 @@ static int bma254_remove(struct i2c_client *client)
 	struct bma254_data *data = i2c_get_clientdata(client);
 
 	bma254_set_enable(&client->dev, 0);
+#ifdef CONFIG_HAS_EARLYSUSPEND
 	unregister_early_suspend(&data->early_suspend);
+#endif
 	sysfs_remove_group(&data->input->dev.kobj, &bma254_attribute_group);
+
+	device_remove_file(data->dev, &dev_attr_name);
+	device_remove_file(data->dev, &dev_attr_raw_data);
+
 	bma254_input_delete(data);
 	kfree(data);
 	return 0;

@@ -34,6 +34,7 @@
 #include <linux/fb.h>
 
 #include <asm/fb.h>
+#include <linux/cma.h>
 
 
     /*
@@ -1382,6 +1383,16 @@ fb_mmap(struct file *file, struct vm_area_struct * vma)
 	 */
 	start = info->fix.smem_start;
 	len = info->fix.smem_len;
+
+#if defined(CONFIG_CPU_EXYNOS4212) || defined(CONFIG_CPU_EXYNOS4412)
+	if (!cma_is_registered_region(start, len)) {
+		pr_err("%s: %x@%x is allowed to map\n",
+			__func__, (unsigned int)start,
+			(unsigned int)len);
+		mutex_unlock(&info->mm_lock);
+		return -EINVAL;
+	}
+#endif
 	mmio_pgoff = PAGE_ALIGN((start & ~PAGE_MASK) + len) >> PAGE_SHIFT;
 	if (vma->vm_pgoff >= mmio_pgoff) {
 		vma->vm_pgoff -= mmio_pgoff;

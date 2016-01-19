@@ -55,11 +55,18 @@
 #include <net/sock.h>
 #include <net/netlink.h>
 #include <linux/skbuff.h>
+#ifdef CONFIG_SECURITY
+#include <linux/security.h>
+#endif
 #include <linux/netlink.h>
 #include <linux/freezer.h>
 #include <linux/tty.h>
 
 #include "audit.h"
+
+#ifdef CONFIG_SEC_AVC_LOG
+#include <mach/sec_debug.h>
+#endif
 
 /* No auditing will take place until audit_initialized == AUDIT_INITIALIZED.
  * (Initialization happens after skb_init is called.) */
@@ -77,7 +84,7 @@ int		audit_ever_enabled;
 EXPORT_SYMBOL_GPL(audit_enabled);
 
 /* Default state when kernel boots without any parameters. */
-static int	audit_default;
+static int	audit_default = 1;
 
 /* If auditing cannot proceed, audit_failure selects what happens. */
 static int	audit_failure = AUDIT_FAIL_PRINTK;
@@ -178,8 +185,7 @@ void audit_panic(const char *message)
 	case AUDIT_FAIL_SILENT:
 		break;
 	case AUDIT_FAIL_PRINTK:
-		if (printk_ratelimit())
-			printk(KERN_ERR "audit: %s\n", message);
+		printk(KERN_ERR "audit: %s\n", message);
 		break;
 	case AUDIT_FAIL_PANIC:
 		/* test audit_pid since printk is always losey, why bother? */
@@ -249,7 +255,6 @@ void audit_log_lost(const char *message)
 	}
 
 	if (print) {
-		if (printk_ratelimit())
 			printk(KERN_WARNING
 				"audit: audit_lost=%d audit_rate_limit=%d "
 				"audit_backlog_limit=%d\n",
@@ -384,13 +389,14 @@ static void audit_printk_skb(struct sk_buff *skb)
 	char *data = NLMSG_DATA(nlh);
 
 	if (nlh->nlmsg_type != AUDIT_EOE) {
-		if (printk_ratelimit())
-			printk(KERN_NOTICE "type=%d %s\n", nlh->nlmsg_type, data);
-		else
-			audit_log_lost("printk limit exceeded\n");
+#ifdef CONFIG_SEC_AVC_LOG
+		sec_debug_avc_log("type=%d %s\n", nlh->nlmsg_type, data);
+#endif
 	}
-
+#ifndef CONFIG_SAMSUNG_PRODUCT_SHIP
+	// Do not hold skb on SHIP Binary, only print to avc msg.
 	audit_hold_skb(skb);
+#endif
 }
 
 static void kauditd_send_skb(struct sk_buff *skb)
@@ -406,9 +412,18 @@ static void kauditd_send_skb(struct sk_buff *skb)
 		audit_pid = 0;
 		/* we might get lucky and get this in the next auditd */
 		audit_hold_skb(skb);
-	} else
+	} else {
+#ifdef CONFIG_SEC_AVC_LOG
+		struct nlmsghdr *nlh = nlmsg_hdr(skb);
+		char *data = NLMSG_DATA(nlh);
+	
+		if (nlh->nlmsg_type != AUDIT_EOE) {
+			sec_debug_avc_log("%s\n", data);
+		}
+#endif
 		/* drop the extra reference if sent ok */
 		consume_skb(skb);
+	}
 }
 
 static int kauditd_thread(void *dummy)
@@ -598,13 +613,13 @@ static int audit_netlink_ok(struct sk_buff *skb, u16 msg_type)
 	case AUDIT_TTY_SET:
 	case AUDIT_TRIM:
 	case AUDIT_MAKE_EQUIV:
-		if (security_netlink_recv(skb, CAP_AUDIT_CONTROL))
+		if (!capable(CAP_AUDIT_CONTROL))
 			err = -EPERM;
 		break;
 	case AUDIT_USER:
 	case AUDIT_FIRST_USER_MSG ... AUDIT_LAST_USER_MSG:
 	case AUDIT_FIRST_USER_MSG2 ... AUDIT_LAST_USER_MSG2:
-		if (security_netlink_recv(skb, CAP_AUDIT_WRITE))
+		if (!capable(CAP_AUDIT_WRITE))
 			err = -EPERM;
 		break;
 	default:  /* bad msg */
@@ -1175,7 +1190,7 @@ struct audit_buffer *audit_log_start(struct audit_context *ctx, gfp_t gfp_mask,
 			remove_wait_queue(&audit_backlog_wait, &wait);
 			continue;
 		}
-		if (audit_rate_check() && printk_ratelimit())
+		if (audit_rate_check())
 			printk(KERN_WARNING
 			       "audit: audit_backlog=%d > "
 			       "audit_backlog_limit=%d\n",
@@ -1501,6 +1516,32 @@ void audit_log(struct audit_context *ctx, gfp_t gfp_mask, int type,
 		audit_log_end(ab);
 	}
 }
+
+#ifdef CONFIG_SECURITY
+/**
+ * audit_log_secctx - Converts and logs SELinux context
+ * @ab: audit_buffer
+ * @secid: security number
+ *
+ * This is a helper function that calls security_secid_to_secctx to convert
+ * secid to secctx and then adds the (converted) SELinux context to the audit
+ * log by calling audit_log_format, thus also preventing leak of internal secid
+ * to userspace. If secid cannot be converted audit_panic is called.
+ */
+void audit_log_secctx(struct audit_buffer *ab, u32 secid)
+{
+	u32 len;
+	char *secctx;
+
+	if (security_secid_to_secctx(secid, &secctx, &len)) {
+		audit_panic("Cannot convert secid to context");
+	} else {
+		audit_log_format(ab, " obj=%s", secctx);
+		security_release_secctx(secctx, len);
+	}
+}
+EXPORT_SYMBOL(audit_log_secctx);
+#endif
 
 EXPORT_SYMBOL(audit_log_start);
 EXPORT_SYMBOL(audit_log_end);

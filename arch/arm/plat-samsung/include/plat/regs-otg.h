@@ -198,6 +198,7 @@
 #define TEST_SE0_NAK_MODE		(0x3<<4)
 #define TEST_PACKET_MODE		(0x4<<4)
 #define TEST_FORCE_ENABLE_MODE		(0x5<<4)
+#define IGNRFRMNUM				(0x1<<15)
 
 /* S3C_UDC_OTG_DAINT device all endpoint interrupt register */
 #define DAINT_OUT_BIT			(16)
@@ -224,6 +225,8 @@
 #define DEPCTL_NEXT_EP_BIT		(11)
 #define DEPCTL_MPS_BIT			(0)
 #define DEPCTL_MPS_MASK			(0x7FF)
+#define DEPCTL_EO_FRNUM			(0x1<<16)
+#define DEPCTL_SETFRAME			(0x3<<28)
 
 #define DEPCTL0_MPS_64			(0x0<<0)
 #define DEPCTL0_MPS_32			(0x1<<0)

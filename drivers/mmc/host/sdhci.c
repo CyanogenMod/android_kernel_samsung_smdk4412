@@ -1968,10 +1968,6 @@ static void sdhci_tasklet_finish(unsigned long param)
 		   controllers do not like that. */
 		sdhci_reset(host, SDHCI_RESET_CMD);
 		sdhci_reset(host, SDHCI_RESET_DATA);
-#ifdef CONFIG_MACH_PX
-		printk(KERN_DEBUG "%s: Controller is resetted!\n",
-			mmc_hostname(host->mmc));
-#endif
 	}
 
 	host->mrq = NULL;
@@ -2068,10 +2064,6 @@ static void sdhci_cmd_irq(struct sdhci_host *host, u32 intmask)
 
 	if (host->cmd->error) {
 		tasklet_schedule(&host->finish_tasklet);
-#ifdef CONFIG_MACH_PX
-		printk(KERN_DEBUG "%s: finish tasklet schedule\n",
-			mmc_hostname(host->mmc));
-#endif
 		return;
 	}
 
@@ -2358,7 +2350,10 @@ EXPORT_SYMBOL_GPL(sdhci_suspend_host);
 
 void sdhci_shutdown_host(struct sdhci_host *host)
 {
-	sdhci_disable_card_detection(host);
+	u32 irqs = 0xFFFF;
+
+	/* all interrupt has to be masked */
+	sdhci_mask_irqs(host, irqs);
 
 	free_irq(host->irq, host);
 
@@ -2370,9 +2365,7 @@ void sdhci_shutdown_host(struct sdhci_host *host)
 #endif
 			regulator_disable(host->vmmc);
 			pr_info("%s : MMC Card OFF\n", __func__);
-#if defined(CONFIG_TARGET_LOCALE_KOR)
 			mdelay(5);
-#endif
 		}
 	}
 }

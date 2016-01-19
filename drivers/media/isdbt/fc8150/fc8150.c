@@ -9,8 +9,14 @@
 #include <linux/gpio.h>
 
 #include <linux/io.h>
+#include <media/isdbt_pdata.h>
 
 #include <mach/gpio.h>
+#include <linux/platform_device.h>
+#if defined(CONFIG_ISDBT_ANT_DET)
+#include <linux/wakelock.h>
+#include <linux/input.h>
+#endif
 
 #include "fc8150.h"
 #include "bbm.h"
@@ -19,6 +25,10 @@
 #include "fc8150_regs.h"
 #include "fc8150_isr.h"
 #include "fci_hal.h"
+
+#if defined(CONFIG_ISDBT_ANT_DET)
+static struct wake_lock isdbt_ant_wlock;
+#endif
 
 struct ISDBT_INIT_INFO_T *hInit;
 
@@ -40,6 +50,7 @@ static DECLARE_WAIT_QUEUE_HEAD(isdbt_isr_wait);
 
 static u8 isdbt_isr_sig;
 static struct task_struct *isdbt_kthread;
+static struct isdbt_platform_data gpio_cfg;
 
 static irqreturn_t isdbt_irq(int irq, void *dev_id)
 {
@@ -103,6 +114,7 @@ void isdbt_hw_init(void)
 	gpio_set_value(GPIO_ISDBT_RST_FC8150, 0);
 	mdelay(1);
 	gpio_set_value(GPIO_ISDBT_RST_FC8150, 1);
+	mdelay(10);
 }
 
 /*POWER_OFF */
@@ -355,13 +367,25 @@ long isdbt_ioctl(struct file *filp, unsigned int cmd, unsigned long arg)
 		res = BBM_RESET(hInit);
 		break;
 	case IOCTL_ISDBT_INIT:
-		res = BBM_I2C_INIT(hInit, FCI_I2C_TYPE);
-		res |= BBM_PROBE(hInit);
+		res = BBM_PROBE(hInit);
 		if (res) {
+#if defined(CONFIG_MACH_T0_JPN_LTE_DCM)
+			if (system_rev == 11) {
+				isdbt_hw_init();
+				PRINTF(hInit, "Chip ID is not correct\n");
+				msWait(3000);
+			} else {
+				PRINTF(hInit, "FC8150 Initialize Fail\n");
+				break;
+			}
+#else
 			PRINTF(hInit, "FC8150 Initialize Fail\n");
 			break;
+#endif
 		}
-		res |= BBM_INIT(hInit);
+
+		res = BBM_INIT(hInit);
+		res |= BBM_I2C_INIT(hInit, FCI_I2C_TYPE);
 		break;
 	case IOCTL_ISDBT_BYTE_READ:
 		err = copy_from_user((void *)&info, (void *)arg, size);
@@ -461,11 +485,211 @@ long isdbt_ioctl(struct file *filp, unsigned int cmd, unsigned long arg)
 	return res;
 }
 
-int isdbt_init(void)
-{
-	s32 res;
+#if defined(CONFIG_ISDBT_ANT_DET)
+enum {
+	ISDBT_ANT_OPEN = 0,
+	ISDBT_ANT_CLOSE,
+	ISDBT_ANT_UNKNOWN,
+};
+enum {
+	ISDBT_ANT_DET_LOW = 0,
+	ISDBT_ANT_DET_HIGH,
+};
 
-	PRINTF(hInit, "isdbt_init\n");
+static struct input_dev *isdbt_ant_input;
+static int isdbt_check_ant;
+static int ant_prev_status;
+
+#define ISDBT_ANT_CHECK_DURATION 500000 /* us */
+#define ISDBT_ANT_CHECK_COUNT 2
+#define ISDBT_ANT_WLOCK_TIMEOUT \
+	((ISDBT_ANT_CHECK_DURATION * ISDBT_ANT_CHECK_COUNT * 2) / 1000000)
+static int isdbt_ant_det_check_value(void)
+{
+	int loop = 0;
+	int cur_val = 0, prev_val = 0;
+	int ret = ISDBT_ANT_UNKNOWN;
+
+	isdbt_check_ant = 1;
+
+	prev_val = \
+		ant_prev_status ? ISDBT_ANT_DET_LOW : ISDBT_ANT_DET_HIGH;
+	for (loop = 0; loop < ISDBT_ANT_CHECK_COUNT; loop++) {
+		usleep_range(ISDBT_ANT_CHECK_DURATION,\
+				 ISDBT_ANT_CHECK_DURATION);
+		cur_val = gpio_get_value_cansleep(gpio_cfg.gpio_ant_det);
+		if (prev_val != cur_val || ant_prev_status == cur_val)
+			break;
+		prev_val = cur_val;
+	}
+
+	if (loop == ISDBT_ANT_CHECK_COUNT) {
+		if (ant_prev_status == ISDBT_ANT_DET_LOW
+			&& cur_val == ISDBT_ANT_DET_HIGH) {
+			ret = ISDBT_ANT_OPEN;
+		} else if (ant_prev_status == ISDBT_ANT_DET_HIGH
+				&& cur_val == ISDBT_ANT_DET_LOW) {
+			ret = ISDBT_ANT_CLOSE;
+		}
+		ant_prev_status = cur_val;
+	}
+	isdbt_check_ant = 0;
+#if 0
+	printk(KERN_DEBUG "%s cnt(%d) cur(%d) prev(%d)\n",
+	__func__, loop, cur_val, ant_prev_status);
+	printk(KERN_DEBUG "system_rev = %d\n", system_rev);
+#endif
+	return ret;
+}
+
+static int isdbt_ant_det_ignore_irq(void)
+{
+	/*printk("chk_ant=%d sr=%d\n",
+		isdbt_check_ant, system_rev); */
+	return isdbt_check_ant;
+}
+
+static void isdbt_ant_det_work_func(struct work_struct *work)
+{
+	if (!isdbt_ant_input) {
+		printk(KERN_DEBUG \
+			"%s: input device is not registered\n", __func__);
+		return;
+	}
+
+	switch (isdbt_ant_det_check_value()) {
+	case ISDBT_ANT_OPEN:
+		input_report_key(isdbt_ant_input, KEY_DMB_ANT_DET_UP, 1);
+		input_report_key(isdbt_ant_input, KEY_DMB_ANT_DET_UP, 0);
+		input_sync(isdbt_ant_input);
+		printk(KERN_DEBUG "%s : ISDBT_ANT_OPEN\n", __func__);
+	break;
+	case ISDBT_ANT_CLOSE:
+		input_report_key(isdbt_ant_input, KEY_DMB_ANT_DET_DOWN, 1);
+		input_report_key(isdbt_ant_input, KEY_DMB_ANT_DET_DOWN, 0);
+		input_sync(isdbt_ant_input);
+		printk(KERN_DEBUG "%s : ISDBT_ANT_CLOSE\n", __func__);
+	break;
+	case ISDBT_ANT_UNKNOWN:
+		printk(KERN_DEBUG "%s : ISDBT_ANT_UNKNOWN\n", __func__);
+	break;
+	default:
+		break;
+	}
+
+}
+
+static struct workqueue_struct *isdbt_ant_det_wq;
+static DECLARE_WORK(isdbt_ant_det_work, isdbt_ant_det_work_func);
+static bool isdbt_ant_det_reg_input(struct platform_device *pdev)
+{
+	struct input_dev *input;
+	int err;
+
+	printk(KERN_DEBUG "%s\n", __func__);
+
+	input = input_allocate_device();
+	if (!input) {
+		printk(KERN_DEBUG "Can't allocate input device\n");
+		err = -ENOMEM;
+	}
+	set_bit(EV_KEY, input->evbit);
+	set_bit(KEY_DMB_ANT_DET_UP & KEY_MAX, input->keybit);
+	set_bit(KEY_DMB_ANT_DET_DOWN & KEY_MAX, input->keybit);
+	input->name = "sec_dmb_key";
+	input->phys = "sec_dmb_key/input0";
+	input->dev.parent = &pdev->dev;
+
+	err = input_register_device(input);
+	if (err) {
+		printk(KERN_DEBUG "Can't register dmb_ant_det key: %d\n", err);
+		goto free_input_dev;
+	}
+	isdbt_ant_input = input;
+	ant_prev_status = gpio_get_value_cansleep(gpio_cfg.gpio_ant_det);
+
+	return true;
+
+free_input_dev:
+	input_free_device(input);
+	return false;
+}
+
+static void isdbt_ant_det_unreg_input(void)
+{
+	input_unregister_device(isdbt_ant_input);
+}
+static bool isdbt_ant_det_create_wq(void)
+{
+	printk(KERN_DEBUG "%s\n", __func__);
+	isdbt_ant_det_wq = create_singlethread_workqueue("isdbt_ant_det_wq");
+	if (isdbt_ant_det_wq)
+		return true;
+	else
+		return false;
+}
+
+static bool isdbt_ant_det_destroy_wq(void)
+{
+	if (isdbt_ant_det_wq) {
+		flush_workqueue(isdbt_ant_det_wq);
+		destroy_workqueue(isdbt_ant_det_wq);
+		isdbt_ant_det_wq = NULL;
+	}
+	return true;
+}
+
+static irqreturn_t isdbt_ant_det_irq_handler(int irq, void *dev_id)
+{
+	int ret = 0;
+
+	if (isdbt_ant_det_ignore_irq())
+		return IRQ_HANDLED;
+
+	wake_lock_timeout(&isdbt_ant_wlock, ISDBT_ANT_WLOCK_TIMEOUT * HZ);
+
+	if (isdbt_ant_det_wq) {
+		ret = queue_work(isdbt_ant_det_wq, &isdbt_ant_det_work);
+		if (ret == 0)
+			printk(KERN_DEBUG "%s queue_work fail\n", __func__);
+	}
+
+	return IRQ_HANDLED;
+
+}
+
+static bool isdbt_ant_det_irq_set(bool set)
+{
+	bool ret = true;
+	int irq_ret;
+
+	if (set) {
+		irq_set_irq_type(gpio_cfg.irq_ant_det, IRQ_TYPE_EDGE_BOTH);
+		irq_ret = request_irq(gpio_cfg.irq_ant_det
+						, isdbt_ant_det_irq_handler
+						, IRQF_DISABLED
+						, "isdbt_ant_det"
+						, NULL);
+		if (irq_ret < 0) {
+			printk(KERN_DEBUG "%s %d\r\n", __func__, irq_ret);
+			ret = false;
+		}
+	    enable_irq_wake(gpio_cfg.irq_ant_det);
+	} else {
+	    disable_irq_wake(gpio_cfg.irq_ant_det);
+		free_irq(gpio_cfg.irq_ant_det, NULL);
+	}
+
+	return ret;
+}
+#endif
+
+static int isdbt_probe(struct platform_device *pdev)
+{
+	int res;
+	struct isdbt_platform_data *p = pdev->dev.platform_data;
+	memcpy(&gpio_cfg, p, sizeof(struct isdbt_platform_data));
+	printk(KERN_DEBUG "%s\n", __func__);
 
 	res = misc_register(&fc8150_misc_device);
 
@@ -494,9 +718,77 @@ int isdbt_init(void)
 	}
 
 	INIT_LIST_HEAD(&(hInit->hHead));
+#if defined(CONFIG_ISDBT_ANT_DET)
+	wake_lock_init(&isdbt_ant_wlock, WAKE_LOCK_SUSPEND, "isdbt_ant_wlock");
+
+	if (!isdbt_ant_det_reg_input(pdev))
+		goto err_reg_input;
+	if (!isdbt_ant_det_create_wq())
+		goto free_reg_input;
+	if (!isdbt_ant_det_irq_set(true))
+		goto free_ant_det_wq;
+
+	return 0;
+free_ant_det_wq:
+	isdbt_ant_det_destroy_wq();
+free_reg_input:
+	isdbt_ant_det_unreg_input();
+err_reg_input:
+	return -EFAULT;
+#else
+	return 0;
+#endif
+
+}
+
+static int isdbt_remove(struct platform_device *pdev)
+{
+	printk(KERN_DEBUG "ISDBT remove\n");
+#if defined(CONFIG_ISDBT_ANT_DET)
+	isdbt_ant_det_unreg_input();
+	isdbt_ant_det_destroy_wq();
+	isdbt_ant_det_irq_set(false);
+	wake_lock_destroy(&isdbt_ant_wlock);
+#endif
+	return 0;
+}
+
+static int isdbt_suspend(struct platform_device *pdev, pm_message_t mesg)
+{
+	return 0;
+}
+
+static int isdbt_resume(struct platform_device *pdev)
+{
+	return 0;
+}
+
+static struct platform_driver isdbt_driver = {
+			.probe	= isdbt_probe,
+	.remove = isdbt_remove,
+	.suspend = isdbt_suspend,
+	.resume = isdbt_resume,
+			.driver = {
+					.owner	= THIS_MODULE,
+					.name = "isdbt"
+				},
+};
+
+int isdbt_init(void)
+{
+	s32 res;
+
+	PRINTF(hInit, "isdbt_init\n");
+	res = platform_driver_register(&isdbt_driver);
+	if (res < 0) {
+		PRINTF(hInit, "isdbt init fail : %d\n", res);
+		return res;
+	}
+
 
 	return 0;
 }
+
 
 void isdbt_exit(void)
 {
@@ -513,7 +805,7 @@ void isdbt_exit(void)
 	BBM_HOSTIF_DESELECT(hInit);
 
 	isdbt_hw_deinit();
-
+	platform_driver_unregister(&isdbt_driver);
 	misc_deregister(&fc8150_misc_device);
 
 	kfree(hInit);

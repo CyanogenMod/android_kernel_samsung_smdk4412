@@ -374,6 +374,8 @@ int fimc_hwget_overflow_state(struct fimc_control *ctrl)
 	flag = S3C_CISTATUS_OVFIY | S3C_CISTATUS_OVFICB | S3C_CISTATUS_OVFICR;
 
 	if (status & flag) {
+		printk(KERN_INFO "FIMC%d overflow has occured status 0x%x\n",
+				ctrl->id, status);
 		cfg = readl(ctrl->regs + S3C_CIWDOFST);
 		cfg |= (S3C_CIWDOFST_CLROVFIY | S3C_CIWDOFST_CLROVFICB |
 			S3C_CIWDOFST_CLROVFICR);
@@ -391,6 +393,64 @@ int fimc_hwget_overflow_state(struct fimc_control *ctrl)
 
 	return 0;
 }
+
+
+#if defined(CONFIG_MACH_GD2)
+int fimc_hwset_camera_offset(struct fimc_control *ctrl)
+{
+	struct s3c_platform_camera *cam = ctrl->cam;
+	struct v4l2_rect *rect = &cam->window;
+	u32 cfg, h1, h2, v1, v2;
+
+	if (!cam) {
+		fimc_err("%s: no active camera\n", __func__);
+		return -ENODEV;
+	}
+
+	h1 = rect->left;
+
+	if((ctrl->cap->fmt.priv == V4L2_PIX_FMT_MODE_CAPTURE) && ctrl->id == FIMC1)
+		h2 = rect->left;
+	else
+		h2 = cam->width - rect->width - rect->left;
+	
+	v1 = rect->top;
+	if((ctrl->cap->fmt.priv == V4L2_PIX_FMT_MODE_CAPTURE) && ctrl->id == FIMC1)
+		v2 = rect->top;
+	else
+		v2 = cam->height - rect->height - rect->top;
+
+	cfg = readl(ctrl->regs + S3C_CIWDOFST);
+	cfg &= ~(S3C_CIWDOFST_WINHOROFST_MASK | S3C_CIWDOFST_WINVEROFST_MASK);
+
+	if((ctrl->cap->fmt.priv != V4L2_PIX_FMT_MODE_CAPTURE) && ctrl->id == FIMC1)
+		cfg |= S3C_CIWDOFST_WINHOROFST(U1_WINDOW_OFFSETH);
+	else
+		cfg |= S3C_CIWDOFST_WINHOROFST(h1);
+
+	cfg |= S3C_CIWDOFST_WINVEROFST(v1);
+	cfg |= S3C_CIWDOFST_WINOFSEN;
+	writel(cfg, ctrl->regs + S3C_CIWDOFST);
+
+	cfg = 0;
+	
+	if((ctrl->cap->fmt.priv != V4L2_PIX_FMT_MODE_CAPTURE) && ctrl->id == FIMC1)
+		cfg |= S3C_CIWDOFST2_WINHOROFST2(U1_WINDOW_OFFSETH2);
+	else
+		cfg |= S3C_CIWDOFST2_WINHOROFST2(h2); 
+
+	cfg |= S3C_CIWDOFST2_WINVEROFST2(v2);
+	writel(cfg, ctrl->regs + S3C_CIWDOFST2);
+
+	if((ctrl->cap->fmt.priv != V4L2_PIX_FMT_MODE_CAPTURE) && ctrl->id == FIMC1)
+		printk(KERN_INFO "h1 = %d h2 = %d v1 = %d v2 = %d\n",U1_WINDOW_OFFSETH, U1_WINDOW_OFFSETH2, v1, v2);
+	else
+		printk(KERN_INFO "h1 = %d h2 = %d v1 = %d v2 = %d\n",h1, h2, v1, v2);		
+
+	return 0;
+}
+
+#else
 
 int fimc_hwset_camera_offset(struct fimc_control *ctrl)
 {
@@ -422,6 +482,7 @@ int fimc_hwset_camera_offset(struct fimc_control *ctrl)
 
 	return 0;
 }
+#endif
 
 int fimc_hwset_camera_polarity(struct fimc_control *ctrl)
 {
@@ -1125,6 +1186,16 @@ int fimc_hwget_frame_end(struct fimc_control *ctrl)
 	return 0;
 }
 
+int fimc_hwget_frame_end_sync(struct fimc_control *ctrl)
+{
+	u32 cfg;
+
+	cfg = readl(ctrl->regs + S3C_CISTATUS);
+	cfg &= S3C_CISTATUS_FRAMEEND;
+
+	return cfg;
+}
+
 int fimc_hwget_last_frame_end(struct fimc_control *ctrl)
 {
 	unsigned long timeo = jiffies;
@@ -1273,7 +1344,7 @@ void fimc_wait_disable_capture(struct fimc_control *ctrl)
 			break;
 		msleep(5);
 	}
-	fimc_info2("IMGCPTEN: Wait time = %d ms\n"	\
+	fimc_err("IMGCPTEN: Wait time = %d ms\n"	\
 		, jiffies_to_msecs(jiffies - timeo + 20));
 	return;
 }

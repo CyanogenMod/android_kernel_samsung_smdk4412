@@ -125,10 +125,6 @@ static struct modem_io_t umts_io_devices[] = {
 	},
 };
 
-/* To get modem state, register phone active irq using resource */
-static struct resource umts_modem_res[] = {
-};
-
 static int umts_link_ldo_enble(bool enable)
 {
 	/* Exynos HSIC V1.2 LDO was controlled by kernel */
@@ -360,8 +356,6 @@ static int umts_link_reconnect(void)
 static struct platform_device umts_modem = {
 	.name = "modem_if",
 	.id = 1,
-	.num_resources = ARRAY_SIZE(umts_modem_res),
-	.resource = umts_modem_res,
 	.dev = {
 		.platform_data = &umts_modem_data,
 	},
@@ -380,7 +374,6 @@ static void umts_modem_cfg_gpio(void)
 	unsigned gpio_ap_dump_int = umts_modem_data.gpio_ap_dump_int;
 	unsigned gpio_flm_uart_sel = umts_modem_data.gpio_flm_uart_sel;
 	unsigned gpio_sim_detect = umts_modem_data.gpio_sim_detect;
-	//unsigned irq_phone_active = umts_modem_res[0].start;
 
 #ifdef CONFIG_SEC_DUAL_MODEM_MODE
 	unsigned gpio_sim_io_sel = umts_modem_data.gpio_sim_io_sel;
@@ -433,7 +426,6 @@ static void umts_modem_cfg_gpio(void)
 			       "PHONE_ACTIVE", err);
 		}
 		gpio_direction_input(gpio_phone_active);
-		pr_err(LOG_TAG "check phone active = %d\n", gpio_phone_active);
 	}
 
 	if (gpio_sim_detect) {
@@ -444,7 +436,7 @@ static void umts_modem_cfg_gpio(void)
 
 		/* gpio_direction_input(gpio_sim_detect); */
 		s3c_gpio_cfgpin(gpio_sim_detect, S3C_GPIO_SFN(0xF));
-		s3c_gpio_setpull(gpio_sim_detect, S3C_GPIO_PULL_NONE);
+		s3c_gpio_setpull(gpio_sim_detect, S3C_GPIO_PULL_DOWN);
 		irq_set_irq_type(gpio_to_irq(gpio_sim_detect),
 							IRQ_TYPE_EDGE_BOTH);
 	}
@@ -533,7 +525,6 @@ static void modem_link_pm_config_gpio(void)
 	unsigned gpio_link_active = modem_link_pm_data.gpio_link_active;
 	unsigned gpio_link_hostwake = modem_link_pm_data.gpio_link_hostwake;
 	unsigned gpio_link_slavewake = modem_link_pm_data.gpio_link_slavewake;
-	/* unsigned irq_link_hostwake = umts_modem_res[1].start; */
 
 	if (gpio_link_enable) {
 		err = gpio_request(gpio_link_enable, "LINK_EN");
@@ -585,6 +576,11 @@ static void board_set_simdetect_polarity(void)
 	if (umts_modem_data.gpio_sim_detect) {
 #if defined(CONFIG_MACH_GC1)
 		if (system_rev >= 6) /* GD1 3G real B'd*/
+			umts_modem_data.sim_polarity = 1;
+		else
+			umts_modem_data.sim_polarity = 0;
+#elif defined(CONFIG_MACH_KONA)
+		if (system_rev >= 1)
 			umts_modem_data.sim_polarity = 1;
 		else
 			umts_modem_data.sim_polarity = 0;

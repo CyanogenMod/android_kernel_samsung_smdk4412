@@ -12,6 +12,12 @@ menuconfig NFC_DEVICES
 	  You can say N here if you don't have any Near Field Communication
 	  devices connected to your computer.
 
+config SF2_NFC_TAG
+	bool "NFC TAG driver"
+	default n
+	help
+	NFC TAG Interrput detecting driver
+
 if NFC_DEVICES
 
 config PN544_NFC
@@ -37,5 +43,28 @@ config PN65N_NFC
 
 	  To compile this driver as a module, choose m here. The module will
 	  be called pn65n.
+
+config PN547_NFC
+    tristate "PN547 NFC driver"
+	depends on I2C
+	select CRC_CCITT
+	default n
+	---help---
+	  Say yes if you want PN547 Near Field Communication driver.
+	  This is for i2c connected version. If unsure, say N here.
+
+	  To compile this driver as a module, choose m here. The module will
+	  be called pn547.
+
+config BCM2079X_NFC
+	tristate "BCM2079X NFC driver for I2C interface"
+	depends on I2C
+	default n
+	help
+	  Say yes if you want BCM2079X Near Field Communication driver.
+	  This is for spi connected version. If unsure, say N here.
+
+	  To compile this driver as a module, choose m here. The module will
+	  be called bcm2079x-i2c.
 
 endif # NFC_DEVICES

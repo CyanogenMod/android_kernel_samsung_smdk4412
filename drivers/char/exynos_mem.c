@@ -85,7 +85,7 @@ static void cache_maint_phys(phys_addr_t start, size_t length, enum cacheop op)
 	phys_addr_t begin = start;
 
 	if (!cma_is_registered_region(start, length)) {
-		pr_err("[%s] handling non-cma region (%#x@%#x) is prohibited\n",
+		pr_err("[%s] handling non-cma region (%#x@%#x)is prohibited\n",
 					__func__, length, start);
 		return;
 	}
@@ -265,7 +265,7 @@ int exynos_mem_mmap(struct file *filp, struct vm_area_struct *vma)
 	}
 
 	if (!cma_is_registered_region(start, size)) {
-		pr_err("[%s] handling non-cma region (%#x@%#x) is prohibited\n",
+		pr_err("[%s] handling non-cma region (%#x@%#x)is prohibited\n",
 						__func__, size, start);
 		return -EINVAL;
 	}

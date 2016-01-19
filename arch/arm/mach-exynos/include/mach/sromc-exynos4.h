@@ -12,23 +12,22 @@
 #include <mach/gpio-exynos4.h>
 #include <mach/regs-mem.h>
 
+#define SROM_WIDTH		0x01000000	/* 16 MB */
 #define SROM_CS0_BASE		0x04000000
 #define SROM_CS1_BASE		0x05000000
 #define SROM_CS2_BASE		0x06000000
 #define SROM_CS3_BASE		0x07000000
-#define SROM_WIDTH		0x01000000
 
-#define GPIO_SFN_SROMC		S3C_GPIO_SFN(2)
-
-#define GPIO_SROMC_CSN		EXYNOS4_GPY0(0)
-#define GPIO_SROMC_CSN0		EXYNOS4_GPY0(0)
-#define GPIO_SROMC_CSN1		EXYNOS4_GPY0(1)
-#define GPIO_SROMC_CSN2		EXYNOS4_GPY0(2)
-#define GPIO_SROMC_CSN3		EXYNOS4_GPY0(3)
-#define GPIO_SROMC_REN		EXYNOS4_GPY0(4)
-#define GPIO_SROMC_WEN		EXYNOS4_GPY0(5)
-#define GPIO_SROMC_LBN		EXYNOS4_GPY1(0)
-#define GPIO_SROMC_UBN		EXYNOS4_GPY1(1)
+#define GPIO_SROMC_CSn		EXYNOS4_GPY0(0)
+#define GPIO_SROMC_CSn0		EXYNOS4_GPY0(0)
+#define GPIO_SROMC_CSn1		EXYNOS4_GPY0(1)
+#define GPIO_SROMC_CSn2		EXYNOS4_GPY0(2)
+#define GPIO_SROMC_CSn3		EXYNOS4_GPY0(3)
+#define GPIO_SROMC_OEn		EXYNOS4_GPY0(4)
+#define GPIO_SROMC_WEn		EXYNOS4_GPY0(5)
+#define GPIO_SROMC_LBn		EXYNOS4_GPY1(0)
+#define GPIO_SROMC_UBn		EXYNOS4_GPY1(1)
+#define GPIO_SROMC_WAITn	EXYNOS4_GPY1(2)
 #define GPIO_SROMC_ADDR_BUS_L	EXYNOS4_GPY3(0)
 #define GPIO_SROMC_ADDR_BUS_H	EXYNOS4_GPY4(0)
 #define GPIO_SROMC_DATA_BUS_L	EXYNOS4_GPY5(0)
@@ -39,6 +38,7 @@ struct sromc_bus_cfg {
 	unsigned addr_bits;	/* Width of address bus	in bits	*/
 	unsigned data_bits;	/* Width of data bus in bits	*/
 	unsigned byte_acc;	/* Byte access			*/
+	unsigned busy_ctrl;	/* BUSY control			*/
 };
 
 /* SROMC bank attributes in BW (Bus width and Wait control) register */
@@ -69,7 +69,7 @@ struct sromc_timing_cfg {
 	u32 pmc;		/* Page Mode config			*/
 };
 
-static unsigned int sfn = GPIO_SFN_SROMC;
+static unsigned int srom_sfn = S3C_GPIO_SFN(2);
 
 /**
  * sromc_enable
@@ -107,23 +107,24 @@ static int sromc_config_demux_gpio(struct sromc_bus_cfg *bc)
 	unsigned int addr_bits = bc->addr_bits;
 	unsigned int data_bits = bc->data_bits;
 	unsigned int byte_acc = bc->byte_acc;
+	unsigned int busy_ctrl = bc->busy_ctrl;
 	unsigned int bits;
 
-	pr_err("[SROMC] %s: addr_bits %d, data_bits %d, byte_acc %d\n",
-		__func__, addr_bits, data_bits, byte_acc);
+	pr_err("[SROMC] %s: addr_bits %d, data_bits %d, byte_acc %d, busy %d\n",
+		__func__, addr_bits, data_bits, byte_acc, busy_ctrl);
 
 	/* Configure address bus */
 	switch (addr_bits) {
 	case 1 ... EXYNOS4_GPIO_Y3_NR:
 		bits = addr_bits;
-		s3c_gpio_cfgrange_nopull(GPIO_SROMC_ADDR_BUS_L, bits, sfn);
+		s3c_gpio_cfgrange_nopull(GPIO_SROMC_ADDR_BUS_L, bits, srom_sfn);
 		break;
 
 	case (EXYNOS4_GPIO_Y3_NR + 1) ... 16:
 		bits = EXYNOS4_GPIO_Y3_NR;
-		s3c_gpio_cfgrange_nopull(GPIO_SROMC_ADDR_BUS_L, bits, sfn);
+		s3c_gpio_cfgrange_nopull(GPIO_SROMC_ADDR_BUS_L, bits, srom_sfn);
 		bits = (addr_bits - EXYNOS4_GPIO_Y3_NR);
-		s3c_gpio_cfgrange_nopull(GPIO_SROMC_ADDR_BUS_H, bits, sfn);
+		s3c_gpio_cfgrange_nopull(GPIO_SROMC_ADDR_BUS_H, bits, srom_sfn);
 		break;
 
 	default:
@@ -135,12 +136,12 @@ static int sromc_config_demux_gpio(struct sromc_bus_cfg *bc)
 	/* Configure data bus (8 or 16 bits) */
 	switch (data_bits) {
 	case 8:
-		s3c_gpio_cfgrange_nopull(GPIO_SROMC_DATA_BUS_L, 8, sfn);
+		s3c_gpio_cfgrange_nopull(GPIO_SROMC_DATA_BUS_L, 8, srom_sfn);
 		break;
 
 	case 16:
-		s3c_gpio_cfgrange_nopull(GPIO_SROMC_DATA_BUS_L, 8, sfn);
-		s3c_gpio_cfgrange_nopull(GPIO_SROMC_DATA_BUS_H, 8, sfn);
+		s3c_gpio_cfgrange_nopull(GPIO_SROMC_DATA_BUS_L, 8, srom_sfn);
+		s3c_gpio_cfgrange_nopull(GPIO_SROMC_DATA_BUS_H, 8, srom_sfn);
 		break;
 
 	default:
@@ -149,20 +150,26 @@ static int sromc_config_demux_gpio(struct sromc_bus_cfg *bc)
 		return -EINVAL;
 	}
 
-	/* Configure REn */
-	s3c_gpio_cfgpin(GPIO_SROMC_REN, sfn);
-	s3c_gpio_setpull(GPIO_SROMC_REN, S3C_GPIO_PULL_NONE);
+	/* Configure OEn */
+	s3c_gpio_cfgpin(GPIO_SROMC_OEn, srom_sfn);
+	s3c_gpio_setpull(GPIO_SROMC_OEn, S3C_GPIO_PULL_NONE);
 
 	/* Configure WEn */
-	s3c_gpio_cfgpin(GPIO_SROMC_WEN, sfn);
-	s3c_gpio_setpull(GPIO_SROMC_WEN, S3C_GPIO_PULL_NONE);
+	s3c_gpio_cfgpin(GPIO_SROMC_WEn, srom_sfn);
+	s3c_gpio_setpull(GPIO_SROMC_WEn, S3C_GPIO_PULL_NONE);
 
 	/* Configure LBn, UBn */
 	if (byte_acc) {
-		s3c_gpio_cfgpin(GPIO_SROMC_LBN, sfn);
-		s3c_gpio_setpull(GPIO_SROMC_LBN, S3C_GPIO_PULL_NONE);
-		s3c_gpio_cfgpin(GPIO_SROMC_UBN, sfn);
-		s3c_gpio_setpull(GPIO_SROMC_UBN, S3C_GPIO_PULL_NONE);
+		s3c_gpio_cfgpin(GPIO_SROMC_LBn, srom_sfn);
+		s3c_gpio_setpull(GPIO_SROMC_LBn, S3C_GPIO_PULL_NONE);
+		s3c_gpio_cfgpin(GPIO_SROMC_UBn, srom_sfn);
+		s3c_gpio_setpull(GPIO_SROMC_UBn, S3C_GPIO_PULL_NONE);
+	}
+
+	/* Configure WAITn */
+	if (busy_ctrl) {
+		s3c_gpio_cfgpin(GPIO_SROMC_WAITn, srom_sfn);
+		s3c_gpio_setpull(GPIO_SROMC_WAITn, S3C_GPIO_PULL_NONE);
 	}
 
 	return 0;
@@ -179,7 +186,7 @@ static int sromc_config_demux_gpio(struct sromc_bus_cfg *bc)
  */
 static int sromc_config_csn_gpio(unsigned int csn)
 {
-	unsigned int pin = GPIO_SROMC_CSN + csn;
+	unsigned int pin = GPIO_SROMC_CSn + csn;
 
 	pr_err("[SROMC] %s: for CSn%d\n", __func__, csn);
 
@@ -189,7 +196,7 @@ static int sromc_config_csn_gpio(unsigned int csn)
 	}
 
 	/* Configure CSn GPIO pin */
-	s3c_gpio_cfgpin(pin, sfn);
+	s3c_gpio_cfgpin(pin, srom_sfn);
 	s3c_gpio_setpull(pin, S3C_GPIO_PULL_NONE);
 
 	return 0;

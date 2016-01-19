@@ -17,6 +17,9 @@
  *  Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
  */
 
+#ifndef _LINUX_WACOM_I2C_COORD_TABLES_H
+#define _LINUX_WACOM_I2C_COORD_TABLES_H
+
 /* Portrait */
 
 /* Portrait Right */
@@ -88,3 +91,4 @@ extern char* tuning_version_B713;
 
 extern char *tuning_model;
 
+#endif /* _LINUX_WACOM_I2C_COORD_TABLES_H */

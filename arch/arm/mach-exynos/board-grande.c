@@ -120,7 +120,7 @@ struct s3cfb_extdsp_lcd {
 #include <mach/midas-tsp.h>
 #include <mach/regs-clock.h>
 
-#include <mach/midas-lcd.h>
+#include <mach/board-lcd.h>
 #include <mach/midas-sound.h>
 #if defined(CONFIG_SEC_DEV_JACK)
 #include <mach/grande-jack.h>
@@ -1304,9 +1304,6 @@ static struct platform_device *midas_devices[] __initdata = {
 #if defined(CONFIG_CHARGER_MAX8922_U1)
 	&max8922_device_charger,
 #endif
-#ifdef CONFIG_EXYNOS_C2C
-	&exynos_device_c2c,
-#endif
 #if defined(CONFIG_S3C64XX_DEV_SPI)
 #if defined(CONFIG_VIDEO_S5C73M3_SPI)
 	&exynos_device_spi1,
@@ -1938,9 +1935,6 @@ static void __init midas_machine_init(void)
 #endif
 #ifdef CONFIG_VIDEO_FIMG2D
 	s5p_fimg2d_set_platdata(&fimg2d_data);
-#endif
-#ifdef CONFIG_EXYNOS_C2C
-	exynos_c2c_set_platdata(&smdk4212_c2c_pdata);
 #endif
 
 	brcm_wlan_init();

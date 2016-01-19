@@ -90,6 +90,17 @@ config ANDROID_LOW_MEMORY_KILLER
 	---help---
 	  Register processes to be killed when memory is low
 
+config SEC_OOM_KILLER
+        bool "Android OOM Killer"
+        default n
+        help
+          klaatu@samsung
+          This enables 'Android-Style oom-killer'
+          The way to select victim by oom-killer provided by
+          linux kernel is totally different from android policy.
+          Hence, it makes more sense that we select the oom victim
+          as android does when LMK is invoked.
+
 endif # if ANDROID
 
 endmenu

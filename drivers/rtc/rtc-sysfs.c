@@ -116,6 +116,27 @@ rtc_sysfs_show_hctosys(struct device *dev, struct device_attribute *attr,
 		return sprintf(buf, "0\n");
 }
 
+#if defined(CONFIG_RTC_ALARM_BOOT)
+static ssize_t
+rtc_sysfs_show_alarm_boot(struct device *dev, struct device_attribute *attr,
+		char *buf)
+{
+	ssize_t retval;
+	unsigned long alarm;
+	struct rtc_wkalrm alm;
+
+	retval = rtc_get_alarm_boot(to_rtc_device(dev), &alm);
+	if (retval) {
+		retval = sprintf(buf, "%d", alm.enabled);
+		printk(KERN_INFO "rtc_sysfs_show_wakealarm enabled? : %d\n",
+			alm.enabled);
+		return retval;
+	}
+
+	return retval;
+}
+#endif
+
 static struct device_attribute rtc_attrs[] = {
 	__ATTR(name, S_IRUGO, rtc_sysfs_show_name, NULL),
 	__ATTR(date, S_IRUGO, rtc_sysfs_show_date, NULL),
@@ -124,6 +145,9 @@ static struct device_attribute rtc_attrs[] = {
 	__ATTR(max_user_freq, S_IRUGO | S_IWUSR, rtc_sysfs_show_max_user_freq,
 			rtc_sysfs_set_max_user_freq),
 	__ATTR(hctosys, S_IRUGO, rtc_sysfs_show_hctosys, NULL),
+#if defined(CONFIG_RTC_ALARM_BOOT)
+	__ATTR(alarm_boot, S_IRUGO, rtc_sysfs_show_alarm_boot, NULL),
+#endif
 	{ },
 };
 

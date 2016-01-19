@@ -57,3 +57,11 @@ config MMC_POLLING_WAIT_CMD23
 	help
 	  If you say Y here, cmd23 dose not use interrupt.
 
+config MMC_MOVI_OPERATION
+	bool "Enable moviNAND Host Work-aound (EXPERIMENTAL)"
+	depends on EXPERIMENTAL
+	help
+	  If you say Y here, moviNAND Host Work-around code be enable.
+	  This feature has to be use only specific projects(M0/T0 3G models)
+	  that use eMCP moviNAND VHX P14_RC2 16GB device.
+

@@ -298,6 +298,8 @@ struct g2d_global {
 	struct early_suspend	early_suspend;
 #endif	
 	int                     irq_handled;
+	struct			mm_struct *mm;
+	unsigned int		dummy_page_addr;
 };
 
 
@@ -376,6 +378,10 @@ void g2d_mem_outer_cache_inv(g2d_params *params);
 u32 g2d_check_pagetable(void * vaddr, unsigned int size, unsigned long pgd);
 void g2d_pagetable_clean(const void *start_addr, unsigned long size, unsigned long pgd);
 int g2d_check_need_dst_cache_clean(g2d_params * params);
+void g2d_clean_outer_pagetable(struct mm_struct *mm, unsigned long vaddr,
+				size_t size);
+void g2d_mmutable_value_replace(struct mm_struct *mm,
+				unsigned long fault_addr, unsigned long l2d_value);
 
 #ifdef CONFIG_HAS_EARLYSUSPEND
 void g2d_early_suspend(struct early_suspend *h);

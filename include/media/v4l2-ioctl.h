@@ -157,6 +157,8 @@ struct v4l2_ioctl_ops {
 					struct v4l2_queryctrl *a);
 	int (*vidioc_g_ctrl)           (struct file *file, void *fh,
 					struct v4l2_control *a);
+	int (*vidioc_noti_ctrl)           (struct file *file, void *fh,
+					struct v4l2_noti_control *a);
 	int (*vidioc_s_ctrl)           (struct file *file, void *fh,
 					struct v4l2_control *a);
 	int (*vidioc_g_ext_ctrls)      (struct file *file, void *fh,

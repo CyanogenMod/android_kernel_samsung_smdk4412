@@ -5,11 +5,13 @@
 
  Description : fci i2c driver
 *******************************************************************************/
+#include <linux/delay.h>
 
 #include "fci_types.h"
 #include "fci_oal.h"
 #include "fc8150_regs.h"
 #include "fci_hal.h"
+#define FEATURE_SIMPLE_INTERFACE
 
 #define I2CSTAT_TIP         0x02 /* Tip bit */
 #define I2CSTAT_NACK        0x80 /* Nack bit */
@@ -38,8 +40,11 @@
 
 static int WaitForXfer(HANDLE hDevice)
 {
-	int i;
 	int res = I2C_OK;
+#ifdef FEATURE_SIMPLE_INTERFACE
+	udelay(30);
+#else
+	int i;
 	u8 status;
 
 	i = I2C_TIMEOUT * 20000;
@@ -59,7 +64,7 @@ static int WaitForXfer(HANDLE hDevice)
 		else
 			res = I2C_OK;
 	}
-
+#endif
 	return res;
 }
 

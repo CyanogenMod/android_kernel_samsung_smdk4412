@@ -123,19 +123,11 @@ obj-$(CONFIG_S5P_DP)		  += s5p-dp-core.o s5p-dp-reg.o
 obj-$(CONFIG_FB_S3C2410)	  += s3c2410fb.o
 ifeq ($(CONFIG_S5P_DSIM_SWITCHABLE_DUAL_LCD),y)
 obj-$(CONFIG_FB_S5P)              += samsung_duallcd/
-ifeq ($(CONFIG_NAPLES_COMMON),y)
-obj-$(CONFIG_S5P_MIPI_DSI2)	  += samsung_duallcd/dsim2_tmp/
-else
 obj-$(CONFIG_S5P_MIPI_DSI2)	  += samsung_duallcd/dsim2/
-endif
 obj-$(CONFIG_FIMD_EXT_SUPPORT)    += samsung_duallcd/extension/
 else
 obj-$(CONFIG_FB_S5P)              += samsung/
-ifeq ($(CONFIG_NAPLES_COMMON),y)
-obj-$(CONFIG_S5P_MIPI_DSI2)	  += samsung/dsim2_tmp/
-else
 obj-$(CONFIG_S5P_MIPI_DSI2)	  += samsung/dsim2/
-endif
 obj-$(CONFIG_FIMD_EXT_SUPPORT)    += samsung/extension/
 endif
 obj-$(CONFIG_FB_S5P_EXTDSP)       += samsung_extdisp/
@@ -182,3 +174,7 @@ obj-$(CONFIG_FB_VIRTUAL)          += vfb.o
 
 #video output switch sysfs driver
 obj-$(CONFIG_VIDEO_OUTPUT_CONTROL) += output.o
+
+ifeq ($(CONFIG_VITHAR),y)
+    EXTRA_CFLAGS += -Idrivers/gpu/vithar
+endif

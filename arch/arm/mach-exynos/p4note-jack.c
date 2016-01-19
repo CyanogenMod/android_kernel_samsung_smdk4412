@@ -76,25 +76,25 @@ static struct sec_jack_zone sec_jack_zones[] = {
 static struct sec_jack_zone sec_jack_zones[] = {
 	{
 		/* adc == 0, unstable zone, default to 3pole if it stays
-		 * in this range for 300ms (15ms delays, 20 samples)
+		 * in this range for 100ms (10ms delays, 10 samples)
 		 */
 		.adc_high = 0,
-		.delay_ms = 15,
-		.check_count = 20,
+		.delay_ms = 10,
+		.check_count = 10,
 		.jack_type = SEC_HEADSET_3POLE,
 	},
 	{
 		/* 0 < adc <= 1200, unstable zone, default to 3pole if it stays
-		 * in this range for 300ms (15ms delays, 20 samples)
+		 * in this range for 100ms (10ms delays, 10 samples)
 		 */
 		.adc_high = 1200,
 		.delay_ms = 10,
-		.check_count = 80,
+		.check_count = 10,
 		.jack_type = SEC_HEADSET_3POLE,
 	},
 	{
 		/* 1200 < adc <= 2600, unstable zone, default to 4pole if it
-		 * stays in this range for 800ms (10ms delays, 80 samples)
+		 * stays in this range for 100ms (10ms delays, 10 samples)
 		 */
 		.adc_high = 2600,
 		.delay_ms = 10,
@@ -102,8 +102,8 @@ static struct sec_jack_zone sec_jack_zones[] = {
 		.jack_type = SEC_HEADSET_4POLE,
 	},
 	{
-		/* 2600 < adc <= 3800, 3 pole zone, default to 3pole if it
-		 * stays in this range for 100ms (10ms delays, 10 samples)
+		/* 2600 < adc <= 3800, 4 pole zone, default to 4pole if it
+		 * stays in this range for 50ms (10ms delays, 5 samples)
 		 */
 		.adc_high = 3800,
 		.delay_ms = 10,

@@ -74,6 +74,7 @@
 #define EXYNOS5_WAKEUP_MASK					S5P_PMUREG(0x0608)
 
 #define EXYNOS5_DEFAULT_WAKEUP_MACK				(0xF << 16)
+#define EXYNOS5_MASK_EINT					(1 << 0)
 #define EXYNOS5_MASK_RTC_ALARM					(1 << 1)
 #define EXYNOS5_MASK_RTC_TICK					(1 << 2)
 #define EXYNOS5_MASK_KEY					(1 << 5)

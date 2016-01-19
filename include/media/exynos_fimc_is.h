@@ -43,7 +43,8 @@ enum exynos5_sensor_id {
 	SENSOR_NAME_S5K6A3	= 2,
 	SENSOR_NAME_S5K4E5	= 3,
 	SENSOR_NAME_S5K3H7	= 4,
-	SENSOR_NAME_CUSTOM	= 5,
+	SENSOR_NAME_S5K6B2	= 5,
+	SENSOR_NAME_CUSTOM	= 100,
 	SENSOR_NAME_END
 };
 
@@ -93,6 +94,8 @@ struct exynos4_platform_fimc_is {
 	int	(*clk_cfg)(struct platform_device *pdev);
 	int	(*clk_on)(struct platform_device *pdev);
 	int	(*clk_off)(struct platform_device *pdev);
+	int	(*filter_on)(void);
+	int	(*filter_off)(void);
 };
 
 #if defined(CONFIG_ARCH_EXYNOS5)
@@ -121,6 +124,10 @@ extern int exynos_fimc_is_clk_on(struct platform_device *pdev);
 extern int exynos_fimc_is_clk_off(struct platform_device *pdev);
 extern int exynos_fimc_is_clk_get(struct platform_device *pdev);
 extern int exynos_fimc_is_clk_put(struct platform_device *pdev);
+#ifdef CONFIG_MACH_IPCAM
+extern int exynos_fimc_is_filter_on(void);
+extern int exynos_fimc_is_filter_off(void);
+#endif
 
 #if defined(CONFIG_ARCH_EXYNOS5)
 /* defined by architecture to configure gpio */

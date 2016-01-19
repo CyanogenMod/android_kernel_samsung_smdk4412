@@ -20,6 +20,10 @@ struct isdbt_platform_data {
 	void (*gpio_on) (void);
 	void (*gpio_off)(void);
 	int	irq;
+#if defined(CONFIG_ISDBT_ANT_DET)
+	unsigned int    gpio_ant_det;
+	unsigned int    irq_ant_det;
+#endif
 };
 #endif
 #endif

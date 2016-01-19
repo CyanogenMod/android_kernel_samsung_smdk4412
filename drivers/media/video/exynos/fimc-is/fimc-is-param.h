@@ -16,6 +16,7 @@
 
 #define IS_REGION_VER 124  /* IS REGION VERSION 1.24 */
 
+
 /* MACROs */
 #define IS_SET_PARAM_BIT(dev, num) \
 	(num >= 32 ? set_bit((num-32), &dev->p_region_index2) \
@@ -1037,7 +1038,7 @@ enum isp_scene_mode {
 	ISP_SCENE_AGAINSTLIGHTWOLIGHT	= 11,
 	ISP_SCENE_FIRE			= 12,
 	ISP_SCENE_TEXT			= 13,
-	ISP_SCENE_CANDLE		= 14
+	ISP_SCENE_CANDLE		= 14,
 };
 
 enum isp_afc_error {

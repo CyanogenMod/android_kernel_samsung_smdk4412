@@ -33,7 +33,7 @@
 #include <linux/ir_remote_con_mc96.h>
 #include <linux/earlysuspend.h>
 #include "irda_fw.h"
-#include <mach/gpio-rev00-p4notepq.h>
+#include <mach/gpio.h>
 
 #define MAX_SIZE 2048
 #define MC96_READ_LENGTH	8
@@ -89,10 +89,6 @@ static int irda_fw_update(struct ir_remocon_data *ir_data)
 		}
 	}
 	ret = buf_ir_test[2] << 8 | buf_ir_test[3];
-
-	if (ret == 0xffff)
-		ret = 0x202;
-
 	if ((ret != FW_VERSION) || (retry_count != 0)) {
 		printk(KERN_INFO "2. %s: chip : %04x, bin : %04x, need update!\n",
 						__func__, ret, FW_VERSION);

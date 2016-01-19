@@ -202,6 +202,7 @@ static struct exynos4_pmu_conf exynos4212_pmu_config[] = {
 	{ S5P_GPS_ALIVE_SYS,			{ 7, 0, 0 } },
 	{ S5P_CMU_SYSCLK_ISP_SYS,		{ 0, 0, 0 } },
 	{ S5P_CMU_SYSCLK_GPS_SYS,		{ 1, 0, 0 } },
+	{ S5P_LOGIC_RESET_DURATION3,		{ 0xf, 0xf, 0xf } },
 	{ S5P_XUSBXTI_SYS,			{ 1, 1, 0 } },
 };
 
@@ -301,10 +302,12 @@ static struct exynos4_pmu_conf exynos4412_pmu_config[] = {
 	{ S5P_GPS_ALIVE_SYS,			{ 7, 0, 0 } },
 	{ S5P_CMU_SYSCLK_ISP_SYS,		{ 1, 0, 0 } },
 	{ S5P_CMU_SYSCLK_GPS_SYS,		{ 1, 0, 0 } },
+	{ S5P_LOGIC_RESET_DURATION3,		{ 0xf, 0xf, 0xf } },
 	{ S5P_XUSBXTI_SYS,			{ 1, 1, 0 } },
 };
 
 static struct exynos4_pmu_conf exynos4x12_c2c_pmu_conf[] = {
+	{ S5P_LPDDR_PHY_DLL_LOCK_SYS,		{ 1, 0, 0 } },
 	{ S5P_CMU_RESET_COREBLK_SYS,		{ 1, 1, 1 } },
 	{ S5P_MPLLUSER_SYSCLK_SYS,		{ 1, 0, 0 } },
 	{ S5P_TOP_RETENTION_COREBLK_SYS,	{ 1, 0, 0 } },
@@ -325,7 +328,7 @@ static struct exynos4_c2c_pmu_conf exynos4_config_for_c2c[] = {
 	{ S5P_TOP_BUS_COREBLK_SYS,      0x0},
 	{ S5P_TOP_PWR_COREBLK_SYS,      0x0},
 	{ S5P_MPLL_SYSCLK_SYS,          0x0},
-#ifdef CONFIG_MACH_SMDK4212
+#ifdef CONFIG_EXYNOS_C2C
 	{ S5P_XUSBXTI_SYS,              0x0},
 #endif
 };
@@ -365,33 +368,37 @@ EXPORT_SYMBOL_GPL(exynos4_sys_powerdown_xusbxti_control);
 
 void exynos4_sys_powerdown_conf(enum sys_powerdown mode)
 {
-	unsigned int count = entry_cnt;
-	unsigned int tmp;
+	unsigned int count;
 
-	for (; count > 0; count--)
+	for (count = entry_cnt; count > 0; count--) {
 		__raw_writel(exynos4_pmu_config[count - 1].val[mode],
 				exynos4_pmu_config[count - 1].reg);
+	}
 
-	if ((!soc_is_exynos4210()) && (exynos4_is_c2c_use())) {
-		for (count = 0 ; count < ARRAY_SIZE(exynos4x12_c2c_pmu_conf) ; count++)
+#ifdef CONFIG_EXYNOS_C2C
+	if (mode == SYS_LPA) {
+		unsigned int tmp;
+
+		for (count = 0; count < ARRAY_SIZE(exynos4x12_c2c_pmu_conf); count++) {
 			__raw_writel(exynos4x12_c2c_pmu_conf[count].val[mode],
 					exynos4x12_c2c_pmu_conf[count].reg);
+		}
 
-		if (soc_is_exynos4212())
-			__raw_writel(exynos4212_c2c_pmu_conf[0].val[mode],
-					exynos4212_c2c_pmu_conf[0].reg);
-
-		for (count = 0 ; count < ARRAY_SIZE(exynos4_config_for_c2c) ; count++) {
+		for (count = 0; count < ARRAY_SIZE(exynos4_config_for_c2c); count++) {
 			tmp = __raw_readl(exynos4_config_for_c2c[count].reg);
 			tmp |= exynos4_config_for_c2c[count].val;
 			__raw_writel(tmp, exynos4_config_for_c2c[count].reg);
 		}
 	}
+#endif
 }
 
 void exynos4_c2c_request_pwr_mode(enum c2c_pwr_mode mode)
 {
-	exynos4_config_for_c2c[0].val = 0x3;
+	if (soc_is_exynos4412() && (samsung_rev() < EXYNOS4412_REV_1_0))
+		exynos4_config_for_c2c[0].val = 0x3;
+	else
+		exynos4_config_for_c2c[0].val = 0x0;
 
 	switch (mode) {
 	/* If C2C mode is MAXIMAL LATENCY */
@@ -401,7 +408,7 @@ void exynos4_c2c_request_pwr_mode(enum c2c_pwr_mode mode)
 			exynos4_config_for_c2c[2].val = 0x1;
 		else
 			exynos4_config_for_c2c[2].val = 0x0;
-#ifdef CONFIG_MACH_SMDK4212
+#ifdef CONFIG_EXYNOS_C2C
 		exynos4_config_for_c2c[3].val = 0x0;
 #endif
 		break;
@@ -409,7 +416,7 @@ void exynos4_c2c_request_pwr_mode(enum c2c_pwr_mode mode)
 	default:
 		exynos4_config_for_c2c[1].val = 0x3;
 		exynos4_config_for_c2c[2].val = 0x1;
-#ifdef CONFIG_MACH_SMDK4212
+#ifdef CONFIG_EXYNOS_C2C
 		exynos4_config_for_c2c[3].val = 0x1;
 #endif
 		break;

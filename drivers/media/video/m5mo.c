@@ -847,7 +847,7 @@ static int m5mo_check_fw(struct v4l2_subdev *sd)
 {
 	struct m5mo_state *state = to_state(sd);
 	u8 sensor_ver[M5MO_FW_VER_LEN] = "FAILED Fujitsu M5MOLS";
-	u8 phone_ver[M5MO_FW_VER_LEN] = "FAILED Fujitsu M5MOLS";
+	u8 phone_ver[M5MO_FW_VER_LEN] = DEFAULT_PHONE_FW_VER;
 	int af_cal_h = 0, af_cal_l = 0;
 	int rg_cal_h = 0, rg_cal_l = 0;
 	int bg_cal_h = 0, bg_cal_l = 0;

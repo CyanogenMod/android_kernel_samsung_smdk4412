@@ -84,8 +84,6 @@
 #define MMC_APP_CMD              55   /* ac   [31:16] RCA        R1  */
 #define MMC_GEN_CMD              56   /* adtc [0] RD/WR          R1  */
 
-#define MMC_IOC_CLOCK		120
-
 static inline bool mmc_op_multi(u32 opcode)
 {
 	return opcode == MMC_WRITE_MULTIPLE_BLOCK ||
@@ -288,6 +286,7 @@ struct _mmc_csd {
 #define EXT_CSD_RST_N_FUNCTION		162	/* R/W */
 #define EXT_CSD_SANITIZE_START		165     /* W */
 #define EXT_CSD_WR_REL_PARAM		166	/* RO */
+#define EXT_CSD_BOOT_WP			173	/* R/W */
 #define EXT_CSD_ERASE_GROUP_DEF		175	/* R/W */
 #define EXT_CSD_BOOT_CONFIG_PROT	178	/* R/W */
 #define EXT_CSD_PART_CONFIG		179	/* R/W */
@@ -331,6 +330,11 @@ struct _mmc_csd {
  */
 
 #define EXT_CSD_WR_REL_PARAM_EN		(1<<2)
+
+#define EXT_CSD_BOOT_WP_PWR_WP_DIS	(1<<6)
+#define EXT_CSD_BOOT_WP_PERM_WP_DIS	(1<<4)
+#define EXT_CSD_BOOT_WP_PERM_WP_EN	(1<<2)
+#define EXT_CSD_BOOT_WP_PWR_WP_EN	(1<<0)
 
 #define EXT_CSD_PART_CONFIG_ACC_MASK	(0x7)
 #define EXT_CSD_PART_CONFIG_ACC_BOOT0	(0x1)

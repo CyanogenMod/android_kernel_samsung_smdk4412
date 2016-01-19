@@ -591,14 +591,19 @@ static int oci_stop(void)
 static int oci_sys_init(struct sec_otghost *otghost)
 {
 	struct sec_otghost_data *pdata = otghost->otg_data;
+	u32 phypwr = 0;
 
 	if (pdata && pdata->phy_init && pdata->pdev) {
 		pr_info("otg phy_init\n");
 		clk_enable(pdata->clk);
 		pdata->phy_init(0);
 
-		writel(0, OTG_PHYPWR);
-		writel(0x87, OTG_PHYCLK);
+		phypwr = readl(OTG_PHYPWR);
+		phypwr &= ~(1 << 4); /* Enable OTG Block */
+		writel(phypwr, OTG_PHYPWR);
+
+		pr_info("otg UPHYPWR = 0x%x\n", readl(OTG_PHYPWR));
+
 	} else
 		pr_info("otg phy_init failed\n");
 

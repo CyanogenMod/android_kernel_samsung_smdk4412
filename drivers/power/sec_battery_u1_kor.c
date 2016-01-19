@@ -54,6 +54,7 @@
 #define FG_T_PSOC		3
 #define FG_T_VFOCV		4
 #define FG_T_AVGVCELL	5
+#define FG_T_FSOC		6
 
 #define ADC_SAMPLING_CNT	6
 #define ADC_CH_CHGCURRENT_MAIN		0
@@ -166,6 +167,7 @@ struct sec_bat_info {
 	unsigned int batt_vfocv;
 	unsigned int batt_soc;
 	unsigned int batt_raw_soc;
+	unsigned int batt_full_soc;
 	unsigned int batt_presoc;
 	unsigned int polling_interval;
 	unsigned int measure_interval;
@@ -202,6 +204,7 @@ struct sec_bat_info {
 
 	unsigned int (*get_lpcharging_state) (void);
 	bool charging_enabled;
+	bool is_timeout_chgstop;
 	bool use_sub_charger;
 	bool sub_chg_ovp;
 	int initial_check_count;
@@ -280,7 +283,7 @@ static int sec_bat_check_vf(struct sec_bat_info *info)
 			pr_info("test case : %d\n", info->test_info.test_value);
 			health = POWER_SUPPLY_HEALTH_UNKNOWN;
 		} else
-			health = POWER_SUPPLY_HEALTH_DEAD;
+			health = POWER_SUPPLY_HEALTH_UNSPEC_FAILURE;
 	} else {
 		health = POWER_SUPPLY_HEALTH_GOOD;
 	}
@@ -288,7 +291,7 @@ static int sec_bat_check_vf(struct sec_bat_info *info)
 	/* update health */
 	if (health != info->batt_health) {
 		if (health == POWER_SUPPLY_HEALTH_UNKNOWN ||
-			health == POWER_SUPPLY_HEALTH_DEAD){
+			health == POWER_SUPPLY_HEALTH_UNSPEC_FAILURE){
 			info->batt_health = health;
 			pr_info("vf error update\n");
 		} else if (info->batt_health != POWER_SUPPLY_HEALTH_OVERHEAT &&
@@ -385,6 +388,10 @@ static int sec_bat_get_fuelgauge_data(struct sec_bat_info *info, int type)
 		value.intval = 1;	/*raw soc */
 		psy->get_property(psy, POWER_SUPPLY_PROP_CAPACITY, &value);
 		break;
+	case FG_T_FSOC:
+		value.intval = 2;	/*full soc */
+		psy->get_property(psy, POWER_SUPPLY_PROP_CAPACITY, &value);
+		break;
 	case FG_T_TEMPER:
 		psy->get_property(psy, POWER_SUPPLY_PROP_TEMP, &value);
 		break;
@@ -408,6 +415,15 @@ static int sec_bat_get_property(struct power_supply *ps,
 			pr_info("batt test case : %d\n",
 					info->test_info.test_value);
 			val->intval = POWER_SUPPLY_STATUS_UNKNOWN;
+		} else if (info->is_timeout_chgstop &&
+			info->charging_status == POWER_SUPPLY_STATUS_FULL &&
+			info->batt_soc != 100) {
+			/* new concept : in case of time-out charging stop,
+			Do not update FULL for UI except soc 100%,
+			Use same time-out value for first charing and
+			re-charging
+			*/
+			val->intval = POWER_SUPPLY_STATUS_CHARGING;
 		} else
 			val->intval = info->charging_status;
 		break;
@@ -431,7 +447,8 @@ static int sec_bat_get_property(struct power_supply *ps,
 			return -EINVAL;
 		break;
 	case POWER_SUPPLY_PROP_CAPACITY:
-		if (info->charging_status == POWER_SUPPLY_STATUS_FULL) {
+		if (!info->is_timeout_chgstop &&
+			info->charging_status == POWER_SUPPLY_STATUS_FULL) {
 			val->intval = 100;
 			break;
 		}
@@ -813,7 +830,7 @@ static int sec_bat_check_temper_adc(struct sec_bat_info *info)
 
 skip_hupdate:
 	if (info->batt_health != POWER_SUPPLY_HEALTH_UNKNOWN &&
-		info->batt_health != POWER_SUPPLY_HEALTH_DEAD &&
+		info->batt_health != POWER_SUPPLY_HEALTH_UNSPEC_FAILURE &&
 		health != info->batt_health) {
 		info->batt_health = health;
 		cancel_work_sync(&info->monitor_work);
@@ -926,6 +943,7 @@ static void sec_bat_update_info(struct sec_bat_info *info)
 	info->batt_soc = sec_bat_get_fuelgauge_data(info, FG_T_SOC);
 	info->batt_vcell = sec_bat_get_fuelgauge_data(info, FG_T_VCELL);
 	info->batt_vfocv = sec_bat_get_fuelgauge_data(info, FG_T_VFOCV);
+	info->batt_full_soc = sec_bat_get_fuelgauge_data(info, FG_T_FSOC);
 	/* info->batt_temp = sec_bat_get_fuelgauge_data(info, FG_T_TEMPER); */
 	/* pr_info("temperature form FG : %d\n", info->batt_temp); */
 }
@@ -1110,6 +1128,7 @@ static void sec_bat_cable_work(struct work_struct *work)
 		info->test_info.is_rechg_state = false;
 		info->charging_start_time = 0;
 		info->charging_status = POWER_SUPPLY_STATUS_DISCHARGING;
+		info->is_timeout_chgstop = false;
 		sec_bat_enable_charging(info, false);
 		wake_lock_timeout(&info->vbus_wake_lock, HZ * 5);
 		cancel_delayed_work(&info->measure_work);
@@ -1173,6 +1192,7 @@ static void sec_bat_charging_time_management(struct sec_bat_info *info)
 		    info->recharging_status == true) {
 			sec_bat_enable_charging(info, false);
 			info->recharging_status = false;
+			info->is_timeout_chgstop = true;
 			dev_info(info->dev, "%s: Recharging timer expired\n",
 				 __func__);
 		}
@@ -1182,6 +1202,7 @@ static void sec_bat_charging_time_management(struct sec_bat_info *info)
 			       (unsigned long)FULL_CHARGING_TIME)) {
 			sec_bat_enable_charging(info, false);
 			info->charging_status = POWER_SUPPLY_STATUS_FULL;
+			info->is_timeout_chgstop = true;
 
 			dev_info(info->dev, "%s: Charging timer expired\n",
 				 __func__);
@@ -1189,6 +1210,7 @@ static void sec_bat_charging_time_management(struct sec_bat_info *info)
 		break;
 	default:
 		dev_info(info->dev, "%s: Undefine Battery Status\n", __func__);
+		info->is_timeout_chgstop = false;
 		return;
 	}
 
@@ -1233,6 +1255,7 @@ static void sec_bat_check_ing_level_trigger(struct sec_bat_info *info)
 				info->charging_start_time = 0;
 				info->charging_status =
 					POWER_SUPPLY_STATUS_DISCHARGING;
+				info->is_timeout_chgstop = false;
 				sec_bat_enable_charging(info, false);
 			}
 			break;
@@ -1519,6 +1542,10 @@ static void sec_bat_monitor_work(struct work_struct *work)
 {
 	struct sec_bat_info *info = container_of(work, struct sec_bat_info,
 						 monitor_work);
+	struct power_supply *psy_fg =
+		power_supply_get_by_name(info->fuel_gauge_name);
+	union power_supply_propval value;
+	int ret = 0;
 
 	wake_lock(&info->monitor_wake_lock);
 
@@ -1545,6 +1572,13 @@ static void sec_bat_monitor_work(struct work_struct *work)
 
 	switch (info->charging_status) {
 	case POWER_SUPPLY_STATUS_FULL:
+		/* notify full state to fuel guage */
+		if (!info->is_timeout_chgstop) {
+			value.intval = POWER_SUPPLY_STATUS_FULL;
+			ret = psy_fg->set_property(psy_fg,
+				POWER_SUPPLY_PROP_STATUS, &value);
+		}
+
 		if (sec_check_recharging(info) &&
 		    info->recharging_status == false) {
 			info->recharging_status = true;
@@ -1564,7 +1598,8 @@ static void sec_bat_monitor_work(struct work_struct *work)
 			info->test_info.is_rechg_state = false;
 
 			dev_info(info->dev, "%s: Not charging\n", __func__);
-		} else if (info->batt_health == POWER_SUPPLY_HEALTH_DEAD) {
+		} else if (info->batt_health ==
+				POWER_SUPPLY_HEALTH_UNSPEC_FAILURE) {
 			sec_bat_enable_charging(info, false);
 			info->charging_status =
 					POWER_SUPPLY_STATUS_NOT_CHARGING;
@@ -1670,7 +1705,7 @@ static struct device_attribute sec_battery_attrs[] = {
 	SEC_BATTERY_ATTR(batt_temp_adc),
 	SEC_BATTERY_ATTR(batt_temp_adc_avg),
 	SEC_BATTERY_ATTR(batt_temp_adc_sub),
-	SEC_BATTERY_ATTR(charging_source),
+	SEC_BATTERY_ATTR(batt_charging_source),
 	SEC_BATTERY_ATTR(batt_lp_charging),
 	SEC_BATTERY_ATTR(video),
 	SEC_BATTERY_ATTR(mp3),
@@ -1683,13 +1718,14 @@ static struct device_attribute sec_battery_attrs[] = {
 	SEC_BATTERY_ATTR(batt_current_adc),
 	SEC_BATTERY_ATTR(batt_esus_test),
 	SEC_BATTERY_ATTR(system_rev),
-	SEC_BATTERY_ATTR(fg_psoc),
+	SEC_BATTERY_ATTR(batt_read_raw_soc),
 	SEC_BATTERY_ATTR(batt_lpm_state),
 	SEC_BATTERY_ATTR(sub_chg_state),
 	SEC_BATTERY_ATTR(lpm_reboot_event),
 	SEC_BATTERY_ATTR(talk_wcdma),
 	SEC_BATTERY_ATTR(talk_gsm),
 	SEC_BATTERY_ATTR(batt_tmu_status),
+	SEC_BATTERY_ATTR(current_avg),
 };
 
 enum {
@@ -1700,7 +1736,7 @@ enum {
 	BATT_TEMP_ADC,
 	BATT_TEMP_ADC_AVG,
 	BATT_TEMP_ADC_SUB,
-	CHARGING_SOURCE,
+	BATT_CHARGING_SOURCE,
 	BATT_LP_CHARGING,
 	BATT_VIDEO,
 	BATT_MP3,
@@ -1713,13 +1749,14 @@ enum {
 	BATT_CURRENT_ADC,
 	BATT_ESUS_TEST,
 	BATT_SYSTEM_REV,
-	BATT_FG_PSOC,
+	BATT_READ_RAW_SOC,
 	BATT_LPM_STATE,
 	BATT_SUB_CHG_STATE,
 	LPM_REBOOT_EVENT,
 	BATT_WCDMA_CALL,
 	BATT_GSM_CALL,
 	BATT_TMU_STATUS,
+	CURRENT_AVG,
 };
 
 static ssize_t sec_bat_show_property(struct device *dev,
@@ -1760,7 +1797,7 @@ static ssize_t sec_bat_show_property(struct device *dev,
 		i += scnprintf(buf + i, PAGE_SIZE - i, "%d\n",
 				info->batt_temp_radc_sub);
 		break;
-	case CHARGING_SOURCE:
+	case BATT_CHARGING_SOURCE:
 		i += scnprintf(buf + i, PAGE_SIZE - i, "%d\n",
 			       info->cable_type);
 		break;
@@ -1815,7 +1852,7 @@ static ssize_t sec_bat_show_property(struct device *dev,
 	case BATT_SYSTEM_REV:
 		i += scnprintf(buf + i, PAGE_SIZE - i, "%d\n", system_rev);
 		break;
-	case BATT_FG_PSOC:
+	case BATT_READ_RAW_SOC:
 		val = sec_bat_get_fuelgauge_data(info, FG_T_PSOC);
 		i += scnprintf(buf + i, PAGE_SIZE - i, "%d\n", val);
 		break;
@@ -1830,6 +1867,9 @@ static ssize_t sec_bat_show_property(struct device *dev,
 	case BATT_TMU_STATUS:
 		i += scnprintf(buf + i, PAGE_SIZE - i, "%d\n",
 			info->batt_tmu_status);
+		break;
+	case CURRENT_AVG:
+		i += scnprintf(buf + i, PAGE_SIZE - i, "%d\n", 0);
 		break;
 	default:
 		i = -EINVAL;
@@ -2011,7 +2051,8 @@ static int sec_bat_read_proc(char *buf, char **start,
 	len = sprintf(buf, "%lu	%u	%u	%u	%u	"
 			"%u	%d	%d	%d	%d	"
 			"%d	%u	%u	%u	%u	"
-			"%u	%u	%d	%d	%lu\n",
+			"%u	%u	%d	%d	%d	"
+			"%u	%lu\n",
 			cur_time.tv_sec,
 			info->batt_raw_soc,
 			info->batt_soc,
@@ -2031,6 +2072,8 @@ static int sec_bat_read_proc(char *buf, char **start,
 			info->present,
 			info->cable_type,
 			info->batt_tmu_status,
+			info->is_timeout_chgstop,
+			info->batt_full_soc,
 			info->charging_passed_time);
 	return len;
 }
@@ -2108,6 +2151,7 @@ static __devinit int sec_bat_probe(struct platform_device *pdev)
 		info->cable_type = CABLE_TYPE_USB; /* default */
 	info->batt_soc = 100;
 	info->recharging_status = false;
+	info->is_timeout_chgstop = false;
 	info->present = 1;
 	info->initial_check_count = INIT_CHECK_COUNT;
 
@@ -2251,13 +2295,18 @@ static int sec_bat_resume(struct device *dev)
 {
 	struct sec_bat_info *info = dev_get_drvdata(dev);
 
+	queue_delayed_work(info->monitor_wqueue,
+		&info->measure_work, 0);
+
 	wake_lock(&info->monitor_wake_lock);
 	queue_work(info->monitor_wqueue, &info->monitor_work);
 
 	schedule_delayed_work(&info->polling_work,
-			      msecs_to_jiffies(info->polling_interval));
+		msecs_to_jiffies(info->polling_interval));
+	/*
 	schedule_delayed_work(&info->measure_work,
-			      msecs_to_jiffies(info->measure_interval));
+		msecs_to_jiffies(info->measure_interval));
+	*/
 
 	return 0;
 }

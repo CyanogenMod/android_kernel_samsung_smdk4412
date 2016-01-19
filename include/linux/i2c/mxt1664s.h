@@ -18,6 +18,7 @@
 
 #define MXT_DEV_NAME "Atmel MXT1664S"
 
+#define MXT_1664S_RESUME_TIME			100	/* msec */
 #define MXT_1664S_SW_RESET_TIME		300	/* msec */
 #define MXT_1664S_HW_RESET_TIME		300	/* msec */
 #define MXT_1664S_FW_RESET_TIME		500	/* msec */

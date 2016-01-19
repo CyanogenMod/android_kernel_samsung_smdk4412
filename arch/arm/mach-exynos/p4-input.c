@@ -156,6 +156,7 @@ static u8 inform_data_rev5[] = {0,
 
 /* Added for the LTE model */
 static u8 inform_data_rev9[] = {0,
+	7, 0, 48, 255,
 	7, 1, 11, 255,
 	46, 3, 16, 24,
 	47, 1, 35, 45,
@@ -346,6 +347,8 @@ static int ts_power_reset(void)
 #define MXT1664S_CONFIG_DATE		"N80XX_ATM_0703"
 #if defined(CONFIG_MACH_P4NOTELTE_USA_VZW)
 #define MXT1664S_CONFIG_DATE_FOR_OVER_HW9	"I925_ATM_1121"
+#else
+#define MXT1664S_CONFIG_DATE_FOR_OVER_HW9	"N80XX_LTE_ATM_0905"
 #endif
 
 #define MXT1664S_MAX_MT_FINGERS	10
@@ -364,7 +367,7 @@ static u8 t8_config_s[] = { GEN_ACQUISITIONCONFIG_T8,
 };
 
 static u8 t9_config_s[] = { TOUCH_MULTITOUCHSCREEN_T9,
-	0x83, 0, 0, P4_NOTE_X_NUM, P4_NOTE_Y_NUM,
+	0x8B, 0, 0, P4_NOTE_X_NUM, P4_NOTE_Y_NUM,
 	0, MXT1664S_BLEN_BATT, MXT1664S_THRESHOLD_BATT, 1, 1,
 	10, 15, 1, 65, MXT1664S_MAX_MT_FINGERS, 20, 30, 20, 255, 15,
 	255, 15, 5, 246, 5, 5, 0, 0, 0, 0,
@@ -553,9 +556,13 @@ static void switch_config(u32 rev)
 
 		t8_config_s[1] = 1;
 
+		t9_config_s[7] = 116;
 		t9_config_s[8] = 55;
+		t9_config_s[14] = 50;
+		t9_config_s[24] = 0;
 		t9_config_s[27] = 64;
 
+		t40_config_s[3] = 15;
 		t40_config_s[4] = 2;
 		t40_config_s[5] = 2;
 
@@ -595,11 +602,9 @@ static void switch_config(u32 rev)
 		t62_config_s[27] = 24;
 #endif
 		t62_config_s[35] = 80;
-		t62_config_s[36] = 50;
+		t62_config_s[36] = 40;
 		t62_config_s[38] = 5;
-#if defined(CONFIG_MACH_P4NOTELTE_USA_VZW)
 		t62_config_s[40] = 50;
-#endif
 		t62_config_s[42] = 30;
 		t62_config_s[43] = 40;
 		t62_config_s[44] = 10;
@@ -607,11 +612,10 @@ static void switch_config(u32 rev)
 		t62_config_s[48] = 30;
 		t62_config_s[49] = 30;
 		t62_config_s[53] = 20;
-#if defined(CONFIG_MACH_P4NOTELTE_USA_VZW)
+
 		/* Change Config Name for LTE */
 		mxt1664s_pdata.config_version =
 			MXT1664S_CONFIG_DATE_FOR_OVER_HW9;
-#endif
 	}
 }
 
@@ -626,30 +630,42 @@ void __init p4_tsp_init(u32 system_rev)
 	printk(KERN_DEBUG "[TSP] TSP IC : %s\n",
 		(5 <= hw_rev) ? "Atmel" : "Synaptics");
 
-	gpio = GPIO_TSP_RST;
-	gpio_request(gpio, "TSP_RST");
-	gpio_direction_output(gpio, 1);
-	gpio_export(gpio, 0);
-
-	gpio = GPIO_TSP_LDO_ON;
-	gpio_request(gpio, "TSP_LDO_ON");
-	gpio_direction_output(gpio, 1);
-	gpio_export(gpio, 0);
-
 	if (5 <= hw_rev) {
-		gpio = GPIO_TSP_LDO_ON1;
-		gpio_request(gpio, "TSP_LDO_ON1");
-		gpio_direction_output(gpio, 1);
-		gpio_export(gpio, 0);
-
 		gpio = GPIO_TSP_LDO_ON2;
 		gpio_request(gpio, "TSP_LDO_ON2");
-		gpio_direction_output(gpio, 1);
+		gpio_direction_output(gpio, 0);
+		gpio_export(gpio, 0);
+
+		gpio = GPIO_TSP_LDO_ON1;
+		gpio_request(gpio, "TSP_LDO_ON1");
+		gpio_direction_output(gpio, 0);
+		gpio_export(gpio, 0);
+
+		gpio = GPIO_TSP_LDO_ON;
+		gpio_request(gpio, "TSP_LDO_ON");
+		gpio_direction_output(gpio, 0);
+		gpio_export(gpio, 0);
+
+		gpio = GPIO_TSP_RST;
+		gpio_request(gpio, "TSP_RST");
+		gpio_direction_output(gpio, 0);
 		gpio_export(gpio, 0);
 
 		switch_config(hw_rev);
-	} else if (1 <= hw_rev)
-		have_tsp_ldo = true;
+	} else {
+		gpio = GPIO_TSP_RST;
+		gpio_request(gpio, "TSP_RST");
+		gpio_direction_output(gpio, 1);
+		gpio_export(gpio, 0);
+
+		gpio = GPIO_TSP_LDO_ON;
+		gpio_request(gpio, "TSP_LDO_ON");
+		gpio_direction_output(gpio, 1);
+		gpio_export(gpio, 0);
+
+		if (1 <= hw_rev)
+			have_tsp_ldo = true;
+	}
 
 	gpio = GPIO_TSP_INT;
 	gpio_request(gpio, "TSP_INT");
@@ -686,6 +702,7 @@ static int wacom_resume_hw(void);
 static int wacom_early_suspend_hw(void);
 static int wacom_late_resume_hw(void);
 static int wacom_reset_hw(void);
+static void wacom_compulsory_flash_mode(bool en);
 static void wacom_register_callbacks(struct wacom_g5_callbacks *cb);
 
 static struct wacom_g5_platform_data wacom_platform_data = {
@@ -697,7 +714,7 @@ static struct wacom_g5_platform_data wacom_platform_data = {
 	.gpio_pen_insert = GPIO_S_PEN_IRQ,
 #endif
 #ifdef WACOM_HAVE_FWE_PIN
-	.gpio_fwe = GPIO_PEN_FWE0,
+	.compulsory_flash_mode = wacom_compulsory_flash_mode,
 #endif
 	.init_platform_hw = wacom_init_hw,
 	.suspend_platform_hw = wacom_suspend_hw,
@@ -769,6 +786,14 @@ static int wacom_init_hw(void)
 	return 0;
 }
 
+#ifdef WACOM_HAVE_FWE_PIN
+static void wacom_compulsory_flash_mode(bool en)
+{
+	gpio_set_value(GPIO_PEN_FWE0, en);
+}
+
+#endif
+
 static int wacom_suspend_hw(void)
 {
 	return wacom_early_suspend_hw();
@@ -787,7 +812,10 @@ static int wacom_early_suspend_hw(void)
 
 static int wacom_late_resume_hw(void)
 {
+	gpio_direction_output(GPIO_PEN_PDCT_18V, 1);
 	gpio_set_value(GPIO_PEN_LDO_EN, 1);
+	msleep(20);
+	gpio_direction_input(GPIO_PEN_PDCT_18V);
 	return 0;
 }
 

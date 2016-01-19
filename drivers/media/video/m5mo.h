@@ -59,6 +59,17 @@
 #define cam_i2c_dbg(fmt, ...)
 #endif
 
+/* Define default F/W version.
+ * - be cafeful of string size.
+ */
+#if defined(CONFIG_MACH_U1_BD)
+#define DEFAULT_PHONE_FW_VER	"TBEC28 Fujitsu M5MOLS"
+#elif defined(CONFIG_MACH_Q1_BD)
+#define DEFAULT_PHONE_FW_VER	"OOEI08 Fujitsu M5MOLS"
+#else
+#define DEFAULT_PHONE_FW_VER	"FAILED Fujitsu M5MOLS"
+#endif
+
 enum m5mo_prev_frmsize {
 	M5MO_PREVIEW_QCIF,
 	M5MO_PREVIEW_QCIF2,

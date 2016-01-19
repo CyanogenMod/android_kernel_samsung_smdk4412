@@ -70,7 +70,7 @@
 
 #if defined(CONFIG_MACH_U1) || defined(CONFIG_MACH_MIDAS) || \
 	defined(CONFIG_MACH_SLP_PQ) || defined(CONFIG_MACH_P10) || \
-	defined(CONFIG_MACH_PX) || defined(CONFIG_MACH_TRATS)
+	defined(CONFIG_MACH_PX) || defined(CONFIG_MACH_TRATS) || defined(CONFIG_GPS_BCMxxxxx)
 /* Devices	*/
 #define CONFIG_BT_S3C_UART	0
 #define CONFIG_GPS_S3C_UART	1
@@ -473,7 +473,7 @@ static void s3c24xx_serial_set_mctrl(struct uart_port *port, unsigned int mctrl)
 
 #if defined(CONFIG_MACH_U1) || defined(CONFIG_MACH_MIDAS) || \
 	defined(CONFIG_MACH_SLP_PQ) || defined(CONFIG_MACH_P10) || \
-	defined(CONFIG_MACH_PX) || defined(CONFIG_MACH_TRATS)
+	defined(CONFIG_MACH_PX) || defined(CONFIG_MACH_TRATS) || defined(CONFIG_GPS_BCMxxxxx)
 	unsigned int umcon = 0;
 	umcon = rd_regl(port, S3C2410_UMCON);
 
@@ -484,13 +484,12 @@ static void s3c24xx_serial_set_mctrl(struct uart_port *port, unsigned int mctrl)
 			umcon &= ~S3C2410_UMCOM_AFC;
 		}
 	}
-#if !defined(CONFIG_MACH_KONA_EUR_LTE) && !defined(CONFIG_MACH_KONALTE_USA_ATT)
+#if !defined(CONFIG_MACH_KONA_EUR_LTE)
 	else if (port->line == CONFIG_GPS_S3C_UART) {
 		umcon |= S3C2410_UMCOM_AFC;
-	} 
+	}
 #endif
 	else {
-
 		umcon &= ~S3C2410_UMCOM_AFC;
 	}
 

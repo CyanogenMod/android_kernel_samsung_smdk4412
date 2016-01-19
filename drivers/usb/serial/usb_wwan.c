@@ -36,6 +36,7 @@
 #include <linux/usb/serial.h>
 #include <linux/serial.h>
 #include "usb-wwan.h"
+#include <linux/mdm_hsic_pm.h>
 
 static int debug;
 
@@ -284,6 +285,9 @@ int usb_wwan_write(struct tty_struct *tty, struct usb_serial_port *port,
 }
 EXPORT_SYMBOL(usb_wwan_write);
 
+#ifdef CONFIG_MDM_HSIC_PM
+#define HELLO_PACKET_SIZE 48
+#endif
 static void usb_wwan_indat_callback(struct urb *urb)
 {
 	int err;
@@ -294,6 +298,7 @@ static void usb_wwan_indat_callback(struct urb *urb)
 	int status = urb->status;
 	int rx_len = urb->actual_length;
 	struct usb_wwan_intf_private *intfdata;
+	struct usb_device *udev;
 
 	dbg("%s: %p", __func__, urb);
 
@@ -308,6 +313,12 @@ static void usb_wwan_indat_callback(struct urb *urb)
 #ifdef CONFIG_MDM_HSIC_PM
 		if (status == -ENOENT && (urb->actual_length > 0)) {
 			pr_info("%s: handle dropped packet\n", __func__);
+			udev = port->serial->dev;
+			if (udev->actconfig->desc.bNumInterfaces == 9 &&
+							hello_packet_rx) {
+				pr_info("%s: dup packet handled\n", __func__);
+				return;
+			}
 			goto handle_rx;
 		}
 #endif
@@ -319,7 +330,7 @@ handle_rx:
 		if (tty) {
 			if (urb->actual_length > 0) {
 #ifdef CONFIG_MDM_HSIC_PM
-				struct usb_device *udev = port->serial->dev;
+				udev = port->serial->dev;
 				/* corner case : efs packet rx at rpm suspend
 				 * it can control twice in racing condition
 				 * rx call back and suspend, both of then ca
@@ -328,9 +339,14 @@ handle_rx:
 				 */
 				urb->status = -EINPROGRESS;
 				urb->actual_length = 0;
-				if (udev->actconfig->desc.bNumInterfaces == 9)
+				if (udev->actconfig->desc.bNumInterfaces == 9) {
 					pr_info("%s: read urb received : %d\n",
 						__func__, rx_len);
+					if (rx_len == HELLO_PACKET_SIZE)
+						hello_packet_rx = 1;
+					else
+						hello_packet_rx = 0;
+				}
 #endif
 				tty_insert_flip_string(tty, data, rx_len);
 				tty_flip_buffer_push(tty);
@@ -346,7 +362,7 @@ handle_rx:
 			return;
 #endif
 		/* Resubmit urb so we continue receiving */
-		if (status != -ESHUTDOWN || !intfdata->suspended) {
+		if (!intfdata->suspended) {
 			err = usb_submit_urb(urb, GFP_ATOMIC);
 			if (err) {
 				if (err != -EPERM) {

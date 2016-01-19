@@ -1,13 +1,16 @@
 /*
- * Source for:
- * Cypress TrueTouch(TM) Standard Product (TTSP) I2C touchscreen driver.
- * For use with Cypress Gen4 and Solo parts.
+ * cyttsp4_i2c.c
+ * Cypress TrueTouch(TM) Standard Product V4 I2C Driver module.
+ * For use with Cypress Txx4xx parts.
  * Supported parts include:
- * CY8CTMA884/616
- * CY8CTMA4XX
+ * TMA4XX
+ * TMA1036
  *
- * Copyright (C) 2009-2012 Cypress Semiconductor, Inc.
- * Copyright (C) 2011 Motorola Mobility, Inc.
+ * Copyright (C) 2012 Cypress Semiconductor
+ * Copyright (C) 2011 Sony Ericsson Mobile Communications AB.
+ *
+ * Author: Aleksej Makarov <aleksej.makarov@sonyericsson.com>
+ * Modified by: Cypress Semiconductor for test with device
  *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
@@ -23,255 +26,221 @@
  * with this program; if not, write to the Free Software Foundation, Inc.,
  * 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
  *
- * Contact Cypress Semiconductor at www.cypress.com <kev@cypress.com>
+ * Contact Cypress Semiconductor at www.cypress.com <ttdrivers@cypress.com>
  *
  */
 
-#include "cyttsp4_core.h"
+#include <linux/cyttsp4_bus.h>
+#include <linux/cyttsp4_core.h>
+#include "cyttsp4_i2c.h"
 
+#include <linux/delay.h>
+#include <linux/hrtimer.h>
 #include <linux/i2c.h>
+#include <linux/init.h>
+#include <linux/module.h>
+#include <linux/mutex.h>
+#include <linux/pm_runtime.h>
 #include <linux/slab.h>
-/* key led */
-#include <linux/regulator/consumer.h>
-#define PRESS_KEY 1	/* Fixed value */
-#define RELEASE_KEY 0	/* Fixed value */
-static int led_status;
-extern struct class *sec_class;
 
 #define CY_I2C_DATA_SIZE  (3 * 256)
 
 struct cyttsp4_i2c {
-	struct cyttsp4_bus_ops ops;
 	struct i2c_client *client;
-	void *ttsp_client;
 	u8 wr_buf[CY_I2C_DATA_SIZE];
+	struct hrtimer timer;
+	struct mutex lock;
+	atomic_t timeout;
 };
 
-/* key led */
-static ssize_t touchkey_led_control(struct device *dev,
-		struct device_attribute *attr, const char *buf,
-		size_t size)
+static int cyttsp4_i2c_read_block_data(struct cyttsp4_i2c *ts_i2c, u8 addr,
+	size_t length, void *values)
 {
-	struct regulator *vreg_led = NULL;
-	int ret;
-	int data;
-	sscanf(buf, "%d\n", &data);
+	int rc;
 
-	pr_info("[TSP] %s : LED buf is %d\n", __func__, data);
-
-	if (vreg_led == NULL) {
-		vreg_led = regulator_get(NULL, "KEYLED_3P3V");
-		if (IS_ERR(vreg_led)) {
-			pr_err("tsp: Fail to register vreg_led(KEYLED_3P3V) in touch driver\n");
-			return size;
-		}
-	}
-	if (data == 1 && led_status == 0) {
-		ret = regulator_enable(vreg_led);
-		if (ret)
-			pr_err("tsp: Fail to enable led\n");
-		led_status = 1;
-	} else if (data == 2 && led_status == 1) {
-		ret = regulator_disable(vreg_led);
-		if (ret)
-			pr_err("tsp: Fail to disable led\n");
-		led_status = 0;
-	}
-
-	return size;
-}
-static DEVICE_ATTR(brightness, S_IRUGO | S_IWUSR | S_IWGRP, NULL,
-		touchkey_led_control);
-
-static s32 cyttsp4_i2c_read_block_data(void *handle, u16 subaddr,
-	size_t length, void *values, int i2c_addr, bool use_subaddr)
-{
-	struct cyttsp4_i2c *ts = container_of(handle, struct cyttsp4_i2c, ops);
-	int retval = 0;
-	u8 sub_addr[2];
-	int subaddr_len;
-
-	if (use_subaddr) {
-		subaddr_len = 1;
-		sub_addr[0] = subaddr;
-	}
-
-	ts->client->addr = i2c_addr;
-	if (!use_subaddr)
-		goto read_packet;
-
-	/* write subaddr */
-	retval = i2c_master_send(ts->client, sub_addr, subaddr_len);
-	if (retval < 0)
-		return retval;
-	else if (retval != subaddr_len)
+	/* write addr */
+	rc = i2c_master_send(ts_i2c->client, &addr, sizeof(addr));
+	if (rc < 0)
+		return rc;
+	else if (rc != sizeof(addr))
 		return -EIO;
 
-read_packet:
-	retval = i2c_master_recv(ts->client, values, length);
+	/* read data */
+	rc = i2c_master_recv(ts_i2c->client, values, length);
 
-	return (retval < 0) ? retval : retval != length ? -EIO : 0;
+	return (rc < 0) ? rc : rc != length ? -EIO : 0;
 }
 
-static s32 cyttsp4_i2c_write_block_data(void *handle, u16 subaddr,
-	size_t length, const void *values, int i2c_addr, bool use_subaddr)
+static int cyttsp4_i2c_write_block_data(struct cyttsp4_i2c *ts_i2c, u8 addr,
+	size_t length, const void *values)
 {
-	struct cyttsp4_i2c *ts = container_of(handle, struct cyttsp4_i2c, ops);
-	int retval;
+	int rc;
 
-	if (use_subaddr) {
-		ts->wr_buf[0] = subaddr;
-		memcpy(&ts->wr_buf[1], values, length);
-		length += 1;
-	} else {
-		memcpy(&ts->wr_buf[0], values, length);
-	}
-	ts->client->addr = i2c_addr;
-	retval = i2c_master_send(ts->client, ts->wr_buf, length);
+	if (sizeof(ts_i2c->wr_buf) < (length + 1))
+		return -ENOMEM;
 
-	return (retval < 0) ? retval : retval != length ? -EIO : 0;
+	ts_i2c->wr_buf[0] = addr;
+	memcpy(&ts_i2c->wr_buf[1], values, length);
+	length += 1;
+
+	/* write data */
+	rc = i2c_master_send(ts_i2c->client, ts_i2c->wr_buf, length);
+
+	return (rc < 0) ? rc : rc != length ? -EIO : 0;
 }
+
+static int cyttsp4_i2c_write(struct cyttsp4_adapter *adap, u8 addr,
+	const void *buf, int size)
+{
+	struct cyttsp4_i2c *ts = dev_get_drvdata(adap->dev);
+	int rc;
+
+	pm_runtime_get_noresume(adap->dev);
+	mutex_lock(&ts->lock);
+	rc = cyttsp4_i2c_write_block_data(ts, addr, size, buf);
+	mutex_unlock(&ts->lock);
+	pm_runtime_put_noidle(adap->dev);
+
+	return rc;
+}
+
+static int cyttsp4_i2c_read(struct cyttsp4_adapter *adap, u8 addr,
+	void *buf, int size)
+{
+	struct cyttsp4_i2c *ts = dev_get_drvdata(adap->dev);
+	int rc;
+
+	pm_runtime_get_noresume(adap->dev);
+	mutex_lock(&ts->lock);
+	rc = cyttsp4_i2c_read_block_data(ts, addr, size, buf);
+	mutex_unlock(&ts->lock);
+	pm_runtime_put_noidle(adap->dev);
+
+	return rc;
+}
+
+static struct cyttsp4_ops ops = {
+	.write = cyttsp4_i2c_write,
+	.read = cyttsp4_i2c_read,
+};
 
 static int __devinit cyttsp4_i2c_probe(struct i2c_client *client,
-	const struct i2c_device_id *id)
+	const struct i2c_device_id *i2c_id)
 {
-	struct regulator *vreg_led = NULL;
-	struct cyttsp4_i2c *ts;
-	int retval = 0;
-	/* key led */
-	struct device *sec_touchkey;
+	struct cyttsp4_i2c *ts_i2c;
+	struct device *dev = &client->dev;
+	char const *adap_id = dev_get_platdata(dev);
+	char const *id;
+	int rc;
 
-	pr_info("%s: Starting %s probe...\n", __func__, CY_I2C_NAME);
+	dev_info(dev, "%s: Starting %s probe...\n", __func__, CYTTSP4_I2C_NAME);
+
+	dev_dbg(dev, "%s: debug on\n", __func__);
+	dev_vdbg(dev, "%s: verbose debug on\n", __func__);
 
 	if (!i2c_check_functionality(client->adapter, I2C_FUNC_I2C)) {
-		pr_err("%s: fail check I2C functionality\n", __func__);
-		retval = -EIO;
-		goto cyttsp4_i2c_probe_exit;
+		dev_err(dev, "%s: fail check I2C functionality\n", __func__);
+		rc = -EIO;
+		goto error_alloc_data_failed;
 	}
 
-	/* allocate and clear memory */
-	ts = kzalloc(sizeof(struct cyttsp4_i2c), GFP_KERNEL);
-	if (ts == NULL) {
-		pr_err("%s: Error, kzalloc.\n", __func__);
-		retval = -ENOMEM;
-		goto cyttsp4_i2c_probe_exit;
+	ts_i2c = kzalloc(sizeof(struct cyttsp4_i2c), GFP_KERNEL);
+	if (ts_i2c == NULL) {
+		dev_err(dev, "%s: Error, kzalloc.\n", __func__);
+		rc = -ENOMEM;
+		goto error_alloc_data_failed;
 	}
 
-	/* register driver_data */
-	ts->client = client;
-	i2c_set_clientdata(client, ts);
-	ts->ops.write = cyttsp4_i2c_write_block_data;
-	ts->ops.read = cyttsp4_i2c_read_block_data;
-	ts->ops.dev = &client->dev;
-	ts->ops.dev->bus = &i2c_bus_type;
+	mutex_init(&ts_i2c->lock);
+	ts_i2c->client = client;
+	client->dev.bus = &i2c_bus_type;
+	i2c_set_clientdata(client, ts_i2c);
+	dev_set_drvdata(&client->dev, ts_i2c);
 
-	ts->ttsp_client = cyttsp4_core_init(&ts->ops, &client->dev,
-		client->irq, client->name);
+	if (adap_id)
+		id = adap_id;
+	else
+		id = CYTTSP4_I2C_NAME;
 
-	if (ts->ttsp_client == NULL) {
-		kfree(ts);
-		ts = NULL;
-		retval = -ENODATA;
-		pr_err("%s: Registration fail ret=%d\n", __func__, retval);
-		goto cyttsp4_i2c_probe_exit;
+	dev_dbg(dev, "%s: add adap='%s' (CYTTSP4_I2C_NAME=%s)\n", __func__, id,
+		CYTTSP4_I2C_NAME);
+
+	pm_runtime_enable(&client->dev);
+
+	rc = cyttsp4_add_adapter(id, &ops, dev);
+	if (rc) {
+		dev_err(dev, "%s: Error on probe %s\n", __func__,
+			CYTTSP4_I2C_NAME);
+		goto add_adapter_err;
 	}
 
-	dev_info(ts->ops.dev,
-			"%s: Registration complete\n", __func__);
-
-	/* key led */
-	vreg_led = regulator_get(NULL, "KEYLED_3P3V");
-	if (IS_ERR(vreg_led))
-		goto err_vreg_led;
-	led_status = 0;
-	sec_touchkey = device_create(sec_class, NULL, 0, NULL, "sec_touchkey");
-	if (device_create_file(sec_touchkey,
-				&dev_attr_brightness) < 0) {
-		pr_err("Failed to create device file(%s)!\n",
-				dev_attr_brightness.attr.name);
-	}
+	dev_info(dev, "%s: Successful probe %s\n", __func__, CYTTSP4_I2C_NAME);
 
 	return 0;
 
-cyttsp4_i2c_probe_exit:
-	return retval;
-
-err_vreg_led:
-	pr_err("tsp: Fail to register vreg_led(KEYLED_3P3V) in touch driver\n");
-	regulator_put(vreg_led);
-	return retval;
+add_adapter_err:
+	pm_runtime_disable(&client->dev);
+	dev_set_drvdata(&client->dev, NULL);
+	i2c_set_clientdata(client, NULL);
+	kfree(ts_i2c);
+error_alloc_data_failed:
+	return rc;
 }
 
 /* registered in driver struct */
 static int __devexit cyttsp4_i2c_remove(struct i2c_client *client)
 {
-	struct regulator *vreg_led = NULL;
-	struct cyttsp4_i2c *ts;
+	struct device *dev = &client->dev;
+	struct cyttsp4_i2c *ts_i2c = dev_get_drvdata(dev);
+	char const *adap_id = dev_get_platdata(dev);
+	char const *id;
 
-	ts = i2c_get_clientdata(client);
-	cyttsp4_core_release(ts->ttsp_client);
-	kfree(ts);
-	regulator_put(vreg_led);
+	if (adap_id)
+		id = adap_id;
+	else
+		id = CYTTSP4_I2C_NAME;
+
+	dev_info(dev, "%s\n", __func__);
+	cyttsp4_del_adapter(id);
+	pm_runtime_disable(&client->dev);
+	dev_set_drvdata(&client->dev, NULL);
+	i2c_set_clientdata(client, NULL);
+	kfree(ts_i2c);
 	return 0;
 }
 
-#if !defined(CONFIG_HAS_EARLYSUSPEND) && !defined(CONFIG_PM_SLEEP)
-#if defined(CONFIG_PM)
-static int cyttsp4_i2c_suspend(struct i2c_client *client, pm_message_t message)
-{
-	struct cyttsp4_i2c *ts = i2c_get_clientdata(client);
-
-	return cyttsp4_suspend(ts);
-}
-
-static int cyttsp4_i2c_resume(struct i2c_client *client)
-{
-	struct cyttsp4_i2c *ts = i2c_get_clientdata(client);
-
-	return cyttsp4_resume(ts);
-}
-#endif
-#endif
-
 static const struct i2c_device_id cyttsp4_i2c_id[] = {
-	{ CY_I2C_NAME, 0 },  { }
+	{ CYTTSP4_I2C_NAME, 0 },  { }
 };
 
 static struct i2c_driver cyttsp4_i2c_driver = {
 	.driver = {
-		.name = CY_I2C_NAME,
+		.name = CYTTSP4_I2C_NAME,
 		.owner = THIS_MODULE,
-#if !defined(CONFIG_HAS_EARLYSUSPEND)
-#if defined(CONFIG_PM_SLEEP)
-		.pm = &cyttsp4_pm_ops,
-#endif
-#endif
 	},
 	.probe = cyttsp4_i2c_probe,
 	.remove = __devexit_p(cyttsp4_i2c_remove),
 	.id_table = cyttsp4_i2c_id,
-#if !defined(CONFIG_HAS_EARLYSUSPEND) && !defined(CONFIG_PM_SLEEP)
-#if defined(CONFIG_PM)
-	.suspend = cyttsp4_i2c_suspend,
-	.resume = cyttsp4_i2c_resume,
-#endif
-#endif
 };
 
 static int __init cyttsp4_i2c_init(void)
 {
-	return i2c_add_driver(&cyttsp4_i2c_driver);
+	int rc = i2c_add_driver(&cyttsp4_i2c_driver);
+
+	pr_info("%s: Cypress TTSP I2C Touchscreen Driver (Built %s) rc=%d\n",
+		 __func__, CY_DRIVER_DATE, rc);
+	return rc;
 }
+module_init(cyttsp4_i2c_init);
 
 static void __exit cyttsp4_i2c_exit(void)
 {
-	return i2c_del_driver(&cyttsp4_i2c_driver);
+	i2c_del_driver(&cyttsp4_i2c_driver);
+	pr_info("%s: module exit\n", __func__);
 }
-
-module_init(cyttsp4_i2c_init);
 module_exit(cyttsp4_i2c_exit);
 
-MODULE_ALIAS(CY_I2C_NAME);
+MODULE_ALIAS(CYTTSP4_I2C_NAME);
 MODULE_LICENSE("GPL");
 MODULE_DESCRIPTION("Cypress TrueTouch(R) Standard Product (TTSP) I2C driver");
 MODULE_AUTHOR("Cypress");

@@ -315,7 +315,7 @@ static inline void mip6_addr_swap(struct sk_buff *skb) {}
 #endif
 
 struct dst_entry *icmpv6_route_lookup(struct net *net, struct sk_buff *skb,
-				      struct sock *sk, struct flowi6 *fl6)
+					     struct sock *sk, struct flowi6 *fl6)
 {
 	struct dst_entry *dst, *dst2;
 	struct flowi6 fl2;

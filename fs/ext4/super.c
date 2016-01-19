@@ -380,6 +380,9 @@ static void __save_error_info(struct super_block *sb, const char *func,
 static void save_error_info(struct super_block *sb, const char *func,
 			    unsigned int line)
 {
+	if (sb->s_flags & MS_RDONLY)
+		return;
+
 	__save_error_info(sb, func, line);
 	ext4_commit_super(sb, 1);
 }
@@ -4840,7 +4843,14 @@ out:
 /* for debugging, sangwoo2.lee */
 void print_bh(struct super_block *sb, struct buffer_head *bh, int start, int len)
 {
-	print_block_data(sb, bh->b_blocknr, bh->b_data, start, len);
+	if (bh) {
+		printk(KERN_ERR " print_bh: bh %p,"
+				" bh->b_size %u, bh->b_data %p\n",
+				(void *) bh, bh->b_size, (void *) bh->b_data);
+		print_block_data(sb, bh->b_blocknr, bh->b_data, start, len);
+	}
+	else
+		printk(KERN_ERR " print_bh: bh is null!\n");
 }
 
 void print_block_data(struct super_block *sb, sector_t blocknr, unsigned char *data_to_dump, int start, int len)

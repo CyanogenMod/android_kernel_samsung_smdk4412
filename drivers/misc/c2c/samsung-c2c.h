@@ -12,35 +12,12 @@
 #ifndef SAMSUNG_C2C_H
 #define SAMSUNG_C2C_H
 
+#include <mach/c2c.h>
+
 /* This timer will be only used for debugging
 #define ENABLE_C2CSTATE_TIMER
 */
 #define C2C_DEV_NAME "c2c_dev"
-#define C2C_SYSREG_DEFAULT 0x832AA803
-
-#ifdef CONFIG_C2C_IPC_ENABLE
-#define C2C_CP_RGN_ADDR		0x60000000
-#define C2C_CP_RGN_SIZE		(56 * SZ_1M)
-#define C2C_SH_RGN_ADDR		(C2C_CP_RGN_ADDR + C2C_CP_RGN_SIZE)
-#define C2C_SH_RGN_SIZE		(8 * SZ_1M)
-
-extern void __iomem *c2c_request_cp_region(unsigned int cp_addr,
-		unsigned int size);
-extern void __iomem *c2c_request_sh_region(unsigned int sh_addr,
-		unsigned int size);
-extern void c2c_release_cp_region(void *rgn);
-extern void c2c_release_sh_region(void *rgn);
-
-extern int c2c_register_handler(void (*handler)(void *), void *data);
-extern int c2c_unregister_handler(void (*handler)(void *));
-extern void c2c_send_interrupt(void);
-extern void c2c_reset_interrupt(void);
-
-struct c2c_ipc_handler {
-	void *data;
-	void (*handler)(void *);
-};
-#endif
 
 enum c2c_set_clear {
 	C2C_CLEAR = 0,
@@ -56,6 +33,18 @@ enum c2c_interrupt {
 struct c2c_state_control {
 	void __iomem *ap_sscm_addr;
 	void __iomem *cp_sscm_addr;
+
+	dma_addr_t shdmem_addr;
+	enum c2c_shrdmem_size shdmem_c2c_size;
+	unsigned long shdmem_byte_size;
+
+	spinlock_t pm_lock;
+	unsigned int gpio_ap_wakeup;
+	unsigned int gpio_ap_status;
+	unsigned int gpio_cp_wakeup;
+	unsigned int gpio_cp_status;
+	bool suspended;
+
 #ifdef CONFIG_C2C_IPC_ENABLE
 	void *shd_pages;
 	struct c2c_ipc_handler hd;
@@ -64,15 +53,19 @@ struct c2c_state_control {
 
 	u32 rx_width;
 	u32 tx_width;
+	void (*setup_gpio)(enum c2c_buswidth rx_width,
+			enum c2c_buswidth tx_width);
 
 	u32 clk_opp100;
 	u32 clk_opp50;
 	u32 clk_opp25;
 
+	struct clk *c2c_clk;
 	struct clk *c2c_sclk;
 	struct clk *c2c_aclk;
 
 	enum c2c_opp_mode opp_mode;
+
 	/* Below variables are needed in reset for retention */
 	u32 retention_reg;
 	void __iomem *c2c_sysreg;
@@ -330,5 +323,7 @@ static inline void c2c_set_shdmem_size(u32 val)
 
 	writel(sysreg, c2c_con.c2c_sysreg);
 }
+
+void (*exynos_c2c_request_pwr_mode)(enum c2c_pwr_mode mode);
 
 #endif

@@ -67,7 +67,6 @@ static int CPRM_CMD_SecureRW(struct mmc_card *card,
 	struct mmc_command cmd;
 	struct mmc_command stop;
 	struct mmc_data data;
-
 	struct scatterlist sg;
 
 	if (command == SD_ACMD25_SECURE_WRITE_MULTI_BLOCK ||
@@ -103,14 +102,8 @@ static int CPRM_CMD_SecureRW(struct mmc_card *card,
 
 	memset(&data, 0, sizeof(struct mmc_data));
 
-		data.timeout_ns = 100000000;
-		data.timeout_clks = 0;
-
-#if defined(CONFIG_TARGET_LOCALE_NTT)
 	data.timeout_ns = 100000000;
 	data.timeout_clks = 0;
-#endif
-
 	data.blksz = length;
 	data.blocks = 1;
 	data.flags = dir;
@@ -214,14 +207,8 @@ static int CPRM_CMD_SecureMultiRW(struct mmc_card *card,
 
 	memset(&data, 0, sizeof(struct mmc_data));
 
-		data.timeout_ns = 100000000;
-		data.timeout_clks = 0;
-
-#if defined(CONFIG_TARGET_LOCALE_NTT)
 	data.timeout_ns = 100000000;
 	data.timeout_clks = 0;
-#endif
-
 	data.blksz = 512;
 	data.blocks = (length + 511) / 512;
 

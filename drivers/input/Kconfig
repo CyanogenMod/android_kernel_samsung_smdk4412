@@ -186,6 +186,14 @@ config INPUT_FBSUSPEND
 	  Call fb notification handlers when the user requested sleep state
 	  changes.
 
+config INPUT_MPU6050
+	bool "Invensense MPU-6050 sensor"
+	default n
+
+config INPUT_MPU6050_POLLING
+	bool "MPU-6050 polling mode"
+	default n
+
 comment "Input Device Drivers"
 
 source "drivers/input/keyboard/Kconfig"

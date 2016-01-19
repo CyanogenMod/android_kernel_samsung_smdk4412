@@ -17,9 +17,6 @@
  *  Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
  */
 
-#include "wacom_i2c_func.h"
-#include "wacom_i2c_firm.h"
-
 #ifndef _WACOM_I2C_FLASH_H
 #define _WACOM_I2C_FLASH_H
 
@@ -31,12 +28,6 @@
 #define WACOM_CMD_THROW1       0x00
 #define WACOM_QUERY_SIZE       19
 #define WACOM_RETRY_CNT        100
-
-struct flash {
-	int BLen;
-	unsigned long size;
-	unsigned char *data;
-};
 
 #define FLASH_START0	'f'
 #define FLASH_START1	'l'
@@ -71,6 +62,17 @@ struct flash {
 
 #define HIDIIC_VERSION V095
 
+#ifdef CONFIG_MACH_V1
+#define START_ADDR	0x2000
+#define MAX_ADDR	0xfbff
+#define BLOCK_NUM 62
+
+#elif defined(CONFIG_MACH_KONA)
+#define START_ADDR	0x4000
+#define MAX_ADDR	0x12FFF
+#endif
+
+#define MPU_W9007 0x2A
 #define FLASH_BLOCK_SIZE	64
 
 #define ASCINT_ON		0x0
@@ -205,6 +207,303 @@ struct flash {
 
 #define WAC_HID_FEATURE_REPORT	0x03
 #define WAC_MSG_RETRIES		5
+
+/*Structure*/
+typedef struct _FW_VERSION
+{
+	u8 UpVer;
+	u8 LoVer;
+} FW_VERSION, *PFW_VERSION;
+
+typedef struct _FLASHINF
+{
+	unsigned int  mode;
+	bool  bExit;
+	bool bPowerSupply;
+	u8  DeviceAddr;
+} FLASHINF, *PFLASHINF;
+
+struct wInt{
+	u16	lI;
+	u16	hI;
+};
+
+struct dwbyte{
+	unsigned char	ll;
+	unsigned char	lh;
+	unsigned char	hl;
+	unsigned char	hh;
+};
+
+union uAddress{
+	unsigned long	Lng;
+	struct	wInt	Int;
+	struct	dwbyte	Byt;
+} ;
+
+typedef struct
+{
+	unsigned char data[12];
+	unsigned char flash_data[64];
+	unsigned char chksum;
+	unsigned char chksumData;
+
+} boot_flash_verify;
+
+typedef struct
+{
+	unsigned char RegNoL;
+	unsigned char RegNoH;
+	unsigned char lenL;
+	unsigned char lenH;
+	unsigned char reportId;
+	unsigned char cmd;		/* command code, see BOOT_xxx constants */
+	unsigned char echo;		/* echo is used to link between command and response */
+	unsigned char cksum;	/* check sum */
+} boot_cmd_header;
+
+/*
+ * VERIFY_FLASH - verify flash memory
+ */
+typedef struct
+{
+	unsigned char RegNoL;
+	unsigned char RegNoH;
+	unsigned char lenL;
+	unsigned char lenH;
+	unsigned char reportId;
+	unsigned char cmd;		/* command code, see BOOT_xxx constants */
+	unsigned char echo;		/* echo is used to link between command and response */
+	union uAddress addr;		/* address must be divisible by 2 */
+	unsigned char size8;		/* size must be divisible by 8 */
+	unsigned char data[64];
+	unsigned char cksum;	/* check sum */
+	unsigned char cksumData;	/* check sum */
+} boot_cmd_verify_flash;
+
+/*
+* WRITE_FLASH - write flash memory
+*/
+typedef struct
+{
+	unsigned char RegNoL;
+	unsigned char RegNoH;
+	unsigned char lenL;
+	unsigned char lenH;
+	unsigned char reportId;
+	unsigned char cmd;		/* command code, see BOOT_xxx constants */
+	unsigned char echo;		/* echo is used to link between command and response */
+	union uAddress addr;		/* address must be divisible by 2 */
+	unsigned char size8;		/* size must be divisible by 8*/
+	unsigned char data[64];
+	unsigned char cksum;	/* check sum */
+	unsigned char cksumData;	/* check sum */
+} boot_cmd_write_flash;
+
+/*
+ * ERASE_FLASH - erase flash memory
+ */
+typedef struct
+{
+	unsigned char RegNoL;
+	unsigned char RegNoH;
+	unsigned char lenL;
+	unsigned char lenH;
+	unsigned char reportId;
+	unsigned char cmd;		/* command code, see BOOT_xxx constants */
+	unsigned char echo;		/* echo is used to link between command and response */
+	unsigned char blkNo;		/* block No. */
+	unsigned char cksum;		/* check sum */
+} boot_cmd_erase_flash;
+
+/*
+* RESET - reset microcontroller
+*/
+typedef struct
+{
+	unsigned char RegNoL;
+	unsigned char RegNoH;
+	unsigned char lenL;
+	unsigned char lenH;
+	unsigned char reportId;
+	unsigned char cmd;			/* command code, see BOOT_xxx constants */
+	unsigned char echo;			/* echo is used to link between command and response */
+	unsigned char cksum;		/* check sum */
+} boot_cmd_reset;
+
+/*
+* BLVER - get bootloader version
+*/
+typedef struct
+{
+	unsigned char RegNoL;
+	unsigned char RegNoH;
+	unsigned char lenL;
+	unsigned char lenH;
+	unsigned char reportId;
+	unsigned char cmd;			/* command code, see BOOT_xxx constants */
+	unsigned char echo;			/* echo is used to link between command and response */
+	unsigned char cksum;		/* check sum */
+} boot_cmd_blver;
+
+/*
+* MPUTYPE - get mpu type
+*/
+typedef struct
+{
+	unsigned char RegNoL;
+	unsigned char RegNoH;
+	unsigned char lenL;
+	unsigned char lenH;
+	unsigned char reportId;
+	unsigned char cmd;			/* command code, see BOOT_xxx constants */
+	unsigned char echo;			/* echo is used to link between command and response */
+	unsigned char cksum;		/* check sum */
+} boot_cmd_mputype;
+
+/*
+* QUERY - confirm boot mode
+*/
+typedef struct
+{
+	unsigned char RegNoL;
+	unsigned char RegNoH;
+	unsigned char lenL;
+	unsigned char lenH;
+	unsigned char reportId;
+	unsigned char cmd;			/* command code, see BOOT_xxx constants */
+	unsigned char echo;			/* echo is used to link between command and response */
+	unsigned char cksum;		/* check sum */
+} boot_cmd_query;
+
+typedef union
+{
+/*
+ * data field is used to make all commands the same length
+ */
+	unsigned char data[72+6];
+	boot_cmd_header header;
+	boot_cmd_verify_flash verify_flash;
+	boot_cmd_write_flash write_flash;
+	boot_cmd_erase_flash erase_flash;
+	boot_cmd_reset reset;
+	boot_cmd_blver blver;
+	boot_cmd_mputype mputype;
+	boot_cmd_query query;
+} boot_cmd;
+
+/*
+ * common for all responses fields
+ */
+typedef struct
+{
+	unsigned char lenL;
+	unsigned char lenH;
+	unsigned char reportId;
+	unsigned char cmd;		/* command code, see BOOT_xxx constants */
+	unsigned char echo;		/* echo is used to link between command and response */
+	unsigned char resp;
+} boot_rsp_header;
+
+/*
+* WRITE_FLASH - write flash memory
+*/
+typedef struct
+{
+	unsigned char lenL;
+	unsigned char lenH;
+	unsigned char reportId;
+	unsigned char cmd;		/* command code, see BOOT_xxx constants */
+	unsigned char echo;		/* echo is used to link between command and response */
+	unsigned char resp;
+} boot_rsp_write_flash;
+
+/*
+* VERIFY_FLASH - verify flash memory
+*/
+typedef struct
+{
+	unsigned char lenL;
+	unsigned char lenH;
+	unsigned char reportId;
+	unsigned char cmd;		/* command code, see BOOT_xxx constants */
+	unsigned char echo;		/* echo is used to link between command and response */
+	unsigned char resp;
+} boot_rsp_verify_flash;
+
+/*
+* ERASE_FLASH - erase flash memory
+*/
+typedef struct
+{
+	unsigned char lenL;
+	unsigned char lenH;
+	unsigned char reportId;
+	unsigned char cmd;		/* command code, see BOOT_xxx constants */
+	unsigned char echo;		/* echo is used to link between command and response */
+	unsigned char resp;
+} boot_rsp_erase_flash;
+
+/*
+* BLVER - boot loader version
+*/
+typedef struct
+{
+	unsigned char lenl;
+	unsigned char lenh;
+	unsigned char reportId;
+	unsigned char cmd;		/* command code, see BOOT_xxx constants */
+	unsigned char echo;		/* echo is used to link between command and response */
+	unsigned char resp;
+} boot_rsp_blver;
+
+/*
+* MPUTYPE - mpu type
+*/
+typedef struct
+{
+	unsigned char lenl;
+	unsigned char lenh;
+	unsigned char reportId;
+	unsigned char cmd;		/* command code, see BOOT_xxx constants */
+	unsigned char echo;		/* echo is used to link between command and response */
+	unsigned char resp;
+} boot_rsp_mputype;
+
+/*
+* QUERY - query
+*/
+typedef struct
+{
+	unsigned char lenl;
+	unsigned char lenh;
+	unsigned char reportId;
+	unsigned char cmd;		/* command code, see BOOT_xxx constants */
+	unsigned char echo;		/* echo is used to link between command and response */
+	unsigned char resp;
+} boot_rsp_query;
+
+
+typedef union
+{
+/*
+ * data field is used to make all responses the same length
+ */
+	unsigned char data[6];
+	boot_rsp_header header;
+	boot_rsp_verify_flash verify_flash;
+	boot_rsp_write_flash write_flash;
+	boot_rsp_erase_flash erase_flash;
+	boot_rsp_blver blver;
+	boot_rsp_mputype mputype;
+	boot_rsp_query query;
+} boot_rsp;
+
+struct flash{
+	int BLen;
+	unsigned long size;
+	unsigned char *data;
+};
 
 extern int wacom_i2c_flash(struct wacom_i2c *wac_i2c);
 

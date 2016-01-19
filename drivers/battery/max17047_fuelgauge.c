@@ -33,7 +33,8 @@
 #include <linux/gpio.h>
 #include <plat/gpio-cfg.h>
 #include <linux/rtc.h>
-#if defined(CONFIG_TARGET_LOCALE_KOR) || defined(CONFIG_MACH_M0_CTC)
+#if defined(CONFIG_TARGET_LOCALE_KOR) || defined(CONFIG_MACH_M0_CTC)\
+	|| defined(CONFIG_MACH_T0_CHN_CTC)
 #ifdef CONFIG_DEBUG_FS
 #include <linux/debugfs.h>
 #endif
@@ -64,10 +65,38 @@
 #undef	DEBUG_FUELGAUGE_POLLING
 #define MAX17047_POLLING_INTERVAL	10000
 
+/* rcomp update */
+#if defined(CONFIG_MACH_C1_KOR_SKT) || \
+	defined(CONFIG_MACH_C1_KOR_KT) || \
+	defined(CONFIG_MACH_C1_KOR_LGT)
+#define CHECK_RCOMP_UPDATE
+#define MAX17047_NEW_RCOMP	0x0070
+#endif
+
 /* adjust full soc */
+#if defined(CONFIG_MACH_T0)
+#if defined(CONFIG_TARGET_LOCALE_KOR)
+#define FULL_SOC_DEFAULT	9700
+#define FULL_SOC_LOW		9600
+#define FULL_SOC_HIGH		10050
+#define KEEP_FULL_SOC		100	/* 1.0% */
+#else
+#define FULL_SOC_DEFAULT	9650
+#define FULL_SOC_LOW		9500
+#define FULL_SOC_HIGH		10050
+#define KEEP_FULL_SOC		100	/* 1.0% */
+#endif
+#elif defined(CONFIG_MACH_GC1)
+#define FULL_SOC_DEFAULT	9700
+#define FULL_SOC_LOW		9650
+#define FULL_SOC_HIGH		10000
+#define KEEP_FULL_SOC		110	/* 1.1% */
+#else	/* M0, C1,,, */
 #define FULL_SOC_DEFAULT	9850
 #define FULL_SOC_LOW		9700
 #define FULL_SOC_HIGH		10000
+#define KEEP_FULL_SOC		100	/* 1.0% */
+#endif
 #define KEEP_SOC_DEFAULT	50 /* 0.5% */
 
 struct max17047_fuelgauge_data {
@@ -99,6 +128,10 @@ struct max17047_fuelgauge_data {
 
 	/* adjust full soc */
 	int				full_soc;
+
+#if defined(CONFIG_MACH_GC1) || defined(CONFIG_MACH_GD2)
+	int				prev_status;
+#endif
 
 #ifdef USE_TRIM_ERROR_DETECTION
 	/* trim error state */
@@ -281,12 +314,6 @@ static int max17047_get_soc(struct i2c_client *client)
 	fullsoc = fg_data->full_soc - empty;
 	rawsoc -= empty;
 
-/* adjust fullsoc value for fast termination */
-#if defined(USE_2STEP_TERM) && !defined(CONFIG_TARGET_LOCALE_KOR)
-	fullsoc *= 99;
-	fullsoc /= 100;
-#endif
-
 	soc = fg_data->soc =
 		((rawsoc < empty) ? 0 : (min((rawsoc * 100 / fullsoc), 100)));
 
@@ -325,36 +352,77 @@ static void max17047_reset_soc(struct i2c_client *client)
 	return;
 }
 
+#if defined(CONFIG_MACH_GC1) || defined(CONFIG_MACH_GD2)
+void max17047_set_rcomp(struct i2c_client *client, int state)
+{
+	u8 rst_cmd[2];
+
+	if (state) {
+		rst_cmd[1] = 0x00;
+#if defined(CONFIG_MACH_GC1_USA_VZW)
+		rst_cmd[0] = 0xC1;
+#elif defined(CONFIG_MACH_GD2)
+		rst_cmd[0] = 0x70;
+#else/*GC1 default*/
+		rst_cmd[0] = 0xCF;
+#endif
+	} else {
+		rst_cmd[1] = 0x00;
+#if defined(CONFIG_MACH_GC1_USA_VZW)
+		rst_cmd[0] = 0x8D;
+#elif defined(CONFIG_MACH_GD2)
+		rst_cmd[0] = 0x54;
+#else/*GC1 default*/
+		rst_cmd[0] = 0x8F;
+#endif
+	}
+
+	max17047_i2c_write(client, MAX17047_REG_RCOMP, rst_cmd);
+	pr_info("%s: state = %d\n", __func__, state);
+}
+
+void max17047_get_rcomp(struct i2c_client *client, int status)
+{
+	u8 data[2];
+
+	if (max17047_i2c_read(client, MAX17047_REG_RCOMP, data) < 0)
+		return;
+
+	pr_info("%s: COMP(0x%02x%02x), status=%d\n",
+		__func__, data[1], data[0], status);
+}
+#endif
+
 static void max17047_adjust_fullsoc(struct i2c_client *client)
 {
 	struct max17047_fuelgauge_data *fg_data =
 		 i2c_get_clientdata(client);
 	int prev_full_soc = fg_data->full_soc;
-	int temp_soc = max17047_get_rawsoc(fg_data->client);
+	int raw_soc = max17047_get_rawsoc(fg_data->client);
 	int keep_soc = 0;
 
-	if (temp_soc < 0) {
-		pr_err("%s : fg data error!(%d)\n", __func__, temp_soc);
+	if (raw_soc < 0) {
+		pr_err("%s : fg data error!(%d)\n", __func__, raw_soc);
 		fg_data->full_soc = FULL_SOC_DEFAULT;
 		return;
 	}
 
-	if (temp_soc < FULL_SOC_LOW)
+	if (raw_soc < FULL_SOC_LOW)
 		fg_data->full_soc = FULL_SOC_LOW;
-	else if (temp_soc > FULL_SOC_HIGH) {
+	else if (raw_soc > FULL_SOC_HIGH) {
 		keep_soc = FULL_SOC_HIGH / 100;
 		fg_data->full_soc = (FULL_SOC_HIGH - keep_soc);
 	} else {
-		keep_soc = temp_soc / 100;
-		if (temp_soc > (FULL_SOC_LOW + keep_soc))
-			fg_data->full_soc = temp_soc - keep_soc;
+		keep_soc = ((raw_soc * KEEP_FULL_SOC) / 10000);
+		if (raw_soc > (FULL_SOC_LOW + keep_soc))
+			fg_data->full_soc = raw_soc - keep_soc;
 		else
 			fg_data->full_soc = FULL_SOC_LOW;
 	}
 
 	if (prev_full_soc != fg_data->full_soc)
-		pr_info("%s : p_full_soc(%d), full_soc(%d), keep_soc(%d)\n",
-			__func__, prev_full_soc, fg_data->full_soc, keep_soc);
+		pr_info("%s : full_soc(%d->%d), rsoc(%d), keep(%d)\n", __func__,
+			prev_full_soc, fg_data->full_soc, raw_soc, keep_soc);
 }
 
 /* SOC% alert, disabled(0xFF00) */
@@ -645,6 +713,21 @@ static int max17047_set_property(struct power_supply *psy,
 		/* adjust full soc */
 		max17047_adjust_fullsoc(fg_data->client);
 		break;
+#if defined(CONFIG_MACH_GC1) || defined(CONFIG_MACH_GD2)
+	case POWER_SUPPLY_PROP_RCOMP:
+		if (fg_data->prev_status == val->intval) {
+			pr_debug("%s: No rcomp change, prev(%d) = cur(%d)\n",
+				__func__, fg_data->prev_status, val->intval);
+		} else {
+			if (val->intval == POWER_SUPPLY_STATUS_CHARGING)
+				max17047_set_rcomp(fg_data->client, 1);
+			else
+				max17047_set_rcomp(fg_data->client, 0);
+			max17047_get_rcomp(fg_data->client, val->intval);
+			fg_data->prev_status = val->intval;
+		}
+		break;
+#endif
 	default:
 		return -EINVAL;
 	}
@@ -819,6 +902,34 @@ static const struct file_operations max17047_debugfs_fops2 = {
 #endif
 #endif
 
+#ifdef CHECK_RCOMP_UPDATE
+static void max17047_check_rcomp_update(struct i2c_client *client)
+{
+	u8 data[2];
+	int ret, rcomp;
+
+	/* read rcomp */
+	ret = max17047_i2c_read(client, MAX17047_REG_RCOMP, data);
+	if (ret < 0)
+		return;
+
+	rcomp = (data[1] << 8) | data[0];
+	pr_info("%s: rcomp = 0x%04x\n", __func__, rcomp);
+
+	/* check rcomp update */
+	if (rcomp != MAX17047_NEW_RCOMP) {
+		data[0] = MAX17047_NEW_RCOMP & 0xff;
+		data[1] = MAX17047_NEW_RCOMP >> 8;
+		max17047_i2c_write(client, MAX17047_REG_RCOMP, data);
+		pr_info("%s: set new rcomp = 0x%04x\n",
+				__func__, MAX17047_NEW_RCOMP);
+		max17047_i2c_read(client, MAX17047_REG_RCOMP, data);
+		rcomp = (data[1] << 8) | data[0];
+		pr_info("%s: verify rcomp = 0x%04x\n", __func__, rcomp);
+	}
+}
+#endif
+
 static int __devinit max17047_fuelgauge_i2c_probe(struct i2c_client *client,
 						  const struct i2c_device_id *id)
 {
@@ -856,6 +967,10 @@ static int __devinit max17047_fuelgauge_i2c_probe(struct i2c_client *client,
 	fg_data->trim_err = max17047_detect_trim_error(fg_data);
 #endif
 
+#ifdef CHECK_RCOMP_UPDATE
+	max17047_check_rcomp_update(client);
+#endif
+
 	/* Initialize full_soc, set this before fisrt SOC reading */
 	fg_data->full_soc = FULL_SOC_DEFAULT;
 	/* first full_soc update */
@@ -872,7 +987,10 @@ static int __devinit max17047_fuelgauge_i2c_probe(struct i2c_client *client,
 	else
 		fg_data->fuelgauge.name = "max17047-fuelgauge";
 
-	fg_data->fuelgauge.type = POWER_SUPPLY_TYPE_BATTERY;
+#if defined(CONFIG_MACH_GC1) || defined(CONFIG_MACH_GD2)
+	fg_data->prev_status = POWER_SUPPLY_STATUS_DISCHARGING;
+#endif
+	fg_data->fuelgauge.type = POWER_SUPPLY_TYPE_UNKNOWN;
 	fg_data->fuelgauge.properties = max17047_fuelgauge_props;
 	fg_data->fuelgauge.num_properties =
 				ARRAY_SIZE(max17047_fuelgauge_props);

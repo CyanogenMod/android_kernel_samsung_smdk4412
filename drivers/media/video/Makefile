@@ -76,14 +76,19 @@ obj-$(CONFIG_VIDEO_S5K4BA) += s5k4ba.o
 obj-$(CONFIG_VIDEO_S5K4EA) += s5k4ea.o
 endif
 obj-$(CONFIG_VIDEO_M5MO)	+= m5mo.o
+ifeq ($(CONFIG_MACH_GC2PD),y)
 obj-$(CONFIG_VIDEO_M9MO)	+= m9mo.o
+else
+obj-$(CONFIG_VIDEO_M9MO)	+= m9mo_sf2.o
+endif
+obj-$(CONFIG_VIDEO_M9MO_SPI)	+= m9mo_spi.o
 ifeq ($(CONFIG_MACH_PX),y)
 obj-$(CONFIG_VIDEO_S5K5BAFX)	+= s5k5bafx-v2.o
 else
 obj-$(CONFIG_VIDEO_S5K5BAFX)	+= s5k5bafx-v2.o
 obj-$(CONFIG_VIDEO_S5K5BBGX)		+= s5k5bbgx.o
 endif
-obj-$(CONFIG_VIDEO_S5K5CCGX_COMMON) 	+= s5k5ccgx.o
+obj-$(CONFIG_VIDEO_S5K5CCGX) 	+= s5k5ccgx.o
 obj-$(CONFIG_VIDEO_SR200PC20)	+= sr200pc20-p2.o
 obj-$(CONFIG_VIDEO_SR200PC20M)		+= sr200pc20m.o
 obj-$(CONFIG_VIDEO_SR030PC30)	+= sr030pc30.o
@@ -92,10 +97,14 @@ obj-$(CONFIG_VIDEO_M5MOLS)	+= m5mols/
 obj-$(CONFIG_VIDEO_S5C73M3)	+= s5c73m3.o
 obj-$(CONFIG_VIDEO_ISX012)	+= isx012.o
 obj-$(CONFIG_VIDEO_S5C73M3_SPI)	+= s5c73m3_spi.o
+obj-$(CONFIG_VIDEO_SR300PC20)	+= sr300pc20.o
 obj-$(CONFIG_VIDEO_SR130PC20)	+= sr130pc20.o
 obj-$(CONFIG_VIDEO_SLP_S5C73M3)	+= slp_s5c73m3.o
 obj-$(CONFIG_VIDEO_SLP_S5K4ECGX)	+= slp_s5k4ecgx.o
 obj-$(CONFIG_VIDEO_SLP_DB8131M)	+= slp_db8131m.o
+obj-$(CONFIG_VIDEO_DB8131M)	+= db8131a.o
+obj-$(CONFIG_VIDEO_DRIME4)	+= drime4.o
+obj-$(CONFIG_VIDEO_DRIME4_SPI)	+= drime4_spi.o
 
 obj-$(CONFIG_SOC_CAMERA_IMX074)		+= imx074.o
 obj-$(CONFIG_SOC_CAMERA_MT9M001)	+= mt9m001.o

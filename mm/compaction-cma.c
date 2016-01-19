@@ -303,8 +303,7 @@ isolate_migratepages_range(struct zone *zone, struct compact_control *cc,
 		}
 
 		/* Try isolate the page */
-		if (__isolate_lru_page(page,
-			    ISOLATE_ACTIVE|ISOLATE_INACTIVE, 0) != 0)
+		if (__isolate_lru_page(page, ISOLATE_BOTH, 0) != 0)
 			continue;
 
 		VM_BUG_ON(PageTransCompound(page));
@@ -660,8 +659,7 @@ static int compact_zone(struct zone *zone, struct compact_control *cc)
 		nr_migrate = cc->nr_migratepages;
 		err = migrate_pages(&cc->migratepages, compaction_alloc,
 				(unsigned long)cc, false,
-				    cc->sync ? MIGRATE_SYNC_LIGHT : MIGRATE_ASYNC
-				    , 0);
+				cc->sync, 0);
 		update_nr_listpages(cc);
 		nr_remaining = cc->nr_migratepages;
 

@@ -27,7 +27,7 @@
 #include "ak8975-reg.h"
 #include <linux/sensor/sensors_core.h>
 
-#ifdef CONFIG_SLP
+#if defined(CONFIG_SLP) || defined(CONFIG_SENSORS_AK8975C_FACTORY)
 #define FACTORY_TEST
 #else
 #undef FACTORY_TEST
@@ -625,13 +625,13 @@ static DEVICE_ATTR(name, 0664,
 		ak8975_show_name, NULL);
 
 #ifdef FACTORY_TEST
-static DEVICE_ATTR(ak8975_asa, 0664,
+static DEVICE_ATTR(asa, 0664,
 		ak8975c_get_asa, NULL);
-static DEVICE_ATTR(ak8975_selftest, 0664,
+static DEVICE_ATTR(selftest, 0664,
 		ak8975c_get_selftest, NULL);
-static DEVICE_ATTR(ak8975_chk_registers, 0664,
+static DEVICE_ATTR(chk_registers, 0664,
 		ak8975c_check_registers, NULL);
-static DEVICE_ATTR(ak8975_chk_cntl, 0664,
+static DEVICE_ATTR(dac, 0664,
 		ak8975c_check_cntl, NULL);
 static DEVICE_ATTR(status, 0664,
 		ak8975c_get_status, NULL);
@@ -644,8 +644,14 @@ int akm8975_probe(struct i2c_client *client,
 {
 	struct akm8975_data *akm;
 	int err;
-
+#ifdef CONFIG_TARGET_LOCALE_KOR
+	int probe_retry_max = 3;
+#endif
 	printk(KERN_INFO "%s is called.\n", __func__);
+
+#ifdef CONFIG_TARGET_LOCALE_KOR
+probe_retry:
+#endif
 	if (client->dev.platform_data == NULL && client->irq == 0) {
 		dev_err(&client->dev, "platform data & irq are NULL.\n");
 		err = -ENODEV;
@@ -723,6 +729,7 @@ int akm8975_probe(struct i2c_client *client,
 		goto exit_i2c_failed;
 	}
 
+	err = -ENOMEM;
 	akm->dev = sensors_classdev_register("magnetic_sensor");
 	if (IS_ERR(akm->dev)) {
 		printk(KERN_ERR "Failed to create device!");
@@ -760,25 +767,25 @@ int akm8975_probe(struct i2c_client *client,
 		goto exit_device_create_file2;
 	}
 
-	if (device_create_file(akm->dev, &dev_attr_ak8975_asa) < 0) {
+	if (device_create_file(akm->dev, &dev_attr_asa) < 0) {
 		printk(KERN_ERR "Failed to create device file(%s)!\n",
-			dev_attr_ak8975_asa.attr.name);
+			dev_attr_asa.attr.name);
 		goto exit_device_create_file3;
 	}
-	if (device_create_file(akm->dev, &dev_attr_ak8975_selftest) < 0) {
+	if (device_create_file(akm->dev, &dev_attr_selftest) < 0) {
 		printk(KERN_ERR "Failed to create device file(%s)!\n",
-			dev_attr_ak8975_selftest.attr.name);
+			dev_attr_selftest.attr.name);
 		goto exit_device_create_file4;
 	}
 	if (device_create_file(akm->dev,\
-		&dev_attr_ak8975_chk_registers) < 0) {
+		&dev_attr_chk_registers) < 0) {
 		printk(KERN_ERR "Failed to create device file(%s)!\n",
-			dev_attr_ak8975_chk_registers.attr.name);
+			dev_attr_chk_registers.attr.name);
 		goto exit_device_create_file5;
 	}
-	if (device_create_file(akm->dev, &dev_attr_ak8975_chk_cntl) < 0) {
+	if (device_create_file(akm->dev, &dev_attr_dac) < 0) {
 		printk(KERN_ERR "Failed to create device file(%s)!\n",
-			dev_attr_ak8975_chk_cntl.attr.name);
+			dev_attr_dac.attr.name);
 		goto exit_device_create_file6;
 	}
 #endif
@@ -789,11 +796,11 @@ return 0;
 
 #ifdef FACTORY_TEST
 exit_device_create_file6:
-	device_remove_file(akm->dev, &dev_attr_ak8975_chk_registers);
+	device_remove_file(akm->dev, &dev_attr_chk_registers);
 exit_device_create_file5:
-	device_remove_file(akm->dev, &dev_attr_ak8975_selftest);
+	device_remove_file(akm->dev, &dev_attr_selftest);
 exit_device_create_file4:
-	device_remove_file(akm->dev, &dev_attr_ak8975_asa);
+	device_remove_file(akm->dev, &dev_attr_asa);
 exit_device_create_file3:
 	device_remove_file(akm->dev, &dev_attr_status);
 exit_device_create_file2:
@@ -820,6 +827,14 @@ exit_set_mode_power_down_failed:
 exit_alloc_data_failed:
 exit_check_functionality_failed:
 exit_platform_data_null:
+#ifdef CONFIG_TARGET_LOCALE_KOR
+	if (probe_retry_max > 0) {
+		pr_err("%s: Failed to probe..(%d try left)\n",
+			__func__, probe_retry_max);
+		probe_retry_max--;
+		goto probe_retry;
+	}
+#endif
 	return err;
 }
 
@@ -830,15 +845,17 @@ static int __devexit akm8975_remove(struct i2c_client *client)
 	#ifdef FACTORY_TEST
 	device_remove_file(akm->dev, &dev_attr_adc);
 	device_remove_file(akm->dev, &dev_attr_status);
-	device_remove_file(akm->dev, &dev_attr_ak8975_asa);
-	device_remove_file(akm->dev, &dev_attr_ak8975_selftest);
-	device_remove_file(akm->dev, &dev_attr_ak8975_chk_registers);
+	device_remove_file(akm->dev, &dev_attr_asa);
+	device_remove_file(akm->dev, &dev_attr_selftest);
+	device_remove_file(akm->dev, &dev_attr_chk_registers);
+	device_remove_file(akm->dev, &dev_attr_dac);
 	#endif
 	device_remove_file(akm->dev, &dev_attr_name);
 	device_remove_file(akm->dev, &dev_attr_vendor);
 	device_remove_file(akm->dev, &dev_attr_raw_data);
 	sensors_classdev_unregister(akm->dev);
 	misc_deregister(&akm->akmd_device);
+	disable_irq(akm->irq);
 	free_irq(akm->irq, akm);
 	gpio_free(akm->pdata->gpio_data_ready_int);
 	mutex_destroy(&akm->lock);

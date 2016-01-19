@@ -38,7 +38,7 @@ static int accel_gpio_init(void)
 	return ret;
 }
 
-static int acceleromter_get_position(void)
+static u8 acceleromter_get_position(void)
 {
 	int position = 0;
 
@@ -177,6 +177,11 @@ static struct platform_device opt_gp2a = {
 		.platform_data = &gp2a_pdata,
 	},
 };
+
+static struct platform_device light_gp2a = {
+	.name = "light_sensor",
+	.id = -1,
+};
 #endif
 
 #if defined(CONFIG_SENSORS_GP2A) || defined(CONFIG_SENSORS_AL3201)
@@ -241,6 +246,13 @@ int kona_sensor_init(void)
 	ret = platform_device_register(&opt_gp2a);
 	if (ret < 0) {
 		pr_err("%s, failed to register opt_gp2a(err=%d)\n",
+			__func__, ret);
+		return ret;
+	}
+
+	ret = platform_device_register(&light_gp2a);
+	if (ret < 0) {
+		pr_err("%s, failed to register light_gp2a(err=%d)\n",
 			__func__, ret);
 		return ret;
 	}

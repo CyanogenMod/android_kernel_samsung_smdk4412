@@ -5,6 +5,7 @@
  * Firmware binary file is on the filesystem, read fild and send it through SDIO
  */
 #include "firmware.h"
+#include <linux/wimax/samsung/wimax732.h>
 
 #define SEEK_SET	0
 #define SEEK_CUR	1
@@ -26,8 +27,12 @@
  *************************************************************************/
 struct file *klib_fopen(
 		const char *filename,	/*!< filename to open */
-		int flags,	/*!< O_RDONLY, O_WRONLY, O_RDWR, O_CREAT, O_EXCL, O_TRUNC, O_APPEND, O_NONBLOCK, O_SYNC, ... */
-		int mode	/*!< file creation permisstion. S_IRxxx S_IWxxx S_IXxxx (xxx=USR,GRP,OTH), S_IRWXx(x=U,G,O)  */
+		/*!< O_RDONLY, O_WRONLY, O_RDWR, O_CREAT,
+		O_EXCL, O_TRUNC, O_APPEND, O_NONBLOCK, O_SYNC,...*/
+		int flags,
+		/*!< file creation permisstion. S_IRxxx
+		S_IWxxx S_IXxxx (xxx=USR,GRP,OTH), S_IRWXx(x=U,G,O)*/
+		int mode
 		)
 {
 	struct file *filp = filp_open(filename, flags, mode);
@@ -78,7 +83,8 @@ int klib_fseek(
 		if (pos < 0)
 			pos = 0;
 
-		return (filp->f_pos = pos);
+		filp->f_pos = pos;
+		return pos;
 	} else
 		return -ENOENT;
 }
@@ -104,17 +110,17 @@ klib_fread(
 	mm_segment_t oldfs;
 
 	if (filp == NULL) {
-		printk("  filp == NULL\n");
+		printk(KERN_INFO "filp == NULL\n");
 		return -ENOENT;
 	}
 
 	if (filp->f_op->read == NULL) {
-		printk("  filp->f_op->read == NULL\n");
+		printk(KERN_INFO "filp->f_op->read == NULL\n");
 		return -ENOSYS;
 	}
 
 	if (((filp->f_flags & O_ACCMODE) & O_RDONLY) != 0) {
-		printk("  ((filp->f_flags & O_ACCMODE) & O_RDONLY) != 0\n");
+		printk(KERN_INFO "((filp->f_flags & O_ACCMODE) & O_RDONLY) != 0\n");
 		return -EACCES;
 	}
 
@@ -208,12 +214,12 @@ int klib_fwrite(
 	mm_segment_t oldfs;
 
 	if (filp == NULL) {
-		printk("  filp == NULL\n");
+		printk(KERN_INFO "filp == NULL\n");
 		return -ENOENT;
 	}
 
 	if (filp->f_op->write == NULL) {
-		printk("  filp->f_op->write == NULL\n");
+		printk(KERN_INFO "filp->f_op->write == NULL\n");
 		return -ENOSYS;
 	}
 
@@ -232,9 +238,10 @@ void s3c_bat_use_wimax(int onoff)
 
 	if (!fp)
 		pr_err("open fail");
-    if (onoff)
+	if (onoff)
 			klib_fwrite("1", 1, fp);
 	else
 		klib_fwrite("0", 1, fp);
 		klib_fclose(fp);
 }
+EXPORT_SYMBOL(s3c_bat_use_wimax);

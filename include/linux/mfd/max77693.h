@@ -28,6 +28,9 @@
 #ifndef __LINUX_MFD_MAX77693_H
 #define __LINUX_MFD_MAX77693_H
 
+#if defined(CONFIG_CHARGER_MAX77693_BAT)
+#include <linux/battery/sec_charger.h>
+#endif
 #include <linux/regulator/consumer.h>
 
 enum {
@@ -118,6 +121,10 @@ struct max77693_platform_data {
 #ifdef CONFIG_BATTERY_MAX77693_CHARGER
 	/* charger data */
 	struct max77693_charger_platform_data *charger_data;
+#endif
+#if defined(CONFIG_CHARGER_MAX77693_BAT)
+	/* charger data */
+	sec_battery_platform_data_t *charger_data;
 #endif
 };
 

@@ -22,6 +22,17 @@ config TOUCHSCREEN_MELFAS_GC
 	  To compile this driver as a module, choose M here: the
 	  module will be called GC model MMS.
 
+config TOUCHSCREEN_MELFAS_W
+	tristate "W model MELFAS touchscreen driver"
+	depends on I2C
+	help
+	  Say Y here if you have a W model MELFAS touchscreen.
+
+	  If unsure, say N.
+
+	  To compile this driver as a module, choose M here: the
+	  module will be called W model MMS.
+
 config TOUCHSCREEN_MELFAS
 	tristate "MELFAS touchscreen driver"
 	depends on I2C
@@ -62,6 +73,28 @@ config TOUCHSCREEN_MELFAS_NOTE
 
           To compile this driver as a module, choose M here: the
           module will be called mms_ts_note.
+
+config TOUCHSCREEN_MMS152_TAB3
+	tristate "TAB3 model MELFAS MMS152 touchscreen driver"
+	depends on I2C
+	help
+	  Say Y here if you have a TAB3 model MELFAS MMS152 touchscreen.
+
+	  If unsure, say N.
+
+	  To compile this driver as a module, choose M here: the
+	  module will be called mms152_tab3.
+
+config TOUCHSCREEN_MMS252
+	tristate "MELFAS MMS252 touchscreen driver"
+	depends on I2C
+	help
+	  Say Y here if you have a MELFAS MMS252 touchscreen.
+
+	  If unsure, say N.
+
+	  To compile this driver as a module, choose M here: the
+	  module will be called melfas-ts.
 
 config TOUCHSCREEN_88PM860X
 	tristate "Marvell 88PM860x touchscreen"
@@ -197,6 +230,17 @@ config TOUCHSCREEN_ATMEL_MXT224_GC
 
           To compile this driver as a module, choose M here: the
           module will be called atmel_mxt224_galaxy_camera_ts.
+
+config TOUCHSCREEN_ATMEL_MXT224E
+	tristate "Atmel mXT224e I2C Touchscreen"
+	depends on I2C
+	help
+	  Say Y here if you have Atmel mXT224E I2C touchscreen.
+
+	  If unsure, say N.
+
+	  To compile this driver as a module, choose M here: the
+	  module will be called mxt224e.
 
 config TOUCHSCREEN_ATMEL_MXT1536E
 	tristate "Atmel mXT 1536E I2C Touchscreen"
@@ -934,6 +978,13 @@ config TOUCHSCREEN_ZINITIX
 	  To compile this driver as a module, choose M here: the
 	  module will be called zinitx_ts.
 
+config TOUCHSCREEN_ZINITIX_BT532
+	tristate "ZINITIX BT532 I2C touchscreen driver"
+	depends on I2C
+	default n
+	help
+	  Say Y here to enable BT532 I2C touchscreen support
+
 config TOUCHSCREEN_MXT1386
 	tristate "ATMEL mXT1386 I2C touchscreen driver"
 	depends on I2C
@@ -957,7 +1008,7 @@ config TOUCHSCREEN_SYNAPTICS_S7301
 
 		To compile this driver as a module, choose M here: the
 		module will be called melfas_ts.
-
+		
 config TOUCHSCREEN_SYNAPTICS_S7301_KEYS
 	bool "S7301 touch key support"
 	default n
@@ -979,7 +1030,7 @@ config TOUCHSCREEN_SYNAPTICS_S7301_KEYLED
 		Say Y here if you want support for SYNAPTICS S7301
 		with GPIO led control
 
-config TOUCHSCREEN_CYTTSP4
+config TOUCHSCREEN_CYPRESS_TMA46X
 	tristate "Cypress GEN4 Touchscreen Interface"
 	depends on I2C
 	help
@@ -1009,6 +1060,16 @@ config KEYPAD_MELFAS_TOUCH
 	  To compile this driver as a module, choose M here: the
 	  module will be called melfas_touchkey.
 
+config TOUCHSCREEN_ATMEL_MXTS
+	tristate "Atmel mXTS I2C Touchscreen"
+	depends on I2C
+	help
+	  Say Y here if you have Atmel mXT S series I2C touchscreen,
+	  If unsure, say N.
+
+	  To compile this driver as a module, choose M here: the
+	  module will be called mxts.
+
 config TOUCHSCREEN_ATMEL_MXT540S
 	tristate "Atmel mXT 540S I2C Touchscreen"
 	depends on I2C
@@ -1021,6 +1082,31 @@ config TOUCHSCREEN_ATMEL_MXT540S
 	  To compile this driver as a module, choose M here: the
 	  module will be called mxt540s.
 
+config TOUCHSCREEN_ATMEL_MXT1188S
+	tristate "Atmel mXT 1188s I2C Touchscreen"
+	depends on I2C
+	help
+	  Say Y here if you have Atmel mXT series I2C touchscreen,
+	  such as ATMEL MXT1188S, connected to your system.
+
+	  If unsure, say N.
+
+	  To compile this driver as a module, choose M here: the
+	  module will be called mxt1188s.
+
+config TOUCHSCREEN_MELFAS_GD2
+	tristate "GD2 model MELFAS touchscreen driver"
+	depends on I2C
+	help
+	  Say Y here if you have a GC model MELFAS touchscreen.
+
+	  If unsure, say N.
+
+	  To compile this driver as a module, choose M here: the
+	  module will be called GC model MMS.
+
 source "drivers/input/touchscreen/wacom/Kconfig"
+
+source "drivers/input/touchscreen/rmi4/Kconfig"
 
 endif

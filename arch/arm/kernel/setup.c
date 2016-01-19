@@ -132,6 +132,9 @@ static struct stack stacks[NR_CPUS];
 char elf_platform[ELF_PLATFORM_SIZE];
 EXPORT_SYMBOL(elf_platform);
 
+#ifdef CONFIG_MIDAS_COMMON
+const char *chip_name;
+#endif
 static const char *cpu_name;
 static const char *machine_name;
 static char __initdata cmd_line[COMMAND_LINE_SIZE];
@@ -1051,6 +1054,8 @@ static int c_show(struct seq_file *m, void *v)
 	seq_puts(m, "\n");
 
 #ifdef CONFIG_MIDAS_COMMON
+	if ((soc_is_exynos4412() || soc_is_exynos4212()) && chip_name)
+		seq_printf(m, "Chip name\t: %s\n", chip_name);
 	if (soc_is_exynos4412())
 		seq_printf(m, "Chip revision\t: %04x\n", samsung_rev());
 #endif

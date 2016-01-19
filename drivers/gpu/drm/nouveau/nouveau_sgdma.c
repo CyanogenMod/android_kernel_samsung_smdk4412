@@ -8,30 +8,112 @@
 #define NV_CTXDMA_PAGE_MASK  (NV_CTXDMA_PAGE_SIZE - 1)
 
 struct nouveau_sgdma_be {
-	/* this has to be the first field so populate/unpopulated in
-	 * nouve_bo.c works properly, otherwise have to move them here
-	 */
-	struct ttm_dma_tt ttm;
+	struct ttm_backend backend;
 	struct drm_device *dev;
+
+	dma_addr_t *pages;
+	bool *ttm_alloced;
+	unsigned nr_pages;
+
 	u64 offset;
+	bool bound;
 };
 
-static void
-nouveau_sgdma_destroy(struct ttm_tt *ttm)
+static int
+nouveau_sgdma_populate(struct ttm_backend *be, unsigned long num_pages,
+		       struct page **pages, struct page *dummy_read_page,
+		       dma_addr_t *dma_addrs)
 {
-	struct nouveau_sgdma_be *nvbe = (struct nouveau_sgdma_be *)ttm;
+	struct nouveau_sgdma_be *nvbe = (struct nouveau_sgdma_be *)be;
+	struct drm_device *dev = nvbe->dev;
 
-	if (ttm) {
+	NV_DEBUG(nvbe->dev, "num_pages = %ld\n", num_pages);
+
+	if (nvbe->pages)
+		return -EINVAL;
+
+	nvbe->pages = kmalloc(sizeof(dma_addr_t) * num_pages, GFP_KERNEL);
+	if (!nvbe->pages)
+		return -ENOMEM;
+
+	nvbe->ttm_alloced = kmalloc(sizeof(bool) * num_pages, GFP_KERNEL);
+	if (!nvbe->ttm_alloced) {
+		kfree(nvbe->pages);
+		nvbe->pages = NULL;
+		return -ENOMEM;
+	}
+
+	nvbe->nr_pages = 0;
+	while (num_pages--) {
+		/* this code path isn't called and is incorrect anyways */
+		if (0) { /*dma_addrs[nvbe->nr_pages] != DMA_ERROR_CODE)*/
+			nvbe->pages[nvbe->nr_pages] =
+					dma_addrs[nvbe->nr_pages];
+		 	nvbe->ttm_alloced[nvbe->nr_pages] = true;
+		} else {
+			nvbe->pages[nvbe->nr_pages] =
+				pci_map_page(dev->pdev, pages[nvbe->nr_pages], 0,
+				     PAGE_SIZE, PCI_DMA_BIDIRECTIONAL);
+			if (pci_dma_mapping_error(dev->pdev,
+						  nvbe->pages[nvbe->nr_pages])) {
+				be->func->clear(be);
+				return -EFAULT;
+			}
+			nvbe->ttm_alloced[nvbe->nr_pages] = false;
+		}
+
+		nvbe->nr_pages++;
+	}
+
+	return 0;
+}
+
+static void
+nouveau_sgdma_clear(struct ttm_backend *be)
+{
+	struct nouveau_sgdma_be *nvbe = (struct nouveau_sgdma_be *)be;
+	struct drm_device *dev;
+
+	if (nvbe && nvbe->pages) {
+		dev = nvbe->dev;
+		NV_DEBUG(dev, "\n");
+
+		if (nvbe->bound)
+			be->func->unbind(be);
+
+		while (nvbe->nr_pages--) {
+			if (!nvbe->ttm_alloced[nvbe->nr_pages])
+				pci_unmap_page(dev->pdev, nvbe->pages[nvbe->nr_pages],
+				       PAGE_SIZE, PCI_DMA_BIDIRECTIONAL);
+		}
+		kfree(nvbe->pages);
+		kfree(nvbe->ttm_alloced);
+		nvbe->pages = NULL;
+		nvbe->ttm_alloced = NULL;
+		nvbe->nr_pages = 0;
+	}
+}
+
+static void
+nouveau_sgdma_destroy(struct ttm_backend *be)
+{
+	struct nouveau_sgdma_be *nvbe = (struct nouveau_sgdma_be *)be;
+
+	if (be) {
 		NV_DEBUG(nvbe->dev, "\n");
-		ttm_dma_tt_fini(&nvbe->ttm);
-		kfree(nvbe);
+
+		if (nvbe) {
+			if (nvbe->pages)
+				be->func->clear(be);
+			kfree(nvbe);
+		}
 	}
 }
 
 static int
-nv04_sgdma_bind(struct ttm_tt *ttm, struct ttm_mem_reg *mem)
+nv04_sgdma_bind(struct ttm_backend *be, struct ttm_mem_reg *mem)
 {
-	struct nouveau_sgdma_be *nvbe = (struct nouveau_sgdma_be *)ttm;
+	struct nouveau_sgdma_be *nvbe = (struct nouveau_sgdma_be *)be;
 	struct drm_device *dev = nvbe->dev;
 	struct drm_nouveau_private *dev_priv = dev->dev_private;
 	struct nouveau_gpuobj *gpuobj = dev_priv->gart_info.sg_ctxdma;
@@ -41,23 +123,24 @@ nv04_sgdma_bind(struct ttm_tt *ttm, struct ttm_mem_reg *mem)
 
 	nvbe->offset = mem->start << PAGE_SHIFT;
 	pte = (nvbe->offset >> NV_CTXDMA_PAGE_SHIFT) + 2;
-	for (i = 0; i < ttm->num_pages; i++) {
-		dma_addr_t dma_offset = nvbe->ttm.dma_address[i];
+	for (i = 0; i < nvbe->nr_pages; i++) {
+		dma_addr_t dma_offset = nvbe->pages[i];
 		uint32_t offset_l = lower_32_bits(dma_offset);
 
 		for (j = 0; j < PAGE_SIZE / NV_CTXDMA_PAGE_SIZE; j++, pte++) {
 			nv_wo32(gpuobj, (pte * 4) + 0, offset_l | 3);
-			offset_l += NV_CTXDMA_PAGE_SIZE;
+			dma_offset += NV_CTXDMA_PAGE_SIZE;
 		}
 	}
 
+	nvbe->bound = true;
 	return 0;
 }
 
 static int
-nv04_sgdma_unbind(struct ttm_tt *ttm)
+nv04_sgdma_unbind(struct ttm_backend *be)
 {
-	struct nouveau_sgdma_be *nvbe = (struct nouveau_sgdma_be *)ttm;
+	struct nouveau_sgdma_be *nvbe = (struct nouveau_sgdma_be *)be;
 	struct drm_device *dev = nvbe->dev;
 	struct drm_nouveau_private *dev_priv = dev->dev_private;
 	struct nouveau_gpuobj *gpuobj = dev_priv->gart_info.sg_ctxdma;
@@ -65,19 +148,22 @@ nv04_sgdma_unbind(struct ttm_tt *ttm)
 
 	NV_DEBUG(dev, "\n");
 
-	if (ttm->state != tt_bound)
+	if (!nvbe->bound)
 		return 0;
 
 	pte = (nvbe->offset >> NV_CTXDMA_PAGE_SHIFT) + 2;
-	for (i = 0; i < ttm->num_pages; i++) {
+	for (i = 0; i < nvbe->nr_pages; i++) {
 		for (j = 0; j < PAGE_SIZE / NV_CTXDMA_PAGE_SIZE; j++, pte++)
 			nv_wo32(gpuobj, (pte * 4) + 0, 0x00000000);
 	}
 
+	nvbe->bound = false;
 	return 0;
 }
 
 static struct ttm_backend_func nv04_sgdma_backend = {
+	.populate		= nouveau_sgdma_populate,
+	.clear			= nouveau_sgdma_clear,
 	.bind			= nv04_sgdma_bind,
 	.unbind			= nv04_sgdma_unbind,
 	.destroy		= nouveau_sgdma_destroy
@@ -96,14 +182,14 @@ nv41_sgdma_flush(struct nouveau_sgdma_be *nvbe)
 }
 
 static int
-nv41_sgdma_bind(struct ttm_tt *ttm, struct ttm_mem_reg *mem)
+nv41_sgdma_bind(struct ttm_backend *be, struct ttm_mem_reg *mem)
 {
-	struct nouveau_sgdma_be *nvbe = (struct nouveau_sgdma_be *)ttm;
+	struct nouveau_sgdma_be *nvbe = (struct nouveau_sgdma_be *)be;
 	struct drm_nouveau_private *dev_priv = nvbe->dev->dev_private;
 	struct nouveau_gpuobj *pgt = dev_priv->gart_info.sg_ctxdma;
-	dma_addr_t *list = nvbe->ttm.dma_address;
+	dma_addr_t *list = nvbe->pages;
 	u32 pte = mem->start << 2;
-	u32 cnt = ttm->num_pages;
+	u32 cnt = nvbe->nr_pages;
 
 	nvbe->offset = mem->start << PAGE_SHIFT;
 
@@ -113,17 +199,18 @@ nv41_sgdma_bind(struct ttm_tt *ttm, struct ttm_mem_reg *mem)
 	}
 
 	nv41_sgdma_flush(nvbe);
+	nvbe->bound = true;
 	return 0;
 }
 
 static int
-nv41_sgdma_unbind(struct ttm_tt *ttm)
+nv41_sgdma_unbind(struct ttm_backend *be)
 {
-	struct nouveau_sgdma_be *nvbe = (struct nouveau_sgdma_be *)ttm;
+	struct nouveau_sgdma_be *nvbe = (struct nouveau_sgdma_be *)be;
 	struct drm_nouveau_private *dev_priv = nvbe->dev->dev_private;
 	struct nouveau_gpuobj *pgt = dev_priv->gart_info.sg_ctxdma;
 	u32 pte = (nvbe->offset >> 12) << 2;
-	u32 cnt = ttm->num_pages;
+	u32 cnt = nvbe->nr_pages;
 
 	while (cnt--) {
 		nv_wo32(pgt, pte, 0x00000000);
@@ -131,22 +218,24 @@ nv41_sgdma_unbind(struct ttm_tt *ttm)
 	}
 
 	nv41_sgdma_flush(nvbe);
+	nvbe->bound = false;
 	return 0;
 }
 
 static struct ttm_backend_func nv41_sgdma_backend = {
+	.populate		= nouveau_sgdma_populate,
+	.clear			= nouveau_sgdma_clear,
 	.bind			= nv41_sgdma_bind,
 	.unbind			= nv41_sgdma_unbind,
 	.destroy		= nouveau_sgdma_destroy
 };
 
 static void
-nv44_sgdma_flush(struct ttm_tt *ttm)
+nv44_sgdma_flush(struct nouveau_sgdma_be *nvbe)
 {
-	struct nouveau_sgdma_be *nvbe = (struct nouveau_sgdma_be *)ttm;
 	struct drm_device *dev = nvbe->dev;
 
-	nv_wr32(dev, 0x100814, (ttm->num_pages - 1) << 12);
+	nv_wr32(dev, 0x100814, (nvbe->nr_pages - 1) << 12);
 	nv_wr32(dev, 0x100808, nvbe->offset | 0x20);
 	if (!nv_wait(dev, 0x100808, 0x00000001, 0x00000001))
 		NV_ERROR(dev, "gart flush timeout: 0x%08x\n",
@@ -205,14 +294,14 @@ nv44_sgdma_fill(struct nouveau_gpuobj *pgt, dma_addr_t *list, u32 base, u32 cnt)
 }
 
 static int
-nv44_sgdma_bind(struct ttm_tt *ttm, struct ttm_mem_reg *mem)
+nv44_sgdma_bind(struct ttm_backend *be, struct ttm_mem_reg *mem)
 {
-	struct nouveau_sgdma_be *nvbe = (struct nouveau_sgdma_be *)ttm;
+	struct nouveau_sgdma_be *nvbe = (struct nouveau_sgdma_be *)be;
 	struct drm_nouveau_private *dev_priv = nvbe->dev->dev_private;
 	struct nouveau_gpuobj *pgt = dev_priv->gart_info.sg_ctxdma;
-	dma_addr_t *list = nvbe->ttm.dma_address;
+	dma_addr_t *list = nvbe->pages;
 	u32 pte = mem->start << 2, tmp[4];
-	u32 cnt = ttm->num_pages;
+	u32 cnt = nvbe->nr_pages;
 	int i;
 
 	nvbe->offset = mem->start << PAGE_SHIFT;
@@ -240,18 +329,19 @@ nv44_sgdma_bind(struct ttm_tt *ttm, struct ttm_mem_reg *mem)
 	if (cnt)
 		nv44_sgdma_fill(pgt, list, pte, cnt);
 
-	nv44_sgdma_flush(ttm);
+	nv44_sgdma_flush(nvbe);
+	nvbe->bound = true;
 	return 0;
 }
 
 static int
-nv44_sgdma_unbind(struct ttm_tt *ttm)
+nv44_sgdma_unbind(struct ttm_backend *be)
 {
-	struct nouveau_sgdma_be *nvbe = (struct nouveau_sgdma_be *)ttm;
+	struct nouveau_sgdma_be *nvbe = (struct nouveau_sgdma_be *)be;
 	struct drm_nouveau_private *dev_priv = nvbe->dev->dev_private;
 	struct nouveau_gpuobj *pgt = dev_priv->gart_info.sg_ctxdma;
 	u32 pte = (nvbe->offset >> 12) << 2;
-	u32 cnt = ttm->num_pages;
+	u32 cnt = nvbe->nr_pages;
 
 	if (pte & 0x0000000c) {
 		u32  max = 4 - ((pte >> 2) & 0x3);
@@ -273,47 +363,55 @@ nv44_sgdma_unbind(struct ttm_tt *ttm)
 	if (cnt)
 		nv44_sgdma_fill(pgt, NULL, pte, cnt);
 
-	nv44_sgdma_flush(ttm);
+	nv44_sgdma_flush(nvbe);
+	nvbe->bound = false;
 	return 0;
 }
 
 static struct ttm_backend_func nv44_sgdma_backend = {
+	.populate		= nouveau_sgdma_populate,
+	.clear			= nouveau_sgdma_clear,
 	.bind			= nv44_sgdma_bind,
 	.unbind			= nv44_sgdma_unbind,
 	.destroy		= nouveau_sgdma_destroy
 };
 
 static int
-nv50_sgdma_bind(struct ttm_tt *ttm, struct ttm_mem_reg *mem)
+nv50_sgdma_bind(struct ttm_backend *be, struct ttm_mem_reg *mem)
 {
-	struct nouveau_sgdma_be *nvbe = (struct nouveau_sgdma_be *)ttm;
+	struct nouveau_sgdma_be *nvbe = (struct nouveau_sgdma_be *)be;
 	struct nouveau_mem *node = mem->mm_node;
-
 	/* noop: bound in move_notify() */
-	node->pages = nvbe->ttm.dma_address;
+	node->pages = nvbe->pages;
+	nvbe->pages = (dma_addr_t *)node;
+	nvbe->bound = true;
 	return 0;
 }
 
 static int
-nv50_sgdma_unbind(struct ttm_tt *ttm)
+nv50_sgdma_unbind(struct ttm_backend *be)
 {
+	struct nouveau_sgdma_be *nvbe = (struct nouveau_sgdma_be *)be;
+	struct nouveau_mem *node = (struct nouveau_mem *)nvbe->pages;
 	/* noop: unbound in move_notify() */
+	nvbe->pages = node->pages;
+	node->pages = NULL;
+	nvbe->bound = false;
 	return 0;
 }
 
 static struct ttm_backend_func nv50_sgdma_backend = {
+	.populate		= nouveau_sgdma_populate,
+	.clear			= nouveau_sgdma_clear,
 	.bind			= nv50_sgdma_bind,
 	.unbind			= nv50_sgdma_unbind,
 	.destroy		= nouveau_sgdma_destroy
 };
 
-struct ttm_tt *
-nouveau_sgdma_create_ttm(struct ttm_bo_device *bdev,
-			 unsigned long size, uint32_t page_flags,
-			 struct page *dummy_read_page)
+struct ttm_backend *
+nouveau_sgdma_init_ttm(struct drm_device *dev)
 {
-	struct drm_nouveau_private *dev_priv = nouveau_bdev(bdev);
-	struct drm_device *dev = dev_priv->dev;
+	struct drm_nouveau_private *dev_priv = dev->dev_private;
 	struct nouveau_sgdma_be *nvbe;
 
 	nvbe = kzalloc(sizeof(*nvbe), GFP_KERNEL);
@@ -321,13 +419,9 @@ nouveau_sgdma_create_ttm(struct ttm_bo_device *bdev,
 		return NULL;
 
 	nvbe->dev = dev;
-	nvbe->ttm.ttm.func = dev_priv->gart_info.func;
 
-	if (ttm_dma_tt_init(&nvbe->ttm, bdev, size, page_flags, dummy_read_page)) {
-		kfree(nvbe);
-		return NULL;
-	}
-	return &nvbe->ttm.ttm;
+	nvbe->backend.func = dev_priv->gart_info.func;
+	return &nvbe->backend;
 }
 
 int
@@ -338,7 +432,7 @@ nouveau_sgdma_init(struct drm_device *dev)
 	u32 aper_size, align;
 	int ret;
 
-	if (dev_priv->card_type >= NV_40 && pci_is_pcie(dev->pdev))
+	if (dev_priv->card_type >= NV_40 && drm_pci_device_is_pcie(dev))
 		aper_size = 512 * 1024 * 1024;
 	else
 		aper_size = 64 * 1024 * 1024;
@@ -367,7 +461,7 @@ nouveau_sgdma_init(struct drm_device *dev)
 		dev_priv->gart_info.type = NOUVEAU_GART_HW;
 		dev_priv->gart_info.func = &nv50_sgdma_backend;
 	} else
-	if (0 && pci_is_pcie(dev->pdev) &&
+	if (0 && drm_pci_device_is_pcie(dev) &&
 	    dev_priv->chipset > 0x40 && dev_priv->chipset != 0x45) {
 		if (nv44_graph_class(dev)) {
 			dev_priv->gart_info.func = &nv44_sgdma_backend;

@@ -37,7 +37,6 @@ struct Si47xx_data {
 	struct device	*dev;
 };
 
-
 /* VNVS:28-OCT'09 : For testing FM tune and seek operation status */
 #define TEST_FM
 

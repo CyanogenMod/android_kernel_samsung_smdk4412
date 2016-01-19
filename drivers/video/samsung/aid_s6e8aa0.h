@@ -3,18 +3,26 @@
 
 #include "smart_dimming.h"
 
-#define aid_300nit_260nit_F8_1st	0x19
+#if defined(CONFIG_LCD_REVERSE)
+#define aid_300nit_190nit_F8_1st	0x3D
+#define aid_188nit_20nit_F8_1st	0x7D
+#else
+#define aid_300nit_190nit_F8_1st	0x19
+#define aid_188nit_20nit_F8_1st	0x59
+#endif
+
+#define aid_300nit_260nit_F8_1st	aid_300nit_190nit_F8_1st
 #define aid_300nit_260nit_F8_18th	0x04
-#define aid_250nit_190nit_F8_1st	0x19
+#define aid_250nit_190nit_F8_1st	aid_300nit_190nit_F8_1st
 #define aid_250nit_190nit_F8_18th	0x04
-#define aid_188nit_182nit_F8_1st	0x59
+#define aid_188nit_182nit_F8_1st	aid_188nit_20nit_F8_1st
 #define aid_188nit_F8_18th		0x0D
 #define aid_186nit_F8_18th		0x1A
 #define aid_184nit_F8_18th		0x27
 #define aid_182nit_F8_18th		0x34
 #define aid_180nit_110nit_F8_18th	0x42
-#define aid_180nit_110nit_F8_1st	0x59
-#define aid_100nit_20nit_F8_1st	0x59
+#define aid_180nit_110nit_F8_1st	aid_188nit_20nit_F8_1st
+#define aid_100nit_20nit_F8_1st	aid_188nit_20nit_F8_1st
 #define aid_108nit_F8_18th		0x38
 #define aid_106nit_F8_18th		0x2F
 #define aid_104nit_F8_18th		0x25

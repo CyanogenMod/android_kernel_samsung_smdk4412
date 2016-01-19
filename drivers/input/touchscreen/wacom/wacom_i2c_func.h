@@ -17,7 +17,7 @@
  *  Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
  */
 
- #ifndef _LINUX_WACOM_I2C_FUNC_H
+#ifndef _LINUX_WACOM_I2C_FUNC_H
 #define _LINUX_WACOM_I2C_FUNC_H
 
 #ifdef CONFIG_SEC_TOUCHSCREEN_DVFS_LOCK
@@ -47,7 +47,6 @@ extern int g_aveLevel_X[];
 extern int g_aveLevel_Y[];
 extern int g_aveLevel_Trs[];
 extern int g_aveLevel_Cor[];
-extern int g_aveShift;
 
 extern int wacom_i2c_send(struct wacom_i2c *wac_i2c,
 			  const char *buf, int count, bool mode);

@@ -34,9 +34,16 @@
 #include <linux/mfd/s5m87xx/s5m-core.h>
 #endif
 
+#if defined(CONFIG_SEC_GPIO_DVS)
+#include <linux/secgpio_dvs.h>
+#endif
 
 #ifdef CONFIG_REGULATOR_MAX77686
 /* max77686 */
+
+#ifdef CONFIG_EXYNOS_C2C
+static struct regulator_consumer_supply ldo2_supply[] = {};
+#endif
 
 #ifdef CONFIG_SND_SOC_WM8994
 static struct regulator_consumer_supply ldo3_supply[] = {
@@ -54,6 +61,10 @@ static struct regulator_consumer_supply ldo5_supply[] = {
 	REGULATOR_SUPPLY("vcc_1.8v", NULL),
 	REGULATOR_SUPPLY("touchkey", NULL),
 };
+
+#ifdef CONFIG_EXYNOS_C2C
+static struct regulator_consumer_supply ldo6_supply[] = {};
+#endif
 
 static struct regulator_consumer_supply ldo8_supply[] = {
 	REGULATOR_SUPPLY("vmipi_1.0v", NULL),
@@ -149,6 +160,12 @@ static struct regulator_consumer_supply max77686_buck4[] = {
 	REGULATOR_SUPPLY("vdd_g3d", "mali_dev.0"),
 };
 
+#ifdef CONFIG_EXYNOS_C2C
+static struct regulator_consumer_supply max77686_buck5[] = {
+	REGULATOR_SUPPLY("vm1m2", NULL),
+};
+#endif
+
 static struct regulator_consumer_supply max77686_buck9 =
 	REGULATOR_SUPPLY("cam_isp_core_1.2v", NULL);
 
@@ -177,9 +194,15 @@ static struct regulator_consumer_supply max77686_enp32khz[] = {
 		.consumer_supplies = &_ldo##_supply[0],			\
 	};
 
+#ifdef CONFIG_EXYNOS_C2C
+REGULATOR_INIT(ldo2, "VMEM_1.2V_AP", 1200000, 1200000, 1, 0, 0);
+#endif
 REGULATOR_INIT(ldo3, "VCC_1.8V_AP", 1800000, 1800000, 1, 0, 0);
 REGULATOR_INIT(ldo5, "VCC_1.8V_IO", 1800000, 1800000, 0,
 	       REGULATOR_CHANGE_STATUS, 1);
+#ifdef CONFIG_EXYNOS_C2C
+REGULATOR_INIT(ldo6, "VMPLL_1.0V_AP", 1000000, 1000000, 1, 0, 0);
+#endif
 REGULATOR_INIT(ldo8, "VMIPI_1.0V", 1000000, 1000000, 1,
 	       REGULATOR_CHANGE_STATUS, 0);
 REGULATOR_INIT(ldo9, "CAM_ISP_MIPI_1.2V", 1200000, 1200000, 0,
@@ -274,6 +297,21 @@ static struct regulator_init_data max77686_buck4_data = {
 	.consumer_supplies = max77686_buck4,
 };
 
+#ifdef CONFIG_EXYNOS_C2C
+static struct regulator_init_data max77686_buck5_data = {
+	.constraints = {
+		.name = "vm1m2 range",
+		.min_uV = 1200000,
+		.max_uV = 1200000,
+		.always_on = 1,
+		.boot_on = 1,
+		.valid_ops_mask = REGULATOR_CHANGE_VOLTAGE,
+	},
+	.num_consumer_supplies = ARRAY_SIZE(max77686_buck5),
+	.consumer_supplies = max77686_buck5,
+};
+#endif
+
 static struct regulator_init_data max77686_buck9_data = {
 	.constraints = {
 		.name = "CAM_ISP_CORE_1.2V",
@@ -308,9 +346,18 @@ static struct max77686_regulator_data max77686_regulators[] = {
 	{MAX77686_BUCK2, &max77686_buck2_data,},
 	{MAX77686_BUCK3, &max77686_buck3_data,},
 	{MAX77686_BUCK4, &max77686_buck4_data,},
+#ifdef CONFIG_EXYNOS_C2C
+	{MAX77686_BUCK5, &max77686_buck5_data,},
+#endif
 	{MAX77686_BUCK9, &max77686_buck9_data,},
+#ifdef CONFIG_EXYNOS_C2C
+	{MAX77686_LDO2, &ldo2_init_data,},
+#endif
 	{MAX77686_LDO3, &ldo3_init_data,},
 	{MAX77686_LDO5, &ldo5_init_data,},
+#ifdef CONFIG_EXYNOS_C2C
+	{MAX77686_LDO6, &ldo6_init_data,},
+#endif
 	{MAX77686_LDO8, &ldo8_init_data,},
 	{MAX77686_LDO9, &ldo9_init_data,},
 	{MAX77686_LDO10, &ldo10_init_data,},
@@ -331,6 +378,9 @@ static struct max77686_regulator_data max77686_regulators[] = {
 
 struct max77686_opmode_data max77686_opmode_data[MAX77686_REG_MAX] = {
 	[MAX77686_LDO3] = {MAX77686_LDO3, MAX77686_OPMODE_NORMAL},
+#ifdef CONFIG_EXYNOS_C2C
+	[MAX77686_LDO6] = {MAX77686_LDO6, MAX77686_OPMODE_NORMAL},
+#endif
 	[MAX77686_LDO8] = {MAX77686_LDO8, MAX77686_OPMODE_STANDBY},
 	[MAX77686_LDO10] = {MAX77686_LDO10, MAX77686_OPMODE_STANDBY},
 	[MAX77686_LDO11] = {MAX77686_LDO11, MAX77686_OPMODE_STANDBY},
@@ -340,10 +390,17 @@ struct max77686_opmode_data max77686_opmode_data[MAX77686_REG_MAX] = {
 #if defined(CONFIG_MACH_T0_CHN_CTC)
 	[MAX77686_LDO17] = {MAX77686_LDO17, MAX77686_OPMODE_NORMAL},
 #endif
+#ifdef CONFIG_EXYNOS_C2C
+	[MAX77686_BUCK1] = {MAX77686_BUCK1, MAX77686_OPMODE_NORMAL},
+#else
 	[MAX77686_BUCK1] = {MAX77686_BUCK1, MAX77686_OPMODE_STANDBY},
+#endif
 	[MAX77686_BUCK2] = {MAX77686_BUCK2, MAX77686_OPMODE_STANDBY},
 	[MAX77686_BUCK3] = {MAX77686_BUCK3, MAX77686_OPMODE_STANDBY},
 	[MAX77686_BUCK4] = {MAX77686_BUCK4, MAX77686_OPMODE_STANDBY},
+#ifdef CONFIG_EXYNOS_C2C
+	[MAX77686_BUCK5] = {MAX77686_BUCK5, MAX77686_OPMODE_NORMAL},
+#endif
 };
 
 struct max77686_platform_data exynos4_max77686_info = {
@@ -821,4 +878,12 @@ struct s5m_platform_data exynos4_s5m8767_info = {
 void midas_power_init(void)
 {
 	printk(KERN_INFO "%s\n", __func__);
+#if defined(CONFIG_SEC_GPIO_DVS)
+	/************************ Caution !!! ****************************/
+	/* This function must be located in an appropriate position for INIT state
+	 * in accordance with the specification of each BB vendor.
+	 */
+	/************************ Caution !!! ****************************/
+	gpio_dvs_check_initgpio();
+#endif
 }

@@ -15,7 +15,7 @@
 #include <plat/system-reset.h>
 #include <plat/watchdog-reset.h>
 
-#ifdef CONFIG_MACH_P4NOTE
+#if defined(CONFIG_MACH_P4NOTE) || defined(CONFIG_MACH_SP7160LTE) || defined(CONFIG_MACH_TAB3)
 #include <mach/regs-pmu.h>
 static void exynos_sw_reset(void)
 {
@@ -36,7 +36,7 @@ void arch_reset(char mode, const char *cmd)
 
 	if (s5p_reset_hook)
 		s5p_reset_hook();
-#ifdef CONFIG_MACH_P4NOTE
+#if defined(CONFIG_MACH_P4NOTE) || defined(CONFIG_MACH_SP7160LTE) || defined(CONFIG_MACH_TAB3)
 	else
 		exynos_sw_reset();
 #endif

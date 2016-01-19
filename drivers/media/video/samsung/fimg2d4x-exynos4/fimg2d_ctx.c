@@ -227,7 +227,10 @@ static int fimg2d_check_dma_sync(struct fimg2d_bltcmd *cmd)
 
 		/* check pagetable */
 		if (img->addr.type == ADDR_USER) {
-			pt = fimg2d_check_pagetable(mm, c->addr, c->size);
+			if (i == IMAGE_DST)
+				pt = fimg2d_check_out_pagetable(mm, c->addr, c->size);
+			else
+				pt = fimg2d_check_in_pagetable(mm, c->addr, c->size);
 			if (pt == PT_FAULT)
 				return -1;
 		} else if (img->addr.type == ADDR_USER_CONTIG) {

@@ -58,30 +58,25 @@
 #define NUM_SNAPSHOT_HDR_CHUNKS 1
 
 struct disk_header {
-	__le32 magic;
+	uint32_t magic;
 
 	/*
 	 * Is this snapshot valid.  There is no way of recovering
 	 * an invalid snapshot.
 	 */
-	__le32 valid;
+	uint32_t valid;
 
 	/*
 	 * Simple, incrementing version. no backward
 	 * compatibility.
 	 */
-	__le32 version;
+	uint32_t version;
 
 	/* In sectors */
-	__le32 chunk_size;
-} __packed;
+	uint32_t chunk_size;
+};
 
 struct disk_exception {
-	__le64 old_chunk;
-	__le64 new_chunk;
-} __packed;
-
-struct core_exception {
 	uint64_t old_chunk;
 	uint64_t new_chunk;
 };
@@ -401,32 +396,32 @@ static struct disk_exception *get_exception(struct pstore *ps, uint32_t index)
 }
 
 static void read_exception(struct pstore *ps,
-			   uint32_t index, struct core_exception *result)
+			   uint32_t index, struct disk_exception *result)
 {
-	struct disk_exception *de = get_exception(ps, index);
+	struct disk_exception *e = get_exception(ps, index);
 
 	/* copy it */
-	result->old_chunk = le64_to_cpu(de->old_chunk);
-	result->new_chunk = le64_to_cpu(de->new_chunk);
+	result->old_chunk = le64_to_cpu(e->old_chunk);
+	result->new_chunk = le64_to_cpu(e->new_chunk);
 }
 
 static void write_exception(struct pstore *ps,
-			    uint32_t index, struct core_exception *e)
+			    uint32_t index, struct disk_exception *de)
 {
-	struct disk_exception *de = get_exception(ps, index);
+	struct disk_exception *e = get_exception(ps, index);
 
 	/* copy it */
-	de->old_chunk = cpu_to_le64(e->old_chunk);
-	de->new_chunk = cpu_to_le64(e->new_chunk);
+	e->old_chunk = cpu_to_le64(de->old_chunk);
+	e->new_chunk = cpu_to_le64(de->new_chunk);
 }
 
 static void clear_exception(struct pstore *ps, uint32_t index)
 {
-	struct disk_exception *de = get_exception(ps, index);
+	struct disk_exception *e = get_exception(ps, index);
 
 	/* clear it */
-	de->old_chunk = 0;
-	de->new_chunk = 0;
+	e->old_chunk = 0;
+	e->new_chunk = 0;
 }
 
 /*
@@ -442,13 +437,13 @@ static int insert_exceptions(struct pstore *ps,
 {
 	int r;
 	unsigned int i;
-	struct core_exception e;
+	struct disk_exception de;
 
 	/* presume the area is full */
 	*full = 1;
 
 	for (i = 0; i < ps->exceptions_per_area; i++) {
-		read_exception(ps, i, &e);
+		read_exception(ps, i, &de);
 
 		/*
 		 * If the new_chunk is pointing at the start of
@@ -456,7 +451,7 @@ static int insert_exceptions(struct pstore *ps,
 		 * is we know that we've hit the end of the
 		 * exceptions.  Therefore the area is not full.
 		 */
-		if (e.new_chunk == 0LL) {
+		if (de.new_chunk == 0LL) {
 			ps->current_committed = i;
 			*full = 0;
 			break;
@@ -465,13 +460,13 @@ static int insert_exceptions(struct pstore *ps,
 		/*
 		 * Keep track of the start of the free chunks.
 		 */
-		if (ps->next_free <= e.new_chunk)
-			ps->next_free = e.new_chunk + 1;
+		if (ps->next_free <= de.new_chunk)
+			ps->next_free = de.new_chunk + 1;
 
 		/*
 		 * Otherwise we add the exception to the snapshot.
 		 */
-		r = callback(callback_context, e.old_chunk, e.new_chunk);
+		r = callback(callback_context, de.old_chunk, de.new_chunk);
 		if (r)
 			return r;
 	}
@@ -646,12 +641,12 @@ static void persistent_commit_exception(struct dm_exception_store *store,
 {
 	unsigned int i;
 	struct pstore *ps = get_info(store);
-	struct core_exception ce;
+	struct disk_exception de;
 	struct commit_callback *cb;
 
-	ce.old_chunk = e->old_chunk;
-	ce.new_chunk = e->new_chunk;
-	write_exception(ps, ps->current_committed++, &ce);
+	de.old_chunk = e->old_chunk;
+	de.new_chunk = e->new_chunk;
+	write_exception(ps, ps->current_committed++, &de);
 
 	/*
 	 * Add the callback to the back of the array.  This code
@@ -706,7 +701,7 @@ static int persistent_prepare_merge(struct dm_exception_store *store,
 				    chunk_t *last_new_chunk)
 {
 	struct pstore *ps = get_info(store);
-	struct core_exception ce;
+	struct disk_exception de;
 	int nr_consecutive;
 	int r;
 
@@ -727,9 +722,9 @@ static int persistent_prepare_merge(struct dm_exception_store *store,
 		ps->current_committed = ps->exceptions_per_area;
 	}
 
-	read_exception(ps, ps->current_committed - 1, &ce);
-	*last_old_chunk = ce.old_chunk;
-	*last_new_chunk = ce.new_chunk;
+	read_exception(ps, ps->current_committed - 1, &de);
+	*last_old_chunk = de.old_chunk;
+	*last_new_chunk = de.new_chunk;
 
 	/*
 	 * Find number of consecutive chunks within the current area,
@@ -738,9 +733,9 @@ static int persistent_prepare_merge(struct dm_exception_store *store,
 	for (nr_consecutive = 1; nr_consecutive < ps->current_committed;
 	     nr_consecutive++) {
 		read_exception(ps, ps->current_committed - 1 - nr_consecutive,
-			       &ce);
-		if (ce.old_chunk != *last_old_chunk - nr_consecutive ||
-		    ce.new_chunk != *last_new_chunk - nr_consecutive)
+			       &de);
+		if (de.old_chunk != *last_old_chunk - nr_consecutive ||
+		    de.new_chunk != *last_new_chunk - nr_consecutive)
 			break;
 	}
 

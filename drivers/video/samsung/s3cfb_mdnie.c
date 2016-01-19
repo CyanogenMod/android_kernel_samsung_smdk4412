@@ -11,20 +11,23 @@
 */
 
 
+#include <plat/regs-fb-s5p.h>
+#include <mach/map.h>
+
 #include "s3cfb.h"
 #include "s3cfb_ielcd.h"
 #include "s3cfb_mdnie.h"
 #include "mdnie.h"
 
+#define FIMD_REG_BASE			S5P_PA_FIMD0
+#define FIMD_MAP_SIZE			SZ_32K
 
-#define s3c_mdnie_readl(addr)			__raw_readl((s3c_mdnie_base + addr))
-#define s3c_mdnie_writel(addr, val)		__raw_writel(val, (s3c_mdnie_base + addr))
-#define s3c_mdnie_write(addr, val)		__raw_writel(val, (s3c_mdnie_base + addr*4))
-
-
+static void __iomem *fimd_reg;
 static struct resource *s3c_mdnie_mem;
 static void __iomem *s3c_mdnie_base;
 
+#define s3c_mdnie_read(addr)		readl(s3c_mdnie_base + addr*4)
+#define s3c_mdnie_write(addr, val)	writel(val, s3c_mdnie_base + addr*4)
 
 int mdnie_write(unsigned int addr, unsigned int val)
 {
@@ -33,122 +36,93 @@ int mdnie_write(unsigned int addr, unsigned int val)
 	return 0;
 }
 
-/* should be fixed with arch */
-#if defined(CONFIG_CPU_EXYNOS4210)
-int s3c_mdnie_mask(void)
+int mdnie_mask(void)
 {
-	s3c_mdnie_writel(S3C_MDNIE_rR40, 0x27);
+	s3c_mdnie_write(MDNIE_REG_MASK, 0x9FFF);
 
 	return 0;
 }
 
-int s3c_mdnie_unmask(void)
+int mdnie_unmask(void)
 {
-	s3c_mdnie_writel(S3C_MDNIE_rR40, 0x0);
+	s3c_mdnie_write(MDNIE_REG_MASK, 0);
 
 	return 0;
 }
 
-int s3c_mdnie_set_size(unsigned int hsize, unsigned int vsize)
+static int mdnie_hw_init(void)
 {
-	unsigned int size;
+	s3c_mdnie_mem = request_mem_region(S3C_MDNIE_PHY_BASE, S3C_MDNIE_MAP_SIZE, "mdnie");
+	if (IS_ERR_OR_NULL(s3c_mdnie_mem)) {
+		pr_err("%s: fail to request_mem_region\n", __func__);
+		return -ENOENT;
+	}
 
-	size = s3c_mdnie_readl(S3C_MDNIE_rR34);
-	size &= ~S3C_MDNIE_SIZE_MASK;
-	size |= hsize;
-	s3c_mdnie_writel(S3C_MDNIE_rR34, size);
+	s3c_mdnie_base = ioremap(S3C_MDNIE_PHY_BASE, S3C_MDNIE_MAP_SIZE);
+	if (IS_ERR_OR_NULL(s3c_mdnie_base)) {
+		pr_err("%s: fail to ioremap\n", __func__);
+		return -ENOENT;
+	}
 
-	size = s3c_mdnie_readl(S3C_MDNIE_rR35);
-	size &= ~S3C_MDNIE_SIZE_MASK;
-	size |= vsize;
-	s3c_mdnie_writel(S3C_MDNIE_rR35, size);
-
-	s3c_mdnie_unmask();
+	fimd_reg = ioremap(FIMD_REG_BASE, FIMD_MAP_SIZE);
+	if (fimd_reg == NULL) {
+		pr_err("%s: fail to ioremap - fimd\n", __func__);
+		return -ENOENT;
+	}
 
 	return 0;
 }
-#else
-int s3c_mdnie_mask(void)
+
+static void get_lcd_size(unsigned int *xres, unsigned int *yres)
 {
-#if 0
-	unsigned int mask;
-	mask = s3c_mdnie_readl(S3C_MDNIE_rR1);
-	mask |= S3C_MDNIE_REG_MASK;
-	s3c_mdnie_writel(S3C_MDNIE_rR1, mask);
-#endif
-	return 0;
+	unsigned int cfg;
+	void __iomem *base_reg = fimd_reg;
+
+	cfg = readl(base_reg + S3C_VIDTCON2);
+	*xres = ((cfg & S3C_VIDTCON2_HOZVAL_MASK) >> S3C_VIDTCON2_HOZVAL_SHIFT) + 1;
+	*yres = ((cfg & S3C_VIDTCON2_LINEVAL_MASK) >> S3C_VIDTCON2_LINEVAL_SHIFT) + 1;
 }
 
-int s3c_mdnie_unmask(void)
+static int mdnie_set_size(void)
 {
-#if 0
-	unsigned int mask;
-	mask = s3c_mdnie_readl(S3C_MDNIE_rR1);
-	mask &= ~S3C_MDNIE_REG_MASK;
-	s3c_mdnie_writel(S3C_MDNIE_rR1, mask);
-#endif
-	return 0;
-}
+	unsigned int cfg, xres, yres;
 
-int s3c_mdnie_set_size(unsigned int hsize, unsigned int vsize)
-{
-	unsigned int size;
+	get_lcd_size(&xres, &yres);
 
-	/* Bank0 Select */
-	s3c_mdnie_writel(S3C_MDNIE_rR0, 0x0);
+	/* Bank0 Select : DO NOT REMOVE THIS LINE */
+	s3c_mdnie_write(MDNIE_REG_BANK_SEL, 0);
 
+#if defined(CONFIG_CPU_EXYNOS4212) || defined(CONFIG_CPU_EXYNOS4412)
 	/* Input Data Unmask */
-	s3c_mdnie_writel(S3C_MDNIE_rR1, 0x077);
+	cfg = s3c_mdnie_read(S3C_MDNIE_rR1);
+	cfg &= ~S3C_MDNIE_INPUT_DATA_ENABLE;
+	s3c_mdnie_write(S3C_MDNIE_rR1, cfg);
+#endif
 
 	/* LCD width */
-	size = s3c_mdnie_readl(S3C_MDNIE_rR3);
-	size &= ~S3C_MDNIE_SIZE_MASK;
-	size |= hsize;
-	s3c_mdnie_writel(S3C_MDNIE_rR3, size);
+	cfg = s3c_mdnie_read(MDNIE_REG_WIDTH);
+	cfg &= ~S3C_MDNIE_SIZE_MASK;
+	cfg |= S3C_MDNIE_HSIZE(xres);
+	s3c_mdnie_write(MDNIE_REG_WIDTH, cfg);
 
 	/* LCD height */
-	size = s3c_mdnie_readl(S3C_MDNIE_rR4);
-	size &= ~S3C_MDNIE_SIZE_MASK;
-	size |= vsize;
-	s3c_mdnie_writel(S3C_MDNIE_rR4, size);
+	cfg = s3c_mdnie_read(MDNIE_REG_HEIGHT);
+	cfg &= ~S3C_MDNIE_SIZE_MASK;
+	cfg |= S3C_MDNIE_VSIZE(yres);
+	s3c_mdnie_write(MDNIE_REG_HEIGHT, cfg);
 
-	/* unmask all */
-	s3c_mdnie_writel(S3C_MDNIE_rR28, 0);
-
-	return 0;
-}
-#endif
-
-int s3c_mdnie_select_mode(int algo, int mcm, int lpa)
-{
-	s3c_mdnie_writel(S3C_MDNIE_rR1, 0x0000);
-	s3c_mdnie_writel(S3C_MDNIE_rR36, 0x0000);
-	s3c_mdnie_writel(S3C_MDNIE_rR37, 0x0FFF);
-	s3c_mdnie_writel(S3C_MDNIE_rR38, 0x005c);
-
-	s3c_mdnie_writel(S3C_MDNIE_rR39, 0x0ff0);
-	s3c_mdnie_writel(S3C_MDNIE_rR43, 0x0064);
-	s3c_mdnie_writel(S3C_MDNIE_rR45, 0x0364);
+	mdnie_unmask();
 
 	return 0;
 }
 
-int s3c_mdnie_init_global(struct s3cfb_global *s3cfb_ctrl)
+int mdnie_display_on(void)
 {
-	s3c_mdnie_set_size(s3cfb_ctrl->lcd->width, s3cfb_ctrl->lcd->height);
+	mdnie_set_size();
 
-	/* mDNIe_Set_Mode(current_mDNIe_UI, current_mDNIe_OutDoor_OnOff); */
-	/* set_mdnie_value(g_mdnie); */
+	ielcd_init_global();
 
-	s3c_ielcd_logic_start();
-	s3c_ielcd_init_global(s3cfb_ctrl);
-
-	return 0;
-}
-
-int s3c_mdnie_display_on(struct s3cfb_global *ctrl)
-{
-	s3c_ielcd_display_on();
+	ielcd_display_on();
 
 	if (!IS_ERR_OR_NULL(g_mdnie))
 		g_mdnie->enable = TRUE;
@@ -156,49 +130,18 @@ int s3c_mdnie_display_on(struct s3cfb_global *ctrl)
 	return 0;
 }
 
-int s3c_mdnie_display_off(void)
+int mdnie_display_off(void)
 {
 	if (!IS_ERR_OR_NULL(g_mdnie))
 		g_mdnie->enable = FALSE;
 
-	return s3c_ielcd_display_off();
+	return ielcd_display_off();
 }
 
-int s3c_mdnie_off(void)
+void mdnie_setup(void)
 {
-	if (!IS_ERR_OR_NULL(g_mdnie))
-		g_mdnie->enable = FALSE;
-
-	s3c_ielcd_logic_stop();
-
-	return 0;
-}
-
-int s3c_mdnie_hw_init(void)
-{
-	s3c_mdnie_mem = request_mem_region(S3C_MDNIE_PHY_BASE, S3C_MDNIE_MAP_SIZE, "mdnie");
-	if (s3c_mdnie_mem == NULL) {
-		printk(KERN_ERR "mDNIe failed to reserved memory region\n");
-		return -ENOENT;
-	}
-
-	s3c_mdnie_base = ioremap(S3C_MDNIE_PHY_BASE, S3C_MDNIE_MAP_SIZE);
-	if (s3c_mdnie_base == NULL) {
-		printk(KERN_ERR "mDNIe failed ioremap\n");
-		return -ENOENT;
-	}
-
-	/* printk(KERN_INFO "%s : 0x%p\n", __func__, s3c_mdnie_base); */
-
-	return 0;
-}
-
-int s3c_mdnie_setup(void)
-{
-	s3c_mdnie_hw_init();
-	s3c_ielcd_hw_init();
-
-	return 0;
+	mdnie_hw_init();
+	ielcd_hw_init();
 }
 
 MODULE_DESCRIPTION("EXYNOS mDNIe Device Driver");

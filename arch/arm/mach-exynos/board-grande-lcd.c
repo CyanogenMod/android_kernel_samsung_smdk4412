@@ -38,11 +38,7 @@
 #include <mach/mipi_ddi.h>
 #include <mach/dsim.h>
 #endif
-#if defined(CONFIG_S5P_DSIM_SWITCHABLE_DUAL_LCD)
-#include <../../../drivers/video/samsung_duallcd/s3cfb.h>
-#else
-#include <../../../drivers/video/samsung/s3cfb.h>
-#endif
+
 
 #ifdef CONFIG_FB_S5P_MDNIE
 #include <linux/mdnie.h>

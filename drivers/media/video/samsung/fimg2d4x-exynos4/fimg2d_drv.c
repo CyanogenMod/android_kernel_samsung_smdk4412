@@ -230,7 +230,11 @@ static long fimg2d_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 
 #ifdef CONFIG_BUSFREQ_OPP
 #if defined(CONFIG_CPU_EXYNOS4212) || defined(CONFIG_CPU_EXYNOS4412)
+#if defined(CONFIG_BUSFREQ_ELEVATION)
+			dev_lock(info->bus_dev, info->dev, 267160);
+#else
 			dev_lock(info->bus_dev, info->dev, 160160);
+#endif
 #endif
 #endif
 		if ((blit.dst) && (dst.addr.type == ADDR_USER)

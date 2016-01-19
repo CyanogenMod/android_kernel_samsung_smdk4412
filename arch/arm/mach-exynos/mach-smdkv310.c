@@ -83,6 +83,7 @@
 #ifdef CONFIG_S3C64XX_DEV_SPI
 #include <plat/s3c64xx-spi.h>
 #endif
+#include <plat/fb-s5p.h>
 
 #include <mach/map.h>
 #include <mach/media.h>
@@ -112,7 +113,6 @@
 #if defined(CONFIG_FB_S5P_MIPI_DSIM)
 #include <mach/mipi_ddi.h>
 #include <mach/dsim.h>
-#include <../../../drivers/video/samsung/s3cfb.h>
 #endif
 
 /* Following are default values for UCON, ULCON and UFCON UART registers */

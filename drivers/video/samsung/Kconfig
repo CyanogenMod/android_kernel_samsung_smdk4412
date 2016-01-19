@@ -38,23 +38,10 @@ config FB_S5P_VSYNC_THREAD
 	bool "S5P Framebuffer vsync thread"
 	depends on FB_S5P
 
-config FB_S5P_VSYNC_SEND_UEVENTS
-	bool "S5P Framebuffer vsync uevents"
-	depends on FB_S5P_VSYNC_THREAD
-	default n
-	help
-	  Some hwcomposer implementations support vsync hinting via uevents to userspace
-	  However this also wakes up many other parts of Android, draining battery.
-	  ICS hwcomposer does not support any form of sync, so these uevents should be
-	  optional and only sent to HWC implementations that expect uevents to be sent
-
 config FB_S5P_VSYNC_SYSFS
-    bool "S5P Framebuffer vsync via sysfs"
-    depends on FB_S5P_VSYNC_THREAD
-    default n
-    help
-    A more efficient method of passing vsync to userspace that doesn't
-    broadcast uevents.
+	bool "S5P Framebuffer vsync via sysfs"
+	depends on FB_S5P_VSYNC_THREAD
+	default y
 
 config FB_S5P_TRACE_UNDERRUN
 	bool "S5P Framebuffer FIFO underrun trace"
@@ -116,6 +103,12 @@ config FB_MDNIE_PWM
 	default "0"
 	---help---
 	This enables support for Samsung MDNIE feature
+
+config FB_EBOOK_PANEL_SCENARIO
+	bool "Samsung EBOOK PANEL SCENARIO"
+	depends on FB_S5P
+	depends on FB_S5P_MDNIE
+	default n
 
 config FB_S5P_MIPI_DSIM
 	bool "Samsung MIPI DSIM"
@@ -279,7 +272,32 @@ config FB_S5P_NT71391
 	---help---
 	  This enables support for Novatek NT71391 MIPI LCD
 
+config FB_S5P_S6D7AA0
+	bool "S6D7AA0 MIPI LCD"
+	depends on FB_S5P_MIPI_DSIM
+	---help---
+	  This enables support for Samsung S6D7AA0 MIPI LCD
+
+config FB_S5P_S6E88A0
+	bool "S6E88A0 MIPI LCD"
+	depends on FB_S5P_MIPI_DSIM
+	---help---
+	  This enables support for Samsung S6E88A0 MIPI LCD
+
+config FB_S5P_HX8369B
+	bool "HX8369B MIPI LCD"
+	depends on FB_S5P_MIPI_DSIM
+	---help---
+	  This enables support for Samsung HX8369B MIPI LCD
+
 endchoice
+
+config FB_S5P_GD2EVF
+	bool "GD2EVF"
+	depends on MACH_GD2
+	default n
+	help
+	  This enables support for Samsung GD2EVF LCD panel	
 
 choice
 	prompt "Select PANEL Type"
@@ -296,6 +314,10 @@ config S6E8AA0_AMS480GYXX
 	---help---
 	This enables support for Samsung S6E8AA0 AMS480GYXX(M0) PANEL
 
+config S6E8AA0_AMS465XX
+	bool "AMS465XX(Superior)"
+	---help---
+	This enables support for Samsung S6E8AA0 AMS465XX(Superior) PANEL
 endchoice
 
 config AID_DIMMING
@@ -304,6 +326,11 @@ config AID_DIMMING
        default n
        ---help---
          This enables support for Samsung S6E8AA0 MIPI LCD AID DIMMING
+
+config LCD_REVERSE
+       bool "LCD REVERSE"
+       depends on FB_S5P_S6E8AA0
+       default n
 
 config LCD_FREQ_SWITCH
        bool "support for LCD Frequency switch"
@@ -357,4 +384,20 @@ config FB_S5P_V2_TL2796
 	bool "TL2796"
 	---help---
 	  This enables support for Samsung  TL2796 WVGA LCD panel
+endchoice
+
+choice
+	prompt "Select S6D7AA0 PANEL Type"
+	depends on FB_S5P_S6D7AA0
+	default S6D7AA0_BP070WX1
+
+config S6D7AA0_BP070WX1
+	bool "BP070WX1 (Santos7)"
+	---help---
+	This enables support for Samsung S6D7AA BP070WX1(Santos7) PANEL
+
+config S6D7AA0_LSL080AL02
+	bool "LSL080AL02 (LT01)"
+	---help---
+	This enables support for Samsung S6D7AA LSL080AL02(LT01) PANEL
 endchoice

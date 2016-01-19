@@ -157,7 +157,7 @@ int usb_control_msg(struct usb_device *dev, unsigned int pipe, __u8 request,
 	 * timeout. we can get the cp dump after dpm resume.
 	 * portnum 2 is HSIC phy0 for CP.
 	 */
-	limit_timeout = (dev->portnum == 2) ? min(timeout, 1500) : timeout;
+	limit_timeout = (dev->portnum == 2) ? min(timeout,500) : timeout;
 
 	/* pr_debug("%s: dev=%s, portnum=%d, timeout=%d\n", __func__,
 		dev_name(&dev->dev), dev->portnum, limit_timeout); */

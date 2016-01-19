@@ -263,6 +263,8 @@
 #define WINCON1_BPPMODE_24BPP_A1887		(0xc << 2)
 #define WINCON1_BPPMODE_25BPP_A1888		(0xd << 2)
 #define WINCON1_BPPMODE_28BPP_A4888		(0xd << 2)
+#define WINCON1_BPPMODE_13BPP_A1444		(0xe << 2)
+#define WINCON1_BPPMODE_16BPP_A4444		(0xe << 2)
 
 /* S5PV210 */
 #define SHADOWCON				(0x34)
@@ -295,6 +297,22 @@
 #define VIDOSDxB_BOTRIGHT_Y_SHIFT		(0)
 #define VIDOSDxB_BOTRIGHT_Y_LIMIT		(0x7ff)
 #define VIDOSDxB_BOTRIGHT_Y(_x)			(((_x) & 0x7ff) << 0)
+
+/* alpha when !win->variant.has_osd_alpha */
+#define VIDWxALPHAx_R(_x)			(((_x) & 0xFF) << 16)
+#define VIDWxALPHAx_G(_x)			(((_x) & 0xFF) << 8)
+#define VIDWxALPHAx_B(_x)			(((_x) & 0xFF) << 0)
+
+/* alpha when win->variant.has_osd_alpha */
+#define VIDOSDxC_ALPHA0_R_H(_x)			(((_x) & 0xF0) << 16)
+#define VIDOSDxC_ALPHA0_G_H(_x)			(((_x) & 0xF0) << 12)
+#define VIDOSDxC_ALPHA0_B_H(_x)			(((_x) & 0xF0) << 8)
+#define VIDOSDxC_ALPHA1_R_H(_x)			(((_x) & 0xF0) << 4)
+#define VIDOSDxC_ALPHA1_G_H(_x)			(((_x) & 0xF0) << 0)
+#define VIDOSDxC_ALPHA1_B_H(_x)			(((_x) & 0xF0) >> 4)
+#define VIDWxALPHAx_R_L(_x)			(((_x) & 0x0F) << 16)
+#define VIDWxALPHAx_G_L(_x)			(((_x) & 0x0F) << 8)
+#define VIDWxALPHAx_B_L(_x)			(((_x) & 0x0F) << 0)
 
 /* For VIDOSD[1..4]C */
 #define VIDISD14C_ALPHA0_R(_x)			((_x) << 20)
@@ -438,6 +456,28 @@
 #define REG_CLKGATE_MODE			(0x1b0)
 #define REG_CLKGATE_MODE_AUTO_CLOCK_GATE	(0 << 0)
 #define REG_CLKGATE_MODE_NON_CLOCK_GATE		(1 << 0)
+
+/* Blending equation */
+#define BLENDEQ(_x)				(0x240 + (_x) * 4)
+#define BLENDEQ_COEF_ZERO			0x0
+#define BLENDEQ_COEF_ONE			0x1
+#define BLENDEQ_COEF_ALPHA_A			0x2
+#define BLENDEQ_COEF_ONE_MINUS_ALPHA_A		0x3
+#define BLENDEQ_COEF_ALPHA_B			0x4
+#define BLENDEQ_COEF_ONE_MINUS_ALPHA_B		0x5
+#define BLENDEQ_COEF_ALPHA0			0x6
+#define BLENDEQ_COEF_A				0xA
+#define BLENDEQ_COEF_ONE_MINUS_A		0xB
+#define BLENDEQ_COEF_B				0xC
+#define BLENDEQ_COEF_ONE_MINUS_B		0xD
+#define BLENDEQ_Q_FUNC(_x)			((_x) << 18)
+#define BLENDEQ_Q_FUNC_MASK			BLENDEQ_Q_FUNC(0xF)
+#define BLENDEQ_P_FUNC(_x)			((_x) << 12)
+#define BLENDEQ_P_FUNC_MASK			BLENDEQ_P_FUNC(0xF)
+#define BLENDEQ_B_FUNC(_x)			((_x) << 6)
+#define BLENDEQ_B_FUNC_MASK			BLENDEQ_B_FUNC(0xF)
+#define BLENDEQ_A_FUNC(_x)			((_x) << 0)
+#define BLENDEQ_A_FUNC_MASK			BLENDEQ_A_FUNC(0xF)
 
 /* Blending equation control */
 #define BLENDCON				(0x260)

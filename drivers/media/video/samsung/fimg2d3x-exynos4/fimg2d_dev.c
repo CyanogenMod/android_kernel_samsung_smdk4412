@@ -44,6 +44,7 @@
 #include <mach/cpufreq.h>
 #include <plat/cpu.h>
 #include <plat/fimg2d.h>
+#include <plat/s5p-sysmmu.h>
 
 #if defined(CONFIG_EXYNOS_DEV_PD)
 #include <linux/pm_runtime.h>
@@ -55,6 +56,54 @@
 #include <linux/smp.h>
 
 struct g2d_global *g2d_dev;
+
+#define LV1_SHIFT		20
+#define LV2_BASE_MASK		0x3ff
+#define LV2_PT_MASK		0xff000
+#define LV2_SHIFT		12
+#define LV1_DESC_MASK		0x3
+#define LV2_VALUE_META		0xc7f
+#define LV2_VALUE_BASE_MASK	0xfff
+
+static int g2d_sysmmu_fault_handler(enum S5P_SYSMMU_INTERRUPT_TYPE itype,
+		unsigned long pgtable_base, unsigned long fault_addr)
+{
+	unsigned long *pgd;
+	unsigned long *lv1d, *lv2d;
+
+	if (itype == SYSMMU_PAGEFAULT) {
+		printk(KERN_ERR "sysmmu page fault(0x%lx), pgd(0x%lx)\n",
+				fault_addr, pgtable_base);
+	} else {
+		printk(KERN_ERR "sysmmu interrupt "
+				"type(%d) pgd(0x%lx) addr(0x%lx)\n",
+				itype, pgtable_base, fault_addr);
+	}
+
+	pgd = (unsigned long *)g2d_dev->mm->pgd;
+
+	lv1d = pgd + (fault_addr >> LV1_SHIFT);
+	printk(KERN_ERR "Level 1 descriptor(0x%lx)\n", *lv1d);
+	if ((*lv1d & LV1_DESC_MASK) != 0x1) {
+		g2d_clean_outer_pagetable(g2d_dev->mm, fault_addr, 4);
+		goto next;
+	}
+
+	lv2d = (unsigned long *)phys_to_virt(*lv1d & ~LV2_BASE_MASK) +
+			((fault_addr & LV2_PT_MASK) >> LV2_SHIFT);
+	printk(KERN_ERR "Level 2 descriptor(0x%lx)\n", *lv2d);
+	if (*lv2d == 0) {
+		if (g2d_dev->faulted_addr)
+			g2d_mmutable_value_replace(g2d_dev->mm, g2d_dev->faulted_addr, 0);
+		g2d_mmutable_value_replace(g2d_dev->mm, fault_addr,
+			(g2d_dev->dummy_page_addr & ~LV2_VALUE_BASE_MASK) | LV2_VALUE_META);
+		g2d_dev->faulted_addr = fault_addr;
+	} else
+		g2d_clean_outer_pagetable(g2d_dev->mm, fault_addr, 4);
+
+next:
+	return 0;
+}
 
 int g2d_sysmmu_fault(unsigned int faulted_addr, unsigned int pt_base)
 {
@@ -187,6 +236,7 @@ static long g2d_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 		if (params.flag.memory_type == G2D_MEMORY_USER)
 			down_write(&page_alloc_slow_rwsem);
 
+		g2d_dev->mm = current->mm;
 		g2d_dev->irq_handled = 0;
 		if (!g2d_do_blit(g2d_dev, &params)) {
 			g2d_dev->irq_handled = 1;
@@ -203,8 +253,19 @@ static long g2d_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 			}
 		}
 
+		if (g2d_dev->faulted_addr)
+			g2d_mmutable_value_replace(g2d_dev->mm, g2d_dev->faulted_addr, 0);
+
 		if (params.flag.memory_type == G2D_MEMORY_USER)
 			up_write(&page_alloc_slow_rwsem);
+
+		if(g2d_dev->faulted_addr) {
+			FIMG2D_ERROR("Return by G2D fault handler");
+			g2d_dev->faulted_addr = 0;
+			g2d_fail_debug(&params);
+			goto g2d_ioctl_done;
+		}
+
 		ret = 0;
 
 		break;
@@ -272,7 +333,8 @@ static int g2d_probe(struct platform_device *pdev)
 	int ret;
 	struct clk *parent;
 	struct clk *sclk;
-	
+	struct page * dummy_page;
+
 	FIMG2D_DEBUG("start probe : name=%s num=%d res[0].start=0x%x res[1].start=0x%x\n",
 	        			pdev->name, pdev->num_resources, 
 	        			pdev->resource[0].start, pdev->resource[1].start);
@@ -366,6 +428,8 @@ static int g2d_probe(struct platform_device *pdev)
 	}
 
 	ret = g2d_init_mem(&pdev->dev, &g2d_dev->reserved_mem.base, &g2d_dev->reserved_mem.size);
+	dummy_page = alloc_page( __GFP_ZERO | __GFP_REPEAT | __GFP_NOWARN | __GFP_COLD);
+	g2d_dev->dummy_page_addr = page_to_phys(dummy_page);
 
 	if (ret != 0) {
 		FIMG2D_ERROR("failed to init. fimg2d mem");
@@ -378,6 +442,9 @@ static int g2d_probe(struct platform_device *pdev)
 	atomic_set(&g2d_dev->num_of_object, 0);
 	atomic_set(&g2d_dev->is_mmu_faulted, 0);
 	g2d_dev->faulted_addr = 0;
+
+	s5p_sysmmu_set_fault_handler(&pdev->dev, g2d_sysmmu_fault_handler);
+	FIMG2D_DEBUG("register sysmmu page fault handler\n");
 
 	/* misc register */
 	ret = misc_register(&fimg2d_dev);

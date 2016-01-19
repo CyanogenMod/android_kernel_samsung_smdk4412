@@ -287,7 +287,11 @@ static struct resource brcm_wlan_resources[] = {
 		.start	= IRQ_EINT(21),
 		.end	= IRQ_EINT(21),
 //chanyun 12.21		.flags	= IORESOURCE_IRQ | IORESOURCE_IRQ_LOWEDGE,
+#ifdef CONFIG_MACH_TAB3
+		.flags = IORESOURCE_IRQ | IORESOURCE_IRQ_LOWEDGE | IORESOURCE_IRQ_SHAREABLE,
+#else
 		.flags = IORESOURCE_IRQ | IORESOURCE_IRQ_HIGHLEVEL | IORESOURCE_IRQ_SHAREABLE,
+#endif
 	},
 };
 

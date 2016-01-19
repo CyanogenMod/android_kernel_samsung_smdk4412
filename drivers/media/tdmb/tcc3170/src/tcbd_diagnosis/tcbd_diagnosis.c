@@ -196,6 +196,10 @@ static inline void tcbd_calc_pcber(struct tcbd_status_data *_status_data)
 			&moving_average[0],
 			_status_data->pcber,
 			MAX_MAVG_ARRAY_SIZE);
+
+	if (_status_data->pcber_moving_avg <= 20)
+		_status_data->pcber_moving_avg = 0;
+
 }
 
 static inline void tcbd_calc_snr(struct tcbd_status_data *_status_data)

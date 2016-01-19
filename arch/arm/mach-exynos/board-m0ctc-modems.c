@@ -349,15 +349,20 @@ CP -> AP Intr : 2Byte
 #define DP_BOOT_FRAME_SIZE_LIMIT     0x7C00	/* 31KB = 31744byte = 0x7C00 */
 #endif
 
+#if defined(CONFIG_LINK_DEVICE_PLD)
+static struct pld_ipc_map msm_ipc_map;
+#else
 static struct dpram_ipc_map msm_ipc_map;
+#endif
 
-static struct modemlink_dpram_control msm_edpram_ctrl = {
-	.dp_type = EXT_DPRAM,
+static struct modemlink_dpram_data msm_edpram = {
+#if defined(CONFIG_LINK_DEVICE_PLD)
+	.type = PLD_DPRAM,
+#else
+	.type = EXT_DPRAM,
+#endif
+	.disabled = true,
 
-	.dpram_irq = MSM_DPRAM_INT_IRQ,
-	.dpram_irq_flags = IRQF_TRIGGER_FALLING,
-
-	.max_ipc_dev = IPC_RFS,
 	.ipc_map = &msm_ipc_map,
 
 	.boot_size_offset = DP_BOOT_SIZE_OFFSET,
@@ -390,15 +395,15 @@ static struct modem_io_t cdma_io_devices[] = {
 		.links = LINKTYPE(LINKDEV_PLD),
 	},
 	[2] = {
-		.name = "umts_ipc0",
-		.id = 0x01,
+		.name = "cdma_ipc0",
+		.id = 0x00,
 		.format = IPC_FMT,
 		.io_type = IODEV_MISC,
 		.links = LINKTYPE(LINKDEV_PLD),
 	},
 	[3] = {
-		.name = "cdma_ipc0",
-		.id = 0x00,
+		.name = "umts_ipc0",
+		.id = 0x01,
 		.format = IPC_FMT,
 		.io_type = IODEV_MISC,
 		.links = LINKTYPE(LINKDEV_PLD),
@@ -541,15 +546,15 @@ static struct modem_io_t cdma_io_devices[] = {
 		.links = LINKTYPE(LINKDEV_DPRAM),
 	},
 	[2] = {
-		.name = "umts_ipc0",
-		.id = 0x01,
+		.name = "cdma_ipc0",
+		.id = 0x00,
 		.format = IPC_FMT,
 		.io_type = IODEV_MISC,
 		.links = LINKTYPE(LINKDEV_DPRAM),
 	},
 	[3] = {
-		.name = "cdma_ipc0",
-		.id = 0x00,
+		.name = "umts_ipc0",
+		.id = 0x01,
 		.format = IPC_FMT,
 		.io_type = IODEV_MISC,
 		.links = LINKTYPE(LINKDEV_DPRAM),
@@ -683,15 +688,22 @@ static struct modem_data cdma_modem_data = {
 	.gpio_cp_off = 0,
 	.gpio_reset_req_n = GPIO_CP_MSM_PMU_RST,
 	.gpio_cp_reset = GPIO_CP_MSM_RST,
+
 	.gpio_pda_active = GPIO_PDA_ACTIVE,
+
 	.gpio_phone_active = GPIO_MSM_PHONE_ACTIVE,
+	.irq_phone_active = MSM_PHONE_ACTIVE_IRQ,
+
 	.gpio_flm_uart_sel = GPIO_BOOT_SW_SEL,
 #if defined(CONFIG_MACH_M0_CTC)
 	.gpio_flm_uart_sel_rev06 = GPIO_BOOT_SW_SEL_REV06,
 	.gpio_host_wakeup = GPIO_IPC_HOST_WAKEUP,
 #endif
 
-	.gpio_dpram_int = GPIO_MSM_DPRAM_INT,
+	.gpio_ipc_int2ap = GPIO_MSM_DPRAM_INT,
+	.irq_ipc_int2ap = MSM_DPRAM_INT_IRQ,
+	.irqf_ipc_int2ap = IRQF_TRIGGER_FALLING,
+
 	.gpio_cp_dump_int = GPIO_CP_DUMP_INT,
 	.gpio_cp_warm_reset = 0,
 
@@ -699,6 +711,7 @@ static struct modem_data cdma_modem_data = {
 
 #if defined(CONFIG_SIM_DETECT)
 	.gpio_sim_detect = GPIO_CP_SIM_DETECT,
+	.irq_sim_detect = CP_SIM_DETECT_IRQ,
 #else
 	.gpio_sim_detect = 0,
 #endif
@@ -718,42 +731,24 @@ static struct modem_data cdma_modem_data = {
 	.link_types = LINKTYPE(LINKDEV_DPRAM),
 #endif
 	.link_name = "mdm6600_edpram",
-	.dpram_ctl = &msm_edpram_ctrl,
+	.dpram = &msm_edpram,
 
+#if defined(CONFIG_MACH_M0_CTC) && !defined(CONFIG_GSM_MODEM_ESC6270)
 	.ipc_version = SIPC_VER_42,
+#else
+	.ipc_version = SIPC_VER_41,
+#endif
+	.max_ipc_dev = (IPC_RAW + 1),
 
 	.num_iodevs = ARRAY_SIZE(cdma_io_devices),
 	.iodevs = cdma_io_devices,
 };
 
-static struct resource cdma_modem_res[] = {
-	[0] = {
-		.name = "cp_active_irq",
-		.start = MSM_PHONE_ACTIVE_IRQ,
-		.end = MSM_PHONE_ACTIVE_IRQ,
-		.flags = IORESOURCE_IRQ,
-	},
-	[1] = {
-		.name = "dpram_irq",
-		.start = MSM_DPRAM_INT_IRQ,
-		.end = MSM_DPRAM_INT_IRQ,
-		.flags = IORESOURCE_IRQ,
-	},
-#if defined(CONFIG_SIM_DETECT)
-	[2] = {
-		.name = "sim_irq",
-		.start = CP_SIM_DETECT_IRQ,
-		.end = CP_SIM_DETECT_IRQ,
-		.flags = IORESOURCE_IRQ,
-	},
-#endif
-};
-
 static struct platform_device cdma_modem = {
 	.name = "modem_if",
 	.id = 2,
-	.num_resources = ARRAY_SIZE(cdma_modem_res),
-	.resource = cdma_modem_res,
+	.num_resources = 0,
+	.resource = NULL,
 	.dev = {
 		.platform_data = &cdma_modem_data,
 	},
@@ -774,7 +769,7 @@ static void config_cdma_modem_gpio(void)
 			cdma_modem_data.gpio_flm_uart_sel_rev06;
 	unsigned gpio_host_wakeup = cdma_modem_data.gpio_host_wakeup;
 #endif
-	unsigned gpio_dpram_int = cdma_modem_data.gpio_dpram_int;
+	unsigned gpio_ipc_int2ap = cdma_modem_data.gpio_ipc_int2ap;
 	unsigned gpio_cp_dump_int = cdma_modem_data.gpio_cp_dump_int;
 	unsigned gpio_sim_detect = cdma_modem_data.gpio_sim_detect;
 
@@ -907,14 +902,14 @@ static void config_cdma_modem_gpio(void)
 		gpio_set_value(gpio_cp_rst, 0);
 	}
 
-	if (gpio_dpram_int) {
-		err = gpio_request(gpio_dpram_int, "MSM_DPRAM_INT");
+	if (gpio_ipc_int2ap) {
+		err = gpio_request(gpio_ipc_int2ap, "MSM_DPRAM_INT");
 		if (err) {
 			pr_err("fail to request gpio %s\n", "MSM_DPRAM_INT");
 		} else {
 			/* Configure as a wake-up source */
-			s3c_gpio_cfgpin(gpio_dpram_int, S3C_GPIO_SFN(0xF));
-			s3c_gpio_setpull(gpio_dpram_int, S3C_GPIO_PULL_NONE);
+			s3c_gpio_cfgpin(gpio_ipc_int2ap, S3C_GPIO_SFN(0xF));
+			s3c_gpio_setpull(gpio_ipc_int2ap, S3C_GPIO_PULL_NONE);
 		}
 	}
 
@@ -1020,8 +1015,8 @@ static u8 *msm_edpram_remap_mem_region(struct sromc_cfg *cfg)
 	}
 	pr_info("[MDM] <%s> DPRAM VA=0x%08X\n", __func__, (int)dp_base);
 
-	msm_edpram_ctrl.dp_base = (u8 __iomem *) dp_base;
-	msm_edpram_ctrl.dp_size = dp_size;
+	msm_edpram.base = (u8 __iomem *)dp_base;
+	msm_edpram.size = dp_size;
 
 	/* Map for IPC */
 	ipc_map = (struct msm_edpram_ipc_cfg *)dp_base;
@@ -1223,8 +1218,6 @@ static void setup_sromc(unsigned csn, struct sromc_cfg *cfg,
 
 /* For ESC6270 modem */
 #if defined(CONFIG_GSM_MODEM_ESC6270)
-static struct dpram_ipc_map gsm_ipc_map;
-
 #if defined(CONFIG_LINK_DEVICE_PLD)
 static struct sromc_cfg gsm_edpram_cfg = {
 	.attr = (MEM_DATA_BUS_8BIT),
@@ -1263,13 +1256,20 @@ static struct sromc_access_cfg gsm_edpram_access_cfg[] = {
 };
 #endif
 
-static struct modemlink_dpram_control gsm_edpram_ctrl = {
-	.dp_type = EXT_DPRAM,
+#if defined(CONFIG_LINK_DEVICE_PLD)
+static struct pld_ipc_map gsm_ipc_map;
+#else
+static struct dpram_ipc_map gsm_ipc_map;
+#endif
 
-	.dpram_irq = ESC_DPRAM_INT_IRQ,
-	.dpram_irq_flags = IRQF_TRIGGER_FALLING,
+static struct modemlink_dpram_data gsm_edpram = {
+#if defined(CONFIG_LINK_DEVICE_PLD)
+	.type = PLD_DPRAM,
+#else
+	.type = EXT_DPRAM,
+#endif
+	.disabled = true,
 
-	.max_ipc_dev = IPC_RFS,
 	.ipc_map = &gsm_ipc_map,
 
 	.boot_size_offset = DP_BOOT_SIZE_OFFSET,
@@ -1454,17 +1454,24 @@ static struct modem_data gsm_modem_data = {
 	.gpio_cp_off = 0,
 	.gpio_reset_req_n = 0,	/* GPIO_CP_MSM_PMU_RST, */
 	.gpio_cp_reset = GPIO_CP2_MSM_RST,
+
 	.gpio_pda_active = 0,
+
 	.gpio_phone_active = GPIO_ESC_PHONE_ACTIVE,
+	.irq_phone_active = ESC_PHONE_ACTIVE_IRQ,
+
 	.gpio_flm_uart_sel = GPIO_BOOT_SW_SEL_CP2,
 
-	.gpio_dpram_int = GPIO_ESC_DPRAM_INT,
+	.gpio_ipc_int2ap = GPIO_ESC_DPRAM_INT,
+	.irq_ipc_int2ap = ESC_DPRAM_INT_IRQ,
+	.irqf_ipc_int2ap = IRQF_TRIGGER_FALLING,
 
 	.gpio_cp_dump_int = 0,
 	.gpio_cp_warm_reset = 0,
 
 #if defined(CONFIG_SIM_DETECT)
 	.gpio_sim_detect = GPIO_ESC_SIM_DETECT,
+	.irq_sim_detect = ESC_SIM_DETECT_IRQ,
 #else
 	.gpio_sim_detect = 0,
 #endif
@@ -1486,42 +1493,20 @@ static struct modem_data gsm_modem_data = {
 	.link_types = LINKTYPE(LINKDEV_DPRAM),
 #endif
 	.link_name = "esc6270_edpram",
-	.dpram_ctl = &gsm_edpram_ctrl,
+	.dpram = &gsm_edpram,
 
 	.ipc_version = SIPC_VER_41,
+	.max_ipc_dev = (IPC_RAW + 1),
 
 	.num_iodevs = ARRAY_SIZE(gsm_io_devices),
 	.iodevs     = gsm_io_devices,
 };
 
-static struct resource gsm_modem_res[] = {
-	[0] = {
-		.name = "cp_active_irq",
-		.start = ESC_PHONE_ACTIVE_IRQ,
-		.end = ESC_PHONE_ACTIVE_IRQ,
-		.flags = IORESOURCE_IRQ,
-	},
-	[1] = {
-		.name = "dpram_irq",
-		.start = ESC_DPRAM_INT_IRQ,
-		.end = ESC_DPRAM_INT_IRQ,
-		.flags = IORESOURCE_IRQ,
-	},
-#if defined(CONFIG_SIM_DETECT)
-	[2] = {
-		.name = "sim_irq",
-		.start = ESC_SIM_DETECT_IRQ,
-		.end = ESC_SIM_DETECT_IRQ,
-		.flags = IORESOURCE_IRQ,
-	},
-#endif
-};
-
 static struct platform_device gsm_modem = {
 	.name = "modem_if",
 	.id = 1,
-	.num_resources = ARRAY_SIZE(gsm_modem_res),
-	.resource = gsm_modem_res,
+	.num_resources = 0,
+	.resource = NULL,
 	.dev = {
 		.platform_data = &gsm_modem_data,
 	},
@@ -1537,7 +1522,7 @@ void config_gsm_modem_gpio(void)
 	unsigned gpio_pda_active = gsm_modem_data.gpio_pda_active;
 	unsigned gpio_phone_active = gsm_modem_data.gpio_phone_active;
 	unsigned gpio_flm_uart_sel = gsm_modem_data.gpio_flm_uart_sel;
-	unsigned gpio_dpram_int = gsm_modem_data.gpio_dpram_int;
+	unsigned gpio_ipc_int2ap = gsm_modem_data.gpio_ipc_int2ap;
 	unsigned gpio_sim_detect = gsm_modem_data.gpio_sim_detect;
 
 #if defined(CONFIG_LINK_DEVICE_PLD)
@@ -1635,15 +1620,15 @@ void config_gsm_modem_gpio(void)
 		gpio_set_value(gpio_cp_rst, 0);
 	}
 
-	if (gpio_dpram_int) {
-		err = gpio_request(gpio_dpram_int, "ESC_DPRAM_INT");
+	if (gpio_ipc_int2ap) {
+		err = gpio_request(gpio_ipc_int2ap, "ESC_DPRAM_INT");
 		if (err) {
 			pr_err("fail to request gpio %s, gpio %d, errno %d\n",
-					"ESC_DPRAM_INT", gpio_dpram_int, err);
+					"ESC_DPRAM_INT", gpio_ipc_int2ap, err);
 		} else {
 			/* Configure as a wake-up source */
-			s3c_gpio_cfgpin(gpio_dpram_int, S3C_GPIO_SFN(0xF));
-			s3c_gpio_setpull(gpio_dpram_int, S3C_GPIO_PULL_NONE);
+			s3c_gpio_cfgpin(gpio_ipc_int2ap, S3C_GPIO_SFN(0xF));
+			s3c_gpio_setpull(gpio_ipc_int2ap, S3C_GPIO_PULL_NONE);
 		}
 	}
 
@@ -1742,8 +1727,8 @@ static u8 *gsm_edpram_remap_mem_region(struct sromc_cfg *cfg)
 	}
 	pr_info("[MDM] <%s> DPRAM VA=0x%08X\n", __func__, (int)dp_base);
 
-	gsm_edpram_ctrl.dp_base = (u8 __iomem *)dp_base;
-	gsm_edpram_ctrl.dp_size = dp_size;
+	gsm_edpram.base = (u8 __iomem *)dp_base;
+	gsm_edpram.size = dp_size;
 
 	/* Map for IPC */
 	ipc_map = (struct msm_edpram_ipc_cfg *)dp_base;
@@ -2235,6 +2220,7 @@ static int host_port_enable(int port, int enable)
 			goto exit;
 		}
 
+#if !defined(CONFIG_MACH_GRANDE) && !defined(CONFIG_MACH_M0_DUOSCTC)
 		gpio_direction_output(GPIO_USB_BOOT_EN, 0);
 		s3c_gpio_setpull(GPIO_USB_BOOT_EN, S3C_GPIO_PULL_NONE);
 		gpio_set_value(GPIO_USB_BOOT_EN, 0);
@@ -2312,6 +2298,7 @@ static int host_port_enable(int port, int enable)
 			gpio_set_value(GPIO_BOOT_SW_SEL_REV06, 1);
 
 		}
+#endif
 
 	}
 

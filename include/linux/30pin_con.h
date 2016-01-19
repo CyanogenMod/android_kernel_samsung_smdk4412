@@ -55,7 +55,7 @@ u16 stmpe811_get_adc_data(u8 channel);
 #endif
 
 extern struct device *sec_switch_dev;
-#ifdef CONFIG_MACH_P4NOTE
+#if defined(CONFIG_MACH_P4NOTE) || defined(CONFIG_MACH_SP7160LTE) || defined(CONFIG_MACH_TAB3) || defined(CONFIG_MACH_KONA)
 extern void host_notifier_enable_irq(void);
 extern void host_notifier_disable_irq(void);
 #endif

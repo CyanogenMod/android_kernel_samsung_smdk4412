@@ -118,6 +118,9 @@ static int s5m87xx_i2c_probe(struct i2c_client *i2c,
 	struct s5m87xx_dev *s5m87xx;
 	int ret = 0;
 
+	if (!pdata)
+		return -EINVAL;
+
 	s5m87xx = kzalloc(sizeof(struct s5m87xx_dev), GFP_KERNEL);
 	if (s5m87xx == NULL)
 		return -ENOMEM;
@@ -133,7 +136,6 @@ static int s5m87xx_i2c_probe(struct i2c_client *i2c,
 		s5m87xx->ono = pdata->ono;
 		s5m87xx->irq_base = pdata->irq_base;
 		s5m87xx->wakeup = pdata->wakeup;
-		s5m87xx->wtsr_smpl = pdata->wtsr_smpl;
 	}
 
 	mutex_init(&s5m87xx->iolock);

@@ -105,6 +105,9 @@ struct s3c_platform_camera {
 
 	/* Board specific power pin control */
 	int				(*cam_power)(int onoff);
+#ifdef CONFIG_MOTOR_IR_FILTER
+	int				(*ir_filter)(int onoff);
+#endif
 	enum flite_index		flite_id;
 	bool				use_isp;
 	int				sensor_index;

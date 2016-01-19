@@ -9,7 +9,7 @@
 
 #include <linux/fs.h>
 #include <linux/file.h>
-#include <asm/uaccess.h>
+#include <linux/uaccess.h>
 
 #define SEEK_SET	0
 #define SEEK_CUR	1
@@ -18,14 +18,12 @@
 /******************************************************************************
  *                          Function Prototypes
  ******************************************************************************/
-struct file *klib_fopen (const char *filename, int flags, int mode);
-void klib_fclose (struct file *filp);
-int klib_fseek (struct file *filp, int offset, int whence);
-int klib_fread (char *buf, int len, struct file *filp);
-int klib_fgetc (struct file *filp);
-int klib_flength (struct file *filp);
-int klib_flen_fcopy (char *buf, int len, struct file *filp);
-int klib_fwrite (char *buf, int len, struct file *filp);
-
-void s3c_bat_use_wimax(int onoff);
+struct file *klib_fopen(const char *filename, int flags, int mode);
+void klib_fclose(struct file *filp);
+int klib_fseek(struct file *filp, int offset, int whence);
+int klib_fread(char *buf, int len, struct file *filp);
+int klib_fgetc(struct file *filp);
+int klib_flength(struct file *filp);
+int klib_flen_fcopy(char *buf, int len, struct file *filp);
+int klib_fwrite(char *buf, int len, struct file *filp);
 #endif	/* _WIMAX_FIRMWARE_H */

@@ -19,6 +19,7 @@
 #include <linux/mfd/max77693-private.h>
 #include <linux/leds-max77693.h>
 #include <linux/ctype.h>
+#include <linux/err.h>
 
 #ifdef CONFIG_LEDS_SWITCH
 #include <linux/gpio.h>
@@ -345,12 +346,13 @@ static int max77693_led_probe(struct platform_device *pdev)
 	/* print_all_reg_value(max77693->i2c); */
 
 	flash_dev = device_create(camera_class, NULL, 0, led_datas[2], "flash");
-	if (flash_dev < 0)
+	if (IS_ERR(flash_dev)) {
 		pr_err("Failed to create device(flash)!\n");
-
-	if (device_create_file(flash_dev, &dev_attr_rear_flash) < 0) {
-		pr_err("failed to create device file, %s\n",
-				dev_attr_rear_flash.attr.name);
+	} else {
+		if (device_create_file(flash_dev, &dev_attr_rear_flash) < 0) {
+			pr_err("failed to create device file, %s\n",
+					dev_attr_rear_flash.attr.name);
+		}
 	}
 
 #ifdef CONFIG_LEDS_SWITCH

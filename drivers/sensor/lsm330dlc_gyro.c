@@ -165,7 +165,6 @@ struct lsm330dlc_gyro_data {
 	bool interruptible;	/* interrupt or polling? */
 	int entries;		/* number of fifo entries */
 	int dps;		/* scale selection */
-	int sensitivity_value;
 	/* fifo data entries */
 	u8 fifo_data[sizeof(struct gyro_t) * 32];
 	u8 ctrl_regs[5];	/* saving register settings */
@@ -358,13 +357,6 @@ static void lsm330dlc_gyro_work_func(struct work_struct *work)
 			data->xyz_data.x -= data->cal_data.x;
 			data->xyz_data.y -= data->cal_data.y;
 			data->xyz_data.z -= data->cal_data.z;
-		} else {
-			data->xyz_data.x -= (data->cal_data.x *
-				data->sensitivity_value / 2);
-			data->xyz_data.y -= (data->cal_data.y *
-				data->sensitivity_value / 2);
-			data->xyz_data.z -= (data->cal_data.z *
-				data->sensitivity_value / 2);
 		}
 	} else {
 		pr_warn("%s, use last data(%d, %d, %d), status=%d, selftest=%d\n",
@@ -518,19 +510,14 @@ static ssize_t lsm330dlc_gyro_selftest_dps_store(struct device *dev,
 
 	ctrl = (data->ctrl_regs[3] & ~FS_MASK);
 
-	if (new_dps == DPS250) {
+	if (new_dps == DPS250)
 		ctrl |= FS_250DPS;
-		data->sensitivity_value = 1;
-	} else if (new_dps == DPS500) {
+	else if (new_dps == DPS500)
 		ctrl |= FS_500DPS;
-		data->sensitivity_value = 2;
-	} else if (new_dps == DPS2000) {
+	else if (new_dps == DPS2000)
 		ctrl |= FS_2000DPS;
-		data->sensitivity_value = 8;
-	} else {
+	else
 		ctrl |= FS_DEFULAT_DPS;
-		data->sensitivity_value = 2;
-	}
 
 	/* apply new dps */
 	mutex_lock(&data->lock);
@@ -545,8 +532,7 @@ static ssize_t lsm330dlc_gyro_selftest_dps_store(struct device *dev,
 	mutex_unlock(&data->lock);
 
 	data->dps = new_dps;
-	pr_info("%s: %d dps stored, sensitivity = %d\n",
-		__func__, data->dps, data->sensitivity_value);
+	pr_info("%s: %d dps stored\n", __func__, data->dps);
 
 	return count;
 }
@@ -910,7 +896,8 @@ read_zero_rate_again:
 	/* check out watermark status */
 	status_reg = i2c_smbus_read_byte_data(data->client, FIFO_SRC_REG);
 	if (!(status_reg & 0x80)) {
-		pr_err("%s: Watermark level is not enough\n", __func__);
+		pr_err("%s: Watermark level is not enough(0x%x)\n",
+			__func__, status_reg);
 		goto exit;
 	}
 
@@ -1082,8 +1069,8 @@ static int lsm330dlc_gyro_bypass_self_test\
 				bZYXDA = temp & 0x08;
 				if (!bZYXDA) {
 					usleep_range(10000, 20000);
-					pr_err("%s: %d,%d: no_data_ready",
-							__func__, i, j);
+					pr_err("%s: %d,%d: no_data_ready, (0x%x)",
+							__func__, i, j, temp);
 					continue;
 				} else
 					break;
@@ -1153,8 +1140,8 @@ static int lsm330dlc_gyro_bypass_self_test\
 				bZYXDA = temp & 0x08;
 				if (!bZYXDA) {
 					usleep_range(10000, 20000);
-					pr_err("%s: %d,%d: no_data_ready",
-							__func__, i, j);
+					pr_err("%s: %d,%d: no_data_ready, (0x%x)",
+							__func__, i, j, temp);
 					continue;
 				} else
 					break;
@@ -1271,7 +1258,7 @@ static ssize_t lsm330dlc_gyro_self_test(struct device *dev,
 	else if (!fifo_pass)
 		printk(KERN_INFO "[gyro_self_test] fifo self-test fail\n");
 	else
-		printk(KERN_INFO "[gyro_self_test] fifo self-test restry\n");
+		printk(KERN_INFO "[gyro_self_test] fifo self-test retry\n");
 
 	/* calibration result */
 	if (cal_pass == 1)
@@ -1288,7 +1275,7 @@ static ssize_t lsm330dlc_gyro_self_test(struct device *dev,
 	else if (!bypass_pass)
 		printk(KERN_INFO "[gyro_self_test] bypass self-test fail\n\n");
 	else
-		printk(KERN_INFO "[gyro_self_test] bypass self-test restry\n\n");
+		printk(KERN_INFO "[gyro_self_test] bypass self-test retry\n\n");
 
 	/* restore backup register */
 	for (i = 0; i < 10; i++) {
@@ -1404,8 +1391,7 @@ static int lsm330dlc_gyro_probe(struct i2c_client *client,
 	}
 
 	data->client = client;
-	data->sensitivity_value = 2;
-
+	data->dps = DPS500;
 	/* read chip id */
 	ret = i2c_smbus_read_byte_data(client, WHO_AM_I);
 

@@ -56,7 +56,7 @@
 #include <trace/events/vmscan.h>
 
 struct cgroup_subsys mem_cgroup_subsys __read_mostly;
-#define MEM_CGROUP_RECLAIM_RETRIES	5
+#define MEM_CGROUP_RECLAIM_RETRIES     5
 struct mem_cgroup *root_mem_cgroup __read_mostly;
 
 #ifdef CONFIG_CGROUP_MEM_RES_CTLR_SWAP
@@ -71,9 +71,8 @@ static int really_do_swap_account __initdata = 0;
 #endif
 
 #else
-#define do_swap_account		(0)
+#define do_swap_account                (0)
 #endif
-
 
 /*
  * Statistics for memory cgroup.
@@ -5059,7 +5058,9 @@ mem_cgroup_create(struct cgroup_subsys *ss, struct cgroup *cont)
 	if (parent)
 		mem->swappiness = get_swappiness(parent);
 	atomic_set(&mem->refcnt, 1);
+
 	mem->move_charge_at_immigrate = 0;
+
 	mutex_init(&mem->thresholds_lock);
 	return &mem->css;
 free_out:

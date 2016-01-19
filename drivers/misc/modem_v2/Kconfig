@@ -1,0 +1,69 @@
+menuconfig SEC_MODEM
+	bool "Samsung Mobile Modem Interface"
+	default n
+	---help---
+	  Samsung Modem Interface Drivers for
+	  SAMSUNG IPC models
+	  And you can select the modem chipset
+	  and interface link type.
+
+config UMTS_MODEM_XMM6260
+	bool "modem chip : IMC XMM6260"
+	depends on SEC_MODEM
+	default n
+
+config UMTS_MODEM_XMM6262
+	bool "modem chip : IMC XMM6262"
+	depends on SEC_MODEM
+	default n
+
+config UMTS_MODEM_XMM6360
+	bool "modem chip : IMC XMM6360"
+	depends on SEC_MODEM
+	default n
+
+config CDMA_MODEM_MDM6600
+	bool "modem chip : QC MDM6600"
+	depends on SEC_MODEM
+	default n
+
+config GSM_MODEM_ESC6270
+	bool "modem chip : QC ESC6270"
+	depends on SEC_MODEM
+	default n
+
+config LINK_DEVICE_HSIC
+	bool "modem driver link device HSIC"
+	depends on SEC_MODEM
+	default n
+
+config LINK_DEVICE_PLD
+	bool "modem driver link device PLD"
+	depends on SEC_MODEM
+	default n
+
+config LINK_ETHERNET
+	bool "SIPC USB raw ehternet patcket"
+	depends on SEC_MODEM
+	select MII
+	default n
+
+config LINK_DEVICE_CLASS_CDC_ACM
+	bool "USB/HSIC subclass CDC-ACM functions"
+	depends on LINK_DEVICE_HSIC
+	default y
+
+config LINK_DEVICE_CLASS_CDC_NCM
+	bool "USB/HSIC subclass CDC-NCM functions"
+	depends on LINK_DEVICE_HSIC
+	default n
+
+config SIM_DETECT
+	bool "SIM_DETECT pin"
+	depends on SEC_MODEM
+	default n
+
+config SIM_SLOT_SWITCH
+	bool "SIM_SLOT_SWITCH"
+	depends on SEC_MODEM
+	default n

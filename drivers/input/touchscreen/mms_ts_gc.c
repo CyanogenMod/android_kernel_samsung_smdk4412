@@ -2770,7 +2770,7 @@ static int __devinit mms_ts_probe(struct i2c_client *client,
 	struct input_dev *input_dev;
 	int ret = 0;
 	char buf[4] = { 0, };
-	int i;
+	int i, retries = 3;
 
 #if SEC_TSP_FACTORY_TEST
 	struct device *fac_dev_ts;
@@ -2824,11 +2824,25 @@ static int __devinit mms_ts_probe(struct i2c_client *client,
 	msleep(100);
 
 	i2c_set_clientdata(client, info);
-	ret = i2c_master_recv(client, buf, 1);
-	if (ret < 0) {		/* tsp connect check */
-		dev_err(&client->dev, "%s: tsp connect err [%d], Add[%d]\n",
-			   __func__, ret, info->client->addr);
-		goto err_config;
+	ret = gpio_get_value(GPIO_OLED_DET);
+	if (ret == 0) {
+		dev_err(&client->dev, "GPIO_OLED_DET low\n");
+
+		while (retries--) {
+			ret = i2c_master_recv(client, buf, 1);
+			if (ret >= 0) {
+				dev_info(&client->dev, "tsp i2c success\n");
+				break;
+			}
+			dev_err(&client->dev, "tsp i2c fail [%d]\n", ret);
+		}
+
+		if (retries < 0) {
+			dev_err(&client->dev, "tsp connect err [%d], Add[%d]\n",
+						ret, info->client->addr);
+			goto err_config;
+		}
+		dev_info(&client->dev, "GPIO_OLED_DET low but i2c pass\n");
 	}
 
 	if (system_rev < 2) {
@@ -2898,7 +2912,7 @@ static int __devinit mms_ts_probe(struct i2c_client *client,
 #endif
 
 #ifdef CONFIG_HAS_EARLYSUSPEND
-	info->early_suspend.level = EARLY_SUSPEND_LEVEL_BLANK_SCREEN + 1;
+	info->early_suspend.level = EARLY_SUSPEND_LEVEL_STOP_DRAWING;
 	info->early_suspend.suspend = mms_ts_early_suspend;
 	info->early_suspend.resume = mms_ts_late_resume;
 	register_early_suspend(&info->early_suspend);
@@ -2974,6 +2988,7 @@ err_config:
 err_input_alloc:
 	kfree(info);
 err_alloc:
+	info->pdata->power(false);
 	return ret;
 
 }

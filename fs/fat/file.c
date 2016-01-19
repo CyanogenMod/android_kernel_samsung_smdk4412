@@ -17,8 +17,10 @@
 #include <linux/blkdev.h>
 #include <linux/fsnotify.h>
 #include <linux/security.h>
-#include <linux/namei.h>
 #include "fat.h"
+#if defined(CONFIG_VMWARE_MVP)
+#include <linux/namei.h>
+#endif
 
 static int fat_ioctl_get_attributes(struct inode *inode, u32 __user *user_attr)
 {
@@ -116,6 +118,7 @@ out:
 	return err;
 }
 
+#if defined(CONFIG_VMWARE_MVP)
 extern int _fat_fallocate(struct inode *inode, loff_t len);
 
 static long fat_vmw_extend(struct file *filp, unsigned long len)
@@ -171,6 +174,7 @@ static long fat_vmw_extend(struct file *filp, unsigned long len)
 	 */
 	return _fat_fallocate(inode, off);
 }
+#endif
 
 long fat_generic_ioctl(struct file *filp, unsigned int cmd, unsigned long arg)
 {
@@ -182,8 +186,10 @@ long fat_generic_ioctl(struct file *filp, unsigned int cmd, unsigned long arg)
 		return fat_ioctl_get_attributes(inode, user_attr);
 	case FAT_IOCTL_SET_ATTRIBUTES:
 		return fat_ioctl_set_attributes(filp, user_attr);
+#if defined(CONFIG_VMWARE_MVP)
 	case FAT_IOCTL_VMW_EXTEND:
 		return fat_vmw_extend(filp, arg);
+#endif
 	default:
 		return -ENOTTY;	/* Inappropriate ioctl for device */
 	}

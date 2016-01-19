@@ -1049,6 +1049,7 @@ static int lsm330dlc_accel_probe(struct i2c_client *client,
 	int probe_retry_max = 3;
 
 	accel_dbgmsg("is started\n");
+
 probe_retry:
 	for (retry = 0; retry < 5; retry++) {
 		if (!i2c_check_functionality(client->adapter,
@@ -1288,14 +1289,12 @@ err_position_device_create_file:
 #ifdef DEBUG_ODR
 	device_remove_file(data->dev, &dev_attr_odr);
 err_odr_device_create_file:
+#endif
 #ifdef USES_MOVEMENT_RECOGNITION
 	device_remove_file(data->dev, &dev_attr_reactive_alert);
-#else
-	device_remove_file(data->dev, &dev_attr_calibration);
-#endif
-#endif
-#ifdef USES_MOVEMENT_RECOGNITION
 err_reactive_device_create_file:
+	device_remove_file(data->dev, &dev_attr_calibration);
+#else
 	device_remove_file(data->dev, &dev_attr_calibration);
 #endif
 err_cal_device_create_file:

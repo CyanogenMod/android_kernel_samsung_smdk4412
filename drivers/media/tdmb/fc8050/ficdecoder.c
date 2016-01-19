@@ -45,6 +45,7 @@ static int fig0_ext1_decoder(u8 cn, u8 *fibBuffer, int figLength);
 static int fig0_ext2_decoder(u8 *fibBuffer, int figLength, int pd);
 static int fig0_ext3_decoder(u8 *fibBuffer, int figLength);
 /* static int fig0_ext4_decoder(u8 *fibBuffer, int figLength); */
+static int fig0_ext9_decoder(u8 *fibBuffer, int figLength);
 static int fig0_ext10_decoder(u8 *fibBuffer, int figLength);
 static int fig0_ext13_decoder(u8 *fibBuffer, int figLength, int pd);
 static int fig0_ext14_decoder(u8 *fibBuffer, int figLength);
@@ -455,6 +456,9 @@ static int fig0_decoder(struct fig *pFig)
 		result = fig0_ext4_decoder(&pFig->data[1], length);
 		*/
 		break;
+	case 9:		/* Country LTO and International table */
+		result = fig0_ext9_decoder(&pFig->data[1], length);
+		break;
 	case 10:	/* Date & Time */
 		result = fig0_ext10_decoder(&pFig->data[1], length-1);
 		break;
@@ -470,7 +474,6 @@ static int fig0_decoder(struct fig *pFig)
 	case 0:		/* Ensembel Information */
 	case 5:		/* Language */
 	case 8:		/* Service component global definition */
-	case 9:		/* Country LTO and International table */
 	case 17:		/* Programme Type */
 		result = dummy_decoder(&pFig->data[1], length);
 		break;
@@ -827,6 +830,23 @@ int fig0_ext3_decoder(u8 *fibBuffer, int figLength)
 }*/
 
 /*
+ *  FIG 0/9 Country, LTO and international table
+ */
+int fig0_ext9_decoder(u8 *fibBuffer, int figLength)
+{
+	struct esbinfo_t *esb;
+	u8 ensemble_ecc;
+
+	esb = get_emsemble_info();
+	ensemble_ecc = fibBuffer[1];
+
+	esb->ecc = ensemble_ecc;
+	/*PRINTF("Ensemble ECC: 0x%02x\n", ensemble_ecc);*/
+
+	return 0;
+}
+
+/*
  *  FIG 0/10 Date & Time
  */
 int fig0_ext10_decoder(u8 *fibBuffer, int figLength)
@@ -865,7 +885,7 @@ int fig0_ext10_decoder(u8 *fibBuffer, int figLength)
 }
 
 /*
- *  FIG 0/13 Announcement
+ *  FIG 0/13 User Application Type
  */
 int fig0_ext13_decoder(u8 *fibBuffer, int figLength, int pd)
 {
@@ -873,7 +893,7 @@ int fig0_ext13_decoder(u8 *fibBuffer, int figLength, int pd)
 	int	result = 0;
 	int	readcnt = 0;
 	u32	sid = 0xffffffff;
-	/* u8	SCIdS; */
+	u8	SCIdS;
 	u8	NumOfUAs;
 	u16	UAtype;
 	u8	UAlen;
@@ -925,8 +945,10 @@ int fig0_ext13_decoder(u8 *fibBuffer, int figLength, int pd)
 
 		sta = fibBuffer[readcnt++];
 
-		/* SCIdS = (sta & 0xff00) >> 4; */
-		NumOfUAs = sta & 0xff;
+		SCIdS = (sta & 0xf0) >> 4;
+		svc_info->scids = SCIdS;
+
+		NumOfUAs = sta & 0x0f;
 
 		/* Because of Visual Radio */
 		svc_info->num_of_user_appl = NumOfUAs;
@@ -940,6 +962,11 @@ int fig0_ext13_decoder(u8 *fibBuffer, int figLength, int pd)
 
 			/* Because of Visual Radio */
 			UAlen = sta & 0x1f;
+
+			if (UAlen > 24) {
+				/* print_log(NULL, "UAlen Err= %d, ", UAlen); */
+				UAlen = 24;
+			}
 
 			svc_info->user_appl_type[i] = UAtype;
 			svc_info->user_appl_length[i] = UAlen;

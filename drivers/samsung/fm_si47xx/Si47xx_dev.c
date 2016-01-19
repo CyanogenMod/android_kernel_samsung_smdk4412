@@ -16,7 +16,6 @@
 #include <linux/interrupt.h>
 
 #include <mach/gpio.h>
-#include <plat/gpio-cfg.h>
 
 #include "Si47xx_dev.h"
 #include <linux/i2c/si47xx_common.h>
@@ -896,15 +895,6 @@ int Si47xx_dev_ch_spacing_set(int ch_spacing)
 		default:
 				ret = -1;
 		}
-
-		if (ret == 0) {
-			if (ret < 0) {
-				dev_err(Si47xx_dev->dev, "Si47xx_dev_ch_spacing_set "
-						"i2c_write 1 failed");
-				Si47xx_dev->settings.channel_spacing =
-					prev_ch_spacing;
-			}
-		}
 	}
 
 	mutex_unlock(&(Si47xx_dev->lock));
@@ -944,12 +934,8 @@ int Si47xx_dev_chan_get(u32 *frequency)
 		dev_err(Si47xx_dev->dev, "Si47xx_dev_chan_get called when DS is invalid");
 		ret = -1;
 	} else {
-		if (ret < 0)
-			debug("Si47xx_dev_chan_get i2c_read failed");
-		else {
-			ret = fmTuneStatus(0, 1, &tune_data);
-			*frequency = tune_data.freq;
-		}
+		ret = fmTuneStatus(0, 1, &tune_data);
+		*frequency = tune_data.freq;
 	}
 	mutex_unlock(&(Si47xx_dev->lock));
 	return ret;
@@ -1036,8 +1022,6 @@ int Si47xx_dev_RSSI_seek_th_set(u8 seek_th)
 	} else {
 		si47xx_set_property(FM_SEEK_TUNE_RSSI_THRESHOLD, seek_th);
 		Si47xx_dev->settings.curr_rssi_th = seek_th;
-		if (ret < 0)
-			debug("Si47xx_dev_RSSI_seek_th_set i2c_write 1 failed");
 	}
 	mutex_unlock(&(Si47xx_dev->lock));
 
@@ -1059,9 +1043,6 @@ int Si47xx_dev_seek_SNR_th_set(u8 seek_SNR)
 	} else {
 		si47xx_set_property(FM_SEEK_TUNE_SNR_THRESHOLD, seek_SNR);
 		Si47xx_dev->settings.curr_snr = seek_SNR;
-
-		if (ret < 0)
-			debug("Si47xx_dev_seek_SNR_th_set i2c_write 1 failed");
 	}
 	mutex_unlock(&(Si47xx_dev->lock));
 
@@ -1301,11 +1282,9 @@ int Si47xx_dev_DE_set(u8 de_tc)
 				ret = -1;
 		}
 
-		if (0 == ret) {
-			if (ret < 0)
-				dev_err(Si47xx_dev->dev, "%s failed %d\n",
-				__func__, ret);
-		}
+		if (ret < 0)
+			dev_err(Si47xx_dev->dev, "%s failed %d\n",
+			__func__, ret);
 	}
 
 	mutex_unlock(&(Si47xx_dev->lock));
@@ -1344,6 +1323,8 @@ int Si47xx_dev_volume_set(u8 volume)
 	int ret = 0;
 
 	debug("Si47xx_dev_volume_set called");
+	if (volume >= SI47XX_VOLUME_NUM)
+		return -EINVAL;
 
 	mutex_lock(&(Si47xx_dev->lock));
 
@@ -1354,10 +1335,6 @@ int Si47xx_dev_volume_set(u8 volume)
 		si47xx_set_property(RX_VOLUME, pSi47xxdata->rx_vol[volume] &
 			RX_VOLUME_MASK);
 		Si47xx_dev->vol_idx = volume;
-
-		if (ret < 0)
-			dev_err(Si47xx_dev->dev, "%s failed %d\n",
-			__func__, ret);
 	}
 
 	mutex_unlock(&(Si47xx_dev->lock));

@@ -2935,7 +2935,7 @@ static void net_tx_action(struct softirq_action *h)
 			clist = clist->next;
 
 			WARN_ON(atomic_read(&skb->users));
-			trace_kfree_skb(skb, net_tx_action);
+			trace_consume_skb(skb);
 			__kfree_skb(skb);
 		}
 	}

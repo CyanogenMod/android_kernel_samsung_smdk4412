@@ -238,7 +238,6 @@ extern int s3c_gpio_slp_setpull_updown(unsigned int pin, unsigned int config);
 #define GPIO_TSP_LDO_EN		EXYNOS4212_GPJ0(6)
 /* GPIO_MHL_SEL			EXYNOS4212_GPJ0(5)	*/
 
-
 /* Modem Interface GPIOs - M0 HSIC */
 #define GPIO_ACTIVE_STATE	EXYNOS4_GPF1(1)
 #define GPIO_PDA_ACTIVE		EXYNOS4_GPF1(6)
@@ -251,7 +250,6 @@ extern int s3c_gpio_slp_setpull_updown(unsigned int pin, unsigned int config);
 #define GPIO_CP_DUMP_INT	EXYNOS4_GPX1(2)
 #define GPIO_PHONE_ACTIVE	EXYNOS4_GPX1(6)
 #define GPIO_CP_RST		EXYNOS4_GPX3(2)
-
 
 /* Modem Interface GPIOs - MDM */
 #define GPIO_MDM2AP_HSIC_READY		EXYNOS4_GPF1(1)
@@ -338,14 +336,17 @@ extern int s3c_gpio_slp_setpull_updown(unsigned int pin, unsigned int config);
 #define GPIO_ISDBT_SPI_MOSI	EXYNOS4_GPC1(4)
 
 #if defined(CONFIG_ISDBT_ANT_DET)
-#define GPIO_ISDBT_ANT_DET          EXYNOS4_GPL2(4)
-#define GPIO_ISDBT_IRQ_ANT_DET      gpio_to_irq(GPIO_ISDBT_ANT_DET)
+#define GPIO_ISDBT_ANT_DET		EXYNOS4_GPL2(4)
+#define GPIO_ISDBT_IRQ_ANT_DET		gpio_to_irq(GPIO_ISDBT_ANT_DET)
+#define GPIO_ISDBT_ANT_DET_REV08	EXYNOS4_GPX1(3)
+#define GPIO_ISDBT_IRQ_ANT_DET_REV08	gpio_to_irq(GPIO_ISDBT_ANT_DET_REV08)
 #endif
+
 #endif
 
 /*BARCODE_EMUL*/
 #if defined(CONFIG_BARCODE_EMUL_ICE4)
-#define GPIO_BARCODE_SDA_1_8V EXYNOS4_GPF0(0)
+#define GPIO_BARCODE_SDA_1_8V	EXYNOS4_GPF0(0)
 #define GPIO_BARCODE_SCL_1_8V	EXYNOS4_GPF0(1)
 
 #if defined(CONFIG_MACH_T0_CHN_CU_DUOS)
@@ -356,10 +357,10 @@ extern int s3c_gpio_slp_setpull_updown(unsigned int pin, unsigned int config);
 #define GPIO_FPGA_CDONE		EXYNOS4_GPF0(3)
 #endif
 
-#define GPIO_FPGA_RST_N			EXYNOS4_GPF0(5)
-#define GPIO_FPGA_SPI_CLK		EXYNOS4212_GPM4(4)
-#define GPIO_FPGA_SPI_SI		EXYNOS4212_GPM4(6)
-#define GPIO_FPGA_SPI_EN		EXYNOS4212_GPM4(5)
+#define GPIO_FPGA_RST_N		EXYNOS4_GPF0(5)
+#define GPIO_FPGA_SPI_CLK	EXYNOS4212_GPM4(4)
+#define GPIO_FPGA_SPI_SI	EXYNOS4212_GPM4(6)
+#define GPIO_FPGA_SPI_EN	EXYNOS4212_GPM4(5)
 #endif
 
 #if defined(CONFIG_FELICA)
@@ -370,5 +371,51 @@ extern int s3c_gpio_slp_setpull_updown(unsigned int pin, unsigned int config);
 #define  FELICA_GPIO_PON       EXYNOS4_GPL2(7)
 #define  FELICA_GPIO_INT       EXYNOS4_GPX1(7)
 #endif
+
+#if defined(CONFIG_MACH_T0_GODIVA_LTE)
+#define GPIO_LTE_VIA_UART_SEL	EXYNOS4212_GPJ0(6)
+#define GPIO_VIA_PMIC_PWRON	EXYNOS4212_GPM0(1)
+#define GPIO_VIA_PS_HOLD_OFF	EXYNOS4212_GPM0(3)
+#define GPIO_VIA_CP_RESET	EXYNOS4_GPF2(4)
+
+#define GPIO_VIA_ACTIVE		EXYNOS4_GPX0(6)
+#define IRQ_VIA_ACTIVE		IRQ_EINT(6)	/* IRQ of GPX0[6] */
+
+#define GPIO_VIA_DPRAM_INT	EXYNOS4_GPX3(2)
+#define IRQ_VIA_DPRAM_INT	IRQ_EINT(26)	/* IRQ of GPX3[2] */
+
+#define GPIO_UART_AP_VIA_RXD	EXYNOS4_GPA1(4)
+#define GPIO_UART_AP_VIA_TXD	EXYNOS4_GPA1(5)
+#define UART_SFN		S3C_GPIO_SFN(2)
+
+#define GPIO_LTE_PMIC_PWRON	EXYNOS4_GPL2(5)
+#define GPIO_LTE_CP_RESET	EXYNOS4_GPL2(4)
+#define GPIO_LTE_PS_HOLD_OFF	EXYNOS4_GPY2(3)
+
+#define GPIO_LTE_ACTIVE		EXYNOS4_GPX1(6)
+#define IRQ_LTE_ACTIVE		IRQ_EINT(14)	/* IRQ of GPX1[6] */
+
+#define GPIO_LTE_INDICATE	EXYNOS4_GPY0(1)
+
+#define GPIO_LTE2AP_WAKEUP	EXYNOS4_GPX0(5)
+#define IRQ_LTE2AP_WAKEUP	IRQ_EINT(5)	/* IRQ of GPX0[5] */
+#define GPIO_AP2LTE_STATUS	EXYNOS4_GPX1(2)
+
+#define GPIO_AP2LTE_WAKEUP	EXYNOS4212_GPJ0(1)
+#define GPIO_LTE2AP_STATUS	EXYNOS4_GPX1(1)
+#define IRQ_LTE2AP_STATUS	IRQ_EINT(9)
+
+/*
+#define GPIO_LTE_IPC1		EXYNOS4212_GPJ0(1)
+*/
+#define GPIO_LTE_IPC2		EXYNOS4212_GPM2(4)
+#define GPIO_LTE_IPC3		EXYNOS4212_GPM3(3)
+
+#define GPIO_MODEM_SPI_CLK	EXYNOS4212_GPM4(4)
+#define GPIO_MODEM_SPI_CSN	EXYNOS4212_GPM4(5)
+#define GPIO_MODEM_SPI_MISO	EXYNOS4212_GPM4(6)
+#define GPIO_MODEM_SPI_MOSI	EXYNOS4212_GPM4(7)
+#define SPI_SFN			S3C_GPIO_SFN(2)
+#endif /*CONFIG_MACH_T0_GODIVA_LTE*/
 
 #endif /* __MACH_GPIO_MIDAS_H */

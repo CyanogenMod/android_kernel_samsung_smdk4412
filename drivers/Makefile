@@ -41,6 +41,8 @@ obj-$(CONFIG_CONNECTOR)		+= connector/
 obj-$(CONFIG_FB_I810)           += video/i810/
 obj-$(CONFIG_FB_INTEL)          += video/intelfb/
 
+obj-$(CONFIG_USE_MUIC)		+= muic/
+
 obj-$(CONFIG_PARPORT)		+= parport/
 obj-y				+= base/ block/ misc/ mfd/ nfc/
 obj-$(CONFIG_NUBUS)		+= nubus/
@@ -87,11 +89,7 @@ obj-$(CONFIG_THERMAL)		+= thermal/
 obj-$(CONFIG_WATCHDOG)		+= watchdog/
 obj-$(CONFIG_PHONE)		+= telephony/
 obj-$(CONFIG_MD)		+= md/
-ifeq ($(CONFIG_BT_TIZEN),y)
-obj-$(CONFIG_BT)		+= bluetooth_tizen/
-else
 obj-$(CONFIG_BT)		+= bluetooth/
-endif
 obj-$(CONFIG_ACCESSIBILITY)	+= accessibility/
 obj-$(CONFIG_ISDN)		+= isdn/
 obj-$(CONFIG_EDAC)		+= edac/
@@ -127,29 +125,20 @@ obj-y				+= ieee802154/
 #common clk code
 obj-y				+= clk/
 obj-$(CONFIG_HWSPINLOCK)	+= hwspinlock/
-obj-$(CONFIG_VIBETONZ)		+= motor/
+obj-$(CONFIG_ANDROID_TIMED_OUTPUT)		+= motor/
 
 obj-$(CONFIG_SENSORS_CORE)	+= sensor/
 obj-$(CONFIG_SENSORS_SSP)	+= sensorhub/
 obj-$(CONFIG_FM_RADIO)   += samsung/
 obj-$(CONFIG_PM_DEVFREQ)	+= devfreq/
-obj-$(CONFIG_SAMSUNG_PHONE_SVNET) += svnet/
-obj-$(CONFIG_PHONE_IPC_SPI) += phone_svn/
 obj-$(CONFIG_ACCESSORY)		+= accessory/
 obj-$(CONFIG_IR_REMOCON)	+= irda/
 obj-$(CONFIG_BARCODE_EMUL)	+= barcode_emul/
 obj-$(CONFIG_EXTCON)		+= extcon/
-obj-$(CONFIG_SAMSUNG_PHONE_TTY)	+= dpram/
-# Secure OS Mobicore
-obj-$(CONFIG_MOBICORE_SUPPORT)	+= gud/
 
 obj-$(CONFIG_IOMMU_SUPPORT)	+= iommu/
 
 obj-$(CONFIG_FELICA) += felica/
 
-obj-$(CONFIG_AUTHENTEC_VPNCLIENT_INTERCEPTOR) += interceptor/
-
-ifeq (1, $(shell if [ -d ./drivers/exfat ]; then echo 1; fi))
-obj-y	+= exfat/
-endif
-
+#obj-$(CONFIG_J4FS)		+= j4fs/
+obj-$(CONFIG_ICE4_FPGA)		+= ice4_fpga/

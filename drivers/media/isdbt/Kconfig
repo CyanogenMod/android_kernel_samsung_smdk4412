@@ -11,4 +11,8 @@ choice
 
 	config ISDBT_FC8100
 		bool "ISDBT_FC8100"
+
 endchoice
+
+        config ISDBT_ANT_DET
+                bool "ISDBT antenna detector"

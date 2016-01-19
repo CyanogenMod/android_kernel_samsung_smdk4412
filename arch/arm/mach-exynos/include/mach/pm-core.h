@@ -42,6 +42,12 @@ static inline void s3c_pm_arch_show_resume_irqs(void)
 #if defined(CONFIG_CPU_EXYNOS4210) || defined(CONFIG_CPU_EXYNOS4412)\
 	|| defined(CONFIG_CPU_EXYNOS5250)
 	pr_info("WAKEUP_STAT: 0x%x\n", __raw_readl(S5P_WAKEUP_STAT));
+
+#if defined(CONFIG_PM_DEBUG_WAKEUP_RESET)
+	pr_info("RST_STAT: 0x%x\n", __raw_readl(S5P_PMUREG(0x0404)));
+	pr_info("CHIP_ID(0x10000004): 0x%0x\n", __raw_readl(S5P_VA_CHIPID + 0x4));
+#endif
+
 	pr_info("WAKEUP_INTx_PEND: 0x%x, 0x%x, 0x%x, 0x%x\n",
 				__raw_readl(S5P_EINT_PEND(0)),
 				__raw_readl(S5P_EINT_PEND(1)),

@@ -26,7 +26,6 @@
 static u8 clear_feature_num;
 static int clear_feature_flag;
 static int set_conf_done;
-
 /* Bulk-Only Mass Storage Reset (class-specific request) */
 #define GET_MAX_LUN_REQUEST	0xFE
 #define BOT_RESET_REQUEST	0xFF
@@ -98,6 +97,22 @@ static inline void s3c_udc_pre_setup(struct s3c_udc *dev)
 	ep_ctrl = __raw_readl(dev->regs + S3C_UDC_OTG_DOEPCTL(EP0_CON));
 	__raw_writel(ep_ctrl|DEPCTL_EPENA|DEPCTL_CNAK,
 		dev->regs + S3C_UDC_OTG_DOEPCTL(EP0_CON));
+}
+
+static inline void s3c_udc_set_nak(struct s3c_udc *dev)
+{
+	u32 ep_ctrl;
+
+	DEBUG_IN_EP("%s : s3c_udc_set_nak.\n", __func__);
+
+	__raw_writel((3<<29)|(1 << 19)|sizeof(struct usb_ctrlrequest),
+			dev->regs + S3C_UDC_OTG_DOEPTSIZ(EP0_CON));
+	__raw_writel(dev->usb_ctrl_dma,
+			dev->regs + S3C_UDC_OTG_DOEPDMA(EP0_CON));
+
+	ep_ctrl = __raw_readl(dev->regs + S3C_UDC_OTG_DOEPCTL(EP0_CON));
+	__raw_writel(ep_ctrl|DEPCTL_EPENA|DEPCTL_SNAK,
+			dev->regs + S3C_UDC_OTG_DOEPCTL(EP0_CON));
 }
 
 static int setdma_rx(struct s3c_ep *ep, struct s3c_request *req)
@@ -178,6 +193,17 @@ static int setdma_tx(struct s3c_ep *ep, struct s3c_request *req)
 	__raw_writel(virt_to_phys(buf), udc->regs + S3C_UDC_OTG_DIEPDMA(ep_num));
 	__raw_writel((pktcnt<<19)|(length<<0), udc->regs + S3C_UDC_OTG_DIEPTSIZ(ep_num));
 	ctrl = __raw_readl(udc->regs + S3C_UDC_OTG_DIEPCTL(ep_num));
+
+	if ((ctrl & DEPCTL_TYPE_MASK) == DEPCTL_ISO_TYPE) {
+		if (ctrl & DEPCTL_EO_FRNUM)	{
+			ctrl &= ~DEPCTL_SETFRAME;
+			ctrl |= DEPCTL_SETD0PID;
+		} else {
+			ctrl &= ~DEPCTL_SETFRAME;
+			ctrl |= DEPCTL_SETD1PID;
+		}
+	}
+
 	__raw_writel(DEPCTL_EPENA|DEPCTL_CNAK|ctrl,
 		udc->regs + S3C_UDC_OTG_DIEPCTL(ep_num));
 
@@ -252,7 +278,7 @@ static void complete_rx(struct s3c_udc *dev, u8 ep_num)
 	}
 }
 
-static void complete_tx(struct s3c_udc *dev, u8 ep_num)
+static int complete_tx(struct s3c_udc *dev, u8 ep_num)
 {
 	struct s3c_ep *ep = &dev->ep[ep_num];
 	struct s3c_request *req;
@@ -262,7 +288,7 @@ static void complete_tx(struct s3c_udc *dev, u8 ep_num)
 	if (list_empty(&ep->queue)) {
 		DEBUG_IN_EP("%s: TX DMA done : NULL REQ on IN EP-%d\n",
 					__func__, ep_num);
-		return;
+		return 1;
 	}
 
 	req = list_entry(ep->queue.next, struct s3c_request, queue);
@@ -276,7 +302,7 @@ static void complete_tx(struct s3c_udc *dev, u8 ep_num)
 		if (last)
 			dev->ep0state = WAIT_FOR_SETUP;
 
-		return;
+		return 1;
 	}
 
 	ep_tsr = __raw_readl(dev->regs + S3C_UDC_OTG_DIEPTSIZ(ep_num));
@@ -302,7 +328,7 @@ static void complete_tx(struct s3c_udc *dev, u8 ep_num)
 			req->req.zero = 0;
 			if (req->written_bytes == ep_maxpacket(ep)) {
 				setdma_tx(ep, req);
-				return;
+				return 1;
 			}
 		}
 		done(ep, req, 0);
@@ -314,6 +340,10 @@ static void complete_tx(struct s3c_udc *dev, u8 ep_num)
 			setdma_tx(ep, req);
 		}
 	}
+	if (req->req.length)
+		return 1;
+	else
+		return 0;
 }
 
 static inline void s3c_udc_check_tx_queue(struct s3c_udc *dev, u8 ep_num)
@@ -342,7 +372,9 @@ static inline void s3c_udc_check_tx_queue(struct s3c_udc *dev, u8 ep_num)
 static void process_ep_in_intr(struct s3c_udc *dev)
 {
 	u32 ep_intr, ep_intr_status;
+	u32 ep_ctrl;
 	u8 ep_num = 0;
+	u32 result;
 
 	ep_intr = __raw_readl(dev->regs + S3C_UDC_OTG_DAINT);
 	DEBUG_IN_EP("*** %s: EP In interrupt : DAINT = 0x%x\n",
@@ -360,12 +392,17 @@ static void process_ep_in_intr(struct s3c_udc *dev)
 			__raw_writel(ep_intr_status, dev->regs + S3C_UDC_OTG_DIEPINT(ep_num));
 
 			if (ep_intr_status & TRANSFER_DONE) {
-				complete_tx(dev, ep_num);
+				result = complete_tx(dev, ep_num);
 
 				if (ep_num == 0) {
-					if (dev->ep0state == WAIT_FOR_SETUP)
-						s3c_udc_pre_setup(dev);
+					if (dev->ep0state == WAIT_FOR_SETUP) {
+						if (result)
+							s3c_udc_pre_setup(dev);
+						else {
+							s3c_udc_set_nak(dev);
+						}
 
+					}
 					/* continue transfer after
 						set_clear_halt for DMA mode */
 					if (clear_feature_flag == 1) {
@@ -526,7 +563,7 @@ static irqreturn_t s3c_udc_irq(int irq, void *_dev)
 			if (reset_available) {
 				DEBUG_ISR("\t\tOTG core got reset (%d)!!\n",
 					reset_available);
-				reset_usbd();
+				reconfig_usbd();
 				dev->ep0state = WAIT_FOR_SETUP;
 				reset_available = 0;
 				s3c_udc_pre_setup(dev);
@@ -1033,7 +1070,13 @@ void s3c_udc_ep_activate(struct s3c_ep *ep)
 			(ep->bmAttributes << DEPCTL_TYPE_BIT);
 		ep_ctrl = (ep_ctrl & ~DEPCTL_MPS_MASK) |
 			(ep->ep.maxpacket << DEPCTL_MPS_BIT);
-		ep_ctrl |= (DEPCTL_SETD0PID | DEPCTL_USBACTEP | DEPCTL_SNAK);
+		ep_ctrl &= ~DEPCTL_SETFRAME;
+		if (ep->bmAttributes == USB_ENDPOINT_XFER_ISOC)
+			ep_ctrl |= (DEPCTL_SETD1PID | DEPCTL_USBACTEP \
+						| DEPCTL_SNAK);
+		else
+			ep_ctrl |= (DEPCTL_SETD0PID | DEPCTL_USBACTEP \
+						| DEPCTL_SNAK);
 
 		if (ep_is_in(ep)) {
 			__raw_writel(ep_ctrl, dev->regs + S3C_UDC_OTG_DIEPCTL(ep_num));

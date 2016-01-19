@@ -29,6 +29,10 @@
 
 #include <plat/regs-serial.h>
 
+#ifdef CONFIG_MIDAS_COMMON
+extern const char *chip_name;
+#endif
+
 static struct cpu_table *cpu;
 
 static struct cpu_table * __init s3c_lookup_cpu(unsigned long idcode,
@@ -54,6 +58,10 @@ void __init s3c_init_cpu(unsigned long idcode,
 	}
 
 	printk("CPU %s (id 0x%08lx)\n", cpu->name, idcode);
+
+#ifdef CONFIG_MIDAS_COMMON
+	chip_name = cpu->name;
+#endif
 
 	if (cpu->map_io == NULL || cpu->init == NULL) {
 		printk(KERN_ERR "CPU %s support not enabled\n", cpu->name);

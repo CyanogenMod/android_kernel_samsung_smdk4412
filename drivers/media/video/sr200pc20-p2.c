@@ -941,9 +941,10 @@ static int sr200pc20_s_parm(struct v4l2_subdev *sd, struct v4l2_streamparm *parm
 	u32 fps = 0;
 	struct sr200pc20_state *state = to_state(sd);
 
+	/* for FrameRate Setting.
 	if (!state->vt_mode)
 		return 0;
-
+	*/
 	cam_dbg("E\n");
 
 	fps = parms->parm.capture.timeperframe.denominator /

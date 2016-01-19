@@ -56,6 +56,9 @@
  */
 #define S3C_FB_MAX_WIN	(5)
 
+#define FENCE_SUPPORT		1
+#define FENCE_NOT_SUPPORT	0
+
 enum s3cfb_data_path_t {
 	DATA_PATH_FIFO = 0,
 	DATA_PATH_DMA = 1,
@@ -110,62 +113,6 @@ struct s3cfb_chroma {
 	enum		s3cfb_chroma_dir_t dir;
 };
 
-struct s3cfb_lcd_timing {
-	int	h_fp;
-	int	h_bp;
-	int	h_sw;
-	int	v_fp;
-	int	v_fpe;
-	int	v_bp;
-	int	v_bpe;
-	int	v_sw;
-#if defined(CONFIG_FB_S5P_MIPI_DSIM) || defined(CONFIG_S5P_MIPI_DSI2)
-	int	cmd_allow_len;
-	int	stable_vfp;
-	void	(*cfg_gpio)(struct platform_device *dev);
-	int	(*backlight_on)(struct platform_device *dev);
-	int	(*reset_lcd)(struct platform_device *dev);
-#endif
-};
-
-struct s3cfb_lcd_polarity {
-	int rise_vclk;
-	int inv_hsync;
-	int inv_vsync;
-	int inv_vden;
-};
-
-#ifdef CONFIG_FB_S5P_MIPI_DSIM
-/* for CPU Interface */
-struct s3cfb_cpu_timing {
-	unsigned int	cs_setup;
-	unsigned int	wr_setup;
-	unsigned int	wr_act;
-	unsigned int	wr_hold;
-};
-#endif
-
-struct s3cfb_lcd {
-#ifdef CONFIG_FB_S5P_MIPI_DSIM
-	char	*name;
-#endif
-	int	width;
-	int	height;
-	int	p_width;
-	int	p_height;
-	int	bpp;
-	int	freq;
-	int	freq_limit;
-	int	vclk;
-	struct	s3cfb_lcd_timing timing;
-	struct	s3cfb_lcd_polarity polarity;
-#ifdef CONFIG_FB_S5P_MIPI_DSIM
-	struct	s3cfb_cpu_timing cpu_timing;
-#endif
-	void	(*init_ldi)(void);
-	void	(*deinit_ldi)(void);
-};
-
 struct s3cfb_fimd_desc {
 	int			state;
 	int			dual;
@@ -201,9 +148,10 @@ struct sysmmu_flag {
 struct s3cfb_global {
 	void __iomem		*regs;
 	void __iomem		*regs_org;
-	void __iomem		*ielcd_regs;
-	void			*data;
+	void __iomem		*ielcd_regs;	/* to force upload Dump */
+	void __iomem		*dsim_regs;	/* to forcd upload Dump */
 	struct mutex		lock;
+	struct mutex		output_lock;
 	spinlock_t		slock;
 	struct device		*dev;
 #ifdef CONFIG_BUSFREQ_OPP
@@ -223,7 +171,7 @@ struct s3cfb_global {
 	struct s3cfb_lcd	*lcd;
 	int			system_state;
 
-        /* New added */
+	/* New added */
 	struct list_head	update_regs_list;
 	struct mutex		update_regs_list_lock;
 	struct kthread_worker	update_regs_worker;
@@ -232,6 +180,7 @@ struct s3cfb_global {
 
 	struct sw_sync_timeline *timeline;
 	int			timeline_max;
+	unsigned int		support_fence;
 #ifdef CONFIG_HAS_WAKELOCK
 	struct early_suspend	early_suspend;
 	struct wake_lock	idle_lock;
@@ -243,6 +192,11 @@ struct s3cfb_global {
 #ifdef CONFIG_FB_S5P_SYSMMU
 	struct sysmmu_flag	sysmmu;
 #endif
+#if defined(CONFIG_FB_S5P_GD2EVF)
+	bool			suspend;
+#endif
+        struct fb_fix_screeninfo initial_fix;
+        struct fb_var_screeninfo initial_var;
 };
 
 struct s3cfb_window {
@@ -291,6 +245,13 @@ enum s3c_fb_pixel_format {
 	S3C_FB_PIXEL_FORMAT_MAX = 7,
 };
 
+enum s3c_fb_blending {
+	S3C_FB_BLENDING_NONE = 0,
+	S3C_FB_BLENDING_PREMULT = 1,
+	S3C_FB_BLENDING_COVERAGE = 2,
+	S3C_FB_BLENDING_MAX = 3,
+};
+
 struct s3c_fb_win_config {
 	enum {
 		S3C_FB_WIN_STATE_DISABLED = 0,
@@ -302,11 +263,13 @@ struct s3c_fb_win_config {
 		__u32 color;
 		struct {
 			int	fd;
-                        __u32	phys_addr;
-                        __u32	virt_addr;
+			__u32	phys_addr;
+			__u32	virt_addr;
 			__u32	offset;
 			__u32	stride;
 			enum s3c_fb_pixel_format format;
+			enum s3c_fb_blending blending;
+			int	fence_fd;
 		};
 	};
 
@@ -325,14 +288,19 @@ struct s3c_reg_data {
 	struct list_head	list;
 	u32			shadowcon;
 	u32			wincon[S3C_FB_MAX_WIN];
+	u32			win_rgborder[S3C_FB_MAX_WIN];
 	u32			winmap[S3C_FB_MAX_WIN];
 	u32			vidosd_a[S3C_FB_MAX_WIN];
 	u32			vidosd_b[S3C_FB_MAX_WIN];
 	u32			vidosd_c[S3C_FB_MAX_WIN];
 	u32			vidosd_d[S3C_FB_MAX_WIN];
+	u32			vidw_alpha0[S3C_FB_MAX_WIN];
+	u32			vidw_alpha1[S3C_FB_MAX_WIN];
+	u32			blendeq[S3C_FB_MAX_WIN - 1];
 	u32			vidw_buf_start[S3C_FB_MAX_WIN];
 	u32			vidw_buf_end[S3C_FB_MAX_WIN];
 	u32			vidw_buf_size[S3C_FB_MAX_WIN];
+	struct sync_fence	*fence[S3C_FB_MAX_WIN];
 };
 
 #define BLENDING_NONE			0x0100
@@ -366,6 +334,8 @@ struct s3c_reg_data {
 #define S3CFB_SET_WIN_MEM_START		_IOW('F', 312, u32)
 #endif
 #define S3CFB_SET_ALPHA_MODE		_IOW('F', 313, unsigned int)
+#define S3CFB_SET_INITIAL_CONFIG        _IO('F', 314)
+#define S3CFB_SUPPORT_FENCE	        _IOW('F', 315, unsigned int)
 
 extern struct fb_ops			s3cfb_ops;
 extern struct s3cfb_global	*get_fimd_global(int id);
@@ -458,26 +428,16 @@ extern void s3cfb_clean_outer_pagetable(unsigned long vaddr, size_t size);
 #if defined(CONFIG_FB_S5P_VSYNC_THREAD)
 extern int s3cfb_wait_for_vsync(struct s3cfb_global *fbdev, u32 timeout);
 #endif
-#ifdef CONFIG_FB_S5P_MIPI_DSIM
-extern int s3cfb_vsync_status_check(void);
-#endif
-
-#ifdef CONFIG_HAS_WAKELOCK
-#ifdef CONFIG_HAS_EARLYSUSPEND
-extern void s3cfb_early_suspend(struct early_suspend *h);
-extern void s3cfb_late_resume(struct early_suspend *h);
-#endif
-#endif
 
 /* LCD */
 extern void s3cfb_set_lcd_info(struct s3cfb_global *ctrl);
 
 #ifdef CONFIG_FB_S5P_MIPI_DSIM
+extern int s3cfb_vsync_status_check(void);
 extern void s5p_dsim_early_suspend(void);
 extern void s5p_dsim_late_resume(void);
 extern void set_dsim_hs_clk_toggle_count(u8 count);
 extern void set_dsim_lcd_enabled(u8 enable);
-extern u32 read_dsim_register(u32 num);
 #endif
 
 
@@ -490,11 +450,5 @@ extern void ams369fg06_gpio_cfg(void);
 extern void lms501kf03_ldi_disable(void);
 #endif
 
-#if defined(CONFIG_FB_S5P_S6C1372) || defined(CONFIG_FB_S5P_S6F1202A)
-extern void s5c1372_ldi_enable(void);
-extern void s5c1372_ldi_disable(void);
-#endif
-
-extern int lcdfreq_init(struct fb_info *fb);
-
 #endif /* _S3CFB_H */
+

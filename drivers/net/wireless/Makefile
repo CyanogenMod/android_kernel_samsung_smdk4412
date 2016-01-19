@@ -47,8 +47,6 @@ obj-$(CONFIG_RT2X00)	+= rt2x00/
 
 obj-$(CONFIG_P54_COMMON)	+= p54/
 
-obj-$(CONFIG_ATH_COMMON)	+= ath/
-
 obj-$(CONFIG_MAC80211_HWSIM)	+= mac80211_hwsim.o
 
 obj-$(CONFIG_WL1251)	+= wl1251/
@@ -63,6 +61,6 @@ obj-$(CONFIG_MWIFIEX)	+= mwifiex/
 obj-$(CONFIG_BCM4334)   += bcmdhd/
 obj-$(CONFIG_BCM4330)   += bcmdhd/
 obj-$(CONFIG_BCM43241)	+= bcmdhd/
-obj-$(CONFIG_BCM4334)   += btlock/
+# obj-$(CONFIG_BCM4334)   += btlock/
 # obj-$(CONFIG_BCM4334)	+= bcm4334/
 # obj-$(CONFIG_BCM4330)	+= bcm4330/

@@ -192,7 +192,7 @@ void s3cfb_start_progress(struct fb_info *fb)
 
 	init_timer(&progress_timer);
 
-	progress_timer.expires  = (get_jiffies_64() + (HZ/20));
+	progress_timer.expires  = (get_jiffies_64() + 5);
 	progress_timer.data     = (long)fb;
 	progress_timer.function = progress_timer_handler;
 	progress_pos = PROGRESS_BAR_LEFT_POS;
@@ -257,7 +257,7 @@ static void progress_timer_handler(unsigned long data)
 		PROGRESS_BAR_WIDTH,
 		PROGRESS_BAR_HEIGHT);
 
-		progress_timer.expires = (get_jiffies_64() + (HZ/20));
+		progress_timer.expires = (get_jiffies_64() + 5);
 		progress_timer.function = progress_timer_handler;
 		add_timer(&progress_timer);
 	} else

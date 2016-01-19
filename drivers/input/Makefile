@@ -26,3 +26,4 @@ obj-$(CONFIG_INPUT_MISC)	+= misc/
 obj-$(CONFIG_INPUT_APMPOWER)	+= apm-power.o
 obj-$(CONFIG_INPUT_KEYRESET)	+= keyreset.o
 obj-$(CONFIG_INPUT_SECBRIDGE)   += sec-input-bridge.o
+obj-$(CONFIG_INPUT_MPU6050)	+= mpu6050_input.o mpu6050_selftest.o

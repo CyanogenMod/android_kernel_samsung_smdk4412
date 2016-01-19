@@ -53,9 +53,13 @@
 #define FIMC_IS_SENSOR_NUM	2
 
 /* Time - out definitions */
-#define FIMC_IS_SHUTDOWN_TIMEOUT	(3*HZ)
+#define FIMC_IS_SHUTDOWN_TIMEOUT	(1*HZ)
+#define FIMC_IS_STREAMON_TIMEOUT	(2*HZ)
+#define FIMC_IS_STREAMOFF_TIMEOUT	(1*HZ)
+#define FIMC_IS_POWEROFF_TIMEOUT	(1*HZ)
 #define FIMC_IS_SHUTDOWN_TIMEOUT_SENSOR	(HZ)
 #define FIMC_IS_SHUTDOWN_TIMEOUT_AF	(3*HZ)
+
 /* Memory definitions */
 #define FIMC_IS_MEM_FW			"f"
 #define FIMC_IS_MEM_ISP_BUF		"i"
@@ -99,6 +103,7 @@
 #define FIMC_IS_DEBUG_LEVEL	3
 
 #define SDCARD_FW
+#define USE_NIGHT_SHOT
 
 #ifdef SDCARD_FW
 #define FIMC_IS_FW_SDCARD	"/sdcard/fimc_is_fw.bin"
@@ -170,10 +175,12 @@ enum sensor_list {
 	SENSOR_S5K6A3_CSI_A	= 2,
 	SENSOR_S5K4E5_CSI_A	= 3,
 	SENSOR_S5K3H7_CSI_A	= 4,
+	SENSOR_S5K6B2_CSI_A	= 9,
 	SENSOR_S5K3H2_CSI_B	= 101,
 	SENSOR_S5K6A3_CSI_B	= 102,
 	SENSOR_S5K4E5_CSI_B	= 103,
 	SENSOR_S5K3H7_CSI_B	= 104,
+	SENSOR_S5K6B2_CSI_B	= 109,
 	/* Custom mode */
 	SENSOR_S5K6A3_CSI_B_CUSTOM	= 200,
 };
@@ -183,7 +190,8 @@ enum sensor_name {
 	SENSOR_NAME_S5K6A3	= 2,
 	SENSOR_NAME_S5K4E5	= 3,
 	SENSOR_NAME_S5K3H7	= 4,
-	SENSOR_NAME_CUSTOM	= 5,
+	SENSOR_NAME_S5K6B2	= 9,
+	SENSOR_NAME_CUSTOM	= 100,
 	SENSOR_NAME_END
 };
 
@@ -292,6 +300,9 @@ struct is_sensor {
 	u32 frametime_max_prev_cam;
 	u32 frametime_max_cap;
 	u32 frametime_max_cam;
+#ifdef USE_NIGHT_SHOT
+	u32 frametime_max_LLS;
+#endif
 	int framerate_update;
 };
 

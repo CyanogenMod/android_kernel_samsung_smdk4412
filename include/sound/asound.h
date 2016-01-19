@@ -96,6 +96,7 @@ enum {
 	SNDRV_HWDEP_IFACE_HDA,		/* HD-audio */
 	SNDRV_HWDEP_IFACE_USB_STREAM,	/* direct access to usb stream */
 	SNDRV_HWDEP_IFACE_MC1N2,	/* MC1N2 */
+	SNDRV_HWDEP_IFACE_YAMAHA_YMU831,	/* YMU831 */
 
 	/* Don't forget to change the following: */
 	SNDRV_HWDEP_IFACE_LAST = SNDRV_HWDEP_IFACE_MC1N2

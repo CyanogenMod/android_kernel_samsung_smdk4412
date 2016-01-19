@@ -26,13 +26,8 @@
 #define DEVICE_CTRL		0x01
 #define EEPROM_START		0xA0
 #define EEPROM_END		0xA7
-#define EPROM_START		0xA0
+#define EPROM_START		0x98
 #define EPROM_END		0xAF
-
-#if defined(CONFIG_MACH_KONA)
-#define EEPROM_CFG3	0xA3
-#define EEPROM_CFG5	0xA5
-#endif
 
 #define BUF_SIZE		20
 #define DEFAULT_BL_NAME		"lcd-backlight"
@@ -290,37 +285,6 @@ static int lp855x_set_power(struct lp855x *lp, int on)
 	return 0;
 }
 
-#if defined(CONFIG_MACH_KONA)
-static int lp855x_config(struct lp855x *lp)
-{
-	u8 val;
-	int ret;
-
-	/* DEVICE CONTROL: No FAST bit to prevent LP8556 register reset */
-	ret = lp855x_write_byte(lp, DEVICE_CTRL, 0x81);
-	if (ret)
-		return ret;
-
-	/* CFG3: SCURVE_EN is linear transitions, SLOPE = 200ms,
-	 * FILTER = heavy smoothing,
-	 * PWM_INPUT_HYSTERESIS = 1-bit hysteresis with 12-bit resolution
-	 */
-	ret = lp855x_write_byte(lp, EEPROM_CFG3, 0x5E);
-	if (ret)
-		return ret;
-
-	/* CFG5: No PWM_DIRECT, PS_MODE from platform data, PWM_FREQ = 9616Hz */
-	val = 0x2 << 4 | 0x04;
-	ret = lp855x_write_byte(lp, EEPROM_CFG5, val);
-
-	if (ret)
-		return ret;
-
-	return 0;
-
-}
-#endif
-
 #ifdef CONFIG_HAS_EARLYSUSPEND
 static void lp855x_early_suspend(struct early_suspend *h)
 {
@@ -337,10 +301,6 @@ static void lp855x_late_resume(struct early_suspend *h)
 
 	lp855x_set_power(lp, 1);
 	backlight_update_status(lp->bl);
-#if defined(CONFIG_MACH_KONA)
-	lp855x_config(lp);
-#endif
-
 }
 #endif
 
@@ -404,10 +364,6 @@ static int lp855x_probe(struct i2c_client *cl, const struct i2c_device_id *id)
 	}
 
 	backlight_update_status(lp->bl);
-
-#if defined(CONFIG_MACH_KONA)
-	lp855x_config(lp);
-#endif
 
 	return 0;
 

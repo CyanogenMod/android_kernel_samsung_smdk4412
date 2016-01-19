@@ -166,13 +166,58 @@ static struct irq_chip max77693_irq_chip = {
 	.irq_unmask		= max77693_irq_unmask,
 };
 
+#if defined(CONFIG_MUIC_MAX77693_RESET_WA)
+static void max77693_muic_irq_mask(struct max77693_dev *max77693)
+{
+	int i;
+
+	/* Mask individual interrupt sources */
+	for (i = MUIC_INT1; i <= MUIC_INT3; i++) {
+		/* MUIC IRQ  0:MASK 1:NOT MASK */
+		max77693->irq_masks_cur[i] = 0x00;
+		max77693->irq_masks_cache[i] = 0x00;
+		pr_info("%s: INT group(%d) irq_mask_cur[0x%02x],"
+			"irq_mask_cache[0x%02x]",
+				__func__, i, max77693->irq_masks_cur[i],
+				max77693->irq_masks_cache[i]);
+	}
+}
+
+static void check_muic_reset(struct max77693_dev *max77693)
+{
+	u8 muic_irq_mask[3] = {};
+	u8 reset_val = 0x0;
+
+	/* MUIC INT1 ~ INT3 MASK register check */
+	max77693_bulk_read(max77693->muic, MAX77693_MUIC_REG_INTMASK1,
+			MAX77693_NUM_IRQ_MUIC_REGS, muic_irq_mask);
+
+	if ((reset_val == muic_irq_mask[0])
+			&& (reset_val == muic_irq_mask[1])
+			&& (reset_val == muic_irq_mask[2])) {
+		pr_warn("%s: MUIC was reseted, try re-write MUIC registers\n",
+				__func__);
+		if (max77693->muic_init_work) {
+			mutex_lock(&max77693->irqlock);
+			max77693_muic_irq_mask(max77693);
+			schedule_work(max77693->muic_init_work);
+			mutex_unlock(&max77693->irqlock);
+		}
+		else
+			pr_warn("%s: MUIC is not probed yet\n", __func__);
+	}
+}
+#endif /* CONFIG_MUIC_MAX77693_RESET_WA */
+
 static irqreturn_t max77693_irq_thread(int irq, void *data)
 {
 	struct max77693_dev *max77693 = data;
-	u8 irq_reg[MAX77693_IRQ_GROUP_NR] = {};
+	u8 irq_reg[MAX77693_IRQ_GROUP_NR] = {0};
+	u8 tmp_irq_reg[MAX77693_IRQ_GROUP_NR] = {};
 	u8 irq_src;
 	int ret;
 	int i;
+
 	pr_debug("%s: irq gpio pre-state(0x%02x)\n", __func__,
 		gpio_get_value(max77693->irq_gpio));
 
@@ -208,17 +253,26 @@ clear_retry:
 
 	if (irq_src & MAX77693_IRQSRC_MUIC) {
 		/* MUIC INT1 ~ INT3 */
-		max77693_bulk_read(max77693->muic, MAX77693_MUIC_REG_INT1, MAX77693_NUM_IRQ_MUIC_REGS,
-				&irq_reg[MUIC_INT1]);
-		pr_info("%s: muic interrupt(0x%02x, 0x%02x, 0x%02x)\n", __func__,
-			irq_reg[MUIC_INT1], irq_reg[MUIC_INT2], irq_reg[MUIC_INT3]);
+		max77693_bulk_read(max77693->muic, MAX77693_MUIC_REG_INT1,
+				MAX77693_NUM_IRQ_MUIC_REGS,
+				&tmp_irq_reg[MUIC_INT1]);
+
+		/* Or temp irq register to irq register for if it retries */
+		for (i = MUIC_INT1; i < MAX77693_IRQ_GROUP_NR; i++)
+			irq_reg[i] |= tmp_irq_reg[i];
+
+		pr_info("%s: muic interrupt(0x%02x, 0x%02x, 0x%02x)\n",
+			__func__, irq_reg[MUIC_INT1],
+			irq_reg[MUIC_INT2], irq_reg[MUIC_INT3]);
 	}
 
 	pr_debug("%s: irq gpio post-state(0x%02x)\n", __func__,
 		gpio_get_value(max77693->irq_gpio));
 
-	if (gpio_get_value(max77693->irq_gpio) == 0)
+	if (gpio_get_value(max77693->irq_gpio) == 0) {
+		pr_warn("%s: irq_gpio is not High!\n", __func__);
 		goto clear_retry;
+	}
 
 	/* Apply masking */
 	for (i = 0; i < MAX77693_IRQ_GROUP_NR; i++) {
@@ -233,6 +287,10 @@ clear_retry:
 		if (irq_reg[max77693_irqs[i].group] & max77693_irqs[i].mask)
 			handle_nested_irq(max77693->irq_base + i);
 	}
+
+#if defined(CONFIG_MUIC_MAX77693_RESET_WA)
+	check_muic_reset(max77693);
+#endif /* CONFIG_MUIC_MAX77693_RESET_WA */
 
 	return IRQ_HANDLED;
 }
