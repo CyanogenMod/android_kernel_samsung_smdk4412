@@ -801,7 +801,6 @@ static	SINT32	get_path
 	}
 
 	McResCtrl_GetPathInfoVirtual(psPathInfo);
-
 #ifdef CONFIG_SND_SOC_MC1N2_MIC_ADC_SWAP
     swap_mic_adc_paths(psPathInfo);
 #endif
@@ -854,8 +853,10 @@ static	SINT32	set_path
 #ifdef CONFIG_SND_SOC_MC1N2_MIC_ADC_SWAP
     swap_mic_adc_paths(psPathInfo);
 #endif
-
 	McResCtrl_SetPathInfo(psPathInfo);
+#ifdef CONFIG_SND_SOC_MC1N2_MIC_ADC_SWAP
+    swap_mic_adc_paths(psPathInfo);
+#endif
 
 	/*	unused analog out volume mute	*/
 	sdRet	= SetVol(MCDRV_VOLUPDATE_ANAOUT_ALL, eMCDRV_VOLUPDATE_MUTE, &dSVolDoneParam);
@@ -1052,6 +1053,10 @@ static	SINT32	set_volume
 	McResCtrl_SetVolInfo(psVolInfo);
 
 	McResCtrl_GetPathInfoVirtual(&sPathInfo);
+#ifdef CONFIG_SND_SOC_MC1N2_MIC_ADC_SWAP
+    swap_mic_adc_paths(&sPathInfo);
+#endif
+
 	return	set_path(&sPathInfo);
 }
 
@@ -1482,6 +1487,10 @@ static	SINT32	set_ae
 	}
 
 	McResCtrl_GetPathInfoVirtual(&sPathInfo);
+#ifdef CONFIG_SND_SOC_MC1N2_MIC_ADC_SWAP
+    swap_mic_adc_paths(&sPathInfo);
+#endif
+
 	return	set_path(&sPathInfo);
 }
 
@@ -2173,6 +2182,10 @@ SINT32	ValidatePathParam
 
 
 	McResCtrl_GetPathInfoVirtual(&sCurPathInfo);
+#ifdef CONFIG_SND_SOC_MC1N2_MIC_ADC_SWAP
+    swap_mic_adc_paths(&sCurPathInfo);
+#endif
+
 	/*	set off to current path info	*/
 	for(bBlock = 0; bBlock < SOURCE_BLOCK_NUM; bBlock++)
 	{
