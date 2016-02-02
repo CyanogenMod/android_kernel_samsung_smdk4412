@@ -1351,7 +1351,7 @@ CONFIG_WIFI_CONTROL_FUNC=y
 # CONFIG_ATH_COMMON is not set
 CONFIG_BCMDHD=m
 # CONFIG_BCM4330 is not set
-CONFIG_BCM4334=y
+CONFIG_BCM4334=m
 # CONFIG_BCM43241 is not set
 CONFIG_BCMDHD_FW_PATH="/system/etc/firmware/fw_bcmdhd.bin"
 CONFIG_BCMDHD_NVRAM_PATH="/system/etc/wifi/bcmdhd.cal"
