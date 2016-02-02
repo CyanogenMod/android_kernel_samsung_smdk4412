@@ -1,7 +1,7 @@
 /*
  * Linux cfg80211 driver
  *
- * Copyright (C) 1999-2012, Broadcom Corporation
+ * Copyright (C) 1999-2014, Broadcom Corporation
  * 
  *      Unless you and Broadcom execute a separate written software license
  * agreement governing use of this software, this software is licensed to you
@@ -21,7 +21,7 @@
  * software in any way with any other Broadcom software provided under a license
  * other than the GPL, without Broadcom's express prior written consent.
  *
- * $Id: wl_cfg80211.h 393930 2013-03-29 12:06:51Z $
+ * $Id: wl_cfg80211.h 457855 2014-02-25 01:27:41Z $
  */
 
 #ifndef _wl_cfg80211_h_
@@ -39,17 +39,17 @@
 
 struct wl_conf;
 struct wl_iface;
-struct wl_priv;
+struct bcm_cfg80211;
 struct wl_security;
 struct wl_ibss;
 
 
-#define htod32(i) i
-#define htod16(i) i
-#define dtoh32(i) i
-#define dtoh16(i) i
-#define htodchanspec(i) i
-#define dtohchanspec(i) i
+#define htod32(i) (i)
+#define htod16(i) (i)
+#define dtoh32(i) (i)
+#define dtoh16(i) (i)
+#define htodchanspec(i) (i)
+#define dtohchanspec(i) (i)
 
 #define WL_DBG_NONE	0
 #define WL_DBG_P2P_ACTION (1 << 5)
@@ -125,7 +125,7 @@ do {										\
 	if (wl_dbg_level & WL_DBG_ERR) {				\
 			printk(KERN_INFO "CFG80211-TRACE) %s : ", __func__);	\
 			printk args;						\
-		}								\
+		} 								\
 } while (0)
 #else
 #define	WL_TRACE_HW4			WL_TRACE
@@ -148,14 +148,12 @@ do {									\
 #define WL_SCAN_RETRY_MAX	3
 #define WL_NUM_PMKIDS_MAX	MAXPMKID
 #define WL_SCAN_BUF_MAX 	(1024 * 8)
-#define WL_TLV_INFO_MAX		1500
+#define WL_TLV_INFO_MAX 	1500
 #define WL_SCAN_IE_LEN_MAX      2048
 #define WL_BSS_INFO_MAX		2048
 #define WL_ASSOC_INFO_MAX	512
-#define WL_IOCTL_LEN_MAX	1024
+#define WL_IOCTL_LEN_MAX	2048
 #define WL_EXTRA_BUF_MAX	2048
-#define WL_ISCAN_BUF_MAX	2048
-#define WL_ISCAN_TIMER_INTERVAL_MS	3000
 #define WL_SCAN_ERSULTS_LAST 	(WL_SCAN_RESULTS_NO_MEM+1)
 #define WL_AP_MAX		256
 #define WL_FILE_NAME_MAX	256
@@ -164,16 +162,16 @@ do {									\
 #define WL_MIN_DWELL_TIME	100
 #define WL_LONG_DWELL_TIME 	1000
 #define IFACE_MAX_CNT 		2
-#define WL_SCAN_CONNECT_DWELL_TIME_MS 		300
-#define WL_SCAN_JOIN_PROBE_INTERVAL_MS 		60
-#define WL_SCAN_JOIN_ACTIVE_DWELL_TIME_MS	320
-#define WL_SCAN_JOIN_PASSIVE_DWELL_TIME_MS	400
-#define WL_AF_TX_MAX_RETRY	5
+#define WL_SCAN_CONNECT_DWELL_TIME_MS 		200
+#define WL_SCAN_JOIN_PROBE_INTERVAL_MS 		20
+#define WL_SCAN_JOIN_ACTIVE_DWELL_TIME_MS 	320
+#define WL_SCAN_JOIN_PASSIVE_DWELL_TIME_MS 	400
+#define WL_AF_TX_MAX_RETRY 	5
 
-#define WL_AF_SEARCH_TIME_MAX		450
-#define WL_AF_TX_EXTRA_TIME_MAX		200
+#define WL_AF_SEARCH_TIME_MAX           450
+#define WL_AF_TX_EXTRA_TIME_MAX         200
 
-#define WL_SCAN_TIMER_INTERVAL_MS	8000 /* Scan timeout */
+#define WL_SCAN_TIMER_INTERVAL_MS	10000 /* Scan timeout */
 #define WL_CHANNEL_SYNC_RETRY 	5
 #define WL_INVALID 		-1
 
@@ -181,6 +179,19 @@ do {									\
 #ifndef WL_SCB_TIMEOUT
 #define WL_SCB_TIMEOUT 20
 #endif
+
+/* SCAN_SUPPRESS timer values in ms */
+#define WL_SCAN_SUPPRESS_TIMEOUT 31000 /* default Framwork DHCP timeout is 30 sec */
+#define WL_SCAN_SUPPRESS_RETRY 3000
+
+#define WL_PM_ENABLE_TIMEOUT 10000
+
+#ifdef WLAIBSS
+/* Custom AIBSS beacon parameters */
+#define AIBSS_INITIAL_MIN_BCN_DUR	500
+#define AIBSS_MIN_BCN_DUR		5000
+#define AIBSS_BCN_FLOOD_DUR		5000
+#endif /* WLAIBSS */
 
 /* driver status */
 enum wl_status {
@@ -242,12 +253,6 @@ enum wl_prof_list {
 	WL_PROF_DTIMPERIOD
 };
 
-/* driver iscan state */
-enum wl_iscan_state {
-	WL_ISCAN_STATE_IDLE,
-	WL_ISCAN_STATE_SCANING
-};
-
 /* donlge escan state */
 enum wl_escan_state {
     WL_ESCAN_STATE_IDLE,
@@ -264,6 +269,14 @@ enum wl_management_type {
 	WL_PROBE_RESP = 0x2,
 	WL_ASSOC_RESP = 0x4
 };
+
+enum wl_handler_del_type {
+	WL_HANDLER_NOTUSE,
+	WL_HANDLER_DEL,
+	WL_HANDLER_MAINTAIN,
+	WL_HANDLER_PEND
+};
+
 /* beacon / probe_response */
 struct beacon_proberesp {
 	__le64 timestamp;
@@ -282,8 +295,8 @@ struct wl_conf {
 	struct ieee80211_channel channel;
 };
 
-typedef s32(*EVENT_HANDLER) (struct wl_priv *wl,
-                            struct net_device *ndev, const wl_event_msg_t *e, void *data);
+typedef s32(*EVENT_HANDLER) (struct bcm_cfg80211 *cfg, bcm_struct_cfgdev *cfgdev,
+                            const wl_event_msg_t *e, void *data);
 
 /* bss inform structure for cfg80211 interface */
 struct wl_cfg80211_bss_info {
@@ -332,7 +345,7 @@ struct wl_ibss {
 	u8 channel;
 };
 
-/* wl driver profile */
+/* cfg driver profile */
 struct wl_profile {
 	u32 mode;
 	s32 band;
@@ -357,22 +370,6 @@ struct net_info {
 	bool pm_block;
 	s32 pm;
 	struct list_head list; /* list of all net_info structure */
-};
-typedef s32(*ISCAN_HANDLER) (struct wl_priv *wl);
-
-/* iscan controller */
-struct wl_iscan_ctrl {
-	struct net_device *dev;
-	struct timer_list timer;
-	u32 timer_ms;
-	u32 timer_on;
-	s32 state;
-	struct task_struct *tsk;
-	struct semaphore sync;
-	ISCAN_HANDLER iscan_handler[WL_SCAN_ERSULTS_LAST];
-	void *data;
-	s8 ioctl_buf[WLC_IOCTL_SMLEN];
-	s8 scan_buf[WL_ISCAN_BUF_MAX];
 };
 
 /* association inform */
@@ -428,6 +425,7 @@ struct escan_info {
 #endif /* STATIC_WL_PRIV_STRUCT */
 #if defined(CUSTOMER_HW4) && defined(DUAL_ESCAN_RESULT_BUFFER)
 	u8 cur_sync_id;
+	u8 escan_type[2];
 #endif /* CUSTOMER_HW4 && DUAL_ESCAN_RESULT_BUFFER */
 	struct wiphy *wiphy;
 	struct net_device *ndev;
@@ -443,19 +441,6 @@ struct ap_info {
 	u8 *rsn_ie;
 	u8 *wps_ie;
 	bool security_mode;
-};
-struct btcoex_info {
-	struct timer_list timer;
-	u32 timer_ms;
-	u32 timer_on;
-	u32 ts_dhcp_start;	/* ms ts ecord time stats */
-	u32 ts_dhcp_ok;		/* ms ts ecord time stats */
-	bool dhcp_done;	/* flag, indicates that host done with
-					 * dhcp before t1/t2 expiration
-					 */
-	s32 bt_state;
-	struct work_struct work;
-	struct net_device *dev;
 };
 
 struct sta_info {
@@ -493,14 +478,33 @@ struct parsed_ies {
 
 #ifdef WL11U
 /* Max length of Interworking element */
-#define IW_IES_MAX_BUF_LEN		9
+#define IW_IES_MAX_BUF_LEN 		9
 #endif
+#ifdef WLFBT
+#define FBT_KEYLEN		32
+#endif
+#define MAX_EVENT_BUF_NUM 16
+typedef struct wl_eventmsg_buf {
+    u16 num;
+    struct {
+		u16 type;
+		bool set;
+	} event [MAX_EVENT_BUF_NUM];
+} wl_eventmsg_buf_t;
+
+typedef struct wl_if_event_info {
+	bool valid;
+	int ifidx;
+	int bssidx;
+	uint8 mac[ETHER_ADDR_LEN];
+	char name[IFNAMSIZ+1];
+} wl_if_event_info;
 
 /* private data of cfg80211 interface */
-struct wl_priv {
-	struct wireless_dev *wdev;	/* representing wl cfg80211 device */
+struct bcm_cfg80211 {
+	struct wireless_dev *wdev;	/* representing cfg cfg80211 device */
 
-	struct wireless_dev *p2p_wdev;	/* representing wl cfg80211 device for P2P */
+	struct wireless_dev *p2p_wdev;	/* representing cfg cfg80211 device for P2P */
 	struct net_device *p2p_net;    /* reference to p2p0 interface */
 
 	struct wl_conf *conf;
@@ -525,7 +529,6 @@ struct wl_priv {
 #else
 	struct wl_ie ie;
 #endif
-	struct wl_iscan_ctrl *iscan;	/* iscan controller */
 
 	/* association information container */
 #if defined(STATIC_WL_PRIV_STRUCT)
@@ -533,7 +536,9 @@ struct wl_priv {
 #else
 	struct wl_connect_info conn_info;
 #endif
+#ifdef DEBUGFS_CFG80211
 	struct dentry		*debugfs;
+#endif /* DEBUGFS_CFG80211 */
 	struct wl_pmk_list *pmk_list;	/* wpa2 pmk list */
 	tsk_ctl_t event_tsk;  		/* task of main event handler thread */
 	void *pub;
@@ -545,9 +550,6 @@ struct wl_priv {
 #ifdef WL_CFG80211_SYNC_GON
 	ulong af_tx_sent_jiffies;
 #endif /* WL_CFG80211_SYNC_GON */
-	bool iscan_on;		/* iscan on/off switch */
-	bool iscan_kickstart;	/* indicate iscan already started */
-	bool escan_on;      /* escan on/off switch */
 	struct escan_info escan_info;   /* escan information */
 	bool active_scan;	/* current scan mode */
 	bool ibss_starter;	/* indicates this sta is ibss starter */
@@ -572,19 +574,20 @@ struct wl_priv {
 	u64 send_action_id;
 	u64 last_roc_id;
 	wait_queue_head_t netif_change_event;
+	wl_if_event_info if_event_info;
 	struct completion send_af_done;
 	struct afx_hdl *afx_hdl;
 	struct ap_info *ap_info;
 	struct sta_info *sta_info;
 	struct p2p_info *p2p;
 	bool p2p_supported;
-	struct btcoex_info *btcoex_info;
+	void *btcoex_info;
 	struct timer_list scan_timeout;   /* Timer for catch scan event timeout */
 #ifdef WL_CFG80211_GON_COLLISION
 	u8 block_gon_req_tx_count;
 	u8 block_gon_req_rx_count;
 #endif /* WL_CFG80211_GON_COLLISION */
-	s32(*state_notifier) (struct wl_priv *wl,
+	s32(*state_notifier) (struct bcm_cfg80211 *cfg,
 		struct net_info *_net_info, enum wl_status state, bool set);
 	unsigned long interrested_state;
 	wlc_ssid_t hostapd_ssid;
@@ -600,6 +603,23 @@ struct wl_priv {
 #ifdef WL_HOST_BAND_MGMT
 	u8 curr_band;
 #endif /* WL_HOST_BAND_MGMT */
+	bool scan_suppressed;
+	struct timer_list scan_supp_timer;
+	struct work_struct wlan_work;
+	struct mutex event_sync;	/* maily for up/down synchronization */
+	bool disable_roam_event;
+	bool pm_enable_work_on;
+	struct delayed_work pm_enable_work;
+	vndr_ie_setbuf_t *ibss_vsie;	/* keep the VSIE for IBSS */
+	int ibss_vsie_len;
+#ifdef WLAIBSS
+	u32 aibss_txfail_pid;
+	u32 aibss_txfail_seq;
+#endif /* WLAIBSS */
+	bool roam_offload;
+#ifdef WLFBT
+	uint8 fbt_key[FBT_KEYLEN];
+#endif
 };
 
 
@@ -609,12 +629,12 @@ static inline struct wl_bss_info *next_bss(struct wl_scan_results *list, struct 
 		(struct wl_bss_info *)((uintptr) bss + dtoh32(bss->length)) : list->bss_info;
 }
 static inline s32
-wl_alloc_netinfo(struct wl_priv *wl, struct net_device *ndev,
+wl_alloc_netinfo(struct bcm_cfg80211 *cfg, struct net_device *ndev,
 	struct wireless_dev * wdev, s32 mode, bool pm_block)
 {
 	struct net_info *_net_info;
 	s32 err = 0;
-	if (wl->iface_cnt == IFACE_MAX_CNT)
+	if (cfg->iface_cnt == IFACE_MAX_CNT)
 		return -ENOMEM;
 	_net_info = kzalloc(sizeof(struct net_info), GFP_KERNEL);
 	if (!_net_info)
@@ -627,20 +647,20 @@ wl_alloc_netinfo(struct wl_priv *wl, struct net_device *ndev,
 		_net_info->pm = 0;
 		_net_info->pm_block = pm_block;
 		_net_info->roam_off = WL_INVALID;
-		wl->iface_cnt++;
-		list_add(&_net_info->list, &wl->net_list);
+		cfg->iface_cnt++;
+		list_add(&_net_info->list, &cfg->net_list);
 	}
 	return err;
 }
 static inline void
-wl_dealloc_netinfo(struct wl_priv *wl, struct net_device *ndev)
+wl_dealloc_netinfo(struct bcm_cfg80211 *cfg, struct net_device *ndev)
 {
 	struct net_info *_net_info, *next;
 
-	list_for_each_entry_safe(_net_info, next, &wl->net_list, list) {
+	list_for_each_entry_safe(_net_info, next, &cfg->net_list, list) {
 		if (ndev && (_net_info->ndev == ndev)) {
 			list_del(&_net_info->list);
-			wl->iface_cnt--;
+			cfg->iface_cnt--;
 			if (_net_info->wdev) {
 				kfree(_net_info->wdev);
 				ndev->ieee80211_ptr = NULL;
@@ -651,25 +671,25 @@ wl_dealloc_netinfo(struct wl_priv *wl, struct net_device *ndev)
 
 }
 static inline void
-wl_delete_all_netinfo(struct wl_priv *wl)
+wl_delete_all_netinfo(struct bcm_cfg80211 *cfg)
 {
 	struct net_info *_net_info, *next;
 
-	list_for_each_entry_safe(_net_info, next, &wl->net_list, list) {
+	list_for_each_entry_safe(_net_info, next, &cfg->net_list, list) {
 		list_del(&_net_info->list);
 			if (_net_info->wdev)
 				kfree(_net_info->wdev);
 			kfree(_net_info);
 	}
-	wl->iface_cnt = 0;
+	cfg->iface_cnt = 0;
 }
 static inline u32
-wl_get_status_all(struct wl_priv *wl, s32 status)
+wl_get_status_all(struct bcm_cfg80211 *cfg, s32 status)
 
 {
 	struct net_info *_net_info, *next;
 	u32 cnt = 0;
-	list_for_each_entry_safe(_net_info, next, &wl->net_list, list) {
+	list_for_each_entry_safe(_net_info, next, &cfg->net_list, list) {
 		if (_net_info->ndev &&
 			test_bit(status, &_net_info->sme_state))
 			cnt++;
@@ -677,18 +697,18 @@ wl_get_status_all(struct wl_priv *wl, s32 status)
 	return cnt;
 }
 static inline void
-wl_set_status_all(struct wl_priv *wl, s32 status, u32 op)
+wl_set_status_all(struct bcm_cfg80211 *cfg, s32 status, u32 op)
 {
 	struct net_info *_net_info, *next;
-	list_for_each_entry_safe(_net_info, next, &wl->net_list, list) {
+	list_for_each_entry_safe(_net_info, next, &cfg->net_list, list) {
 		switch (op) {
 			case 1:
 				return; /* set all status is not allowed */
 			case 2:
 				clear_bit(status, &_net_info->sme_state);
-				if (wl->state_notifier &&
-					test_bit(status, &(wl->interrested_state)))
-					wl->state_notifier(wl, _net_info, status, false);
+				if (cfg->state_notifier &&
+					test_bit(status, &(cfg->interrested_state)))
+					cfg->state_notifier(cfg, _net_info, status, false);
 				break;
 			case 4:
 				return; /* change all status is not allowed */
@@ -698,26 +718,26 @@ wl_set_status_all(struct wl_priv *wl, s32 status, u32 op)
 	}
 }
 static inline void
-wl_set_status_by_netdev(struct wl_priv *wl, s32 status,
+wl_set_status_by_netdev(struct bcm_cfg80211 *cfg, s32 status,
 	struct net_device *ndev, u32 op)
 {
 
 	struct net_info *_net_info, *next;
 
-	list_for_each_entry_safe(_net_info, next, &wl->net_list, list) {
+	list_for_each_entry_safe(_net_info, next, &cfg->net_list, list) {
 		if (ndev && (_net_info->ndev == ndev)) {
 			switch (op) {
 				case 1:
 					set_bit(status, &_net_info->sme_state);
-					if (wl->state_notifier &&
-						test_bit(status, &(wl->interrested_state)))
-						wl->state_notifier(wl, _net_info, status, true);
+					if (cfg->state_notifier &&
+						test_bit(status, &(cfg->interrested_state)))
+						cfg->state_notifier(cfg, _net_info, status, true);
 					break;
 				case 2:
 					clear_bit(status, &_net_info->sme_state);
-					if (wl->state_notifier &&
-						test_bit(status, &(wl->interrested_state)))
-						wl->state_notifier(wl, _net_info, status, false);
+					if (cfg->state_notifier &&
+						test_bit(status, &(cfg->interrested_state)))
+						cfg->state_notifier(cfg, _net_info, status, false);
 					break;
 				case 4:
 					change_bit(status, &_net_info->sme_state);
@@ -730,12 +750,12 @@ wl_set_status_by_netdev(struct wl_priv *wl, s32 status,
 }
 
 static inline u32
-wl_get_status_by_netdev(struct wl_priv *wl, s32 status,
+wl_get_status_by_netdev(struct bcm_cfg80211 *cfg, s32 status,
 	struct net_device *ndev)
 {
 	struct net_info *_net_info, *next;
 
-	list_for_each_entry_safe(_net_info, next, &wl->net_list, list) {
+	list_for_each_entry_safe(_net_info, next, &cfg->net_list, list) {
 				if (ndev && (_net_info->ndev == ndev))
 					return test_bit(status, &_net_info->sme_state);
 	}
@@ -743,11 +763,11 @@ wl_get_status_by_netdev(struct wl_priv *wl, s32 status,
 }
 
 static inline s32
-wl_get_mode_by_netdev(struct wl_priv *wl, struct net_device *ndev)
+wl_get_mode_by_netdev(struct bcm_cfg80211 *cfg, struct net_device *ndev)
 {
 	struct net_info *_net_info, *next;
 
-	list_for_each_entry_safe(_net_info, next, &wl->net_list, list) {
+	list_for_each_entry_safe(_net_info, next, &cfg->net_list, list) {
 				if (ndev && (_net_info->ndev == ndev))
 					return _net_info->mode;
 	}
@@ -756,41 +776,86 @@ wl_get_mode_by_netdev(struct wl_priv *wl, struct net_device *ndev)
 
 
 static inline void
-wl_set_mode_by_netdev(struct wl_priv *wl, struct net_device *ndev,
+wl_set_mode_by_netdev(struct bcm_cfg80211 *cfg, struct net_device *ndev,
 	s32 mode)
 {
 	struct net_info *_net_info, *next;
 
-	list_for_each_entry_safe(_net_info, next, &wl->net_list, list) {
+	list_for_each_entry_safe(_net_info, next, &cfg->net_list, list) {
 				if (ndev && (_net_info->ndev == ndev))
 					_net_info->mode = mode;
 	}
 }
 static inline struct wl_profile *
-wl_get_profile_by_netdev(struct wl_priv *wl, struct net_device *ndev)
+wl_get_profile_by_netdev(struct bcm_cfg80211 *cfg, struct net_device *ndev)
 {
 	struct net_info *_net_info, *next;
 
-	list_for_each_entry_safe(_net_info, next, &wl->net_list, list) {
+	list_for_each_entry_safe(_net_info, next, &cfg->net_list, list) {
 				if (ndev && (_net_info->ndev == ndev))
 					return &_net_info->profile;
 	}
 	return NULL;
 }
 static inline struct net_info *
-wl_get_netinfo_by_netdev(struct wl_priv *wl, struct net_device *ndev)
+wl_get_netinfo_by_netdev(struct bcm_cfg80211 *cfg, struct net_device *ndev)
 {
 	struct net_info *_net_info, *next;
 
-	list_for_each_entry_safe(_net_info, next, &wl->net_list, list) {
+	list_for_each_entry_safe(_net_info, next, &cfg->net_list, list) {
 				if (ndev && (_net_info->ndev == ndev))
 					return _net_info;
 	}
 	return NULL;
 }
-#define wl_to_wiphy(w) (w->wdev->wiphy)
-#define wl_to_prmry_ndev(w) (w->wdev->netdev)
+#define bcmcfg_to_wiphy(cfg) (cfg->wdev->wiphy)
+#define bcmcfg_to_prmry_ndev(cfg) (cfg->wdev->netdev)
+#define bcmcfg_to_prmry_wdev(cfg) (cfg->wdev)
+#define bcmcfg_to_p2p_wdev(cfg) (cfg->p2p_wdev)
 #define ndev_to_wl(n) (wdev_to_wl(n->ieee80211_ptr))
+#define ndev_to_wdev(ndev) (ndev->ieee80211_ptr)
+#define wdev_to_ndev(wdev) (wdev->netdev)
+
+#if defined(WL_ENABLE_P2P_IF)
+#define ndev_to_wlc_ndev(ndev, cfg)	((ndev == cfg->p2p_net) ? \
+	bcmcfg_to_prmry_ndev(cfg) : ndev)
+#else
+#define ndev_to_wlc_ndev(ndev, cfg)	(ndev)
+#endif /* WL_ENABLE_P2P_IF */
+
+#if defined(WL_CFG80211_P2P_DEV_IF)
+#define wdev_to_wlc_ndev(wdev, cfg)	\
+	((wdev->iftype == NL80211_IFTYPE_P2P_DEVICE) ? \
+	bcmcfg_to_prmry_ndev(cfg) : wdev_to_ndev(wdev))
+#define cfgdev_to_wlc_ndev(cfgdev, cfg)	wdev_to_wlc_ndev(cfgdev, cfg)
+#define bcmcfg_to_prmry_cfgdev(cfgdev, cfg) bcmcfg_to_prmry_wdev(cfg)
+#elif defined(WL_ENABLE_P2P_IF)
+#define cfgdev_to_wlc_ndev(cfgdev, cfg)	ndev_to_wlc_ndev(cfgdev, cfg)
+#define bcmcfg_to_prmry_cfgdev(cfgdev, cfg) bcmcfg_to_prmry_ndev(cfg)
+#else
+#define cfgdev_to_wlc_ndev(cfgdev, cfg)	(cfgdev)
+#define bcmcfg_to_prmry_cfgdev(cfgdev, cfg) (cfgdev)
+#endif /* WL_CFG80211_P2P_DEV_IF */
+
+#if defined(WL_CFG80211_P2P_DEV_IF)
+#define ndev_to_cfgdev(ndev)	ndev_to_wdev(ndev)
+#define discover_cfgdev(cfgdev, cfg) (cfgdev->iftype == NL80211_IFTYPE_P2P_DEVICE)
+#else
+#define ndev_to_cfgdev(ndev)	(ndev)
+#define discover_cfgdev(cfgdev, cfg) (cfgdev == cfg->p2p_net)
+#endif /* WL_CFG80211_P2P_DEV_IF */
+
+#if defined(WL_CFG80211_P2P_DEV_IF)
+#define scan_req_match(cfg)	(((cfg) && (cfg->scan_request) && \
+	(cfg->scan_request->wdev == cfg->p2p_wdev)) ? true : false)
+#elif defined(WL_ENABLE_P2P_IF)
+#define scan_req_match(cfg)	(((cfg) && (cfg->scan_request) && \
+	(cfg->scan_request->dev == cfg->p2p_net)) ? true : false)
+#else
+#define scan_req_match(cfg)	(((cfg) && p2p_is_on(cfg) && p2p_scan(cfg)) ? \
+	true : false)
+#endif /* WL_CFG80211_P2P_DEV_IF */
+
 #define wl_to_sr(w) (w->scan_req_int)
 #if defined(STATIC_WL_PRIV_STRUCT)
 #define wl_to_ie(w) (w->ie)
@@ -799,27 +864,25 @@ wl_get_netinfo_by_netdev(struct wl_priv *wl, struct net_device *ndev)
 #define wl_to_ie(w) (&w->ie)
 #define wl_to_conn(w) (&w->conn_info)
 #endif
-#define iscan_to_wl(i) ((struct wl_priv *)(i->data))
-#define wl_to_iscan(w) (w->iscan)
 #define wiphy_from_scan(w) (w->escan_info.wiphy)
-#define wl_get_drv_status_all(wl, stat) \
-	(wl_get_status_all(wl, WL_STATUS_ ## stat))
-#define wl_get_drv_status(wl, stat, ndev)  \
-	(wl_get_status_by_netdev(wl, WL_STATUS_ ## stat, ndev))
-#define wl_set_drv_status(wl, stat, ndev)  \
-	(wl_set_status_by_netdev(wl, WL_STATUS_ ## stat, ndev, 1))
-#define wl_clr_drv_status(wl, stat, ndev)  \
-	(wl_set_status_by_netdev(wl, WL_STATUS_ ## stat, ndev, 2))
-#define wl_clr_drv_status_all(wl, stat)  \
-	(wl_set_status_all(wl, WL_STATUS_ ## stat, 2))
-#define wl_chg_drv_status(wl, stat, ndev)  \
-	(wl_set_status_by_netdev(wl, WL_STATUS_ ## stat, ndev, 4))
+#define wl_get_drv_status_all(cfg, stat) \
+	(wl_get_status_all(cfg, WL_STATUS_ ## stat))
+#define wl_get_drv_status(cfg, stat, ndev)  \
+	(wl_get_status_by_netdev(cfg, WL_STATUS_ ## stat, ndev))
+#define wl_set_drv_status(cfg, stat, ndev)  \
+	(wl_set_status_by_netdev(cfg, WL_STATUS_ ## stat, ndev, 1))
+#define wl_clr_drv_status(cfg, stat, ndev)  \
+	(wl_set_status_by_netdev(cfg, WL_STATUS_ ## stat, ndev, 2))
+#define wl_clr_drv_status_all(cfg, stat)  \
+	(wl_set_status_all(cfg, WL_STATUS_ ## stat, 2))
+#define wl_chg_drv_status(cfg, stat, ndev)  \
+	(wl_set_status_by_netdev(cfg, WL_STATUS_ ## stat, ndev, 4))
 
 #define for_each_bss(list, bss, __i)	\
 	for (__i = 0; __i < list->count && __i < WL_AP_MAX; __i++, bss = next_bss(list, bss))
 
-#define for_each_ndev(wl, iter, next) \
-	list_for_each_entry_safe(iter, next, &wl->net_list, list)
+#define for_each_ndev(cfg, iter, next) \
+	list_for_each_entry_safe(iter, next, &cfg->net_list, list)
 
 
 /* In case of WPS from wpa_supplicant, pairwise siute and group suite is 0.
@@ -829,7 +892,7 @@ wl_get_netinfo_by_netdev(struct wl_priv *wl, struct net_device *ndev)
 	((wl_cfgp2p_find_wpsie((u8 *)_sme->ie, _sme->ie_len) != NULL) && \
 	 (!_sme->crypto.n_ciphers_pairwise) && \
 	 (!_sme->crypto.cipher_group))
-extern s32 wl_cfg80211_attach(struct net_device *ndev, void *data);
+extern s32 wl_cfg80211_attach(struct net_device *ndev, void *context);
 extern s32 wl_cfg80211_attach_post(struct net_device *ndev);
 extern void wl_cfg80211_detach(void *para);
 
@@ -840,14 +903,17 @@ struct device *wl_cfg80211_get_parent_dev(void);
 
 extern s32 wl_cfg80211_up(void *para);
 extern s32 wl_cfg80211_down(void *para);
-extern s32 wl_cfg80211_notify_ifadd(struct net_device *ndev, s32 idx, s32 bssidx,
-	void* _net_attach);
-extern s32 wl_cfg80211_ifdel_ops(struct net_device *net);
-extern s32 wl_cfg80211_notify_ifdel(void);
-extern s32 wl_cfg80211_is_progress_ifadd(void);
-extern s32 wl_cfg80211_is_progress_ifchange(void);
-extern s32 wl_cfg80211_is_progress_ifadd(void);
-extern s32 wl_cfg80211_notify_ifchange(void);
+extern s32 wl_cfg80211_notify_ifadd(int ifidx, char *name, uint8 *mac, uint8 bssidx);
+extern s32 wl_cfg80211_notify_ifdel(int ifidx, char *name, uint8 *mac, uint8 bssidx);
+extern s32 wl_cfg80211_notify_ifchange(int ifidx, char *name, uint8 *mac, uint8 bssidx);
+extern struct net_device* wl_cfg80211_allocate_if(struct bcm_cfg80211 *cfg, int ifidx, char *name,
+	uint8 *mac, uint8 bssidx);
+extern int wl_cfg80211_register_if(struct bcm_cfg80211 *cfg, int ifidx, struct net_device* ndev);
+extern int wl_cfg80211_remove_if(struct bcm_cfg80211 *cfg, int ifidx, struct net_device* ndev);
+extern int wl_cfg80211_scan_stop(bcm_struct_cfgdev *cfgdev);
+extern bool wl_cfg80211_is_vsdb_mode(void);
+extern void* wl_cfg80211_get_dhdp(void);
+extern bool wl_cfg80211_is_p2p_active(void);
 extern void wl_cfg80211_dbg_level(u32 level);
 extern s32 wl_cfg80211_get_p2p_dev_addr(struct net_device *net, struct ether_addr *p2pdev_addr);
 extern s32 wl_cfg80211_set_p2p_noa(struct net_device *net, char* buf, int len);
@@ -855,16 +921,117 @@ extern s32 wl_cfg80211_get_p2p_noa(struct net_device *net, char* buf, int len);
 extern s32 wl_cfg80211_set_wps_p2p_ie(struct net_device *net, char *buf, int len,
 	enum wl_management_type type);
 extern s32 wl_cfg80211_set_p2p_ps(struct net_device *net, char* buf, int len);
+
+/* btcoex functions */
+void* wl_cfg80211_btcoex_init(struct net_device *ndev);
+void wl_cfg80211_btcoex_deinit(void);
+
+#ifdef WL_SUPPORT_AUTO_CHANNEL
+#define CHANSPEC_BUF_SIZE	1024
+#define CHAN_SEL_IOCTL_DELAY	300
+#define CHAN_SEL_RETRY_COUNT	15
+#define CHANNEL_IS_RADAR(channel)	(((channel & WL_CHAN_RADAR) || \
+	(channel & WL_CHAN_PASSIVE)) ? true : false)
+#define CHANNEL_IS_2G(channel)	(((channel >= 1) && (channel <= 14)) ? \
+	true : false)
+#define CHANNEL_IS_5G(channel)	(((channel >= 36) && (channel <= 165)) ? \
+	true : false)
+extern s32 wl_cfg80211_get_best_channels(struct net_device *dev, char* command,
+	int total_len);
+#endif /* WL_SUPPORT_AUTO_CHANNEL */
 extern int wl_cfg80211_hang(struct net_device *dev, u16 reason);
 extern s32 wl_mode_to_nl80211_iftype(s32 mode);
 int wl_cfg80211_do_driver_init(struct net_device *net);
 void wl_cfg80211_enable_trace(bool set, u32 level);
-extern s32 wl_update_wiphybands(struct wl_priv *wl);
+extern s32 wl_update_wiphybands(struct bcm_cfg80211 *cfg, bool notify);
 extern s32 wl_cfg80211_if_is_group_owner(void);
 extern chanspec_t wl_ch_host_to_driver(u16 channel);
+extern s32 wl_set_tx_power(struct net_device *dev,
+	enum nl80211_tx_power_setting type, s32 dbm);
+extern s32 wl_get_tx_power(struct net_device *dev, s32 *dbm);
 extern s32 wl_add_remove_eventmsg(struct net_device *ndev, u16 event, bool add);
-extern void wl_stop_wait_next_action_frame(struct wl_priv *wl, struct net_device *ndev);
+extern void wl_stop_wait_next_action_frame(struct bcm_cfg80211 *cfg, struct net_device *ndev);
 #ifdef WL_HOST_BAND_MGMT
 extern s32 wl_cfg80211_set_band(struct net_device *ndev, int band);
 #endif /* WL_HOST_BAND_MGMT */
+extern void wl_cfg80211_add_to_eventbuffer(wl_eventmsg_buf_t *ev, u16 event, bool set);
+extern s32 wl_cfg80211_apply_eventbuffer(struct net_device *ndev,
+	struct bcm_cfg80211 *cfg, wl_eventmsg_buf_t *ev);
+extern void get_primary_mac(struct bcm_cfg80211 *cfg, struct ether_addr *mac);
+extern void wl_cfg80211_update_power_mode(struct net_device *dev);
+#define SCAN_BUF_CNT	2
+#define SCAN_BUF_NEXT	1
+#define WL_SCANTYPE_LEGACY	0x1
+#define WL_SCANTYPE_P2P		0x2
+#if defined(DUAL_ESCAN_RESULT_BUFFER)
+#define wl_escan_set_sync_id(a, b) ((a) = (b)->escan_info.cur_sync_id)
+#define wl_escan_set_type(a, b) ((a)->escan_info.escan_type\
+[((a)->escan_info.cur_sync_id)%SCAN_BUF_CNT] = (b))
+static inline wl_scan_results_t *wl_escan_get_buf(struct bcm_cfg80211 *cfg, bool aborted)
+{
+	u8 index;
+	if (aborted) {
+		if (cfg->escan_info.escan_type[0] == cfg->escan_info.escan_type[1])
+			index = (cfg->escan_info.cur_sync_id + 1)%SCAN_BUF_CNT;
+		else
+			index = (cfg->escan_info.cur_sync_id)%SCAN_BUF_CNT;
+	}
+	else
+		index = (cfg->escan_info.cur_sync_id)%SCAN_BUF_CNT;
+
+	return (wl_scan_results_t *)cfg->escan_info.escan_buf[index];
+}
+static inline int wl_escan_check_sync_id(s32 status, u16 result_id, u16 wl_id)
+{
+	if (result_id != wl_id) {
+		WL_ERR(("ESCAN sync id mismatch :status :%d "
+			"cur_sync_id:%d coming sync_id:%d\n",
+			status, wl_id, result_id));
+		return -1;
+	}
+	else
+		return 0;
+}
+static inline void wl_escan_print_sync_id(s32 status, u16 result_id, u16 wl_id)
+{
+	if (result_id != wl_id) {
+		WL_ERR(("ESCAN sync id mismatch :status :%d "
+			"cur_sync_id:%d coming sync_id:%d\n",
+			status, wl_id, result_id));
+	}
+}
+
+#define wl_escan_increment_sync_id(a, b) ((a)->escan_info.cur_sync_id += b)
+#define wl_escan_init_sync_id(a) ((a)->escan_info.cur_sync_id = 0)
+#else
+#define wl_escan_set_sync_id(a, b) ((a) = htod16(0x1234))
+#define wl_escan_set_type(a, b)
+#define wl_escan_get_buf(a, b) ((wl_scan_results_t *) (a)->escan_info.escan_buf)
+#define wl_escan_check_sync_id(a, b, c) 0
+#define wl_escan_print_sync_id(a, b, c)
+#define wl_escan_increment_sync_id(a, b)
+#define wl_escan_init_sync_id(a)
+#endif /* DUAL_ESCAN_RESULT_BUFFER */
+
+extern void wl_cfg80211_ibss_vsie_set_buffer(vndr_ie_setbuf_t *ibss_vsie, int ibss_vsie_len);
+extern s32 wl_cfg80211_ibss_vsie_delete(struct net_device *dev);
+#ifdef WLAIBSS
+extern void wl_cfg80211_set_txfail_pid(int pid);
+#endif /* WLAIBSS */
+#ifdef WLFBT
+extern void wl_cfg80211_get_fbt_key(uint8 *key);
+#endif
+
+/* Action frame specific functions */
+extern u8 wl_get_action_category(void *frame, u32 frame_len);
+extern int wl_get_public_action(void *frame, u32 frame_len, u8 *ret_action);
+
+extern int wl_cfg80211_enable_roam_offload(struct net_device *dev, bool enable);
+
+#ifdef WL_CFG80211_VSDB_PRIORITIZE_SCAN_REQUEST
+struct net_device *wl_cfg80211_get_remain_on_channel_ndev(struct bcm_cfg80211 *cfg);
+#endif /* WL_CFG80211_VSDB_PRIORITIZE_SCAN_REQUEST */
+
+extern int wl_cfg80211_get_ioctl_version(void);
+
 #endif				/* _wl_cfg80211_h_ */
