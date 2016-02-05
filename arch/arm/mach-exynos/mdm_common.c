@@ -307,7 +307,6 @@ long mdm_modem_ioctl(struct file *filp, unsigned int cmd,
 		else {
 			pr_info("%s: ramdump collection completed\n", __func__);
 			mdm_drv->mdm_ram_dump_status = 0;
-			panic("CP Crash %s", mdm_read_err_report());
 		}
 		complete(&mdm_ram_dumps);
 		break;
