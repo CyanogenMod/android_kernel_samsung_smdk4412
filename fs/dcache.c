@@ -417,7 +417,7 @@ repeat:
 	if (dentry->d_count == 1)
 		might_sleep();
 	spin_lock(&dentry->d_lock);
-	BUG_ON(!dentry->d_count);
+	if (!dentry->d_count) return;
 	if (dentry->d_count > 1) {
 		dentry->d_count--;
 		spin_unlock(&dentry->d_lock);
