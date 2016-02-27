@@ -204,7 +204,6 @@ static void finish_boost_do_work(struct work_struct *work) {
 	is_boosting = 0;
 	boost_timer.function = NULL;
 	mutex_unlock(&boost_mutex);
-	printk(KERN_DEBUG "[boost] ended boost\n");
 }
 
 static DECLARE_WORK(finish_boost_work, finish_boost_do_work);
@@ -906,7 +905,6 @@ static ssize_t store_boost_lock_time(struct kobject *a, struct attribute *b,
 			hrtimer_start(&boost_timer, time, HRTIMER_MODE_REL);
 		}
 	} else {
-		printk(KERN_DEBUG "[boost] cancelling boost lock");
 		if (boost_timer.function != NULL) {
 			hrtimer_cancel(&boost_timer);
 		}
@@ -1010,7 +1008,6 @@ static void cpu_up_work(struct work_struct *work)
 		nr_up = max(nr_up, min_cpu_lock - online);
 #ifdef CONFIG_CPU_FREQ_GOV_PEGASUSQ_BOOST
 	if (is_boosting && boost_mincpus) {
-		printk(KERN_DEBUG "[PEGASUSQ_BOOST] boost mincpus to %d", boost_mincpus);
 		nr_up = max(nr_up, boost_mincpus - online);
 	}
 #endif
@@ -1310,7 +1307,6 @@ static void dbs_check_cpu(struct cpu_dbs_info_s *this_dbs_info)
 
 #ifdef CONFIG_CPU_FREQ_GOV_PEGASUSQ_BOOST
 	if (is_boosting && policy->cur < dbs_tuners_ins.boost_freq) {
-		printk(KERN_DEBUG "[PEGASUSQ_BOOST] boosting to %d\n", dbs_tuners_ins.boost_freq);
 		/* disallow boosting beyond max freq */
 		int target = min(policy->max, dbs_tuners_ins.boost_freq);
 		dbs_tuners_ins.boost_freq = target;
