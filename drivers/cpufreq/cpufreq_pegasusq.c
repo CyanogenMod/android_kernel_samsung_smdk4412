@@ -900,7 +900,6 @@ static ssize_t store_boost_lock_time(struct kobject *a, struct attribute *b,
 			time = ktime_set(0, (unsigned long)input);
 			hrtimer_init(&boost_timer, CLOCK_MONOTONIC, HRTIMER_MODE_REL);
 			boost_timer.function = &end_boost;
-			printk(KERN_DEBUG "[boost] starting boost lock: %lu\n", input);
 			hrtimer_start(&boost_timer, time, HRTIMER_MODE_REL);
 		}
 	} else {
