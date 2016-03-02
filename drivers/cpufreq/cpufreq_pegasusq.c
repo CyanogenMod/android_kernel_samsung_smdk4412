@@ -202,7 +202,6 @@ static DEFINE_MUTEX(boost_mutex);
 static void finish_boost_do_work(struct work_struct *work) {
 	mutex_lock(&boost_mutex);
 	is_boosting = 0;
-	boost_timer.function = NULL;
 	mutex_unlock(&boost_mutex);
 }
 
