@@ -155,6 +155,16 @@ config SENSORS_LSM330DLC
 	help
 	  Driver for STMicro LSM330DLC
 
+config SENSORS_LSM330DLC_USE_INPUT_DEV
+    depends on SENSORS_LSM330DLC
+    bool "LSM330DLC - expose device in /dev/input"
+    default n
+    help
+        Samsung blob sensor HALs expect LSM330DLC to be exposed via /dev/accelerometer
+        Writing a custom sensor HAL is probably easier if the accelerometer is exposed
+        in the same place as the rest of the sensors. Note that enabling this will not
+        disable /dev/accelerometer
+
 config SENSORS_LPS331
 	tristate "STMicro LPS331 driver"
 	default n
