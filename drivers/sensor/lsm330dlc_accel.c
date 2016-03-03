@@ -42,7 +42,11 @@
 #undef DEBUG_ODR
 #undef DEBUG_REACTIVE_ALERT
 /* It will be used, when google fusion is enabled. */
+#ifdef CONFIG_SENSORS_LSM330DLC_USE_INPUT_DEV
+#define USES_INPUT_DEV 1
+#else
 #undef USES_INPUT_DEV
+#endif
 
 #define VENDOR		"STM"
 #define CHIP_ID		"LSM330"
@@ -1130,7 +1134,7 @@ probe_retry:
 		pr_err("%s: could not create sysfs group\n", __func__);
 		goto err_create_sysfs;
 	}
-#else
+#endif
 	/* sensor HAL expects to find /dev/accelerometer */
 	data->lsm330dlc_accel_device.minor = MISC_DYNAMIC_MINOR;
 	data->lsm330dlc_accel_device.name = ACC_DEV_NAME;
@@ -1141,7 +1145,6 @@ probe_retry:
 		pr_err("%s: misc_register failed\n", __FILE__);
 		goto err_misc_register;
 	}
-#endif
 
 #ifdef USES_MOVEMENT_RECOGNITION
 	data->movement_recog_flag = OFF;
@@ -1315,11 +1318,10 @@ err_create_sysfs:
 	input_unregister_device(data->input_dev);
 err_input_allocate:
 	destroy_workqueue(data->work_queue);
-err_create_workqueue:
-#else
+#endif
 	misc_deregister(&data->lsm330dlc_accel_device);
 err_misc_register:
-#endif
+err_create_workqueue:
 	mutex_destroy(&data->read_lock);
 	mutex_destroy(&data->write_lock);
 err_read_reg:
@@ -1373,9 +1375,8 @@ static int lsm330dlc_accel_remove(struct i2c_client *client)
 	sysfs_remove_group(&data->input_dev->dev.kobj,
 		&lsm330dlc_attribute_group);
 	input_unregister_device(data->input_dev);
-#else
-	misc_deregister(&data->lsm330dlc_accel_device);
 #endif
+	misc_deregister(&data->lsm330dlc_accel_device);
 	mutex_destroy(&data->read_lock);
 	mutex_destroy(&data->write_lock);
 	kfree(data);
