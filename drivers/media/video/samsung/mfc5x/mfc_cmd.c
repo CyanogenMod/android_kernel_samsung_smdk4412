@@ -310,7 +310,7 @@ int mfc_cmd_inst_open(struct mfc_inst_ctx *ctx)
 	}
 
 	memset(&h2r_args, 0, sizeof(struct mfc_cmd_args));
-	h2r_args.arg[0] = ctx->codecid;
+	h2r_args.arg[0] = (1 << 29) | ctx->codecid;
 	h2r_args.arg[1] = crc << 31 | pixelcache;
 	h2r_args.arg[2] = ctx->ctxbufofs;
 	h2r_args.arg[3] = ctx->ctxbufsize;

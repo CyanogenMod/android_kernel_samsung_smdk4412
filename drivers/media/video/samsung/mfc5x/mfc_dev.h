@@ -114,6 +114,10 @@ struct mfc_dev {
 #if defined(CONFIG_BUSFREQ)
 	atomic_t		busfreq_lock_cnt; /* Bus frequency Lock count */
 #endif
+#if defined(CONFIG_MACH_GC1) && defined(CONFIG_EXYNOS4_CPUFREQ)
+	atomic_t		cpufreq_lock_cnt; /* CPU frequency Lock count */
+	int				cpufreq_level; /* CPU frequency leve */
+#endif
 #if defined(CONFIG_CPU_EXYNOS4210) && defined(CONFIG_EXYNOS4_CPUFREQ)
 	atomic_t		cpufreq_lock_cnt; /* CPU frequency Lock count */
 	int				cpufreq_level; /* CPU frequency leve */
