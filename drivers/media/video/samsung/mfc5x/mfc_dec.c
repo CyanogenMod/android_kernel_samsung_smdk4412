@@ -155,10 +155,6 @@ static void dump_stream(unsigned long address, unsigned int size)
 	ctx->ctxbufofs = mfc_mem_base_ofs(alloc->real) >> 11;
 	ctx->ctxbufsize = alloc->size;
 
-	memset((void *)alloc->addr, 0, alloc->size);
-
-	mfc_mem_cache_clean((void *)alloc->addr, alloc->size);
-
 	return 0;
 }
 
@@ -175,10 +171,6 @@ static int h264_alloc_ctx_buf(struct mfc_inst_ctx *ctx)
 
 	ctx->ctxbufofs = mfc_mem_base_ofs(alloc->real) >> 11;
 	ctx->ctxbufsize = alloc->size;
-
-	memset((void *)alloc->addr, 0, alloc->size);
-
-	mfc_mem_cache_clean((void *)alloc->addr, alloc->size);
 
 	return 0;
 }
@@ -1591,56 +1583,6 @@ static int CheckMPEG4StartCode(unsigned char *src_mem, unsigned int remainSize)
 	return -1;
 }
 
-static int CheckDecStartCode(unsigned char *src_mem,
-				unsigned int nstreamSize,
-				SSBSIP_MFC_CODEC_TYPE nCodecType)
-{
-	unsigned int	index = 0;
-	/* Check Start Code within "isearchSize" bytes */
-	unsigned int	isearchSize = 20;
-	unsigned int	nShift = 0;
-	unsigned char	nFlag = 0xFF;
-
-	if (nCodecType == H263_DEC) {
-		nFlag = 0x08;
-		nShift = 4;
-	} else if (nCodecType == MPEG4_DEC) {
-		nFlag = 0x01;
-		nShift = 0;
-	} else if (nCodecType == H264_DEC) {
-		nFlag = 0x01;
-		nShift = 0;
-	} else
-		nFlag = 0xFF;
-
-	/* Last frame detection from user */
-	if (nstreamSize == 0)
-		nFlag = 0xFF;
-
-	if (nFlag == 0xFF)
-		return 0;
-
-	if (nstreamSize > 3) {
-		if (nstreamSize > isearchSize) {
-			for (index = 0; index < isearchSize-3; index++) {
-				if ((src_mem[index] == 0x00) &&
-					(src_mem[index+1] == 0x00) &&
-					((src_mem[index+2] >> nShift) == nFlag))
-					return index;
-			}
-		} else {
-			for (index = 0; index < nstreamSize - 3; index++) {
-				if ((src_mem[index] == 0x00) &&
-					(src_mem[index+1] == 0x00) &&
-					((src_mem[index+2] >> nShift) == nFlag))
-					return index;
-			}
-		}
-	}
-
-	return -1;
-}
-
 void mfc_init_decoders(void)
 {
 	list_add_tail(&unknown_dec.list, &mfc_decoders);
@@ -1904,6 +1846,20 @@ int mfc_init_decoding(struct mfc_inst_ctx *ctx, union mfc_args *args)
 	}
 #endif
 
+#if defined(CONFIG_MACH_GC1) && defined(CONFIG_EXYNOS4_CPUFREQ)
+	if ((ctx->width >= 1280 && ctx->height >= 720)
+		|| (ctx->width >= 720 && ctx->height >= 1280)) {
+		if (atomic_read(&ctx->dev->cpufreq_lock_cnt) == 0) {
+			if (0 == ctx->dev->cpufreq_level) /* 800MHz */
+				exynos_cpufreq_get_level(800000, &ctx->dev->cpufreq_level);
+			exynos_cpufreq_lock(DVFS_LOCK_ID_MFC, ctx->dev->cpufreq_level);
+			mfc_dbg("[%s] CPU Freq Locked 800MHz!\n", __func__);
+		}
+		atomic_inc(&ctx->dev->cpufreq_lock_cnt);
+		ctx->cpufreq_flag = true;
+	}
+#endif
+
 #if defined(CONFIG_CPU_EXYNOS4210) && defined(CONFIG_EXYNOS4_CPUFREQ)
 	if ((ctx->width >= 1280 && ctx->height >= 720)
 		|| (ctx->width >= 720 && ctx->height >= 1280)) {
@@ -1919,27 +1875,27 @@ int mfc_init_decoding(struct mfc_inst_ctx *ctx, union mfc_args *args)
 #endif
 
 #ifdef CONFIG_BUSFREQ_OPP
-	if (HD_MOVIE_SIZE_MULTIPLY_WIDTH_HEIGHT > (ctx->width * ctx->height)) {
-		if (atomic_read(&ctx->dev->dmcthreshold_lock_cnt) == 0) {
-			mfc_info("Implement set dmc_max_threshold\n");
-			if (soc_is_exynos4212()) {
+if (HD_MOVIE_SIZE_MULTIPLY_WIDTH_HEIGHT > (ctx->width * ctx->height)) {
+	if (atomic_read(&ctx->dev->dmcthreshold_lock_cnt) == 0) {
+		mfc_info("Implement set dmc_max_threshold\n");
+		if (soc_is_exynos4212()) {
+			dmc_max_threshold =
+				EXYNOS4212_DMC_MAX_THRESHOLD + DECODING_LOAD;
+		} else if (soc_is_exynos4412()) {
+			if (samsung_rev() >= EXYNOS4412_REV_2_0)
 				dmc_max_threshold =
-					EXYNOS4212_DMC_MAX_THRESHOLD + 5;
-			} else if (soc_is_exynos4412()) {
-				if (samsung_rev() >= EXYNOS4412_REV_2_0)
-					dmc_max_threshold =
-						PRIME_DMC_MAX_THRESHOLD + 5;
-				else
-					dmc_max_threshold =
-						EXYNOS4412_DMC_MAX_THRESHOLD + 5;
-			} else {
-				pr_err("Unsupported model.\n");
-				return -EINVAL;
-			}
+					PRIME_DMC_MAX_THRESHOLD + DECODING_LOAD;
+			else
+				dmc_max_threshold =
+					EXYNOS4412_DMC_MAX_THRESHOLD + DECODING_LOAD;
+		} else {
+			pr_err("Unsupported model.\n");
+			return -EINVAL;
 		}
-		atomic_inc(&ctx->dev->dmcthreshold_lock_cnt);
-		ctx->dmcthreshold_flag = true;
 	}
+	atomic_inc(&ctx->dev->dmcthreshold_lock_cnt);
+	ctx->dmcthreshold_flag = true;
+}
 #endif
 	/*
 	 * allocate & set codec buffers
@@ -2146,28 +2102,11 @@ static int mfc_decoding_frame(struct mfc_inst_ctx *ctx, struct mfc_dec_exe_arg *
 	int display_chroma_addr;
 	int display_frame_type;
 	int display_frame_tag;
-	unsigned char *stream_vir;
 	int ret;
 	struct mfc_dec_ctx *dec_ctx = (struct mfc_dec_ctx *)ctx->c_priv;
 	long mem_ofs;
 #ifdef CONFIG_VIDEO_MFC_VCM_UMP
 	void *ump_handle;
-#endif
-
-#ifdef CONFIG_EXYNOS_CONTENT_PATH_PROTECTION
-	if (!ctx->drm_flag) {
-#endif
-		/* Check Frame Start code */
-		stream_vir = phys_to_virt(exe_arg->in_strm_buf + start_ofs);
-		ret = CheckDecStartCode(stream_vir, exe_arg->in_strm_size,
-				exe_arg->in_codec_type);
-		if (ret < 0) {
-			mfc_err("Frame Check start Code Failed\n");
-			/* FIXME: Need to define proper error */
-			return MFC_FRM_BUF_SIZE_FAIL;
-		}
-#ifdef CONFIG_EXYNOS_CONTENT_PATH_PROTECTION
-	}
 #endif
 
 	/* Set Frame Tag */
@@ -2405,7 +2344,9 @@ int mfc_exec_decoding(struct mfc_inst_ctx *ctx, union mfc_args *args)
 		if (ctx->resolution_status == RES_SET_CHANGE) {
 			ret = mfc_decoding_frame(ctx, exe_arg, &consumed);
 #ifndef CONFIG_SLP
-		} else if ((ctx->resolution_status == RES_WAIT_FRAME_DONE) &&
+		}
+
+		if ((ctx->resolution_status == RES_WAIT_FRAME_DONE) &&
 			(exe_arg->out_display_status == DISP_S_FINISH)) {
 			exe_arg->out_display_status = DISP_S_RES_CHANGE;
 			ret = mfc_change_resolution(ctx, exe_arg);

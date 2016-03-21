@@ -213,7 +213,7 @@ static int mfc_open(struct inode *inode, struct file *file)
 
 	mutex_lock(&mfcdev->lock);
 
-#if defined(CONFIG_USE_MFC_CMA) && defined(CONFIG_MACH_M0)
+#ifdef CONFIG_USE_MFC_CMA
 	if (atomic_read(&mfcdev->inst_cnt) == 0) {
 		size_t size = 0x02800000;
 		mfcdev->cma_vaddr = dma_alloc_coherent(mfcdev->device, size,
@@ -368,8 +368,6 @@ static int mfc_open(struct inode *inode, struct file *file)
 
 		mfc_ctx->ctxbufofs = mfc_mem_base_ofs(alloc->real) >> 11;
 		mfc_ctx->ctxbufsize = alloc->size;
-		memset((void *)alloc->addr, 0, alloc->size);
-		mfc_mem_cache_clean((void *)alloc->addr, alloc->size);
 	}
 #endif
 
@@ -392,7 +390,7 @@ static int mfc_open(struct inode *inode, struct file *file)
 	ret = mfc_queue_alloc(mfc_ctx);
 	if (ret < 0) {
 		mfc_err("mfc_queue_alloc failed\n");
-		goto err_inst_ctx;
+		goto err_queue_alloc;
 	}
 #endif
 
@@ -403,9 +401,17 @@ static int mfc_open(struct inode *inode, struct file *file)
 
 	return 0;
 
+#ifdef CONFIG_SLP_DMABUF
+err_queue_alloc:
+#endif
 #ifdef CONFIG_EXYNOS_CONTENT_PATH_PROTECTION
 err_drm_ctx:
 #endif
+	mfcdev->inst_ctx[inst_id] = NULL;
+	atomic_dec(&mfcdev->inst_cnt);
+
+	mfc_destroy_inst(mfc_ctx);
+
 err_inst_ctx:
 err_inst_id:
 err_inst_cnt:
@@ -423,7 +429,16 @@ err_pwr_enable:
 #endif
 
 err_fw_state:
-#ifdef CONFIG_EXYNOS_CONTENT_PATH_PROTECTION
+#ifdef CONFIG_USE_MFC_CMA
+    if (atomic_read(&mfcdev->inst_cnt) == 0) {
+		size_t size = 0x02800000;
+		dma_free_coherent(mfcdev->device, size, mfcdev->cma_vaddr,
+							mfcdev->cma_dma_addr);
+		printk(KERN_INFO "%s[%d] size 0x%x, vaddr 0x%x, base 0x0%x\n",
+				__func__, __LINE__, (int)size,
+				(int) mfcdev->cma_vaddr,
+				(int)mfcdev->cma_dma_addr);
+	}
 #endif
 	mutex_unlock(&mfcdev->lock);
 
@@ -472,6 +487,19 @@ static int mfc_release(struct inode *inode, struct file *file)
 			/* release Freq lock back to normal */
 			exynos4_busfreq_lock_free(DVFS_LOCK_ID_MFC);
 			mfc_dbg("[%s] Bus Freq lock Released Normal!\n", __func__);
+		}
+	}
+#endif
+
+#if defined(CONFIG_MACH_GC1) && defined(CONFIG_EXYNOS4_CPUFREQ)
+	/* Release MFC & CPU Frequency lock for High resolution */
+	if (mfc_ctx->cpufreq_flag == true) {
+		atomic_dec(&dev->cpufreq_lock_cnt);
+		mfc_ctx->cpufreq_flag = false;
+		if (atomic_read(&dev->cpufreq_lock_cnt) == 0) {
+			/* release Freq lock back to normal */
+			exynos_cpufreq_lock_free(DVFS_LOCK_ID_MFC);
+			mfc_dbg("[%s] CPU Freq lock Released Normal!\n", __func__);
 		}
 	}
 #endif
@@ -565,7 +593,7 @@ static int mfc_release(struct inode *inode, struct file *file)
 
 err_pwr_disable:
 
-#if defined(CONFIG_USE_MFC_CMA) && defined(CONFIG_MACH_M0)
+#ifdef CONFIG_USE_MFC_CMA
 	if (atomic_read(&mfcdev->inst_cnt) == 0) {
 		size_t size = 0x02800000;
 		dma_free_coherent(mfcdev->device, size, mfcdev->cma_vaddr,
@@ -977,6 +1005,16 @@ static long mfc_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 		/* RMVME: need locking ? */
 		mutex_lock(&dev->lock);
 
+		if (mfc_ctx->state < INST_STATE_SETUP) {
+			mfc_err("IOCTL_MFC_GET_CONFIG invalid state: 0x%08x\n",
+					mfc_ctx->state);
+			in_param.ret_code = MFC_STATE_INVALID;
+			ret = -EINVAL;
+
+			mutex_unlock(&dev->lock);
+			break;
+		}
+
 		cfg_arg = (struct mfc_config_arg *)&in_param.args;
 
 		in_param.ret_code = mfc_get_inst_cfg(mfc_ctx, cfg_arg->type,
@@ -1083,9 +1121,13 @@ static int mfc_mmap(struct file *file, struct vm_area_struct *vma)
 	unsigned long start, size;
 #endif
 #endif
+	mfc_info("%s line : %d IN\n", __func__, __LINE__);
 	mfc_ctx = (struct mfc_inst_ctx *)file->private_data;
-	if (!mfc_ctx)
+	if (!mfc_ctx) {
+		mfc_err("%s line : %d mfc_ctx is NULL\n",
+					__func__, __LINE__);
 		return -EINVAL;
+	}
 
 #if !(defined(CONFIG_VIDEO_MFC_VCM_UMP) || defined(CONFIG_S5P_VMEM))
 	dev = mfc_ctx->dev;
@@ -1325,9 +1367,30 @@ static int mfc_mmap(struct file *file, struct vm_area_struct *vma)
 	return 0;
 }
 
+#ifdef CONFIG_USE_MFC_CMA
+/* FIXME: workaround for CMA migration fail due to page lock */
+static int mfc_open_with_retry(struct inode *inode, struct file *file)
+{
+	int ret;
+	int i = 0;
+
+	ret = mfc_open(inode, file);
+
+	while (ret == -ENOMEM && i++ < 10) {
+		msleep(1000);
+		ret = mfc_open(inode, file);
+	}
+
+	return ret;
+}
+#define MFC_OPEN mfc_open_with_retry
+#else
+#define MFC_OPEN mfc_open
+#endif
+
 static const struct file_operations mfc_fops = {
 	.owner		= THIS_MODULE,
-	.open		= mfc_open,
+	.open		= MFC_OPEN,
 	.release	= mfc_release,
 	.unlocked_ioctl	= mfc_ioctl,
 	.mmap		= mfc_mmap,

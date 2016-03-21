@@ -41,7 +41,7 @@
 #define SAMSUNG_MFC_DEV_NAME           "/dev/s3c-mfc"
 
 #if defined(CONFIG_CPU_EXYNOS4212) || defined(CONFIG_CPU_EXYNOS4412)
-#define SUPPORT_SLICE_ENCODING        0 // originaly 1, but we're missing matching userspace
+#define SUPPORT_SLICE_ENCODING        0 // originally 1, but we're missing matching userspace
 #else
 #define SUPPORT_SLICE_ENCODING        0
 #endif
@@ -136,7 +136,7 @@ typedef enum {
     /* C210 specific feature */
     MFC_ENC_SETCONF_VUI_INFO,
     MFC_ENC_SETCONF_I_PERIOD,
-	MFC_ENC_SETCONF_SPS_PPS_GEN,
+    MFC_ENC_SETCONF_SPS_PPS_GEN,
     MFC_ENC_SETCONF_HIER_P,
 
     MFC_ENC_SETCONF_SEI_GEN,
