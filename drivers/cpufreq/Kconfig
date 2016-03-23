@@ -138,6 +138,15 @@ config CPU_FREQ_DEFAULT_GOV_PEGASUSQ
 	bool "pegasusq"
 	select CPU_FREQ_GOV_PEGASUSQ
 
+config CPU_FREQ_DEFAULT_GOV_INTELLIACTIVE
+	bool "intelliactive"
+	select CPU_FREQ_GOV_INTELLIACTIVE
+	help
+	  Use the CPUFreq governor 'intelliactive' as default. This allows
+	  you to get a full dynamic cpu frequency capable system by simply
+	  loading your cpufreq low-level hardware driver, using the
+	  'interactive' governor for latency-sensitive workloads.
+
 endchoice
 
 config CPU_FREQ_GOV_PERFORMANCE
@@ -306,6 +315,23 @@ config CPU_FREQ_GOV_PEGASUSQ_BOOST
 	bool "pegasusq - enable suport for userspace-controlled cpu boosts"
 	depends on CPU_FREQ_GOV_PEGASUSQ
 	default n
+
+config CPU_FREQ_GOV_INTELLIACTIVE
+	tristate "'intelliactive' cpufreq policy governor"
+	help
+	  'intelliactive' - This driver adds a dynamic cpufreq policy governor
+	  designed for latency-sensitive workloads.
+
+	  This governor attempts to reduce the latency of clock
+	  increases so that the system is more responsive to
+	  interactive workloads.
+
+	  To compile this driver as a module, choose M here: the
+	  module will be called cpufreq_interactive.
+
+	  For details, take a look at linux/Documentation/cpu-freq.
+
+	  If in doubt, say N.
 
 config CPU_FREQ_GOV_SLP
 	tristate "'slp' cpufreq policy governor"
