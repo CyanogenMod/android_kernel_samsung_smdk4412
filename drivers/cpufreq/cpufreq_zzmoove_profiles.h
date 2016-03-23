@@ -334,10 +334,10 @@ struct zzmoove_profile zzmoove_profiles[] = {
 #endif /* defined(CONFIG_HAS_EARLYSUSPEND)... */
 		0,		// scaling_block_cycles (0=disable, any value above 0)
 #ifdef CONFIG_EXYNOS4_EXPORT_TEMP
-		0,		// scaling_block_temp (0=disable, range from 30°C to 80°C)
+		0,		// scaling_block_temp (0=disable, range from 30Â°C to 80Â°C)
 #endif /* CONFIG_EXYNOS4_EXPORT_TEMP */
 #ifdef ENABLE_SNAP_THERMAL_SUPPORT
-		0,		// scaling_trip_temp (0=disable, range from 40°C to 69°C)
+		0,		// scaling_trip_temp (0=disable, range from 40Â°C to 69Â°C)
 #endif /* ENABLE_SNAP_THERMAL_SUPPORT */
 		1200000,	// scaling_block_freq (all valid system frequencies)
 		10,		// scaling_block_threshold (0=disable, range from 1 to 100)
