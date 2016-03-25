@@ -185,7 +185,7 @@ static int lowmem_shrink(struct shrinker *s, struct shrink_control *sc)
 
 #ifdef ENHANCED_LMK_ROUTINE
 	for (i = 0; i < LOWMEM_DEATHPENDING_DEPTH; i++)
-		selected_oom_adj[i] = min_adj;
+		selected_oom_adj[i] = min_score_adj;
 #else
 	selected_oom_score_adj = min_score_adj;
 #endif
@@ -238,8 +238,8 @@ static int lowmem_shrink(struct shrinker *s, struct shrink_control *sc)
 					break;
 				}
 			}
-		} else if (selected_oom_adj[max_selected_oom_idx] < oom_adj ||
-			(selected_oom_adj[max_selected_oom_idx] == oom_adj &&
+		} else if (selected_oom_adj[max_selected_oom_idx] < oom_score_adj ||
+			(selected_oom_adj[max_selected_oom_idx] == oom_score_adj &&
 			selected_tasksize[max_selected_oom_idx] < tasksize)) {
 			is_exist_oom_task = 1;
 		}
@@ -247,7 +247,7 @@ static int lowmem_shrink(struct shrinker *s, struct shrink_control *sc)
 		if (is_exist_oom_task) {
 			selected[max_selected_oom_idx] = p;
 			selected_tasksize[max_selected_oom_idx] = tasksize;
-			selected_oom_adj[max_selected_oom_idx] = oom_adj;
+			selected_oom_adj[max_selected_oom_idx] = oom_score_adj;
 
 			if (all_selected_oom < LOWMEM_DEATHPENDING_DEPTH)
 				all_selected_oom++;
@@ -263,7 +263,7 @@ static int lowmem_shrink(struct shrinker *s, struct shrink_control *sc)
 			}
 
 			lowmem_print(2, "select %d (%s), adj %d, size %d, to kill\n",
-				p->pid, p->comm, oom_adj, tasksize);
+				p->pid, p->comm, oom_score_adj, tasksize);
 		}
 #else
 		if (selected) {
