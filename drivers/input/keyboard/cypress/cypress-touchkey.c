@@ -1446,9 +1446,8 @@ static ssize_t sec_keypad_enable_store(struct device *dev,
 	return count;
 }
 
-static DEVICE_ATTR(keypad_enable, S_IRUGO|S_IWUSR, sec_keypad_enable_show,
-	      sec_keypad_enable_store);
-
+static DEVICE_ATTR(keypad_enable, S_IRUGO | S_IWUSR | S_IWGRP,
+		   sec_keypad_enable_show, sec_keypad_enable_store);
 static DEVICE_ATTR(recommended_version, S_IRUGO | S_IWUSR | S_IWGRP,
 		   touch_version_read, touch_version_write);
 static DEVICE_ATTR(updated_version, S_IRUGO | S_IWUSR | S_IWGRP,
@@ -1534,8 +1533,9 @@ static struct attribute *touchkey_attributes[] = {
 	&dev_attr_touchkey_threshold.attr,
 	&dev_attr_autocal_enable.attr,
 	&dev_attr_autocal_stat.attr,
-	&dev_attr_keypad_enable.attr,
 #endif
+	&dev_attr_keypad_enable.attr,
+
 	NULL,
 };
 
