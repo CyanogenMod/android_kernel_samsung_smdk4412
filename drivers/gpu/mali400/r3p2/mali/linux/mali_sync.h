@@ -39,7 +39,6 @@ _mali_osk_errcode_t mali_stream_create(const char * name, int * out_fd);
 struct sync_pt *mali_stream_create_point(int tl_fd);
 int mali_stream_create_fence(struct sync_pt *pt);
 int mali_stream_create_empty_fence(int tl_fd);
-int mali_stream_create_signalled_fence(int tl_fd);
 
 /**
  * Commit an empty timed fence

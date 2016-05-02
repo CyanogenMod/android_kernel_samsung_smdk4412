@@ -165,25 +165,6 @@ int mali_stream_create_empty_fence(int tl_fd)
 	return fd;
 }
 
-int mali_stream_create_signalled_fence(int tl_fd)
-{
-	int fd;
-	mali_sync_pt *pt;
-
-	pt = mali_stream_create_point_internal(tl_fd, MALI_FALSE);
-
-	if (NULL == pt) return -ENOMEM;
-
-	fd = mali_stream_create_fence(pt);
-
-	if (0 <= fd)
-	{
-		mali_sync_signal_pt(pt, 0);
-	}
-
-	return fd;
-}
-
 _mali_osk_errcode_t mali_fence_validate(int fd)
 {
 	struct sync_fence * fence;

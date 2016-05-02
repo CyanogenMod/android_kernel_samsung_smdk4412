@@ -697,11 +697,6 @@ static int mali_ioctl(struct inode *inode, struct file *filp, unsigned int cmd, 
 			err = sync_fence_create_empty_wrapper(session_data, (_mali_uk_fence_create_empty_s __user *)arg);
 			break;
 #endif
-		case MALI_IOC_FENCE_CREATE_SIGNALLED:
-#if defined(CONFIG_SYNC)
-			err = sync_fence_create_signalled_wrapper(session_data, (_mali_uk_fence_create_signalled_s __user *)arg);
-			break;
-#endif
 		case MALI_IOC_FENCE_VALIDATE:
 #if defined(CONFIG_SYNC)
 			err = sync_fence_validate_wrapper(session_data, (_mali_uk_fence_validate_s __user *)arg);

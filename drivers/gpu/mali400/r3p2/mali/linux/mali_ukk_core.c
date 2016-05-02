@@ -152,26 +152,6 @@ int sync_fence_create_empty_wrapper(struct mali_session_data *session_data, _mal
 	return 0;
 }
 
-int sync_fence_create_signalled_wrapper(struct mali_session_data *session_data, _mali_uk_fence_create_signalled_s __user *uargs)
-{
-	_mali_uk_fence_create_signalled_s kargs;
-
-	MALI_CHECK_NON_NULL(uargs, -EINVAL);
-
-	if (0 != get_user(kargs.stream, &uargs->stream)) return -EFAULT;
-
-	kargs.fence = mali_stream_create_signalled_fence(kargs.stream);
-	if (0 > kargs.fence)
-	{
-		return kargs.fence;
-	}
-
-	kargs.ctx = NULL; /* prevent kernel address to be returned to user space */
-	if (0 != copy_to_user(uargs, &kargs, sizeof(_mali_uk_fence_create_signalled_s))) return -EFAULT;
-
-	return 0;
-}
-
 int sync_fence_validate_wrapper(struct mali_session_data *session, _mali_uk_fence_validate_s __user *uargs)
 {
 	int fd;
