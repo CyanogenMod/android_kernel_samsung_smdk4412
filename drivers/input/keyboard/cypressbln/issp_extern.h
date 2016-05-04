@@ -36,7 +36,6 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #define INC_ISSP_EXTERN
 
 #include "issp_directives.h"
-#include <linux/i2c/touchkey_i2c.h>
 
 extern signed char fXRESInitializeTargetForISSP(void);
 extern signed char fPowerCycleInitializeTargetForISSP(void);
@@ -94,7 +93,7 @@ extern void SetTPLow(void);
 extern void ToggleTP(void);
 #endif
 
-extern int ISSP_main(struct touchkey_i2c *tkey_i2c);
+extern int ISSP_main(void);
 
 #endif				/*(INC_ISSP_EXTERN)*/
 #endif				/*(PROJECT_REV_)*/
