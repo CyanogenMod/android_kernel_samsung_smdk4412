@@ -1,0 +1,16 @@
+#
+# Cypress touchkey configuration
+#
+
+config KEYBOARD_CYPRESS_TOUCH
+	tristate "Cypress touchkey support"
+	help
+	  Say Y here to enable the cypress touchkey.
+
+	  To compile this driver as a module, choose M here.
+
+config TOUCHKEY_BLN
+	bool "BLN Support"
+	depends on KEYBOARD_CYPRESS_TOUCH
+	help
+	  BLN support.
