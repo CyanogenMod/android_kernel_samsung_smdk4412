@@ -640,6 +640,9 @@ void ErrorTrap(unsigned char bErrorNumber)
 /* Based on the diagram in the AN2026                                        */
 /* ========================================================================= */
 
+#ifdef CONFIG_TOUCHKEY_BLN
+int ISSP_main(void) {
+#else
 int ISSP_main(struct touchkey_i2c *tkey_i2c)
 {
 	unsigned long flags;
@@ -657,6 +660,8 @@ RAM Load, FLASHBlock Program, and Target Checksum Verification.*/
 	issp_tkey_i2c->pdata->suspend();
 	/*msleep(1);*/
 	usleep_range(1000, 1000);
+#endif
+
 #ifdef RESET_MODE
 	gpio_tlmm_config(LED_26V_EN);
 	gpio_tlmm_config(EXT_TSP_SCL);
