@@ -198,7 +198,7 @@
 static struct wacom_g5_callbacks *wacom_callbacks;
 #endif /* CONFIG_EPEN_WACOM_G5SP */
 
-#ifdef CONFIG_KEYBOARD_CYPRESS_TOUCH
+#if defined(CONFIG_KEYBOARD_CYPRESS_TOUCH) || defined(CONFIG_KEYBOARD_CYPRESS_TOUCH_BLN)
 #include <linux/i2c/touchkey_i2c.h>
 #endif
 
@@ -3095,7 +3095,11 @@ REGULATOR_INIT(ldo17, "VTF_2.8V", 2800000, 2800000, 0,
 REGULATOR_INIT(ldo18, "TOUCH_LED_3.3V", 3300000, 3300000, 0,
 		REGULATOR_CHANGE_STATUS, 1);
 #else
+#if defined(CONFIG_KEYBOARD_CYPRESS_TOUCH_BLN) && defined(CONFIG_TOUCHKEY_BLN)
+REGULATOR_INIT(ldo18, "TOUCH_LED_3.3V", 2500000, 3300000, 0,
+#else
 REGULATOR_INIT(ldo18, "TOUCH_LED_3.3V", 3000000, 3300000, 0,
+#endif
 	REGULATOR_CHANGE_STATUS | REGULATOR_CHANGE_VOLTAGE, 1);
 #endif
 REGULATOR_INIT(ldo21, "VDDQ_M1M2_1.2V", 1200000, 1200000, 1,
@@ -6194,7 +6198,7 @@ static void p6_wacom_register_callbacks(struct wacom_g5_callbacks *cb)
 #ifdef CONFIG_S3C_DEV_I2C8_EMUL
 static struct i2c_board_info i2c_devs8_emul[];
 #endif
-#ifdef CONFIG_KEYBOARD_CYPRESS_TOUCH
+#if defined(CONFIG_KEYBOARD_CYPRESS_TOUCH) || defined(CONFIG_KEYBOARD_CYPRESS_TOUCH_BLN)
 static void touchkey_init_hw(void)
 {
 	gpio_request(GPIO_3_TOUCH_INT, "3_TOUCH_INT");
@@ -6295,7 +6299,7 @@ static struct touchkey_platform_data touchkey_pdata = {
 	.power_on = touchkey_power_on,
 	.led_power_on = touchkey_led_power_on,
 };
-#endif /*CONFIG_KEYBOARD_CYPRESS_TOUCH*/
+#endif /*(CONFIG_KEYBOARD_CYPRESS_TOUCH) || (CONFIG_KEYBOARD_CYPRESS_TOUCH_BLN)*/
 
 
 
@@ -6448,7 +6452,7 @@ struct platform_device s3c_device_i2c8 = {
 
 /* I2C8 */
 static struct i2c_board_info i2c_devs8_emul[] = {
-#ifdef CONFIG_KEYBOARD_CYPRESS_TOUCH
+#if defined(CONFIG_KEYBOARD_CYPRESS_TOUCH) || defined(CONFIG_KEYBOARD_CYPRESS_TOUCH_BLN)
 	{
 		I2C_BOARD_INFO("sec_touchkey", 0x20),
 		.platform_data = &touchkey_pdata,
@@ -7983,7 +7987,7 @@ static void __init smdkc210_machine_init(void)
 			ARRAY_SIZE(tuna_i2c15_boardinfo));
 #endif
 #ifdef CONFIG_S3C_DEV_I2C8_EMUL
-#ifdef CONFIG_KEYBOARD_CYPRESS_TOUCH
+#if defined(CONFIG_KEYBOARD_CYPRESS_TOUCH) || defined(CONFIG_KEYBOARD_CYPRESS_TOUCH_BLN)
 	touchkey_init_hw();
 #endif
 	i2c_register_board_info(8, i2c_devs8_emul, ARRAY_SIZE(i2c_devs8_emul));
