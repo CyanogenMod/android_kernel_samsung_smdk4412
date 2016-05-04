@@ -1858,3 +1858,9 @@ config MACH_KONA_SENSOR
           BMA254 / BOSCH
           YAS532 / YAMAHA
           GP2A030A / SHARP
+
+
+config TOUCHKEY_BLN
+         bool "BLN Support"
+         help
+             BLN Support

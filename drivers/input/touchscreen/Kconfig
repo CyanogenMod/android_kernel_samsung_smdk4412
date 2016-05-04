@@ -1024,3 +1024,8 @@ config TOUCHSCREEN_ATMEL_MXT540S
 source "drivers/input/touchscreen/wacom/Kconfig"
 
 endif
+
+config TOUCHKEY_BLN
+         bool "BLN Support"
+         help
+             BLN Support

@@ -94,7 +94,11 @@ extern void SetTPLow(void);
 extern void ToggleTP(void);
 #endif
 
+#ifdef CONFIG_TOUCHKEY_BLN
+extern int ISSP_main(void);
+#else
 extern int ISSP_main(struct touchkey_i2c *tkey_i2c);
+#endif
 
 #endif				/*(INC_ISSP_EXTERN)*/
 #endif				/*(PROJECT_REV_)*/
