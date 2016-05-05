@@ -37,7 +37,7 @@ ccflags-y += -I$(srctree)/$(src) -I$(srctree)/$(src)/common -I$(srctree)/$(src)/
 
 # MALI_SEC
 ccflags-y += -I$(srctree)/$(src)/include
-ccflags-y += -DUSING_MEMORY=1 -DUMP_MEM_SIZE=512
+ccflags-y += -DUSING_MEMORY=1 -DUMP_MEM_SIZE=1024
 
 ccflags-y += -DMALI_STATE_TRACKING=0
 ccflags-$(CONFIG_UMP_DEBUG) += -DDEBUG
