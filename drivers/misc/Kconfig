@@ -61,27 +61,6 @@ config AD525X_DPOT_SPI
 	  To compile this driver as a module, choose M here: the
 	  module will be called ad525x_dpot-spi.
 
-config ANDROID_PMEM
-	bool "Android pmem allocator"
-	depends on MACH_U1 || MACH_PX || MACH_TRATS
-	default n
-
-if ANDROID_PMEM
-	comment "Reserved memory configurations"
-
-config ANDROID_PMEM_MEMSIZE_PMEM
-	int "Memory size in kbytes for android surface using pmem"
-	default "4096"
-
-config ANDROID_PMEM_MEMSIZE_PMEM_GPU1
-	int "Memory size in kbytes for android surface using pmem_gpu1"
-	default "10240"
-
-config ANDROID_PMEM_MEMSIZE_PMEM_CAM
-	int "Memory size in kbytes for android camera using pmem_camera"
-	default "4096"
-endif
-
 config ATMEL_PWM
 	tristate "Atmel AT32/AT91 PWM support"
 	depends on AVR32 || ARCH_AT91SAM9263 || ARCH_AT91SAM9RL || ARCH_AT91CAP9
