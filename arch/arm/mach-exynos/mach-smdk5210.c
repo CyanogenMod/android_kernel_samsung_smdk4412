@@ -947,20 +947,6 @@ static void __init exynos5_cma_region_reserve(
 static void __init exynos5_reserve_mem(void)
 {
 	static struct cma_region regions[] = {
-#ifdef CONFIG_ANDROID_PMEM_MEMSIZE_PMEM
-		{
-			.name = "pmem",
-			.size = CONFIG_ANDROID_PMEM_MEMSIZE_PMEM * SZ_1K,
-			.start = 0,
-		},
-#endif
-#ifdef CONFIG_ANDROID_PMEM_MEMSIZE_PMEM_GPU1
-		{
-			.name = "pmem_gpu1",
-			.size = CONFIG_ANDROID_PMEM_MEMSIZE_PMEM_GPU1 * SZ_1K,
-			.start = 0,
-		},
-#endif
 #ifdef CONFIG_VIDEO_SAMSUNG_MEMSIZE_FIMD
 		{
 			.name = "fimd",
@@ -1021,7 +1007,6 @@ static void __init exynos5_reserve_mem(void)
 		},
 	};
 	static const char map[] __initconst =
-		"android_pmem.0=pmem;android_pmem.1=pmem_gpu1;"
 		"s3cfb.0=fimd;"
 		"exynos-gsc.0=gsc0;exynos-gsc.1=gsc1;exynos-gsc.2=gsc2;exynos-gsc.3=gsc3;"
 		"ion-exynos=fimd,gsc0,gsc1,gsc2,gsc3;"
