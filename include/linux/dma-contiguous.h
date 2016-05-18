@@ -71,8 +71,6 @@ void dma_contiguous_reserve(phys_addr_t addr_limit);
 int dma_declare_contiguous(struct device *dev, unsigned long size,
 			   phys_addr_t base, phys_addr_t limit);
 
-int dma_prepare_alloc_from_contiguous(struct device *dev, int count,
-					unsigned int order);
 struct page *dma_alloc_from_contiguous(struct device *dev, int count,
 				       unsigned int order);
 bool dma_release_from_contiguous(struct device *dev, struct page *pages,
@@ -87,13 +85,6 @@ static inline void dma_contiguous_reserve(phys_addr_t limit) { }
 static inline
 int dma_declare_contiguous(struct device *dev, unsigned long size,
 			   phys_addr_t base, phys_addr_t limit)
-{
-	return -ENOSYS;
-}
-
-static inline
-int dma_prepare_alloc_from_contiguous(struct device *dev, int count,
-					unsigned int order)
 {
 	return -ENOSYS;
 }
