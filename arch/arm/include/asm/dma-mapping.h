@@ -175,21 +175,6 @@ static inline void dma_free_noncoherent(struct device *dev, size_t size,
 {
 }
 
-#ifdef CONFIG_DMA_CMA
-static inline int dma_prepare_alloc_coherent(struct device *dev, size_t size)
-{
-	int count = PAGE_ALIGN(size) >> PAGE_SHIFT;
-	int align = get_order(PAGE_ALIGN(size));
-
-	return dma_prepare_alloc_from_contiguous(dev, count, align);
-}
-#else
-static inline int dma_prepare_alloc_coherent(struct device *dev, size_t size)
-{
-	return 0;
-}
-#endif
-
 /**
  * dma_alloc_coherent - allocate consistent memory for DMA
  * @dev: valid struct device pointer, or NULL for ISA and EISA-like devices
