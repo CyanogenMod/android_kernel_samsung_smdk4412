@@ -1114,11 +1114,7 @@ static int __init i2c_adap_s3c_init(void)
 {
 	return platform_driver_register(&s3c24xx_i2c_driver);
 }
-#ifdef CONFIG_FAST_RESUME
-beforeresume_initcall(i2c_adap_s3c_init);
-#else
 subsys_initcall(i2c_adap_s3c_init);
-#endif
 
 static void __exit i2c_adap_s3c_exit(void)
 {

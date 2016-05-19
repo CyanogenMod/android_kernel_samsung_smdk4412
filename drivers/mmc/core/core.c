@@ -2710,11 +2710,7 @@ static void __exit mmc_exit(void)
 	destroy_workqueue(workqueue);
 }
 
-#ifdef CONFIG_FAST_RESUME
-beforeresume_initcall(mmc_init);
-#else
 subsys_initcall(mmc_init);
-#endif
 module_exit(mmc_exit);
 
 MODULE_LICENSE("GPL");

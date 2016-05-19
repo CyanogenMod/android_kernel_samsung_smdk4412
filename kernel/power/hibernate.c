@@ -838,11 +838,7 @@ close_finish:
 	goto Finish;
 }
 
-#ifdef CONFIG_FAST_RESUME
-resume_initcall(software_resume);
-#else
 late_initcall(software_resume);
-#endif
 
 
 static const char * const hibernation_modes[] = {
@@ -1034,42 +1030,11 @@ static ssize_t reserved_size_store(struct kobject *kobj,
 
 power_attr(reserved_size);
 
-#ifdef CONFIG_FAST_RESUME
-static ssize_t noresume_show(struct kobject *kobj,
-			struct kobj_attribute *attr, char *buf)
-{
-	return sprintf(buf, "%d\n", noresume);
-}
-
-static ssize_t noresume_store(struct kobject *kobj,
-			struct kobj_attribute *attr, const char *buf, size_t n)
-{
-	if (sscanf(buf, "%d", &noresume) == 1) {
-		noresume = !!noresume;
-		if (noresume) {
-			if (!swsusp_resume_device)
-				swsusp_resume_device =
-						name_to_dev_t(resume_file);
-			swsusp_check();
-			swsusp_close(FMODE_READ);
-		}
-		return n;
-	}
-
-	return -EINVAL;
-}
-
-power_attr(noresume);
-#endif
-
 static struct attribute * g[] = {
 	&disk_attr.attr,
 	&resume_attr.attr,
 	&image_size_attr.attr,
 	&reserved_size_attr.attr,
-#ifdef CONFIG_FAST_RESUME
-	&noresume_attr.attr,
-#endif
 	NULL,
 };
 

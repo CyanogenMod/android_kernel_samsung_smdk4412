@@ -161,14 +161,6 @@ config FULL_PAGE_RECLAIM
 	  dramatically decreased and small size of hibernation snapshot image
 	  has benefit for fast booting.
 
-config FAST_RESUME
-	bool "Using fast resume during Suspend-to-Disk"
-	depends on HIBERNATION
-	---help---
-	  software_resume() function which triggers hibernation restore is
-	  called faster on booting time by introducing new initcalls. This has
-	  benefit for fast booting on hibernation
-
 config PM_STD_PARTITION
 	string "Default resume partition"
 	depends on HIBERNATION

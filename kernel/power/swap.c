@@ -959,11 +959,8 @@ int swsusp_check(void)
 		if (!memcmp(HIBERNATE_SIG, swsusp_header->sig, 10)) {
 			memcpy(swsusp_header->sig, swsusp_header->orig_sig, 10);
 			/* Reset swap signature now */
-#if defined(CONFIG_FAST_RESUME) && defined(CONFIG_SLP)
-			if (noresume)
-#endif
-				error = hib_bio_write_page(swsusp_resume_block,
-							swsusp_header, NULL);
+			error = hib_bio_write_page(swsusp_resume_block,
+					swsusp_header, NULL);
 		} else {
 			error = -EINVAL;
 		}

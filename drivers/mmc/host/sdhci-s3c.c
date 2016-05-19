@@ -853,11 +853,7 @@ static void __exit sdhci_s3c_exit(void)
 	platform_driver_unregister(&sdhci_s3c_driver);
 }
 
-#ifdef CONFIG_FAST_RESUME
-beforeresume_initcall(sdhci_s3c_init);
-#else
 module_init(sdhci_s3c_init);
-#endif
 module_exit(sdhci_s3c_exit);
 
 MODULE_DESCRIPTION("Samsung SDHCI (HSMMC) glue");
