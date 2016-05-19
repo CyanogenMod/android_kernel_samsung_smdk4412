@@ -2716,11 +2716,7 @@ static void __exit mmc_blk_exit(void)
 	unregister_blkdev(MMC_BLOCK_MAJOR, "mmc");
 }
 
-#ifdef CONFIG_FAST_RESUME
-beforeresume_initcall(mmc_blk_init);
-#else
 module_init(mmc_blk_init);
-#endif
 module_exit(mmc_blk_exit);
 
 MODULE_LICENSE("GPL");

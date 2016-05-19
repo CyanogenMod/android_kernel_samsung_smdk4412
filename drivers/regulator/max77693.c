@@ -559,11 +559,7 @@ static int __init max77693_pmic_init(void)
 {
 	return platform_driver_register(&max77693_pmic_driver);
 }
-#ifdef CONFIG_FAST_RESUME
-beforeresume_initcall(max77693_pmic_init);
-#else
 subsys_initcall(max77693_pmic_init);
-#endif
 
 static void __exit max77693_pmic_cleanup(void)
 {

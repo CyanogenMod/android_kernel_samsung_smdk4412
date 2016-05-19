@@ -61,10 +61,6 @@ extern unsigned long sys_pwr_conf_addr;
 extern unsigned int l2x0_save[3];
 extern unsigned int scu_save[2];
 
-#ifdef CONFIG_FAST_RESUME
-static void exynos4_init_cpuidle_post_hib(void);
-#endif
-
 enum hc_type {
 	HC_SDHC,
 	HC_MSHC,
@@ -998,9 +994,6 @@ static int exynos4_cpuidle_notifier_event(struct notifier_block *this,
 		pr_debug("PM_SUSPEND_PREPARE for CPUIDLE\n");
 		return NOTIFY_OK;
 	case PM_POST_HIBERNATION:
-#ifdef CONFIG_FAST_RESUME
-		exynos4_init_cpuidle_post_hib();
-#endif
 	case PM_POST_RESTORE:
 	case PM_POST_SUSPEND:
 		enable_hlt();
@@ -1097,35 +1090,6 @@ static void __init exynos4_core_down_clk(void)
 }
 #else
 #define exynos4_core_down_clk()	do { } while (0)
-#endif
-
-#ifdef CONFIG_FAST_RESUME
-static void exynos4_init_cpuidle_post_hib(void)
-{
-	if (soc_is_exynos4210())
-		use_clock_down = SW_CLK_DWN;
-	else
-		use_clock_down = HW_CLK_DWN;
-
-	/* Clock down feature can use only EXYNOS4212 */
-	if (use_clock_down == HW_CLK_DWN)
-		exynos4_core_down_clk();
-
-	sys_pwr_conf_addr = (unsigned long)S5P_CENTRAL_SEQ_CONFIGURATION;
-
-	/* Save register value for SCU */
-	scu_save[0] = __raw_readl(S5P_VA_SCU + 0x30);
-	scu_save[1] = __raw_readl(S5P_VA_SCU + 0x0);
-
-	/* Save register value for L2X0 */
-	l2x0_save[0] = __raw_readl(S5P_VA_L2CC + 0x108);
-	l2x0_save[1] = __raw_readl(S5P_VA_L2CC + 0x10C);
-	l2x0_save[2] = __raw_readl(S5P_VA_L2CC + 0xF60);
-
-	flush_cache_all();
-	outer_clean_range(virt_to_phys(l2x0_save), ARRAY_SIZE(l2x0_save));
-	outer_clean_range(virt_to_phys(scu_save), ARRAY_SIZE(scu_save));
-}
 #endif
 
 static int __init exynos4_init_cpuidle(void)

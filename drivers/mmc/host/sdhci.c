@@ -36,11 +36,9 @@
 #define DBG(f, x...) \
 	pr_debug(DRIVER_NAME " [%s()]: " f,  __func__, ## x)
 
-#ifndef CONFIG_FAST_RESUME
 #if defined(CONFIG_LEDS_CLASS) || (defined(CONFIG_LEDS_CLASS_MODULE) && \
 	defined(CONFIG_MMC_SDHCI_MODULE))
 #define SDHCI_USE_LEDS_CLASS
-#endif
 #endif
 
 #define MAX_TUNING_LOOP 40
