@@ -23,7 +23,6 @@
 #include <linux/sched.h>
 #include <linux/list.h>
 #include <linux/mutex.h>
-#include <linux/android_pmem.h>
 #include <linux/io.h>
 #include <linux/types.h>
 #include <asm/smc.h>
