@@ -17,7 +17,6 @@
 
 #include "msm_mdp.h"
 #include "memory_ll.h"
-//#include "android_pmem.h"
 
 #ifdef CONFIG_MSM_SOC_REV_A
 #define MSM_SMI_BASE 0xE0000000

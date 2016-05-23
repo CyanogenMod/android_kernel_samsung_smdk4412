@@ -30,7 +30,6 @@
 #include <linux/fb.h>
 #include <msm_mdp.h>
 #include <linux/file.h>
-#include "android_pmem.h"
 #include <linux/major.h>
 #include <asm/system.h>
 #include <asm/mach-types.h>
