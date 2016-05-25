@@ -135,20 +135,24 @@ struct spi_data_packet_header {
 	unsigned long more:1;
 };
 
+struct link_pm_data {
+	struct miscdevice miscdev;
+	struct spi_link_device *spild;
+
+	struct notifier_block pm_notifier;
+};
+
 struct spi_link_device {
 	struct link_device ld;
 
-	/* Link to SPI control functions dependent on each platform */
-	int max_ipc_dev;
-
 	/* Wakelock for SPI device */
 	struct wake_lock spi_wake_lock;
+
 	/* Workqueue for modem bin transfers */
 	struct workqueue_struct *ipc_spi_wq;
 
 	/* SPI state */
 	int spi_state;
-	int spi_is_restart;
 
 	/* SPI Timer state */
 	int spi_timer_tx_state;
@@ -182,11 +186,13 @@ struct spi_link_device {
 	struct io_device    *iod[MAX_DEV_FORMAT];
 	struct sk_buff_head  skb_rxq[MAX_DEV_FORMAT];
 
+	/* LINK PM DEVICE DATA */
+	struct link_pm_data *link_pm_data;
+
 	/* Multi-purpose miscellaneous buffer */
 	u8 *buff;
 	u8 *sync_buff;
 
-	struct completion ril_init;
 	struct semaphore srdy_sem;
 
 	int send_modem_spi;
@@ -201,6 +207,12 @@ struct spi_link_device {
 /* converts from struct link_device* to struct xxx_link_device* */
 #define to_spi_link_device(linkdev) \
 			container_of(linkdev, struct spi_link_device, ld)
+
+struct spi_v_buff {
+	unsigned long base;
+	unsigned long size;
+	void __iomem *mmio;
+};
 
 extern unsigned int lpcharge;
 extern int get_console_suspended(void);

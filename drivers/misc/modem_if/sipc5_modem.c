@@ -34,6 +34,7 @@
 #include <linux/wakelock.h>
 
 #include <linux/platform_data/modem.h>
+#include <mach/c2c.h>
 #include "modem_prj.h"
 #include "modem_variation.h"
 #include "modem_utils.h"
@@ -77,27 +78,31 @@ static struct modem_shared *create_modem_shared_data(void)
 static struct modem_ctl *create_modemctl_device(struct platform_device *pdev,
 		struct modem_shared *msd)
 {
-	int ret = 0;
-	struct modem_data *pdata;
+	struct modem_data *pdata = pdev->dev.platform_data;
 	struct modem_ctl *modemctl;
-	struct device *dev = &pdev->dev;
+	int ret;
 
 	/* create modem control device */
 	modemctl = kzalloc(sizeof(struct modem_ctl), GFP_KERNEL);
-	if (!modemctl)
+	if (!modemctl) {
+		mif_err("%s: modemctl kzalloc fail\n", pdata->name);
+		mif_err("%s: xxx\n", pdata->name);
 		return NULL;
+	}
 
 	modemctl->msd = msd;
-	modemctl->dev = dev;
+	modemctl->dev = &pdev->dev;
 	modemctl->phone_state = STATE_OFFLINE;
 
-	pdata = pdev->dev.platform_data;
 	modemctl->mdm_data = pdata;
 	modemctl->name = pdata->name;
 
 	/* init modemctl device for getting modemctl operations */
 	ret = call_modem_init_func(modemctl, pdata);
 	if (ret) {
+		mif_err("%s: call_modem_init_func fail (err %d)\n",
+			pdata->name, ret);
+		mif_err("%s: xxx\n", pdata->name);
 		kfree(modemctl);
 		return NULL;
 	}
@@ -111,8 +116,8 @@ static struct io_device *create_io_device(struct modem_io_t *io_t,
 		struct modem_shared *msd, struct modem_ctl *modemctl,
 		struct modem_data *pdata)
 {
-	int ret = 0;
-	struct io_device *iod = NULL;
+	int ret;
+	struct io_device *iod;
 
 	iod = kzalloc(sizeof(struct io_device), GFP_KERNEL);
 	if (!iod) {
@@ -128,6 +133,7 @@ static struct io_device *create_io_device(struct modem_io_t *io_t,
 	iod->format = io_t->format;
 	iod->io_typ = io_t->io_type;
 	iod->link_types = io_t->links;
+	iod->app = io_t->app;
 	iod->net_typ = pdata->modem_net;
 	iod->use_handover = pdata->use_handover;
 	iod->ipc_version = pdata->ipc_version;
@@ -139,7 +145,7 @@ static struct io_device *create_io_device(struct modem_io_t *io_t,
 		modemctl->iod = iod;
 	if (iod->format == IPC_BOOT) {
 		modemctl->bootd = iod;
-		mif_info("Bood device = %s\n", iod->name);
+		mif_err("BOOT device = %s\n", iod->name);
 	}
 
 	/* link between io device and modem shared */
@@ -160,7 +166,7 @@ static struct io_device *create_io_device(struct modem_io_t *io_t,
 		return NULL;
 	}
 
-	mif_debug("%s is created!!!\n", iod->name);
+	mif_info("%s created\n", iod->name);
 	return iod;
 }
 
@@ -168,7 +174,6 @@ static int attach_devices(struct io_device *iod, enum modem_link tx_link)
 {
 	struct modem_shared *msd = iod->msd;
 	struct link_device *ld;
-	unsigned ch;
 
 	/* find link type for this io device */
 	list_for_each_entry(ld, &msd->link_dev_list, list) {
@@ -232,36 +237,36 @@ static int __devinit modem_probe(struct platform_device *pdev)
 {
 	int i;
 	struct modem_data *pdata = pdev->dev.platform_data;
-	struct modem_shared *msd = NULL;
-	struct modem_ctl *modemctl = NULL;
+	struct modem_shared *msd;
+	struct modem_ctl *modemctl;
 	struct io_device *iod[pdata->num_iodevs];
 	struct link_device *ld;
-
-	mif_err("%s\n", pdev->name);
-	memset(iod, 0, sizeof(iod));
+	mif_err("%s: +++\n", pdata->name);
 
 	msd = create_modem_shared_data();
 	if (!msd) {
-		mif_err("msd == NULL\n");
-		goto err_free_modemctl;
+		mif_err("%s: msd == NULL\n", pdata->name);
+		return -ENOMEM;
 	}
 
 	modemctl = create_modemctl_device(pdev, msd);
 	if (!modemctl) {
-		mif_err("modemctl == NULL\n");
-		goto err_free_modemctl;
+		mif_err("%s: modemctl == NULL\n", pdata->name);
+		kfree(msd);
+		return -ENOMEM;
 	}
 
 	/* create link device */
 	/* support multi-link device */
+	memset(iod, 0, sizeof(iod));
 	for (i = 0; i < LINKDEV_MAX ; i++) {
 		/* find matching link type */
 		if (pdata->link_types & LINKTYPE(i)) {
 			ld = call_link_init_func(pdev, i);
 			if (!ld)
-				goto err_free_modemctl;
+				goto free_mc;
 
-			mif_err("link created: %s\n", ld->name);
+			mif_err("%s: %s link created\n", pdata->name, ld->name);
 			ld->link_type = i;
 			ld->mc = modemctl;
 			ld->msd = msd;
@@ -274,8 +279,8 @@ static int __devinit modem_probe(struct platform_device *pdev)
 		iod[i] = create_io_device(&pdata->iodevs[i], msd, modemctl,
 				pdata);
 		if (!iod[i]) {
-			mif_err("iod[%d] == NULL\n", i);
-			goto err_free_modemctl;
+			mif_err("%s: iod[%d] == NULL\n", pdata->name, i);
+			goto free_iod;
 		}
 
 		attach_devices(iod[i], pdata->iodevs[i].tx_link);
@@ -283,21 +288,23 @@ static int __devinit modem_probe(struct platform_device *pdev)
 
 	platform_set_drvdata(pdev, modemctl);
 
-	mif_err("Complete!!!\n");
-
+	mif_err("%s: ---\n", pdata->name);
 	return 0;
 
-err_free_modemctl:
-	for (i = 0; i < pdata->num_iodevs; i++)
-		if (iod[i] != NULL)
+free_iod:
+	for (i = 0; i < pdata->num_iodevs; i++) {
+		if (iod[i])
 			kfree(iod[i]);
+	}
 
-	if (modemctl != NULL)
+free_mc:
+	if (modemctl)
 		kfree(modemctl);
 
-	if (msd != NULL)
+	if (msd)
 		kfree(msd);
 
+	mif_err("%s: xxx\n", pdata->name);
 	return -ENOMEM;
 }
 
@@ -305,13 +312,19 @@ static void modem_shutdown(struct platform_device *pdev)
 {
 	struct device *dev = &pdev->dev;
 	struct modem_ctl *mc = dev_get_drvdata(dev);
+	struct utc_time utc;
+
 	mc->ops.modem_off(mc);
 	mc->phone_state = STATE_OFFLINE;
+
+	get_utc_time(&utc);
+	mif_info("%s: at [%02d:%02d:%02d.%03d]\n",
+		mc->name, utc.hour, utc.min, utc.sec, utc.msec);
 }
 
 static int modem_suspend(struct device *pdev)
 {
-#ifndef CONFIG_LINK_DEVICE_HSIC
+#if !defined(CONFIG_LINK_DEVICE_HSIC)
 	struct modem_ctl *mc = dev_get_drvdata(pdev);
 
 	if (mc->gpio_pda_active)
@@ -323,7 +336,7 @@ static int modem_suspend(struct device *pdev)
 
 static int modem_resume(struct device *pdev)
 {
-#ifndef CONFIG_LINK_DEVICE_HSIC
+#if !defined(CONFIG_LINK_DEVICE_HSIC)
 	struct modem_ctl *mc = dev_get_drvdata(pdev);
 
 	if (mc->gpio_pda_active)
@@ -334,8 +347,8 @@ static int modem_resume(struct device *pdev)
 }
 
 static const struct dev_pm_ops modem_pm_ops = {
-	.suspend    = modem_suspend,
-	.resume     = modem_resume,
+	.suspend = modem_suspend,
+	.resume = modem_resume,
 };
 
 static struct platform_driver modem_driver = {
@@ -343,7 +356,7 @@ static struct platform_driver modem_driver = {
 	.shutdown = modem_shutdown,
 	.driver = {
 		.name = "mif_sipc5",
-		.pm   = &modem_pm_ops,
+		.pm = &modem_pm_ops,
 	},
 };
 
