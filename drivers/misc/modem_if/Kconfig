@@ -24,8 +24,18 @@ config CDMA_MODEM_CBP72
 	depends on SEC_MODEM
 	default n
 
+config CDMA_MODEM_CBP82
+	bool "modem chip : VIA CBP8.2"
+	depends on SEC_MODEM
+	default n
+
 config LTE_MODEM_CMC221
 	bool "modem chip : SEC CMC221"
+	depends on SEC_MODEM
+	default n
+
+config UMTS_MODEM_SS222
+	bool "modem chip : SEC SS222"
 	depends on SEC_MODEM
 	default n
 
@@ -44,6 +54,11 @@ config GSM_MODEM_ESC6270
 	depends on SEC_MODEM
 	default n
 
+config CDMA_MODEM_QSC6085
+	bool "modem chip : Qualcomm QSC6085"
+	depends on SEC_MODEM
+	default n
+
 config LINK_DEVICE_MIPI
 	bool "modem driver link device MIPI-HSI"
 	depends on SEC_MODEM
@@ -58,6 +73,7 @@ config LINK_DEVICE_PLD
 	bool "modem driver link device PLD"
 	depends on SEC_MODEM
 	default n
+
 config LINK_DEVICE_USB
 	bool "modem driver link device USB"
 	depends on SEC_MODEM
@@ -78,18 +94,13 @@ config LINK_DEVICE_SPI
 	depends on SEC_MODEM
 	default n
 
+config BOOT_DEVICE_SPI
+	bool "modem driver boot device SPI"
+	depends on SEC_MODEM
+	default n
+
 config WORKQUEUE_FRONT
 	bool "IPC: SPI workqueue front"
-	depends on SEC_MODEM
-	default n
-
-config IPC_CMC22x_OLD_RFS
-	bool "IPC: CMC22x ancient RFS"
-	depends on SEC_MODEM
-	default n
-
-config SIPC_VER_5
-	bool "IPC: Samsung IPC 5.0"
 	depends on SEC_MODEM
 	default n
 
