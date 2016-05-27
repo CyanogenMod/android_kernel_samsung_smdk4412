@@ -269,7 +269,7 @@ static void usb_rx_complete(struct urb *urb)
 		switch (pipe_data->format) {
 		case IF_USB_FMT_EP:
 			if (usb_ld->if_usb_is_main) {
-				pr_urb("IPC-RX", urb);
+//				pr_urb("IPC-RX", urb);
 				iod_format = IPC_FMT;
 			} else {
 				iod_format = IPC_BOOT;
@@ -477,13 +477,13 @@ static int _usb_tx_work(struct sk_buff *skb)
 
 	if (!pipe_data)
 		return -ENOENT;
-
+/*
 	if (iod->format == IPC_FMT && usb_ld->if_usb_is_main)
 		pr_skb("IPC-TX", skb);
 
 	if (iod->format == IPC_RAW)
 		mif_debug("TX[RAW]\n");
-
+*/
 	return usb_tx_urb_with_skb(usb_ld->usbdev, skb,	pipe_data);
 }
 
@@ -741,11 +741,11 @@ static inline int link_pm_slave_wake(struct link_pm_data *pm_data)
 				!= HOSTWAKE_TRIGLEVEL) {
 		if (gpio_get_value(pm_data->gpio_link_slavewake)) {
 			gpio_set_value(pm_data->gpio_link_slavewake, 0);
-			mif_info("gpio [SWK] set [0]\n");
+			mif_debug("gpio [SWK] set [0]\n");
 			mdelay(5);
 		}
 		gpio_set_value(pm_data->gpio_link_slavewake, 1);
-		mif_info("gpio [SWK] set [1]\n");
+		mif_debug("gpio [SWK] set [1]\n");
 		mdelay(5);
 
 		/* wait host wake signal*/
@@ -860,7 +860,7 @@ static irqreturn_t link_pm_irq_handler(int irq, void *data)
 		runtime pm status changes to ACTIVE
 	*/
 	value = gpio_get_value(pm_data->gpio_link_hostwake);
-	mif_info("gpio [HWK] get [%d]\n", value);
+	mif_debug("gpio [HWK] get [%d]\n", value);
 
 	/*
 	* igonore host wakeup interrupt at suspending kernel
@@ -975,7 +975,9 @@ static int link_pm_notifier_event(struct notifier_block *this,
 {
 	struct link_pm_data *pm_data =
 			container_of(this, struct link_pm_data,	pm_notifier);
+#ifdef CONFIG_UMTS_MODEM_XMM6262
 	struct modem_ctl *mc = if_usb_get_modemctl(pm_data);
+#endif
 
 	switch (event) {
 	case PM_SUSPEND_PREPARE:
@@ -984,11 +986,13 @@ static int link_pm_notifier_event(struct notifier_block *this,
 	case PM_RESTORE_PREPARE:
 #endif
 		pm_data->dpm_suspending = true;
+#ifdef CONFIG_UMTS_MODEM_XMM6262
 		/* set PDA Active High if previous state was LPA */
 		if (!gpio_get_value(pm_data->gpio_link_active)) {
 			mif_info("PDA active High to LPA suspend spot\n");
 			gpio_set_value(mc->gpio_pda_active, 1);
 		}
+#endif
 		mif_debug("dpm suspending set to true\n");
 		return NOTIFY_OK;
 	case PM_POST_SUSPEND:
@@ -1002,14 +1006,15 @@ static int link_pm_notifier_event(struct notifier_block *this,
 			queue_delayed_work(pm_data->wq, &pm_data->link_pm_work,
 				0);
 			mif_info("post resume\n");
-		} else {
+		}
+#ifdef CONFIG_UMTS_MODEM_XMM6262
 		/* LPA to Kernel suspend and User Freezing task fail resume,
 		restore to LPA GPIO states. */
-			if (!gpio_get_value(pm_data->gpio_link_active)) {
-				mif_info("PDA active low to LPA GPIO state\n");
-				gpio_set_value(mc->gpio_pda_active, 0);
-			}
+		if (!gpio_get_value(pm_data->gpio_link_active)) {
+			mif_info("PDA active low to LPA GPIO state\n");
+			gpio_set_value(mc->gpio_pda_active, 0);
 		}
+#endif
 		mif_debug("dpm suspending set to false\n");
 		return NOTIFY_OK;
 	}
@@ -1453,7 +1458,8 @@ static int usb_link_pm_init(struct usb_link_device *usb_ld, void *data)
 	struct modem_data *pdata =
 			(struct modem_data *)pdev->dev.platform_data;
 	struct modemlink_pm_data *pm_pdata;
-	struct link_pm_data *pm_data;
+	struct link_pm_data *pm_data =
+			kzalloc(sizeof(struct link_pm_data), GFP_KERNEL);
 
 	if (!pdata || !pdata->link_pm_data) {
 		mif_err("platform data is NULL\n");
@@ -1461,7 +1467,6 @@ static int usb_link_pm_init(struct usb_link_device *usb_ld, void *data)
 	}
 	pm_pdata = pdata->link_pm_data;
 
-	pm_data = kzalloc(sizeof(struct link_pm_data), GFP_KERNEL);
 	if (!pm_data) {
 		mif_err("link_pm_data is NULL\n");
 		return -ENOMEM;

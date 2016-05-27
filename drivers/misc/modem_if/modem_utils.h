@@ -16,7 +16,6 @@
 #define __MODEM_UTILS_H__
 
 #include <linux/rbtree.h>
-#include "modem_prj.h"
 
 #define IS_CONNECTED(iod, ld) ((iod)->link_types & LINKTYPE((ld)->link_type))
 
@@ -26,8 +25,6 @@
 #define MIF_SEPARATOR_DPRAM "DPRAM_LOGGER(VER1.1)"
 #define MAX_IPC_SKB_SIZE 4096
 #define MAX_LOG_SIZE 64
-
-#define MIF_TAG	"mif"
 
 #define MAX_LOG_CNT (MAX_MIF_BUFF_SIZE / MAX_LOG_SIZE)
 #define MIF_ID_SIZE sizeof(enum mif_log_id)
@@ -99,19 +96,7 @@ struct mif_time_block {
 	char buff[MAX_TIM_LOG_SIZE];
 };
 
-static inline int ns2us(long ns)
-{
-	return (ns > 0) ? (ns / 1000) : 0;
-}
-
-static inline int ns2ms(long ns)
-{
-	return (ns > 0) ? (ns / 1000000) : 0;
-}
-
-void ts2utc(struct timespec *ts, struct utc_time *utc);
-void get_utc_time(struct utc_time *utc);
-
+int mif_dump_dpram(struct io_device *);
 int mif_dump_log(struct modem_shared *, struct io_device *);
 
 #define mif_irq_log(msd, map, data, len) \
@@ -156,7 +141,7 @@ static inline unsigned int countbits(unsigned int n)
 }
 
 /* print IPC message as hex string with UTC time */
-void pr_ipc(int level, const char *tag, const char *data, size_t len);
+int pr_ipc(const char *str, const char *data, size_t len);
 
 /* print buffer as hex string */
 int pr_buffer(const char *tag, const char *data, size_t data_len,
@@ -171,12 +156,9 @@ int pr_buffer(const char *tag, const char *data, size_t data_len,
 	pr_buffer(tag, (char *)((urb)->transfer_buffer), \
 			(size_t)((urb)->actual_length), (size_t)16)
 
-/* Stop/wake all TX queues in network interfaces */
-void mif_netif_stop(struct link_device *ld);
-void mif_netif_wake(struct link_device *ld);
-
 /* flow control CMD from CP, it use in serial devices */
 int link_rx_flowctl_cmd(struct link_device *ld, const char *data, size_t len);
+
 
 /* get iod from tree functions */
 
@@ -222,13 +204,11 @@ void mif_add_timer(struct timer_list *timer, unsigned long expire,
 		void (*function)(unsigned long), unsigned long data);
 
 /* debug helper functions for sipc4, sipc5 */
-void mif_print_data(const char *buff, int len);
-void mif_dump2format16(const char *data, int len, char *buff, char *tag);
-void mif_dump2format4(const char *data, int len, char *buff, char *tag);
-void mif_print_dump(const char *data, int len, int width);
+void mif_print_data(char *buf, int len);
 void print_sipc4_hdlc_fmt_frame(const u8 *psrc);
 void print_sipc4_fmt_frame(const u8 *psrc);
 void print_sipc5_link_fmt_frame(const u8 *psrc);
+
 
 /*---------------------------------------------------------------------------
 
@@ -302,17 +282,23 @@ void print_sipc5_link_fmt_frame(const u8 *psrc);
 -------------------------------------------------------------------------*/
 #define UDP_HDR_SIZE	8
 
-void print_ip4_packet(const u8 *ip_pkt, bool tx);
-bool is_dns_packet(const u8 *ip_pkt);
-bool is_syn_packet(const u8 *ip_pkt);
+void print_ip4_packet(u8 *ip_pkt, bool tx);
+bool is_dns_packet(u8 *ip_pkt);
+bool is_syn_packet(u8 *ip_pkt);
 
-int mif_register_isr(unsigned int irq, irq_handler_t isr, unsigned long flags,
-			const char *name, void *data);
-int mif_test_dpram(char *dp_name, void __iomem *start, u16 bytes);
+int memcmp16_to_io(const void __iomem *to, void *from, int size);
+int mif_test_dpram(char *dp_name, u8 __iomem *start, u32 size);
 
-struct file *mif_open_file(const char *path);
-void mif_save_file(struct file *fp, const char *buff, size_t size);
-void mif_close_file(struct file *fp);
+static const inline char *get_dev_name(int dev)
+{
+	if (dev == IPC_FMT)
+		return "FMT";
+	else if (dev == IPC_RAW)
+		return "RAW";
+	else if (dev == IPC_RFS)
+		return "RFS";
+	else
+		return "NONE";
+}
 
 #endif/*__MODEM_UTILS_H__*/
-

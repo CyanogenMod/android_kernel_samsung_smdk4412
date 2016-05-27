@@ -1,4 +1,5 @@
 /*
+ * Copyright (C) 2010 Google, Inc.
  * Copyright (C) 2010 Samsung Electronics.
  *
  * This software is licensed under the terms of the GNU General Public
@@ -15,21 +16,14 @@
 #ifndef __MODEM_IF_H__
 #define __MODEM_IF_H__
 
-#include <linux/platform_device.h>
-#include <linux/miscdevice.h>
-
 enum modem_t {
 	IMC_XMM6260,
 	IMC_XMM6262,
 	VIA_CBP71,
 	VIA_CBP72,
-	VIA_CBP82,
-	SEC_CMC220,
 	SEC_CMC221,
-	SEC_SS222,
 	QC_MDM6600,
 	QC_ESC6270,
-	QC_QSC6085,
 	SPRD_SC8803,
 	DUMMY,
 	MAX_MODEM_TYPE
@@ -39,11 +33,10 @@ enum dev_format {
 	IPC_FMT,
 	IPC_RAW,
 	IPC_RFS,
-	IPC_MULTI_RAW,
 	IPC_CMD,
 	IPC_BOOT,
+	IPC_MULTI_RAW,
 	IPC_RAMDUMP,
-	IPC_DEBUG,
 	MAX_DEV_FORMAT,
 };
 #define MAX_IPC_DEV	(IPC_RFS + 1)	/* FMT, RAW, RFS */
@@ -58,14 +51,13 @@ enum modem_io {
 enum modem_link {
 	LINKDEV_UNDEFINED,
 	LINKDEV_MIPI,
+	LINKDEV_DPRAM,
+	LINKDEV_SPI,
 	LINKDEV_USB,
 	LINKDEV_HSIC,
-	LINKDEV_DPRAM,
-	LINKDEV_PLD,
 	LINKDEV_C2C,
-	LINKDEV_SHMEM,
-	LINKDEV_SPI,
-	LINKDEV_MAX
+	LINKDEV_PLD,
+	LINKDEV_MAX,
 };
 #define LINKTYPE(modem_link) (1u << (modem_link))
 
@@ -74,12 +66,6 @@ enum modem_network {
 	CDMA_NETWORK,
 	TDSCDMA_NETWORK,
 	LTE_NETWORK,
-	MAX_MODEM_NETWORK
-};
-
-enum ap_type {
-	S5P,
-	MAX_AP_TYPE
 };
 
 enum sipc_ver {
@@ -88,16 +74,15 @@ enum sipc_ver {
 	SIPC_VER_41 = 41,
 	SIPC_VER_42 = 42,
 	SIPC_VER_50 = 50,
-	MAX_SIPC_VER
+	MAX_SIPC_VER,
 };
 
 /**
  * struct modem_io_t - declaration for io_device
  * @name:	device name
- * @id:		for SIPC4, contains format & channel information
+ * @id:		contain format & channel information
  *		(id & 11100000b)>>5 = format  (eg, 0=FMT, 1=RAW, 2=RFS)
  *		(id & 00011111b)    = channel (valid only if format is RAW)
- *		for SIPC5, contains only 8-bit channel ID
  * @format:	device format
  * @io_type:	type of this io_device
  * @links:	list of link_devices to use this io_device
@@ -109,7 +94,7 @@ enum sipc_ver {
  *		TX is only one link_device.
  * @app:	the name of the application that will use this IO device
  *
- * This structure is used in board-*-modems.c
+ * This structure is used in board-*-modem.c
  */
 struct modem_io_t {
 	char *name;
@@ -118,7 +103,11 @@ struct modem_io_t {
 	enum modem_io io_type;
 	enum modem_link links;
 	enum modem_link tx_link;
+#ifdef CONFIG_MACH_U1
 	char *app;
+#else
+	bool rx_gather;
+#endif
 };
 
 struct modemlink_pm_data {
@@ -137,14 +126,10 @@ struct modemlink_pm_data {
 	void *hub_pm_data;
 	bool has_usbhub;
 
-#ifdef CONFIG_EXYNOS4_CPUFREQ
 	/* cpu/bus frequency lock */
 	atomic_t freqlock;
-	atomic_t freq_dpramlock;
 	int (*freq_lock)(struct device *dev);
 	int (*freq_unlock)(struct device *dev);
-	unsigned gpio_cpufreq_lock;
-#endif
 
 	int autosuspend_delay_ms; /* if zero, the default value is used */
 	void (*ehci_reg_dump)(struct device *);
@@ -155,25 +140,31 @@ struct modemlink_pm_link_activectl {
 	int gpio_request_host_active;
 };
 
-#define RES_DPRAM_MEM_ID	0
-#define RES_DPRAM_SFR_ID	1
+#define RES_CP_ACTIVE_IRQ_ID	0
+#define RES_DPRAM_MEM_ID	1
+#define RES_DPRAM_IRQ_ID	2
+#define RES_DPRAM_SFR_ID	3
 
+#ifdef CONFIG_MACH_U1
+#define STR_CP_ACTIVE_IRQ	"cp_active_irq"
 #define STR_DPRAM_BASE		"dpram_base"
+#define STR_DPRAM_IRQ		"dpram_irq"
 #define STR_DPRAM_SFR_BASE	"dpram_sfr_base"
+#endif
 
 enum dpram_type {
 	EXT_DPRAM,
 	AP_IDPRAM,
 	CP_IDPRAM,
-	PLD_DPRAM,
+	SHM_DPRAM,
 	MAX_DPRAM_TYPE
 };
 
-#define DPRAM_SIZE_8KB		(8 << 10)
-#define DPRAM_SIZE_16KB		(16 << 10)
-#define DPRAM_SIZE_32KB		(32 << 10)
-#define DPRAM_SIZE_64KB		(64 << 10)
-#define DPRAM_SIZE_128KB	(128 << 10)
+#define DPRAM_SIZE_8KB		0x02000
+#define DPRAM_SIZE_16KB		0x04000
+#define DPRAM_SIZE_32KB		0x08000
+#define DPRAM_SIZE_64KB		0x10000
+#define DPRAM_SIZE_128KB	0x20000
 
 enum dpram_speed {
 	DPRAM_SPEED_LOW,
@@ -202,16 +193,7 @@ struct dpram_ipc_device {
 };
 
 struct dpram_ipc_map {
-	u16 __iomem *magic;
-	u16 __iomem *access;
-
-	struct dpram_ipc_device dev[MAX_IPC_DEV];
-
-	u16 __iomem *mbx_cp2ap;
-	u16 __iomem *mbx_ap2cp;
-};
-
-struct pld_ipc_map {
+#if defined(CONFIG_LINK_DEVICE_PLD)
 	u16 __iomem *mbx_ap2cp;
 	u16 __iomem *magic_ap2cp;
 	u16 __iomem *access_ap2cp;
@@ -223,51 +205,49 @@ struct pld_ipc_map {
 	struct dpram_ipc_device dev[MAX_IPC_DEV];
 
 	u16 __iomem *address_buffer;
+#else
+	u16 __iomem *magic;
+	u16 __iomem *access;
+
+	struct dpram_ipc_device dev[MAX_IPC_DEV];
+
+	u16 __iomem *mbx_cp2ap;
+	u16 __iomem *mbx_ap2cp;
+#endif
 };
 
-struct modemlink_dpram_data {
-	enum dpram_type type;	/* DPRAM type */
-	enum ap_type ap;	/* AP type for AP_IDPRAM */
+struct modemlink_dpram_control {
+	void (*reset)(void);
+	void (*clear_intr)(void);
+	u16 (*recv_intr)(void);
+	void (*send_intr)(u16);
+	u16 (*recv_msg)(void);
+	void (*send_msg)(u16);
 
-	/* Stirct I/O access (e.g. ioread16(), etc.) is required */
-	bool strict_io_access;
+	int (*wakeup)(void);
+	void (*sleep)(void);
 
-	/* Aligned access is required */
-	int aligned;
+	void (*setup_speed)(enum dpram_speed);
 
-	/* Disabled during phone booting */
-	bool disabled;
+	enum dpram_type dp_type;	/* DPRAM type */
+	int aligned;			/* aligned access is required */
+#ifdef CONFIG_MACH_U1
+	bool disabled;			/* Disabled during phone booting */
+#endif
+	u8 __iomem *dp_base;
+	u32 dp_size;
 
-	/* Virtual base address and size */
-	u8 __iomem *base;
-	u32 size;
+	int dpram_irq;
+	unsigned long dpram_irq_flags;
 
-	/* Pointer to an IPC map (DPRAM or PLD) */
-	void *ipc_map;
-
-	/* Timeout of waiting for RES_ACK from CP (in msec) */
-	unsigned long res_ack_wait_timeout;
+	int max_ipc_dev;
+	struct dpram_ipc_map *ipc_map;
 
 	unsigned boot_size_offset;
 	unsigned boot_tag_offset;
 	unsigned boot_count_offset;
 	unsigned max_boot_frame_size;
-
-	void (*setup_speed)(enum dpram_speed);
-	void (*clear_int2ap)(void);
 };
-
-enum shmem_type {
-	REAL_SHMEM,
-	C2C_SHMEM,
-	MAX_SHMEM_TYPE
-};
-
-#define STR_SHMEM_BASE		"shmem_base"
-
-#define SHMEM_SIZE_1MB		(1 << 20)	/* 1 MB */
-#define SHMEM_SIZE_2MB		(2 << 20)	/* 2 MB */
-#define SHMEM_SIZE_4MB		(4 << 20)	/* 4 MB */
 
 /* platform data */
 struct modem_data {
@@ -277,45 +257,20 @@ struct modem_data {
 	unsigned gpio_cp_off;
 	unsigned gpio_reset_req_n;
 	unsigned gpio_cp_reset;
-
-	/* for broadcasting AP's PM state (active or sleep) */
 	unsigned gpio_pda_active;
-
-	/* for checking aliveness of CP */
 	unsigned gpio_phone_active;
-	int irq_phone_active;
-
-	/* for AP-CP IPC interrupt */
-	unsigned gpio_ipc_int2ap;
-	int irq_ipc_int2ap;
-	unsigned long irqf_ipc_int2ap;	/* IRQ flags */
-	unsigned gpio_ipc_int2cp;
-
-	/* for AP-CP power management (PM) handshaking */
-	unsigned gpio_ap_wakeup;
-	int irq_ap_wakeup;
-	unsigned gpio_ap_status;
-	unsigned gpio_cp_wakeup;
-	unsigned gpio_cp_status;
-	int irq_cp_status;
-
-	/* for USB/HSIC PM */
-	unsigned gpio_host_wakeup;
-	int irq_host_wakeup;
-	unsigned gpio_host_active;
-	unsigned gpio_slave_wakeup;
-	unsigned gpio_hub_suspend;
-
 	unsigned gpio_cp_dump_int;
 	unsigned gpio_ap_dump_int;
 	unsigned gpio_flm_uart_sel;
-	unsigned gpio_cp_warm_reset;
 #if defined(CONFIG_MACH_M0_CTC)
 	unsigned gpio_flm_uart_sel_rev06;
+	unsigned gpio_host_wakeup;
 #endif
-
+	unsigned gpio_cp_warm_reset;
 	unsigned gpio_sim_detect;
-	int irq_sim_detect;
+#if defined(CONFIG_LINK_DEVICE_DPRAM) || defined(CONFIG_LINK_DEVICE_PLD)
+	unsigned gpio_dpram_int;
+#endif
 
 #ifdef CONFIG_LINK_DEVICE_PLD
 	unsigned gpio_fpga1_creset;
@@ -329,6 +284,14 @@ struct modem_data {
 	unsigned gpio_fpga2_cs_n;
 #endif
 
+#ifdef CONFIG_LTE_MODEM_CMC221
+	unsigned gpio_dpram_status;
+	unsigned gpio_dpram_wakeup;
+	unsigned gpio_slave_wakeup;
+	unsigned gpio_host_active;
+	unsigned gpio_host_wakeup;
+	int      irq_host_wakeup;
+#endif
 #ifdef CONFIG_MACH_U1_KOR_LGT
 	unsigned gpio_cp_reset_msm;
 	unsigned gpio_boot_sw_sel;
@@ -353,74 +316,41 @@ struct modem_data {
 #endif
 
 	/* Switch with 2 links in a modem */
-	unsigned gpio_link_switch;
-
-#ifdef CONFIG_EXYNOS4_CPUFREQ
-	/* cpu/bus frequency lock */
-	unsigned gpio_cpufreq_lock;
-#endif
+	unsigned gpio_dynamic_switching;
 
 	/* Modem component */
-	enum modem_network modem_net;
-	enum modem_t modem_type;
-	enum modem_link link_types;
-	char *link_name;
-
+	enum modem_network  modem_net;
+	enum modem_t        modem_type;
+	enum modem_link     link_types;
+	char               *link_name;
+#if defined(CONFIG_LINK_DEVICE_DPRAM) || defined(CONFIG_LINK_DEVICE_PLD)
 	/* Link to DPRAM control functions dependent on each platform */
-	struct modemlink_dpram_data *dpram;
+	struct modemlink_dpram_control *dpram_ctl;
+#endif
 
 	/* SIPC version */
 	enum sipc_ver ipc_version;
 
-	/* the number of real IPC devices -> (IPC_RAW + 1) or (IPC_RFS + 1) */
-	int max_ipc_dev;
-
 	/* Information of IO devices */
-	unsigned num_iodevs;
-	struct modem_io_t *iodevs;
+	unsigned            num_iodevs;
+	struct modem_io_t  *iodevs;
 
 	/* Modem link PM support */
 	struct modemlink_pm_data *link_pm_data;
 
+	void (*gpio_revers_bias_clear)(void);
+	void (*gpio_revers_bias_restore)(void);
+
 	/* Handover with 2+ modems */
 	bool use_handover;
 
+	/* Debugging option */
+	bool use_mif_log;
 	/* SIM Detect polarity */
 	bool sim_polarity;
-
-	void (*gpio_revers_bias_clear)(void);
-	void (*gpio_revers_bias_restore)(void);
 };
 
-#define MODEM_BOOT_DEV_SPI "modem_boot_spi"
-
-struct modem_boot_spi_platform_data {
-	const char *name;
-	unsigned int gpio_cp_status;
-};
-
-struct modem_boot_spi {
-	struct miscdevice dev;
-	struct spi_device *spi_dev;
-	struct mutex lock;
-	unsigned gpio_cp_status;
-};
-#define to_modem_boot_spi(misc)	container_of(misc, struct modem_boot_spi, dev);
-
-struct utc_time {
-	u16 year;
-	u8 mon:4,
-	   day:4;
-	u8 hour;
-	u8 min;
-	u8 sec;
-	u16 msec;
-} __packed;
-
-extern void get_utc_time(struct utc_time *utc);
-
-#define LOG_TAG	"mif: "
-#define CALLER	(__builtin_return_address(0))
+#define LOG_TAG "mif: "
 
 #define mif_err(fmt, ...) \
 	pr_err(LOG_TAG "%s: " pr_fmt(fmt), __func__, ##__VA_ARGS__)
