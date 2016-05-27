@@ -22,7 +22,7 @@
 #include <linux/sched.h>
 #include <linux/netdevice.h>
 #include <linux/if_arp.h>
-#include <linux/platform_data/modem.h>
+#include "modem.h"
 
 #include "modem_prj.h"
 

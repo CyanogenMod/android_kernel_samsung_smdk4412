@@ -31,7 +31,7 @@
 #include <linux/delay.h>
 #include <linux/spi/spi.h>
 
-#include <linux/platform_data/modem.h>
+#include "modem.h"
 #include <linux/platform_data/lte_modem_bootloader.h>
 
 #define LEN_XMIT_DELEY	100

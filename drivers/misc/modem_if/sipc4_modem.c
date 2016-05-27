@@ -32,7 +32,7 @@
 #include <linux/delay.h>
 #include <linux/wakelock.h>
 
-#include <linux/platform_data/modem.h>
+#include "modem.h"
 #include "modem_prj.h"
 #include "modem_variation.h"
 #include "modem_utils.h"
@@ -328,9 +328,22 @@ static int modem_resume(struct device *pdev)
 	return 0;
 }
 
+#ifdef CONFIG_FAST_BOOT
+static void modem_complete(struct device *pdev)
+{
+	struct modem_ctl *mc = dev_get_drvdata(pdev);
+
+	if (mc->modem_complete)
+		mc->modem_complete(mc);
+}
+#endif
+
 static const struct dev_pm_ops modem_pm_ops = {
 	.suspend    = modem_suspend,
 	.resume     = modem_resume,
+#ifdef CONFIG_FAST_BOOT
+	.complete  = modem_complete,
+#endif
 };
 
 static struct platform_driver modem_driver = {
