@@ -24,7 +24,7 @@
 #include <linux/sched.h>
 #include <linux/platform_device.h>
 
-#include <linux/platform_data/modem.h>
+#include "modem.h"
 #include "modem_prj.h"
 #include <linux/regulator/consumer.h>
 
@@ -115,6 +115,13 @@ static int esc6270_reset(struct modem_ctl *mc)
 int esc6270_boot_on(struct modem_ctl *mc)
 {
 	struct link_device *ld = get_current_link(mc->iod);
+#if defined(CONFIG_LINK_DEVICE_DPRAM)
+	/* clear intr */
+	struct dpram_link_device *dpld = to_dpram_link_device(ld);
+	u16 recv_msg = dpld->recv_intr(dpld);
+
+	pr_info("[MODEM_IF:ESC] dpram intr: %x\n", recv_msg);
+#endif
 
 	pr_info("[MODEM_IF:ESC] <%s>\n", __func__);
 
@@ -273,8 +280,11 @@ int esc6270_init_modemctl_device(struct modem_ctl *mc, struct modem_data *pdata)
 	gpio_set_value(mc->gpio_cp_reset, 0);
 	gpio_set_value(mc->gpio_cp_on, 0);
 
-	pdev = to_platform_device(mc->dev);
-	mc->irq_phone_active = platform_get_irq_byname(pdev, "cp_active_irq");
+	mc->irq_phone_active = pdata->irq_phone_active;
+	if (!mc->irq_phone_active) {
+		mif_err("%s: ERR! get irq_phone_active fail\n", mc->name);
+		return -1;
+	}
 	pr_info("[MODEM_IF:ESC] <%s> PHONE_ACTIVE IRQ# = %d\n",
 		__func__, mc->irq_phone_active);
 
@@ -302,7 +312,7 @@ int esc6270_init_modemctl_device(struct modem_ctl *mc, struct modem_data *pdata)
 	}
 
 #if defined(CONFIG_SIM_DETECT)
-	mc->irq_sim_detect = platform_get_irq_byname(pdev, "sim_irq");
+	mc->irq_sim_detect = pdata->irq_sim_detect;
 	pr_info("[MODEM_IF:ESC] <%s> SIM_DECTCT IRQ# = %d\n",
 		__func__, mc->irq_sim_detect);
 

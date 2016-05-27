@@ -15,7 +15,7 @@
 #ifndef __MODEM_LINK_PM_USB_H__
 #define __MODEM_LINK_PM_USB_H__
 
-#include <linux/platform_data/modem.h>
+#include "modem.h"
 #include "modem_prj.h"
 #include "modem_link_device_usb.h"
 

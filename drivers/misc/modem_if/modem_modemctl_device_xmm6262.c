@@ -24,9 +24,11 @@
 #include <linux/platform_device.h>
 #include <linux/cma.h>
 #include <plat/devs.h>
-#include <linux/platform_data/modem.h>
+#include "modem.h"
 #include "modem_prj.h"
-
+#ifdef CONFIG_FAST_BOOT
+#include <linux/fake_shut_down.h>
+#endif
 static int xmm6262_on(struct modem_ctl *mc)
 {
 	mif_info("\n");
@@ -59,11 +61,13 @@ static int xmm6262_on(struct modem_ctl *mc)
 	udelay(60);
 	gpio_set_value(mc->gpio_cp_on, 0);
 	msleep(20);
+
+	mc->phone_state = STATE_BOOTING;
+
 	if (mc->gpio_revers_bias_restore)
 		mc->gpio_revers_bias_restore();
 	gpio_set_value(mc->gpio_pda_active, 1);
 
-	mc->phone_state = STATE_BOOTING;
 
 	return 0;
 }
@@ -120,6 +124,20 @@ static int xmm6262_reset(struct modem_ctl *mc)
 	return 0;
 }
 
+static int xmm6262_force_crash_exit(struct modem_ctl *mc)
+{
+	mif_info("\n");
+
+	if (!mc->gpio_ap_dump_int)
+		return -ENXIO;
+	
+	gpio_set_value(mc->gpio_ap_dump_int, 1);
+	mif_info("set ap_dump_int(%d) to high=%d\n",
+		mc->gpio_ap_dump_int, gpio_get_value(mc->gpio_ap_dump_int));
+	return 0;
+}
+
+
 static irqreturn_t phone_active_irq_handler(int irq, void *_mc)
 {
 	int phone_reset = 0;
@@ -172,14 +190,72 @@ static irqreturn_t phone_active_irq_handler(int irq, void *_mc)
 	return IRQ_HANDLED;
 }
 
+#ifdef CONFIG_FAST_BOOT
+#include <linux/reboot.h>
+
+static void mif_sim_detect_complete(struct modem_ctl *mc)
+{
+	if (mc->sim_shutdown_req) {
+		mif_info("fake shutdown sim changed shutdown\n");
+		kernel_power_off();
+		/*kernel_restart(NULL);*/
+		mc->sim_shutdown_req = false;
+	}
+}
+
+static int mif_init_sim_shutdown(struct modem_ctl *mc)
+{
+	mc->sim_shutdown_req = false;
+	mc->modem_complete = mif_sim_detect_complete;
+
+	return 0;
+}
+
+static void mif_check_fake_shutdown(struct modem_ctl *mc, bool online)
+{
+	if (fake_shut_down && mc->sim_state.online != online)
+		mc->sim_shutdown_req = true;
+}
+
+#else
+static inline int mif_init_sim_shutdown(struct modem_ctl *mc) { return 0; }
+#define mif_check_fake_shutdown(a, b) do {} while (0)
+#endif
+
+
+#define SIM_DETECT_DEBUG
 static irqreturn_t sim_detect_irq_handler(int irq, void *_mc)
 {
 	struct modem_ctl *mc = (struct modem_ctl *)_mc;
+#ifdef SIM_DETECT_DEBUG
+	int val = gpio_get_value(mc->gpio_sim_detect);
+	static int unchange;
+	static int prev_val;
 
-	if (mc->iod && mc->iod->sim_state_changed)
+	if (mc->phone_state == STATE_BOOTING) {
+		mif_info("BOOTING, reset unchange\n");
+		unchange = 0;
+	}
+
+	if (prev_val == val) {
+		if (unchange++ > 50) {
+			mif_err("Abnormal SIM detect GPIO irqs");
+			disable_irq_nosync(mc->gpio_sim_detect);
+			panic("SIM detect IRQ Error");
+		}
+	} else {
+		unchange = 0;
+	}
+	prev_val = val;
+#endif
+	if (mc->iod && mc->iod->sim_state_changed) {
+		mif_check_fake_shutdown(mc,
+			gpio_get_value(mc->gpio_sim_detect) == mc->sim_polarity
+			);
 		mc->iod->sim_state_changed(mc->iod,
 			gpio_get_value(mc->gpio_sim_detect) == mc->sim_polarity
 			);
+	}
 
 	return IRQ_HANDLED;
 }
@@ -189,6 +265,7 @@ static void xmm6262_get_ops(struct modem_ctl *mc)
 	mc->ops.modem_on = xmm6262_on;
 	mc->ops.modem_off = xmm6262_off;
 	mc->ops.modem_reset = xmm6262_reset;
+	mc->ops.modem_force_crash_exit = xmm6262_force_crash_exit;
 }
 
 int xmm6262_init_modemctl_device(struct modem_ctl *mc,
@@ -217,6 +294,7 @@ int xmm6262_init_modemctl_device(struct modem_ctl *mc,
 	mc->gpio_cp_ctrl1 = pdata->gpio_cp_ctrl1;
 	mc->gpio_cp_ctrl2 = pdata->gpio_cp_ctrl2;
 #endif
+
 
 	pdev = to_platform_device(mc->dev);
 	mc->irq_phone_active = gpio_to_irq(mc->gpio_phone_active);
@@ -261,6 +339,12 @@ int xmm6262_init_modemctl_device(struct modem_ctl *mc,
 		/* initialize sim_state => insert: gpio=0, remove: gpio=1 */
 		mc->sim_state.online =
 			gpio_get_value(mc->gpio_sim_detect) == mc->sim_polarity;
+
+		ret = mif_init_sim_shutdown(mc);
+		if (ret) {
+			mif_err("failed to sim fake shutdown init: %d\n", ret);
+			goto err_sim_detect_set_wake_irq;
+		}
 	}
 
 	return ret;
