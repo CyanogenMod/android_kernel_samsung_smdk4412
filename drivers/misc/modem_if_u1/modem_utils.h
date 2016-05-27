@@ -98,7 +98,18 @@ struct mif_time_block {
 	char buff[MAX_TIM_LOG_SIZE];
 };
 
+struct utc_time {
+	u16 year;
+	u8 mon:4,
+	   day:4;
+	u8 hour;
+	u8 min;
+	u8 sec;
+	u16 msec;
+} __packed;
+
 void ts2utc(struct timespec *ts, struct utc_time *utc);
+void get_utc_time(struct utc_time *utc);
 
 int mif_dump_dpram(struct io_device *);
 int mif_dump_log(struct modem_shared *, struct io_device *);
