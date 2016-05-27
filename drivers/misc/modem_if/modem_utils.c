@@ -12,18 +12,35 @@
  *
  */
 
-#include <linux/netdevice.h>
-#include <linux/platform_data/modem.h>
+#include <linux/init.h>
+#include <linux/module.h>
 #include <linux/platform_device.h>
+#include <linux/interrupt.h>
+#include <linux/miscdevice.h>
+#include <linux/netdevice.h>
 #include <linux/skbuff.h>
 #include <linux/ip.h>
+#include <net/ip.h>
 #include <linux/tcp.h>
 #include <linux/udp.h>
 #include <linux/rtc.h>
 #include <linux/time.h>
-#include <net/ip.h>
+#include <linux/uaccess.h>
+#include <linux/fs.h>
+#include <linux/io.h>
+#include <linux/wait.h>
+#include <linux/time.h>
+#include <linux/sched.h>
+#include <linux/slab.h>
+#include <linux/mutex.h>
+#include <linux/irq.h>
+#include <linux/gpio.h>
+#include <linux/delay.h>
+#include <linux/wakelock.h>
 
+#include "modem.h"
 #include "modem_prj.h"
+#include "modem_variation.h"
 #include "modem_utils.h"
 
 #define CMD_SUSPEND	((unsigned short)(0x00CA))
@@ -35,42 +52,29 @@
 	"mif: ------------------------------------------------------------"
 #define LINE_BUFF_SIZE	80
 
-#ifdef CONFIG_LINK_DEVICE_DPRAM
-#include "modem_link_device_dpram.h"
-int mif_dump_dpram(struct io_device *iod)
+static const char *hex = "0123456789abcdef";
+
+void ts2utc(struct timespec *ts, struct utc_time *utc)
 {
-	struct link_device *ld = get_current_link(iod);
-	struct dpram_link_device *dpld = to_dpram_link_device(ld);
-	u32 size = dpld->dp_size;
-	unsigned long read_len = 0;
-	struct sk_buff *skb;
-	char *buff;
+	struct tm tm;
 
-	buff = kzalloc(size, GFP_ATOMIC);
-	if (!buff) {
-		pr_err("[MIF] <%s> alloc dpram buff  failed\n", __func__);
-		return -ENOMEM;
-	} else {
-		dpld->dpram_dump(ld, buff);
-	}
-
-	while (read_len < size) {
-		skb = alloc_skb(MAX_IPC_SKB_SIZE, GFP_ATOMIC);
-		if (!skb) {
-			pr_err("[MIF] <%s> alloc skb failed\n", __func__);
-			kfree(buff);
-			return -ENOMEM;
-		}
-		memcpy(skb_put(skb, MAX_IPC_SKB_SIZE),
-			buff + read_len, MAX_IPC_SKB_SIZE);
-		skb_queue_tail(&iod->sk_rx_q, skb);
-		read_len += MAX_IPC_SKB_SIZE;
-		wake_up(&iod->wq);
-	}
-	kfree(buff);
-	return 0;
+	time_to_tm((ts->tv_sec - (sys_tz.tz_minuteswest * 60)), 0, &tm);
+	utc->year = 1900 + tm.tm_year;
+	utc->mon = 1 + tm.tm_mon;
+	utc->day = tm.tm_mday;
+	utc->hour = tm.tm_hour;
+	utc->min = tm.tm_min;
+	utc->sec = tm.tm_sec;
+	utc->msec = ns2ms(ts->tv_nsec);
 }
-#endif
+
+void get_utc_time(struct utc_time *utc)
+{
+	struct timespec ts;
+	getnstimeofday(&ts);
+	ts2utc(&ts, utc);
+}
+EXPORT_SYMBOL(get_utc_time);
 
 int mif_dump_log(struct modem_shared *msd, struct io_device *iod)
 {
@@ -82,7 +86,7 @@ int mif_dump_log(struct modem_shared *msd, struct io_device *iod)
 	while (read_len < MAX_MIF_BUFF_SIZE) {
 		skb = alloc_skb(MAX_IPC_SKB_SIZE, GFP_ATOMIC);
 		if (!skb) {
-			pr_err("[MIF] <%s> alloc skb failed\n", __func__);
+			mif_err("ERR! alloc_skb fail\n");
 			spin_unlock_irqrestore(&msd->lock, flags);
 			return -ENOMEM;
 		}
@@ -164,7 +168,6 @@ void _mif_com_log(enum mif_log_id id,
 	struct mif_common_block *block;
 	unsigned long int flags;
 	va_list args;
-	int ret;
 
 	spin_lock_irqsave(&msd->lock, flags);
 
@@ -179,7 +182,7 @@ void _mif_com_log(enum mif_log_id id,
 	block->time = get_kernel_time();
 
 	va_start(args, format);
-	ret = vsnprintf(block->buff, MAX_COM_LOG_SIZE, format, args);
+	vsnprintf(block->buff, MAX_COM_LOG_SIZE, format, args);
 	va_end(args);
 }
 
@@ -209,13 +212,12 @@ void _mif_time_log(enum mif_log_id id, struct modem_shared *msd,
 
 /* dump2hex
  * dump data to hex as fast as possible.
- * the length of @buf must be greater than "@len * 3"
+ * the length of @buff must be greater than "@len * 3"
  * it need 3 bytes per one data byte to print.
  */
-static inline int dump2hex(char *buf, const char *data, size_t len)
+static inline int dump2hex(char *buff, const char *data, size_t len)
 {
-	static const char *hex = "0123456789abcdef";
-	char *dest = buf;
+	char *dest = buff;
 	int i;
 
 	for (i = 0; i < len; i++) {
@@ -228,24 +230,26 @@ static inline int dump2hex(char *buf, const char *data, size_t len)
 
 	*dest = '\0';
 
-	return dest - buf;
+	return dest - buff;
 }
 
-int pr_ipc(const char *str, const char *data, size_t len)
+void pr_ipc(int level, const char *tag, const char *data, size_t len)
 {
-	struct timeval tv;
-	struct tm date;
-	unsigned char hexstr[128];
+	struct utc_time utc;
+	unsigned char str[128];
 
-	do_gettimeofday(&tv);
-	time_to_tm((tv.tv_sec - sys_tz.tz_minuteswest * 60), 0, &date);
+	if (level < 0)
+		return;
 
-	dump2hex(hexstr, data, (len > 40 ? 40 : len));
-
-	return pr_info("mif: %s: [%02d-%02d %02d:%02d:%02d.%03ld] %s\n",
-			str, date.tm_mon + 1, date.tm_mday,
-			date.tm_hour, date.tm_min, date.tm_sec,
-			(tv.tv_usec > 0 ? tv.tv_usec / 1000 : 0), hexstr);
+	get_utc_time(&utc);
+	dump2hex(str, data, (len > 32 ? 32 : len));
+	if (level > 0) {
+		pr_err("%s: [%02d:%02d:%02d.%03d] %s: %s\n", MIF_TAG,
+			utc.hour, utc.min, utc.sec, utc.msec, tag, str);
+	} else {
+		pr_info("%s: [%02d:%02d:%02d.%03d] %s: %s\n", MIF_TAG,
+			utc.hour, utc.min, utc.sec, utc.msec, tag, str);
+	}
 }
 
 /* print buffer as hex string */
@@ -253,12 +257,12 @@ int pr_buffer(const char *tag, const char *data, size_t data_len,
 							size_t max_len)
 {
 	size_t len = min(data_len, max_len);
-	unsigned char hexstr[len ? len * 3 : 1]; /* 1 <= sizeof <= max_len*3 */
-	dump2hex(hexstr, data, len);
+	unsigned char str[len ? len * 3 : 1]; /* 1 <= sizeof <= max_len*3 */
+	dump2hex(str, data, len);
 
 	/* don't change this printk to mif_debug for print this as level7 */
-	return printk(KERN_INFO "mif: %s(%u): %s%s\n", tag, data_len, hexstr,
-			len == data_len ? "" : " ...");
+	return printk(KERN_INFO "%s: %s(%u): %s%s\n", MIF_TAG, tag, data_len,
+			str, (len == data_len) ? "" : " ...");
 }
 
 /* flow control CM from CP, it use in serial devices */
@@ -285,7 +289,7 @@ int link_rx_flowctl_cmd(struct link_device *ld, const char *data, size_t len)
 			break;
 
 		default:
-			mif_err("flowctl BACMD: %04X\n", *cmd);
+			mif_err("flowctl BAD CMD: %04X\n", *cmd);
 			break;
 		}
 	}
@@ -411,6 +415,42 @@ void rawdevs_set_tx_link(struct modem_shared *msd, enum modem_link link_type)
 		iodevs_for_each(msd, iodev_set_tx_link, ld);
 }
 
+void mif_netif_stop(struct link_device *ld)
+{
+	struct io_device *iod;
+
+	if (ld->ipc_version < SIPC_VER_50)
+		iod = link_get_iod_with_channel(ld, 0x20 | RMNET0_CH_ID);
+	else
+		iod = link_get_iod_with_channel(ld, RMNET0_CH_ID);
+
+	if (iod)
+		iodevs_for_each(iod->msd, iodev_netif_stop, 0);
+}
+
+void mif_netif_wake(struct link_device *ld)
+{
+	struct io_device *iod;
+
+	/**
+	 * If ld->suspend_netif_tx is true, this means that there was a SUSPEND
+	 * flow control command from CP so MIF must wait for a RESUME command
+	 * from CP.
+	 */
+	if (ld->suspend_netif_tx) {
+		mif_info("%s: waiting for FLOW_CTRL_RESUME\n", ld->name);
+		return;
+	}
+
+	if (ld->ipc_version < SIPC_VER_50)
+		iod = link_get_iod_with_channel(ld, 0x20 | RMNET0_CH_ID);
+	else
+		iod = link_get_iod_with_channel(ld, RMNET0_CH_ID);
+
+	if (iod)
+		iodevs_for_each(iod->msd, iodev_netif_wake, 0);
+}
+
 /**
  * ipv4str_to_be32 - ipv4 string to be32 (big endian 32bits integer)
  * @return: return zero when errors occurred
@@ -447,7 +487,7 @@ void mif_add_timer(struct timer_list *timer, unsigned long expire,
 	add_timer(timer);
 }
 
-void mif_print_data(char *buf, int len)
+void mif_print_data(const char *buff, int len)
 {
 	int words = len >> 4;
 	int residue = len - (words << 4);
@@ -458,11 +498,8 @@ void mif_print_data(char *buf, int len)
 
 	/* Make the last line, if ((len % 16) > 0) */
 	if (residue > 0) {
-		memset(last, 0, sizeof(last));
-		memset(tb, 0, sizeof(tb));
-		b = buf + (words << 4);
-
 		sprintf(last, "%04X: ", (words << 4));
+		b = (char *)buff + (words << 4);
 		for (i = 0; i < residue; i++) {
 			sprintf(tb, "%02x ", b[i]);
 			strcat(last, tb);
@@ -474,7 +511,7 @@ void mif_print_data(char *buf, int len)
 	}
 
 	for (i = 0; i < words; i++) {
-		b = buf + (i << 4);
+		b = (char *)buff + (i << 4);
 		mif_err("%04X: "
 			"%02x %02x %02x %02x  %02x %02x %02x %02x  "
 			"%02x %02x %02x %02x  %02x %02x %02x %02x\n",
@@ -488,13 +525,141 @@ void mif_print_data(char *buf, int len)
 		mif_err("%s\n", last);
 }
 
+void mif_dump2format16(const char *data, int len, char *buff, char *tag)
+{
+	char *d;
+	int i;
+	int words = len >> 4;
+	int residue = len - (words << 4);
+	char line[LINE_BUFF_SIZE];
+	char tb[8];
+
+	for (i = 0; i < words; i++) {
+		memset(line, 0, LINE_BUFF_SIZE);
+		d = (char *)data + (i << 4);
+
+		if (tag)
+			sprintf(line, "%s%04X| "
+				"%02x %02x %02x %02x  "
+				"%02x %02x %02x %02x  "
+				"%02x %02x %02x %02x  "
+				"%02x %02x %02x %02x\n",
+				tag, (i << 4),
+				d[0], d[1], d[2], d[3],
+				d[4], d[5], d[6], d[7],
+				d[8], d[9], d[10], d[11],
+				d[12], d[13], d[14], d[15]);
+		else
+			sprintf(line, "%04X| "
+				"%02x %02x %02x %02x  "
+				"%02x %02x %02x %02x  "
+				"%02x %02x %02x %02x  "
+				"%02x %02x %02x %02x\n",
+				(i << 4),
+				d[0], d[1], d[2], d[3],
+				d[4], d[5], d[6], d[7],
+				d[8], d[9], d[10], d[11],
+				d[12], d[13], d[14], d[15]);
+
+		strcat(buff, line);
+	}
+
+	/* Make the last line, if (len % 16) > 0 */
+	if (residue > 0) {
+		memset(line, 0, LINE_BUFF_SIZE);
+		memset(tb, 0, sizeof(tb));
+		d = (char *)data + (words << 4);
+
+		if (tag)
+			sprintf(line, "%s%04X|", tag, (words << 4));
+		else
+			sprintf(line, "%04X|", (words << 4));
+
+		for (i = 0; i < residue; i++) {
+			sprintf(tb, " %02x", d[i]);
+			strcat(line, tb);
+			if ((i & 0x3) == 0x3) {
+				sprintf(tb, " ");
+				strcat(line, tb);
+			}
+		}
+		strcat(line, "\n");
+
+		strcat(buff, line);
+	}
+}
+
+void mif_dump2format4(const char *data, int len, char *buff, char *tag)
+{
+	char *d;
+	int i;
+	int words = len >> 2;
+	int residue = len - (words << 2);
+	char line[LINE_BUFF_SIZE];
+	char tb[8];
+
+	for (i = 0; i < words; i++) {
+		memset(line, 0, LINE_BUFF_SIZE);
+		d = (char *)data + (i << 2);
+
+		if (tag)
+			sprintf(line, "%s%04X| %02x %02x %02x %02x\n",
+				tag, (i << 2), d[0], d[1], d[2], d[3]);
+		else
+			sprintf(line, "%04X| %02x %02x %02x %02x\n",
+				(i << 2), d[0], d[1], d[2], d[3]);
+
+		strcat(buff, line);
+	}
+
+	/* Make the last line, if (len % 4) > 0 */
+	if (residue > 0) {
+		memset(line, 0, LINE_BUFF_SIZE);
+		memset(tb, 0, sizeof(tb));
+		d = (char *)data + (words << 2);
+
+		if (tag)
+			sprintf(line, "%s%04X|", tag, (words << 2));
+		else
+			sprintf(line, "%04X|", (words << 2));
+
+		for (i = 0; i < residue; i++) {
+			sprintf(tb, " %02x", d[i]);
+			strcat(line, tb);
+		}
+		strcat(line, "\n");
+
+		strcat(buff, line);
+	}
+}
+
+void mif_print_dump(const char *data, int len, int width)
+{
+	char *buff;
+
+	buff = kzalloc(len << 3, GFP_ATOMIC);
+	if (!buff) {
+		mif_err("ERR! kzalloc fail\n");
+		return;
+	}
+
+	if (width == 16)
+		mif_dump2format16(data, len, buff, LOG_TAG);
+	else
+		mif_dump2format4(data, len, buff, LOG_TAG);
+
+	pr_info("%s", buff);
+
+	kfree(buff);
+}
+
 void print_sipc4_hdlc_fmt_frame(const u8 *psrc)
 {
 	u8 *frm;			/* HDLC Frame	*/
 	struct fmt_hdr *hh;		/* HDLC Header	*/
 	struct sipc_fmt_hdr *fh;	/* IPC Header	*/
-	u16 hh_len = sizeof(struct fmt_hdr);
-	u16 fh_len = sizeof(struct sipc_fmt_hdr);
+	int hh_len = sizeof(struct fmt_hdr);
+	int fh_len = sizeof(struct sipc_fmt_hdr);
 	u8 *data;
 	int dlen;
 
@@ -531,7 +696,7 @@ void print_sipc4_hdlc_fmt_frame(const u8 *psrc)
 void print_sipc4_fmt_frame(const u8 *psrc)
 {
 	struct sipc_fmt_hdr *fh = (struct sipc_fmt_hdr *)psrc;
-	u16 fh_len = sizeof(struct sipc_fmt_hdr);
+	int fh_len = sizeof(struct sipc_fmt_hdr);
 	u8 *data;
 	int dlen;
 
@@ -558,8 +723,8 @@ void print_sipc5_link_fmt_frame(const u8 *psrc)
 	u8 *lf;				/* Link Frame	*/
 	struct sipc5_link_hdr *lh;	/* Link Header	*/
 	struct sipc_fmt_hdr *fh;	/* IPC Header	*/
-	u16 lh_len;
-	u16 fh_len;
+	int lh_len;
+	int fh_len;
 	u8 *data;
 	int dlen;
 
@@ -567,10 +732,7 @@ void print_sipc5_link_fmt_frame(const u8 *psrc)
 
 	/* Point HDLC header and IPC header */
 	lh = (struct sipc5_link_hdr *)lf;
-	if (lh->cfg & SIPC5_CTL_FIELD_EXIST)
-		lh_len = SIPC5_HEADER_SIZE_WITH_CTL_FLD;
-	else
-		lh_len = SIPC5_MIN_HEADER_SIZE;
+	lh_len = (u16)sipc5_get_hdr_len((u8 *)lh);
 	fh = (struct sipc_fmt_hdr *)(lf + lh_len);
 	fh_len = sizeof(struct sipc_fmt_hdr);
 
@@ -601,8 +763,8 @@ static void strcat_tcp_header(char *buff, u8 *pkt)
 {
 	struct tcphdr *tcph = (struct tcphdr *)pkt;
 	int eol;
-	char line[LINE_BUFF_SIZE];
-	char flag_str[32];
+	char line[LINE_BUFF_SIZE] = {0, };
+	char flag_str[32] = {0, };
 
 /*-------------------------------------------------------------------------
 
@@ -630,21 +792,17 @@ static void strcat_tcp_header(char *buff, u8 *pkt)
 
 -------------------------------------------------------------------------*/
 
-	memset(line, 0, LINE_BUFF_SIZE);
 	snprintf(line, LINE_BUFF_SIZE,
-		"mif: TCP:: Src.Port %u, Dst.Port %u\n",
-		ntohs(tcph->source), ntohs(tcph->dest));
+		"%s: TCP:: Src.Port %u, Dst.Port %u\n",
+		MIF_TAG, ntohs(tcph->source), ntohs(tcph->dest));
 	strcat(buff, line);
 
-	memset(line, 0, LINE_BUFF_SIZE);
 	snprintf(line, LINE_BUFF_SIZE,
-		"mif: TCP:: SEQ 0x%08X(%u), ACK 0x%08X(%u)\n",
-		ntohs(tcph->seq), ntohs(tcph->seq),
+		"%s: TCP:: SEQ 0x%08X(%u), ACK 0x%08X(%u)\n",
+		MIF_TAG, ntohs(tcph->seq), ntohs(tcph->seq),
 		ntohs(tcph->ack_seq), ntohs(tcph->ack_seq));
 	strcat(buff, line);
 
-	memset(line, 0, LINE_BUFF_SIZE);
-	memset(flag_str, 0, sizeof(flag_str));
 	if (tcph->cwr)
 		strcat(flag_str, "CWR ");
 	if (tcph->ece)
@@ -664,12 +822,12 @@ static void strcat_tcp_header(char *buff, u8 *pkt)
 	eol = strlen(flag_str) - 1;
 	if (eol > 0)
 		flag_str[eol] = 0;
-	snprintf(line, LINE_BUFF_SIZE, "mif: TCP:: Flags {%s}\n", flag_str);
+	snprintf(line, LINE_BUFF_SIZE, "%s: TCP:: Flags {%s}\n",
+		MIF_TAG, flag_str);
 	strcat(buff, line);
 
-	memset(line, 0, LINE_BUFF_SIZE);
 	snprintf(line, LINE_BUFF_SIZE,
-		"mif: TCP:: Window %u, Checksum 0x%04X, Urg Pointer %u\n",
+		"%s: TCP:: Window %u, Checksum 0x%04X, Urgent %u\n", MIF_TAG,
 		ntohs(tcph->window), ntohs(tcph->check), ntohs(tcph->urg_ptr));
 	strcat(buff, line);
 }
@@ -677,7 +835,7 @@ static void strcat_tcp_header(char *buff, u8 *pkt)
 static void strcat_udp_header(char *buff, u8 *pkt)
 {
 	struct udphdr *udph = (struct udphdr *)pkt;
-	char line[LINE_BUFF_SIZE];
+	char line[LINE_BUFF_SIZE] = {0, };
 
 /*-------------------------------------------------------------------------
 
@@ -693,41 +851,39 @@ static void strcat_udp_header(char *buff, u8 *pkt)
 
 -------------------------------------------------------------------------*/
 
-	memset(line, 0, LINE_BUFF_SIZE);
 	snprintf(line, LINE_BUFF_SIZE,
-		"mif: UDP:: Src.Port %u, Dst.Port %u\n",
-		ntohs(udph->source), ntohs(udph->dest));
+		"%s: UDP:: Src.Port %u, Dst.Port %u\n",
+		MIF_TAG, ntohs(udph->source), ntohs(udph->dest));
 	strcat(buff, line);
 
-	memset(line, 0, LINE_BUFF_SIZE);
 	snprintf(line, LINE_BUFF_SIZE,
-		"mif: UDP:: Length %u, Checksum 0x%04X\n",
-		ntohs(udph->len), ntohs(udph->check));
+		"%s: UDP:: Length %u, Checksum 0x%04X\n",
+		MIF_TAG, ntohs(udph->len), ntohs(udph->check));
 	strcat(buff, line);
 
 	if (ntohs(udph->dest) == 53) {
-		memset(line, 0, LINE_BUFF_SIZE);
-		snprintf(line, LINE_BUFF_SIZE, "mif: UDP:: DNS query!!!\n");
+		snprintf(line, LINE_BUFF_SIZE, "%s: UDP:: DNS query!!!\n",
+			MIF_TAG);
 		strcat(buff, line);
 	}
 
 	if (ntohs(udph->source) == 53) {
-		memset(line, 0, LINE_BUFF_SIZE);
-		snprintf(line, LINE_BUFF_SIZE, "mif: UDP:: DNS response!!!\n");
+		snprintf(line, LINE_BUFF_SIZE, "%s: UDP:: DNS response!!!\n",
+			MIF_TAG);
 		strcat(buff, line);
 	}
 }
 
-void print_ip4_packet(u8 *ip_pkt, bool tx)
+void print_ip4_packet(const u8 *ip_pkt, bool tx)
 {
 	char *buff;
 	struct iphdr *iph = (struct iphdr *)ip_pkt;
-	u8 *pkt = ip_pkt + (iph->ihl << 2);
+	u8 *pkt = (u8 *)ip_pkt + (iph->ihl << 2);
 	u16 flags = (ntohs(iph->frag_off) & 0xE000);
 	u16 frag_off = (ntohs(iph->frag_off) & 0x1FFF);
 	int eol;
-	char line[LINE_BUFF_SIZE];
-	char flag_str[16];
+	char line[LINE_BUFF_SIZE] = {0, };
+	char flag_str[16] = {0, };
 
 /*---------------------------------------------------------------------------
 				IPv4 Header Format
@@ -764,32 +920,25 @@ void print_ip4_packet(u8 *ip_pkt, bool tx)
 	if (!buff)
 		return;
 
-
-	memset(line, 0, LINE_BUFF_SIZE);
 	if (tx)
 		snprintf(line, LINE_BUFF_SIZE, "\n%s\n", TX_SEPARATOR);
 	else
 		snprintf(line, LINE_BUFF_SIZE, "\n%s\n", RX_SEPARATOR);
 	strcat(buff, line);
 
-	memset(line, 0, LINE_BUFF_SIZE);
 	snprintf(line, LINE_BUFF_SIZE, "%s\n", LINE_SEPARATOR);
 	strcat(buff, line);
 
-	memset(line, 0, LINE_BUFF_SIZE);
 	snprintf(line, LINE_BUFF_SIZE,
-		"mif: IP4:: Version %u, Header Length %u, TOS %u, Length %u\n",
-		iph->version, (iph->ihl << 2), iph->tos, ntohs(iph->tot_len));
+		"%s: IP4:: Version %u, Header Length %u, TOS %u, Length %u\n",
+		MIF_TAG, iph->version, (iph->ihl << 2), iph->tos,
+		ntohs(iph->tot_len));
 	strcat(buff, line);
 
-	memset(line, 0, LINE_BUFF_SIZE);
-	snprintf(line, LINE_BUFF_SIZE,
-		"mif: IP4:: ID %u, Fragment Offset %u\n",
-		ntohs(iph->id), frag_off);
+	snprintf(line, LINE_BUFF_SIZE, "%s: IP4:: ID %u, Fragment Offset %u\n",
+		MIF_TAG, ntohs(iph->id), frag_off);
 	strcat(buff, line);
 
-	memset(line, 0, LINE_BUFF_SIZE);
-	memset(flag_str, 0, sizeof(flag_str));
 	if (flags & IP_CE)
 		strcat(flag_str, "CE ");
 	if (flags & IP_DF)
@@ -799,19 +948,18 @@ void print_ip4_packet(u8 *ip_pkt, bool tx)
 	eol = strlen(flag_str) - 1;
 	if (eol > 0)
 		flag_str[eol] = 0;
-	snprintf(line, LINE_BUFF_SIZE, "mif: IP4:: Flags {%s}\n", flag_str);
+	snprintf(line, LINE_BUFF_SIZE, "%s: IP4:: Flags {%s}\n",
+		MIF_TAG, flag_str);
 	strcat(buff, line);
 
-	memset(line, 0, LINE_BUFF_SIZE);
 	snprintf(line, LINE_BUFF_SIZE,
-		"mif: IP4:: TTL %u, Protocol %u, Header Checksum 0x%04X\n",
-		iph->ttl, iph->protocol, ntohs(iph->check));
+		"%s: IP4:: TTL %u, Protocol %u, Header Checksum 0x%04X\n",
+		MIF_TAG, iph->ttl, iph->protocol, ntohs(iph->check));
 	strcat(buff, line);
 
-	memset(line, 0, LINE_BUFF_SIZE);
 	snprintf(line, LINE_BUFF_SIZE,
-		"mif: IP4:: Src.IP %u.%u.%u.%u, Dst.IP %u.%u.%u.%u\n",
-		ip_pkt[12], ip_pkt[13], ip_pkt[14], ip_pkt[15],
+		"%s: IP4:: Src.IP %u.%u.%u.%u, Dst.IP %u.%u.%u.%u\n",
+		MIF_TAG, ip_pkt[12], ip_pkt[13], ip_pkt[14], ip_pkt[15],
 		ip_pkt[16], ip_pkt[17], ip_pkt[18], ip_pkt[19]);
 	strcat(buff, line);
 
@@ -828,7 +976,6 @@ void print_ip4_packet(u8 *ip_pkt, bool tx)
 		break;
 	}
 
-	memset(line, 0, LINE_BUFF_SIZE);
 	snprintf(line, LINE_BUFF_SIZE, "%s\n", LINE_SEPARATOR);
 	strcat(buff, line);
 
@@ -837,7 +984,7 @@ void print_ip4_packet(u8 *ip_pkt, bool tx)
 	kfree(buff);
 }
 
-bool is_dns_packet(u8 *ip_pkt)
+bool is_dns_packet(const u8 *ip_pkt)
 {
 	struct iphdr *iph = (struct iphdr *)ip_pkt;
 	struct udphdr *udph = (struct udphdr *)(ip_pkt + (iph->ihl << 2));
@@ -852,7 +999,7 @@ bool is_dns_packet(u8 *ip_pkt)
 		return false;
 }
 
-bool is_syn_packet(u8 *ip_pkt)
+bool is_syn_packet(const u8 *ip_pkt)
 {
 	struct iphdr *iph = (struct iphdr *)ip_pkt;
 	struct tcphdr *tcph = (struct tcphdr *)(ip_pkt + (iph->ihl << 2));
@@ -867,124 +1014,248 @@ bool is_syn_packet(u8 *ip_pkt)
 		return false;
 }
 
-int memcmp16_to_io(const void __iomem *to, void *from, int size)
+/**
+ * mif_register_isr
+ * @irq: IRQ number for a DPRAM interrupt
+ * @isr: function pointer to an interrupt service routine
+ * @flags: set of interrupt flags
+ * @name: name of the interrupt
+ * @data: pointer to a data for @isr
+ *
+ * Registers the ISR for the IRQ number.
+ */
+int mif_register_isr(unsigned int irq, irq_handler_t isr, unsigned long flags,
+			const char *name, void *data)
 {
-	u16 *d = (u16 *)to;
-	u16 *s = (u16 *)from;
-	int count = size >> 1;
-	int diff = 0;
-	int i;
-	u16 d1;
-	u16 s1;
+	int ret;
 
-	for (i = 0; i < count; i++) {
-		d1 = ioread16(d);
-		s1 = *s;
-		if (d1 != s1) {
-			diff++;
-			mif_err("ERR! [%d] d:0x%04X != s:0x%04X\n", i, d1, s1);
-		}
-		d++;
-		s++;
+	ret = request_irq(irq, isr, flags, name, data);
+	if (ret) {
+		mif_err("%s: ERR! request_irq fail (err %d)\n", name, ret);
+		return ret;
 	}
 
-	return diff;
+	ret = enable_irq_wake(irq);
+	if (ret)
+		mif_err("%s: ERR! enable_irq_wake fail (err %d)\n", name, ret);
+
+	mif_err("%s (#%d) handler registered\n", name, irq);
+
+	return 0;
 }
 
-int mif_test_dpram(char *dp_name, u8 __iomem *start, u32 size)
+int mif_test_dpram(char *dp_name, void __iomem *start, u16 bytes)
 {
-	u8 __iomem *dst;
-	int i;
+	u16 i;
+	u16 words = bytes >> 1;
+	u16 __iomem *dst = (u16 __iomem *)start;
 	u16 val;
+	int err_cnt = 0;
 
-	mif_info("%s: start = 0x%p, size = %d\n", dp_name, start, size);
+	mif_err("%s: start 0x%p, bytes %d\n", dp_name, start, bytes);
 
-	dst = start;
-	for (i = 0; i < (size >> 1); i++) {
-		iowrite16((i & 0xFFFF), dst);
-		dst += 2;
-	}
-
-	dst = start;
-	for (i = 0; i < (size >> 1); i++) {
+	mif_err("%s: 0/6 stage ...\n", dp_name);
+	for (i = 1; i <= 100; i++) {
+		iowrite16(0x1234, dst);
 		val = ioread16(dst);
-		if (val != (i & 0xFFFF)) {
-			mif_info("%s: ERR! dst[%d] 0x%04X != 0x%04X\n",
-				dp_name, i, val, (i & 0xFFFF));
-			return -EINVAL;
+		if (val != 0x1234) {
+			mif_err("%s: [0x0000] read 0x%04X != written 0x1234 "
+				"(try# %d)\n", dp_name, val, i);
+			err_cnt++;
 		}
-		dst += 2;
 	}
 
-	dst = start;
-	for (i = 0; i < (size >> 1); i++) {
+	if (err_cnt > 0) {
+		mif_err("%s: FAIL!!!\n", dp_name);
+		return -EINVAL;
+	}
+
+	mif_err("%s: 1/6 stage ...\n", dp_name);
+	dst = (u16 __iomem *)start;
+	for (i = 0; i < words; i++) {
+		iowrite16(0, dst);
+		dst++;
+	}
+
+	dst = (u16 __iomem *)start;
+	for (i = 0; i < words; i++) {
+		val = ioread16(dst);
+		if (val != 0x0000) {
+			mif_err("%s: ERR! [0x%04X] read 0x%04X != written "
+				"0x0000\n", dp_name, i, val);
+			err_cnt++;
+		}
+		dst++;
+	}
+
+	if (err_cnt > 0) {
+		mif_err("%s: FAIL!!!\n", dp_name);
+		return -EINVAL;
+	}
+
+	mif_err("%s: 2/6 stage ...\n", dp_name);
+	dst = (u16 __iomem *)start;
+	for (i = 0; i < words; i++) {
+		iowrite16(0xFFFF, dst);
+		dst++;
+	}
+
+	dst = (u16 __iomem *)start;
+	for (i = 0; i < words; i++) {
+		val = ioread16(dst);
+		if (val != 0xFFFF) {
+			mif_err("%s: ERR! [0x%04X] read 0x%04X != written "
+				"0xFFFF\n", dp_name, i, val);
+			err_cnt++;
+		}
+		dst++;
+	}
+
+	if (err_cnt > 0) {
+		mif_err("%s: FAIL!!!\n", dp_name);
+		return -EINVAL;
+	}
+
+	mif_err("%s: 3/6 stage ...\n", dp_name);
+	dst = (u16 __iomem *)start;
+	for (i = 0; i < words; i++) {
 		iowrite16(0x00FF, dst);
-		dst += 2;
+		dst++;
 	}
 
-	dst = start;
-	for (i = 0; i < (size >> 1); i++) {
+	dst = (u16 __iomem *)start;
+	for (i = 0; i < words; i++) {
 		val = ioread16(dst);
 		if (val != 0x00FF) {
-			mif_info("%s: ERR! dst[%d] 0x%04X != 0x00FF\n",
-				dp_name, i, val);
-			return -EINVAL;
+			mif_err("%s: ERR! [0x%04X] read 0x%04X != written "
+				"0x00FF\n", dp_name, i, val);
+			err_cnt++;
 		}
-		dst += 2;
+		dst++;
 	}
 
-	dst = start;
-	for (i = 0; i < (size >> 1); i++) {
+	if (err_cnt > 0) {
+		mif_err("%s: FAIL!!!\n", dp_name);
+		return -EINVAL;
+	}
+
+	mif_err("%s: 4/6 stage ...\n", dp_name);
+	dst = (u16 __iomem *)start;
+	for (i = 0; i < words; i++) {
 		iowrite16(0x0FF0, dst);
-		dst += 2;
+		dst++;
 	}
 
-	dst = start;
-	for (i = 0; i < (size >> 1); i++) {
+	dst = (u16 __iomem *)start;
+	for (i = 0; i < words; i++) {
 		val = ioread16(dst);
 		if (val != 0x0FF0) {
-			mif_info("%s: ERR! dst[%d] 0x%04X != 0x0FF0\n",
-				dp_name, i, val);
-			return -EINVAL;
+			mif_err("%s: ERR! [0x%04X] read 0x%04X != written "
+				"0x0FF0\n", dp_name, i, val);
+			err_cnt++;
 		}
-		dst += 2;
+		dst++;
 	}
 
-	dst = start;
-	for (i = 0; i < (size >> 1); i++) {
+	if (err_cnt > 0) {
+		mif_err("%s: FAIL!!!\n", dp_name);
+		return -EINVAL;
+	}
+
+	mif_err("%s: 5/6 stage ...\n", dp_name);
+	dst = (u16 __iomem *)start;
+	for (i = 0; i < words; i++) {
 		iowrite16(0xFF00, dst);
-		dst += 2;
+		dst++;
 	}
 
-	dst = start;
-	for (i = 0; i < (size >> 1); i++) {
+	dst = (u16 __iomem *)start;
+	for (i = 0; i < words; i++) {
 		val = ioread16(dst);
 		if (val != 0xFF00) {
-			mif_info("%s: ERR! dst[%d] 0x%04X != 0xFF00\n",
-				dp_name, i, val);
-			return -EINVAL;
+			mif_err("%s: ERR! [0x%04X] read 0x%04X != written "
+				"0xFF00\n", dp_name, i, val);
+			err_cnt++;
 		}
-		dst += 2;
+		dst++;
 	}
 
-	dst = start;
-	for (i = 0; i < (size >> 1); i++) {
-		iowrite16(0, dst);
-		dst += 2;
+	mif_err("%s: 6/6 stage ...\n", dp_name);
+	dst = (u16 __iomem *)start;
+	for (i = 0; i < words; i++) {
+		iowrite16((i & 0xFFFF), dst);
+		dst++;
 	}
 
-	dst = start;
-	for (i = 0; i < (size >> 1); i++) {
+	dst = (u16 __iomem *)start;
+	for (i = 0; i < words; i++) {
 		val = ioread16(dst);
-		if (val != 0) {
-			mif_info("%s: ERR! dst[%d] 0x%04X != 0\n",
-				dp_name, i, val);
-			return -EINVAL;
+		if (val != (i & 0xFFFF)) {
+			mif_err("%s: ERR! [0x%04X] read 0x%04X != written "
+				"0x%04X\n", dp_name, i, val, (i & 0xFFFF));
+			err_cnt++;
 		}
-		dst += 2;
+		dst++;
 	}
 
-	mif_info("%s: PASS!!!\n", dp_name);
+	if (err_cnt > 0) {
+		mif_err("%s: FAIL!!!\n", dp_name);
+		return -EINVAL;
+	}
+
+	mif_err("%s: PASS!!!\n", dp_name);
+
+	dst = (u16 __iomem *)start;
+	for (i = 0; i < words; i++) {
+		iowrite16(0, dst);
+		dst++;
+	}
+
 	return 0;
+}
+
+struct file *mif_open_file(const char *path)
+{
+	struct file *fp;
+	mm_segment_t old_fs;
+
+	old_fs = get_fs();
+	set_fs(get_ds());
+
+	fp = filp_open(path, O_RDWR|O_CREAT|O_APPEND, 0666);
+
+	set_fs(old_fs);
+
+	if (IS_ERR(fp))
+		return NULL;
+
+	return fp;
+}
+
+void mif_save_file(struct file *fp, const char *buff, size_t size)
+{
+	int ret;
+	mm_segment_t old_fs;
+
+	old_fs = get_fs();
+	set_fs(get_ds());
+
+	ret = fp->f_op->write(fp, buff, size, &fp->f_pos);
+	if (ret < 0)
+		mif_err("ERR! write fail\n");
+
+	set_fs(old_fs);
+}
+
+void mif_close_file(struct file *fp)
+{
+	mm_segment_t old_fs;
+
+	old_fs = get_fs();
+	set_fs(get_ds());
+
+	filp_close(fp, NULL);
+
+	set_fs(old_fs);
 }
 

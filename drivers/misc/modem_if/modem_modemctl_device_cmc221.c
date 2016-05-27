@@ -1,6 +1,4 @@
-/* /linux/drivers/misc/modem_if/modem_modemctl_device_cmc221.c
- *
- * Copyright (C) 2010 Google, Inc.
+/*
  * Copyright (C) 2010 Samsung Electronics.
  *
  * This software is licensed under the terms of the GNU General Public
@@ -13,15 +11,15 @@
  * GNU General Public License for more details.
  *
  */
-#include <linux/init.h>
 
+#include <linux/init.h>
 #include <linux/irq.h>
 #include <linux/interrupt.h>
 #include <linux/gpio.h>
 #include <linux/delay.h>
 #include <linux/platform_device.h>
+#include "modem.h"
 
-#include <linux/platform_data/modem.h>
 #include "modem_prj.h"
 #include "modem_link_device_usb.h"
 #include "modem_link_device_dpram.h"
@@ -77,7 +75,7 @@ static irqreturn_t phone_active_handler(int irq, void *arg)
 static irqreturn_t dynamic_switching_handler(int irq, void *arg)
 {
 	struct modem_ctl *mc = (struct modem_ctl *)arg;
-	int txpath = gpio_get_value(mc->gpio_dynamic_switching);
+	int txpath = gpio_get_value(mc->gpio_link_switch);
 	bool enumerated = usb_is_enumerated(mc->msd);
 
 	mif_err("txpath=%d, enumeration=%d\n", txpath, enumerated);
@@ -93,6 +91,52 @@ static irqreturn_t dynamic_switching_handler(int irq, void *arg)
 
 	return IRQ_HANDLED;
 }
+
+#ifdef CONFIG_EXYNOS4_CPUFREQ /* Set cpu clock to 800MHz for high TP */
+static void cmc221_cpufreq_lock(struct work_struct *work)
+{
+	struct modem_ctl *mc;
+
+	mc = container_of(work, struct modem_ctl, work_cpu_lock.work);
+	if (mc->mdm_data->link_pm_data->freq_lock) {
+		mif_debug("Call freq lock func.\n");
+		mc->mdm_data->link_pm_data->freq_lock(mc->dev);
+
+		cancel_delayed_work(&mc->work_cpu_unlock);
+		schedule_delayed_work(&mc->work_cpu_unlock, 
+					msecs_to_jiffies(5000));
+	}
+}
+
+static void cmc221_cpufreq_unlock(struct work_struct *work)
+{
+	struct modem_ctl *mc;
+	int tp_level;
+
+	mc = container_of(work, struct modem_ctl, work_cpu_unlock.work);
+	tp_level = gpio_get_value(mc->gpio_cpufreq_lock);
+
+	mif_debug("TP Level is (%d)\n", tp_level);
+	if (tp_level) {
+		mif_debug("maintain cpufreq lock !!!\n");
+		schedule_delayed_work(&mc->work_cpu_unlock, 
+					msecs_to_jiffies(5000));
+	} else {
+		if (mc->mdm_data->link_pm_data->freq_unlock) {
+			mif_debug("Call freq unlock func.\n");
+			mc->mdm_data->link_pm_data->freq_unlock(mc->dev);
+		}
+	}
+}
+
+static irqreturn_t cpufreq_lock_handler(int irq, void *arg)
+{
+	struct modem_ctl *mc = (struct modem_ctl *)arg;
+
+	schedule_delayed_work(&mc->work_cpu_lock, 0);
+	return IRQ_HANDLED;
+}
+#endif
 
 static int cmc221_on(struct modem_ctl *mc)
 {
@@ -204,11 +248,10 @@ static int cmc221_boot_off(struct modem_ctl *mc)
 {
 	int ret;
 	struct link_device *ld = get_current_link(mc->bootd);
-	struct dpram_link_device *dpld = to_dpram_link_device(ld);
 
 	mif_err("%s\n", mc->name);
 
-	ret = wait_for_completion_interruptible_timeout(&dpld->dpram_init_cmd,
+	ret = wait_for_completion_interruptible_timeout(&ld->init_cmpl,
 			DPRAM_INIT_TIMEOUT);
 	if (!ret) {
 		/* ret == 0 on timeout, ret < 0 if interrupted */
@@ -249,22 +292,23 @@ int cmc221_init_modemctl_device(struct modem_ctl *mc, struct modem_data *pdata)
 	int ret = 0;
 	int irq = 0;
 	unsigned long flag = 0;
-	struct platform_device *pdev = NULL;
 
-	mc->gpio_cp_on        = pdata->gpio_cp_on;
-	mc->gpio_cp_reset     = pdata->gpio_cp_reset;
+	mc->gpio_cp_on = pdata->gpio_cp_on;
+	mc->gpio_cp_reset = pdata->gpio_cp_reset;
 	mc->gpio_phone_active = pdata->gpio_phone_active;
-	mc->gpio_pda_active   = pdata->gpio_pda_active;
+	mc->gpio_pda_active = pdata->gpio_pda_active;
 #if 0	/*TODO: check the GPIO map*/
-	mc->gpio_cp_dump_int  = pdata->gpio_cp_dump_int;
+	mc->gpio_cp_dump_int = pdata->gpio_cp_dump_int;
 	mc->gpio_flm_uart_sel = pdata->gpio_flm_uart_sel;
 	mc->gpio_slave_wakeup = pdata->gpio_slave_wakeup;
-	mc->gpio_host_active  = pdata->gpio_host_active;
-	mc->gpio_host_wakeup  = pdata->gpio_host_wakeup;
+	mc->gpio_host_active = pdata->gpio_host_active;
+	mc->gpio_host_wakeup = pdata->gpio_host_wakeup;
 #endif
-	mc->gpio_dynamic_switching = pdata->gpio_dynamic_switching;
+	mc->gpio_link_switch = pdata->gpio_link_switch;
 	mc->need_switch_to_usb = false;
-
+#ifdef CONFIG_EXYNOS4_CPUFREQ
+	mc->gpio_cpufreq_lock = pdata->gpio_cpufreq_lock;
+#endif
 	if (!mc->gpio_cp_on || !mc->gpio_cp_reset || !mc->gpio_phone_active) {
 		mif_err("%s: ERR! no GPIO data\n", mc->name);
 		return -ENXIO;
@@ -276,10 +320,9 @@ int cmc221_init_modemctl_device(struct modem_ctl *mc, struct modem_data *pdata)
 	cmc221_get_ops(mc);
 	dev_set_drvdata(mc->dev, mc);
 
-	pdev = to_platform_device(mc->dev);
-	mc->irq_phone_active = platform_get_irq_byname(pdev, "cp_active_irq");
+	mc->irq_phone_active = pdata->irq_phone_active;
 	if (!mc->irq_phone_active) {
-		mif_err("%s: ERR! get cp_active_irq fail\n", mc->name);
+		mif_err("%s: ERR! get irq_phone_active fail\n", mc->name);
 		return -1;
 	}
 	mif_err("%s: PHONE_ACTIVE IRQ# = %d\n", mc->name, mc->irq_phone_active);
@@ -301,8 +344,8 @@ int cmc221_init_modemctl_device(struct modem_ctl *mc, struct modem_data *pdata)
 	}
 
 	flag = IRQF_TRIGGER_RISING | IRQF_TRIGGER_FALLING | IRQF_NO_SUSPEND;
-	if (mc->gpio_dynamic_switching) {
-		irq = gpio_to_irq(mc->gpio_dynamic_switching);
+	if (mc->gpio_link_switch) {
+		irq = gpio_to_irq(mc->gpio_link_switch);
 		mif_err("%s: DYNAMIC_SWITCH IRQ# = %d\n", mc->name, irq);
 		ret = request_irq(irq, dynamic_switching_handler, flag,
 				"dynamic_switching", mc);
@@ -312,6 +355,24 @@ int cmc221_init_modemctl_device(struct modem_ctl *mc, struct modem_data *pdata)
 			return ret;
 		}
 	}
+
+#ifdef CONFIG_EXYNOS4_CPUFREQ
+	INIT_DELAYED_WORK(&mc->work_cpu_lock, cmc221_cpufreq_lock);
+	INIT_DELAYED_WORK(&mc->work_cpu_unlock, cmc221_cpufreq_unlock);
+
+	flag = IRQF_TRIGGER_RISING;
+	if (mc->gpio_cpufreq_lock) {
+		irq = gpio_to_irq(mc->gpio_cpufreq_lock);
+		mif_err("%s: CPUFREQ_LOCK_CNT IRQ# = %d\n", mc->name, irq);
+		ret = request_irq(irq, cpufreq_lock_handler, flag,
+				"cpufreq_lock", mc);
+		if (ret) {
+			mif_err("%s: ERR! request_irq(#%d) fail (err %d)\n",
+				mc->name, irq, ret);
+			return ret;
+		}
+	}
+#endif
 
 	return 0;
 }
