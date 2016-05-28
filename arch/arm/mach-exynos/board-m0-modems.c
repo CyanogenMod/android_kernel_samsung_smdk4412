@@ -28,7 +28,12 @@
 #include <linux/usb/hcd.h>
 #include <linux/usb/ehci_def.h>
 
+#ifdef CONFIG_MACH_KONA
+#include "../../../drivers/misc/modem_if/modem.h"
+#else
 #include <linux/platform_data/modem.h>
+#endif
+
 #include <mach/sec_modem.h>
 
 extern int s3c_gpio_slp_cfgpin(unsigned int pin, unsigned int config);
