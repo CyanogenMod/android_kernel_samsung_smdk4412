@@ -151,6 +151,13 @@ config CPU_FREQ_DEFAULT_GOV_INTELLIACTIVE
 	  loading your cpufreq low-level hardware driver, using the
 	  'interactive' governor for latency-sensitive workloads.
 
+config CPU_FREQ_DEFAULT_GOV_WHEATLEY
+	bool "wheatley"
+	select CPU_FREQ_GOV_WHEATLEY
+	select CPU_FREQ_GOV_PERFORMANCE
+	help
+	  Use the CPUFreq governor 'wheatley' as default.
+
 endchoice
 
 config CPU_FREQ_GOV_PERFORMANCE
@@ -318,11 +325,6 @@ config CPU_FREQ_GOV_PEGASUSQ
 config CPU_FREQ_GOV_PEGASUSQPLUS
 	tristate "'pegasusqplus' cpufreq policy governor"
 
-config CPU_FREQ_GOV_PEGASUSQ_BOOST
-	bool "pegasusq - enable suport for userspace-controlled cpu boosts"
-	depends on CPU_FREQ_GOV_PEGASUSQ
-	default n
-
 config CPU_FREQ_GOV_INTELLIACTIVE
 	tristate "'intelliactive' cpufreq policy governor"
 	help
@@ -339,6 +341,10 @@ config CPU_FREQ_GOV_INTELLIACTIVE
 	  For details, take a look at linux/Documentation/cpu-freq.
 
 	  If in doubt, say N.
+
+config CPU_FREQ_GOV_WHEATLEY
+	tristate "'wheatley' cpufreq governor"
+	depends on CPU_FREQ	  
 
 config CPU_FREQ_GOV_SLP
 	tristate "'slp' cpufreq policy governor"
