@@ -474,7 +474,7 @@ CONFIG_KONA_01_BD=y
 # CONFIG_SLP is not set
 # CONFIG_MACH_REDWOOD is not set
 # CONFIG_GPS_BCM47511 is not set
-# CONFIG_GPS_BCM4752 is not set
+CONFIG_GPS_BCM4752=y
 # CONFIG_GPS_GSD4T is not set
 # CONFIG_GPIO_NAPLES_00_BD is not set
 # CONFIG_SLP_DISP_DEBUG is not set
@@ -565,7 +565,7 @@ CONFIG_SEC_MODEM_M0=y
 #
 # Connectivity Feature
 #
-# CONFIG_GPS_BRCM_475X is not set
+CONFIG_GPS_BRCM_475X=y
 # CONFIG_BT_CSR8811 is not set
 # CONFIG_BT_BCM4330 is not set
 CONFIG_BT_BCM4334=y
