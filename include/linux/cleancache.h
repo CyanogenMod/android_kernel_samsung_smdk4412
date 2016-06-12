@@ -28,9 +28,9 @@ struct cleancache_ops {
 			pgoff_t, struct page *);
 	void (*put_page)(int, struct cleancache_filekey,
 			pgoff_t, struct page *);
-	void (*flush_page)(int, struct cleancache_filekey, pgoff_t);
-	void (*flush_inode)(int, struct cleancache_filekey);
-	void (*flush_fs)(int);
+	void (*invalidate_page)(int, struct cleancache_filekey, pgoff_t);
+	void (*invalidate_inode)(int, struct cleancache_filekey);
+	void (*invalidate_fs)(int);
 };
 
 extern struct cleancache_ops
