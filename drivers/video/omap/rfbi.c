@@ -190,7 +190,7 @@ static int ps_to_rfbi_ticks(int time, int div)
 static unsigned long rfbi_get_max_tx_rate(void)
 {
 	unsigned long	l4_rate, dss1_rate;
-	int		min_l4_ticks = 0;
+	int		min_l4_ticks = 1;
 	int		i;
 
 	/* According to TI this can't be calculated so make the
