@@ -2,7 +2,7 @@
  * OMAP2 Remote Frame Buffer Interface support
  *
  * Copyright (C) 2005 Nokia Corporation
- * Author: Juha Yrjölä <juha.yrjola@nokia.com>
+ * Author: Juha YrjÃ¶lÃ¤ <juha.yrjola@nokia.com>
  *	   Imre Deak <imre.deak@nokia.com>
  *
  * This program is free software; you can redistribute it and/or modify it
@@ -190,7 +190,7 @@ static int ps_to_rfbi_ticks(int time, int div)
 static unsigned long rfbi_get_max_tx_rate(void)
 {
 	unsigned long	l4_rate, dss1_rate;
-	int		min_l4_ticks = 0;
+	int		min_l4_ticks = 1;
 	int		i;
 
 	/* According to TI this can't be calculated so make the
@@ -231,6 +231,7 @@ static unsigned long rfbi_get_max_tx_rate(void)
 			"can't determine maximum RFBI transfer rate\n");
 		return rfbi.l4_khz * 1000;
 	}
+  
 	return rfbi.l4_khz * 1000 / min_l4_ticks;
 }
 #else
