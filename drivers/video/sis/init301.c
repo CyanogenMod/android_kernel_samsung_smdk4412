@@ -5713,7 +5713,7 @@ SiS_SetGroup1_LVDS(struct SiS_Private *SiS_Pr, unsigned short ModeNo, unsigned s
   temp = (unsigned short)(tempecx & 0x00FF);
   SiS_SetReg(SiS_Pr->SiS_Part1Port,0x1F,temp);
 
-  if(SiS_Pr->ChipType >= SIS_315H) {
+  if((SiS_Pr->ChipType >= SIS_315H ) && (tempvcfact !=0 )) {
      tempeax = (SiS_Pr->SiS_VGAVDE << 18) / tempvcfact;
      tempbx = (unsigned short)(tempeax & 0xFFFF);
   } else {
