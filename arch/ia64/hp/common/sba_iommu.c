@@ -952,10 +952,11 @@ static dma_addr_t sba_map_page(struct device *dev, struct page *page,
 	}
 #endif
 	ioc = GET_IOC(dev);
+	if (ioc != NULL) {
 	ASSERT(ioc);
 
 	prefetch(ioc->res_hint);
-
+}
 	ASSERT(size > 0);
 	ASSERT(size <= DMA_CHUNK_SIZE);
 
@@ -1001,7 +1002,9 @@ static dma_addr_t sba_map_page(struct device *dev, struct page *page,
 	sba_check_pdir(ioc,"Check after sba_map_single_attrs()");
 	spin_unlock_irqrestore(&ioc->res_lock, flags);
 #endif
-	return SBA_IOVA(ioc, iovp, offset);
+
+(ioc != NULL) ? return SBA_IOVA(ioc, iovp, offset): return SBA_IOVA(-1,iovp,offset);
+
 }
 
 static dma_addr_t sba_map_single_attrs(struct device *dev, void *addr,
@@ -1057,9 +1060,11 @@ static void sba_unmap_page(struct device *dev, dma_addr_t iova, size_t size,
 	dma_addr_t offset;
 
 	ioc = GET_IOC(dev);
+	if (ioc != NULL){
 	ASSERT(ioc);
-
+}
 #ifdef ALLOW_IOV_BYPASS
+	if (ioc != NULL) {
 	if (likely((iova & ioc->imask) != ioc->ibase)) {
 		/*
 		** Address does not fall w/in IOVA, must be bypassing
@@ -1074,6 +1079,7 @@ static void sba_unmap_page(struct device *dev, dma_addr_t iova, size_t size,
 #endif
 		return;
 	}
+}
 #endif
 	offset = iova & ~iovp_mask;
 
@@ -1136,14 +1142,19 @@ sba_alloc_coherent (struct device *dev, size_t size, dma_addr_t *dma_handle, gfp
 	void *addr;
 
 	ioc = GET_IOC(dev);
+	if (ioc != NULL)
 	ASSERT(ioc);
 
 #ifdef CONFIG_NUMA
 	{
 		struct page *page;
-		page = alloc_pages_exact_node(ioc->node == MAX_NUMNODES ?
+(ioc != NULL) ? 
+		(page = alloc_pages_exact_node(ioc->node == MAX_NUMNODES ?
 		                        numa_node_id() : ioc->node, flags,
-		                        get_order(size));
+		                        get_order(size)) ) : (page = alloc_pages_exact_node(
+		                        numa_node_id(), flags,
+		                        get_order(size)));
+		                        
 
 		if (unlikely(!page))
 			return NULL;
@@ -1498,7 +1509,7 @@ static int sba_map_sg_attrs(struct device *dev, struct scatterlist *sglist,
 	}
 	spin_unlock_irqrestore(&ioc->res_lock, flags);
 #endif
-
+if (ioc != NULL)
 	prefetch(ioc->res_hint);
 
 	/*
