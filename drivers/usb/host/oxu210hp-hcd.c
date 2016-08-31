@@ -806,8 +806,8 @@ static int qtd_fill(struct ehci_qtd *qtd, dma_addr_t buf, size_t len,
 		}
 
 		/* short packets may only terminate transfers */
-		if (count != len)
-			count -= (count % maxpacket);
+		if ((count != len) && (maxpacket !=0))
+			 count -= (count % maxpacket);
 	}
 	qtd->hw_token = cpu_to_le32((count << 16) | token);
 	qtd->length = count;
