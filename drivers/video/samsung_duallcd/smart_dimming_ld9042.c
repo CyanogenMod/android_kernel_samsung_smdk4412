@@ -569,7 +569,7 @@ u32 calc_gamma_table_22(struct str_smart_dim *smart, u32 gv, u8 result[])
 	u32 i, c;
 	u32 temp;
 	u32 lidx_22;
-	u32 dv[CI_MAX][IV_MAX];
+	u32 dv[CI_MAX+1][IV_MAX+1];
 	s16 gamma_22[CI_MAX][IV_MAX];
 	u16 offset;
 	u32(*calc_reg[IV_MAX])(int ci, u32 dv[CI_MAX][IV_MAX]) = {
@@ -657,7 +657,7 @@ u32 calc_gamma_table_19(struct str_smart_dim *smart, u32 gv, u8 result[])
 	u32 i, c;
 	u32 temp;
 	u32 lidx_19;
-	u32 dv[CI_MAX][IV_MAX];
+	u32 dv[CI_MAX+1][IV_MAX+1];
 	s16 gamma_19[CI_MAX][IV_MAX];
 	u16 offset;
 	u32(*calc_reg[IV_MAX])(int ci, u32 dv[CI_MAX][IV_MAX]) = {
