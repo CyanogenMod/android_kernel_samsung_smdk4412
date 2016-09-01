@@ -1316,7 +1316,7 @@ static DEVICE_ATTR(power_reduce, 0664, power_reduce_show,
 static ssize_t lcd_type_show(struct device *dev,
 	struct device_attribute *attr, char *buf)
 {
-	char temp[15];
+	char temp[16];
 #if defined(CONFIG_MACH_Q1_BD)
 	sprintf(temp, "SMD_AMS529HA01\n");
 #else

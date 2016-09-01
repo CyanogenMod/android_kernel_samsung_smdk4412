@@ -248,7 +248,7 @@ appldata_timer_handler(ctl_table *ctl, int write,
 			   void __user *buffer, size_t *lenp, loff_t *ppos)
 {
 	int len;
-	char buf[2];
+	char buf[3];
 
 	if (!*lenp || *ppos) {
 		*lenp = 0;

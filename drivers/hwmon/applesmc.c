@@ -772,7 +772,7 @@ static ssize_t applesmc_show_fan_speed(struct device *dev,
 {
 	int ret;
 	unsigned int speed = 0;
-	char newkey[5];
+	char newkey[12];
 	u8 buffer[2];
 
 	sprintf(newkey, fan_speed_fmt[to_option(attr)], to_index(attr));
@@ -792,7 +792,7 @@ static ssize_t applesmc_store_fan_speed(struct device *dev,
 {
 	int ret;
 	unsigned long speed;
-	char newkey[5];
+	char newkey[12];
 	u8 buffer[2];
 
 	if (strict_strtoul(sysfsbuf, 10, &speed) < 0 || speed >= 0x4000)

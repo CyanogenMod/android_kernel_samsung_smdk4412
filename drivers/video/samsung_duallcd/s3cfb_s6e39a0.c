@@ -821,7 +821,7 @@ static const struct backlight_ops s6e8ax0_backlight_ops  = {
 static ssize_t lcd_type_show(struct device *dev,
 	struct device_attribute *attr, char *buf)
 {
-	char temp[15];
+	char temp[16];
 	sprintf(temp, "SMD_AMS465GS0x\n");
 	strcat(buf, temp);
 	return strlen(buf);

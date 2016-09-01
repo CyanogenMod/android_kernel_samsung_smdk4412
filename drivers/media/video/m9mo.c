@@ -2041,8 +2041,8 @@ static int m9mo_get_sensor_fw_version(struct v4l2_subdev *sd)
 	int ois_ver = 0x00;
 	int parm_ver = 0x00;
 	int user_ver_temp;
-	char user_ver[20];
-	char sensor_ver[7];
+	char user_ver[21];
+	char sensor_ver[16];
 	int i = 0;
 
 	cam_err("E\n");

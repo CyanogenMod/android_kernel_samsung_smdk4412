@@ -857,7 +857,7 @@ device_attribute *attr, char *buf)
 {
 	struct lcd_info *lcd = dev_get_drvdata(dev);
 	struct ld9040_panel_data *pdata = lcd->lcd_pd->pdata;
-	char temp[15];
+	char temp[22];
 
 	switch (pdata->lcdtype) {
 	case LCDTYPE_SM2_A1:

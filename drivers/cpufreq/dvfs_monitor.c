@@ -171,7 +171,7 @@ static ssize_t dvfs_mon_read(struct file *file, char __user *buf,
 	unsigned long nanosec_rem;
 	int freq, prev_freq;
 	char cpu_status[NR_CPUS * 8 + 1];
-	char temp[3];
+	char temp[4];
 	int i;
 
 	wait_event_interruptible(dvfs_info->wait_queue,

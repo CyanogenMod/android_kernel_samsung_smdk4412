@@ -63,7 +63,7 @@ extern unsigned int lcdtype;
 static ssize_t lcdtype_show(struct device *dev,
 	struct device_attribute *attr, char *buf)
 {
-	char temp[15];
+	char temp[24];
 #if defined(CONFIG_FB_S5P_S6F1202A)
 	/*For P2*/
 	if (lcdtype == 0)

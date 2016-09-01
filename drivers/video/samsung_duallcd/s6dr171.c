@@ -341,7 +341,7 @@ static DEVICE_ATTR(power_reduce, 0664, power_reduce_show, power_reduce_store);
 static ssize_t lcd_type_show(struct device *dev,
 	struct device_attribute *attr, char *buf)
 {
-	char temp[15];
+	char temp[18];
 	sprintf(temp, "SMD_AMS480GZ01-0\n");
 	strcat(buf, temp);
 	return strlen(buf);
