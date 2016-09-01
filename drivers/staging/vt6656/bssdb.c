@@ -704,7 +704,8 @@ BOOL BSSbUpdateToBSSList(void *hDeviceContext,
 			jj++;
 		}
         }
-        pBSSList->ldBmAverRange = ldBmSum /jj;
+        (jj != 0) ?
+        pBSSList->ldBmAverRange = ldBmSum /jj : pBSSList->ldBmAverRange = ldBmSum / 1;
     }
 
     pBSSList->uIELength = uIELength;

@@ -635,7 +635,7 @@ u32 calc_gamma_table_ea8061(struct str_smart_dim *smart, u32 gv, u8 result[], u8
 	u32 i, c, t1;
 	u32 temp;
 	u32 lidx;
-	u32 dv[CI_MAX][IV_MAX];
+	u32 dv[CI_MAX+1][IV_MAX+1];
 	s16 gamma[CI_MAX][IV_MAX];
 	u16 offset;
 	u32(*calc_reg[IV_MAX])(int ci, u32 dv[CI_MAX][IV_MAX], u32 adjust_volt[CI_MAX][AD_IVMAX]) = {
@@ -727,7 +727,7 @@ u32 calc_gamma_table_190_ea8061(struct str_smart_dim *smart, u32 gv, u8 result[]
 	u32 i, c, t1;
 	u32 temp;
 	u32 lidx_215_190;
-	u32 dv[CI_MAX][IV_MAX];
+	u32 dv[CI_MAX+1][IV_MAX+1];
 	s16 gamma_215_190[CI_MAX][IV_MAX];
 	u16 offset;
 	u32(*calc_reg[IV_MAX])(int ci, u32 dv[CI_MAX][IV_MAX], u32 adjust_volt[CI_MAX][AD_IVMAX]) = {
@@ -826,7 +826,7 @@ u32 calc_gamma_table_20_100_ea8061(struct str_smart_dim *smart, u32 gv, u8 resul
 	u32 i, c, t1;
 	u32 temp;
 	u32 lidx_110;
-	u32 dv[CI_MAX][IV_MAX];
+	u32 dv[CI_MAX+1][IV_MAX+1];
 	s16 gamma_110[CI_MAX][IV_MAX];
 	u16 offset;
 	u32(*calc_reg[IV_MAX])(int ci, u32 dv[CI_MAX][IV_MAX], u32 adjust_volt[CI_MAX][AD_IVMAX]) = {
