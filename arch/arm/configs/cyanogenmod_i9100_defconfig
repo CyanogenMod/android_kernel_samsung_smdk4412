@@ -1405,15 +1405,15 @@ CONFIG_WLAN=y
 # CONFIG_USB_NET_RNDIS_WLAN is not set
 CONFIG_WIFI_CONTROL_FUNC=y
 # CONFIG_ATH_COMMON is not set
-CONFIG_BCM4330=m
+CONFIG_BCM4330=y
 # CONFIG_BCM4334 is not set
 # CONFIG_BCM4335 is not set
 # CONFIG_BCM4339 is not set
 # CONFIG_BCM4354 is not set
 # CONFIG_BCM43241 is not set
 CONFIG_BROADCOM_WIFI=y
-CONFIG_BCMDHD_FW_PATH="/system/etc/firmware/fw_bcmdhd.bin"
-CONFIG_BCMDHD_NVRAM_PATH="/system/etc/wifi/bcmdhd.cal"
+CONFIG_BCMDHD_FW_PATH="/system/etc/wifi/bcmdhd_sta.bin"
+CONFIG_BCMDHD_NVRAM_PATH="/system/etc/wifi/nvram_net.txt"
 CONFIG_BROADCOM_WIFI_RESERVED_MEM=y
 CONFIG_WLAN_REGION_CODE=100
 # CONFIG_HOSTAP is not set
