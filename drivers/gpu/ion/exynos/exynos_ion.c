@@ -1054,8 +1054,9 @@ static struct ion_heap *__ion_heap_create(struct ion_platform_heap *heap_data)
 		heap = ion_exynos_heap_create(heap_data);
 		break;
 	case ION_HEAP_TYPE_EXYNOS_CONTIG:
-		heap = ion_exynos_contig_heap_create(heap_data);
-		break;
+		pr_err("%s: Heap type is disabled: %d\n", __func__,
+				heap_data->type);
+		return ERR_PTR(-EINVAL);
 	case ION_HEAP_TYPE_EXYNOS_USER:
 		heap = ion_exynos_user_heap_create(heap_data);
 		break;
@@ -1086,7 +1087,8 @@ void __ion_heap_destroy(struct ion_heap *heap)
 		ion_exynos_heap_destroy(heap);
 		break;
 	case ION_HEAP_TYPE_EXYNOS_CONTIG:
-		ion_exynos_contig_heap_destroy(heap);
+		pr_err("%s: Heap type is disabled: %d\n", __func__,
+				heap->type);
 		break;
 	case ION_HEAP_TYPE_EXYNOS_USER:
 		ion_exynos_user_heap_destroy(heap);
