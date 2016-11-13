@@ -1,6 +1,10 @@
 #ifndef __MDNIE_H__
 #define __MDNIE_H__
 
+#ifdef CONFIG_HAS_EARLYSUSPEND
+#include <linux/earlysuspend.h>
+#endif
+
 #define END_SEQ			0xffff
 
 enum MODE {
@@ -115,6 +119,12 @@ struct mdnie_info {
 	unsigned int negative;
 #ifdef CONFIG_HAS_EARLYSUSPEND
 	struct early_suspend    early_suspend;
+#endif
+#ifdef CONFIG_FB_MDNIE_RGB_ADJUST
+	u8 r_adj;
+	u8 g_adj;
+	u8 b_adj;
+	bool rgb_adj_enable;
 #endif
 };
 
