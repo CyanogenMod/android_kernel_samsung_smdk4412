@@ -116,6 +116,12 @@ struct mdnie_info {
 #ifdef CONFIG_HAS_EARLYSUSPEND
 	struct early_suspend    early_suspend;
 #endif
+#ifdef CONFIG_FB_MDNIE_RGB_ADJUST
+	u8 r_adj;
+	u8 g_adj;
+	u8 b_adj;
+	bool rgb_adj_enable;
+#endif
 };
 
 extern struct mdnie_info *g_mdnie;
