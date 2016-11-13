@@ -117,6 +117,13 @@ config FB_MDNIE_PWM
 	---help---
 	This enables support for Samsung MDNIE feature
 
+config FB_MDNIE_RGB_ADJUST
+	bool "Samsung MDNIE RGB adjustment support"
+	depends on FB_S5P_MDNIE
+	default n
+	---help---
+	This enables support for scaling the display's RGB values in hardware
+
 config FB_S5P_MIPI_DSIM
 	bool "Samsung MIPI DSIM"
 	depends on FB_S5P
