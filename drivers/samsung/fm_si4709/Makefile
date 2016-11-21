@@ -17,6 +17,7 @@ $(MOD_NAME)-y := Si4705_dev.o \
 				Si4705_main.o
 else
 MOD_NAME = Si4709_driver
+CFLAGS_MODULE += -mlong-calls -fno-pic
 obj-$(CONFIG_FM_SI4709) := $(MOD_NAME).o
 $(MOD_NAME)-y := Si4709_dev.o \
 				Si4709_i2c_drv.o \
