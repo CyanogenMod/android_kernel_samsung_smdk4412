@@ -3,24 +3,6 @@
 
 #include "mdnie.h"
 
-
-static const unsigned short tune_cyanogenmod[] = {
-	/*start */
-	0x0001, 0x0000, /* */
-	0x002c, 0x0fff, /*DNR bypass 0x003C */
-	0x002d, 0x1900, /*DNR bypass 0x0a08 */
-	0x002e, 0x0000, /*DNR bypass 0x1010 */
-	0x002f, 0x0fff, /*DNR bypass 0x0400 */
-	0x003A, 0x0009, /*HDTR (DE off)(CS only 9) */
-	0x003B, 0x0000, /*DE SHARPNESS */
-	0x003C, 0x0000, /*NOISE LEVEL */
-	0x003F, 0x0000, /*CS GAIN */
-	0x0042, 0x003f, /*DE TH (MAX DIFF) */
-	0x0028, 0x0000, /*Register Mask */
-	/*end */
-	END_SEQ, 0x0000,
-};
-
 static const unsigned short tune_dynamic_gallery[] = {
 	/*start U1 dynamic gallery */
 	0x0001, 0x0041, /*SCR + PCC */
@@ -1030,7 +1012,7 @@ struct mdnie_tunning_info etc_table[CABC_MAX][OUTDOOR_MAX][TONE_MAX] = {
 struct mdnie_tunning_info tunning_table[CABC_MAX][MODE_MAX][SCENARIO_MAX] = {
 	{
 		{
-			{"CYANOGENMOD",		tune_cyanogenmod},
+			{"DYNAMIC_UI",		tune_dynamic_ui},
 			{"DYNAMIC_UI",		tune_dynamic_ui},
 			{"DYNAMIC_VIDEO",	tune_dynamic_video},
 			{"DYNAMIC_VIDEO",	tune_dynamic_video},
@@ -1040,7 +1022,7 @@ struct mdnie_tunning_info tunning_table[CABC_MAX][MODE_MAX][SCENARIO_MAX] = {
 			{"DYNAMIC_GALLERY",	tune_dynamic_gallery},
 			{"DYNAMIC_VT",		tune_dynamic_vt},
 		}, {
-			{"CYANOGENMOD",		tune_cyanogenmod},
+			{"STANDARD_UI",		tune_standard_ui},
 			{"STANDARD_UI",		tune_standard_ui},
 			{"STANDARD_VIDEO",	tune_standard_video},
 			{"STANDARD_VIDEO",	tune_standard_video},
@@ -1050,7 +1032,7 @@ struct mdnie_tunning_info tunning_table[CABC_MAX][MODE_MAX][SCENARIO_MAX] = {
 			{"STANDARD_GALLERY",	tune_standard_gallery},
 			{"STANDARD_VT",		tune_standard_vt},
 		}, {
-			{"CYANOGENMOD",		tune_cyanogenmod},
+			{"NATURAL_UI",		tune_natural_ui},
 			{"NATURAL_UI",		tune_natural_ui},
 			{"NATURAL_VIDEO",	tune_natural_video},
 			{"NATURAL_VIDEO",	tune_natural_video},
@@ -1060,7 +1042,7 @@ struct mdnie_tunning_info tunning_table[CABC_MAX][MODE_MAX][SCENARIO_MAX] = {
 			{"NATURAL_GALLERY",	tune_natural_gallery},
 			{"NATURAL_VT",		tune_natural_vt},
 		}, {
-			{"CYANOGENMOD",		tune_cyanogenmod},
+			{"MOVIE_UI",		tune_movie_ui},
 			{"MOVIE_UI",		tune_movie_ui},
 			{"MOVIE_VIDEO",		tune_movie_video},
 			{"MOVIE_VIDEO",		tune_movie_video},
