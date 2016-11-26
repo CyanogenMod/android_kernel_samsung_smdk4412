@@ -23,6 +23,23 @@ static inline u8 mdnie_scale_value(u8 val, u8 adj) {
 	return big / 255;
 }
 
+#if defined(CONFIG_CPU_EXYNOS4210)
+static const unsigned short default_scr_values[] = {
+	0x00c8, 0x0000,	/*kb R	SCR */
+	0x00c9, 0x0000,	/*gc R */
+	0x00ca, 0xafaf,	/*rm R */
+	0x00cb, 0xafaf,	/*yw R */
+	0x00cc, 0x0000,	/*kb G */
+	0x00cd, 0xb7b7,	/*gc G */
+	0x00ce, 0x0000,	/*rm G */
+	0x00cf, 0xb7b7,	/*yw G */
+	0x00d0, 0x00bc,	/*kb B */
+	0x00d1, 0x00bc,	/*gc B */
+	0x00d2, 0x00bc,	/*rm B */
+	0x00d3, 0x00bc,	/*yw B */
+	END_SEQ, 0x0000,
+};
+#else
 static const unsigned short default_scr_values[] = {
 	0x00e1, 0xff00, /*SCR RrCr*/
 	0x00e2, 0x00ff, /*SCR RgCg*/
@@ -38,6 +55,7 @@ static const unsigned short default_scr_values[] = {
 	0x00ec, 0x00ff, /*SCR KbWb*/
 	END_SEQ, 0x0000,
 };
+#endif
 
 u16 mdnie_rgb_hook(struct mdnie_info *mdnie, int reg, int val) {
 	u8 adj = 255, c1, c2;
