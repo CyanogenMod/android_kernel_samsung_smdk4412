@@ -89,6 +89,12 @@ config BROADCOM_WIFI_RESERVED_MEM
 	---help---
 	  This is a configuration for broadcom WLAN driver.
 
+config WIFI_BROADCOM_COB
+        bool "BROADCOM WIFI COB"
+        depends on (BCM4334)
+        ---help---
+          This is a configuration for broadcom WIFI COB Type.
+
 config BCM4335BT
 	bool "BROADCOM BTLOCK Enable"
 	depends on BCM4335
